@@ -1,6 +1,6 @@
 #!/bin/bash
 clear
+PATH="$PATH:$HOME/bin"
 wget https://github.com/mebabo1/menano/releases/download/bininstall/bin.tar.gz
 chmod +x bin.tar.gz
 tar xf bin.tar.gz
-PATH="$PATH:$HOME/bin"
