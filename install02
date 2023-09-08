@@ -1,6 +1,6 @@
 #!/bin/bash
 clear
-wget https://github.com/mebabo1/menano/blob/File/bin.tar.gz
+wget https://github.com/mebabo1/menano/releases/download/untagged-b2adee86ec91d4984b86/bin.tar.gz
 chmod +x bin.tar.gz
 tar xf bin.tar.gz
 PATH="$PATH:$HOME/bin"
