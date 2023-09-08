@@ -1,6 +1,6 @@
 #!/bin/bash
 clear
-wget https://github.com/mebabo1/menano/blob/File/bin.tar.gz
-tar xf bin.tar.gz
+wget https://github.com/mebabo1/menano/blob/File/bin.tar.xz
+tar xf bin.tar.xz
 PATH="$PATH:$HOME/bin"
-rm -rf bin.tar.gz
+rm -rf bin.tar.xz
