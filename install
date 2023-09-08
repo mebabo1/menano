@@ -1,0 +1,17 @@
+#!/bin/bash
+
+termux-setup-storage
+
+pkg update -y
+
+pkg install x11-repo && pkg install xorg-server-xvfb -y && cd ~/storage/downloads && dpkg -i ./*.deb
+
+apt -f install -y && cd
+
+pkg install nano pulseaudio -y
+
+echo 'pulseaudio --start --load="module-native-protocol-tcp auth-ip-acl=127.0.0.1 auth-anonymous=1" --exit-idle-time=-1' >> ~/.bashrc
+source ~/.bashrc
+
+echo "allow-external-apps = true" >> ~/.termux/termux.properties
+echo "hide-soft-keyboard-on-startup = true" >> ~/.termux/termux.properties
