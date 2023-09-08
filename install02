@@ -1,10 +1,8 @@
 #!/bin/bash
 clear
-wget https://github.com/mebabo1/menano/blob/File/.profile
-mkdir bin
+wget https://github.com/mebabo1/menano/blob/File/bin.zip
+unzip bin.zip
 cd bin
-wget https://github.com/mebabo1/menano/blob/File/x11
-wget https://github.com/mebabo1/menano/blob/File/x22
 chmod +x x11
 chmod +x x22
 cd
