@@ -1,9 +1,8 @@
 #!/bin/bash
 clear
-wget https://github.com/mebabo1/menano/blob/File/bin.zip
-unzip bin.zip
-cd bin
-chmod +x x11
-chmod +x x22
+cd /sdcard/download/
+wget https://github.com/mebabo1/menano/blob/File/bin.tar.gz
+mv bin.tar.gz bin.tar.gz
 cd
+tar xf bin.tar.gz
 PATH="$PATH:$HOME/bin"
