@@ -1,6 +1,9 @@
 #!/bin/bash
 clear
+echo "PATH."
 PATH="$PATH:$HOME/bin"
+echo "download bin.tar.gz."
 wget https://github.com/mebabo1/menano/releases/download/bininstall/bin.tar.gz
 chmod +x bin.tar.gz
 tar xf bin.tar.gz
+rm -rf bin.tar.gz install02
