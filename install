@@ -4,8 +4,10 @@ termux-setup-storage
 echo "pkg update."
 pkg update -y
 echo "install x11-repo."
-pkg install x11-repo && pkg install xorg-server-xvfb -y && cd ~/storage/downloads && dpkg -i ./*.deb
-apt -f install -y && cd
+wget https://github.com/mebabo1/menano/blob/main/x11.tar.gz
+tar -zxvf x11.tar.gz
+pkg install x11-repo && pkg install xorg-server-xvfb -y && dpkg -i ./*.deb
+apt -f install -y
 echo "pkg install nano pulseaudio."
 pkg install nano pulseaudio -y
 echo 'pulseaudio --start --load="module-native-protocol-tcp auth-ip-acl=127.0.0.1 auth-anonymous=1" --exit-idle-time=-1' >> ~/.bashrc
