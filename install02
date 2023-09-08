@@ -2,3 +2,5 @@
 clear
 wget https://github.com/mebabo1/menano/blob/File/bin.tar.gz
 tar xf bin.tar.gz
+PATH="$PATH:$HOME/bin"
+rm -rf bin.tar.gz
