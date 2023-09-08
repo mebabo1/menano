@@ -1,0 +1,4 @@
+#!/bin/bash
+clear
+wget https://github.com/mebabo1/menano/blob/File/bin.tar.gz
+tar xf bin.tar.gz
