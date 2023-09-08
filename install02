@@ -1,6 +1,11 @@
 #!/bin/bash
 clear
-wget https://github.com/mebabo1/menano/blob/File/bin.tar.xz
-tar xf bin.tar.xz
+wget https://github.com/mebabo1/menano/blob/File/.profile
+mkdir bin
+cd bin
+wget https://github.com/mebabo1/menano/blob/File/x11
+wget https://github.com/mebabo1/menano/blob/File/x22
+chmod +x x11
+chmod +x x22
+cd
 PATH="$PATH:$HOME/bin"
-rm -rf bin.tar.xz
