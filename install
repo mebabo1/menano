@@ -1,4 +1,5 @@
 #!/bin/bash
+clear
 termux-setup-storage
 pkg update -y
 pkg install x11-repo && pkg install xorg-server-xvfb -y && cd ~/storage/downloads && dpkg -i ./*.deb
