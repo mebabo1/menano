@@ -5,3 +5,6 @@ clear
 rm -rf bin start-ubuntu22.sh
 wget https://github.com/mebabo1/menano/releases/download/bininstall/bin01.tar.gz
 tar xf bin01.tar.gz
+rm -rf bin01.tar.gz
+bash ubuntu22.sh
+apt update
