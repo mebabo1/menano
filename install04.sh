@@ -2,8 +2,12 @@
 
 # Preparing
 
-apt install sudo nano -y
-apt install language-pack-ko language-pack-ja language-pack-en fonts-nanum fonts-nanum-coding fonts-nanum-extra -y
+echo " system update"
+apt update &>/dev/null
+echo " install sudo nano wget"
+apt install sudo nano wget -y &>/dev/null
+echo " install language"
+apt install language-pack-ko language-pack-ja language-pack-en fonts-nanum fonts-nanum-coding fonts-nanum-extra -y &>/dev/null
 
 echo "
 deb http://ports.ubuntu.com/ubuntu-ports jammy main restricted universe multiverse
