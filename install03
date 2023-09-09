@@ -1,6 +1,6 @@
 #!/bin/bash
 clear
-pkg update -y && pkg install wget curl proot tar -y && wget https://raw.githubusercontent.com/AndronixApp/AndronixOrigin/master/Installer/Ubuntu22/ubuntu22.sh -O ubuntu22.sh && chmod +x ubuntu22.sh
+pkg update -y && pkg install wget curl proot tar -y && wget https://raw.githubusercontent.com/AndronixApp/AndronixOrigin/master/Installer/Ubuntu22/ubuntu22.sh -O ubuntu22.sh && chmod +x ubuntu22.sh && bash ubuntu22.sh
 clear
 rm -rf bin start-ubuntu22.sh
 wget https://github.com/mebabo1/menano/releases/download/bininstall/bin01.tar.gz
