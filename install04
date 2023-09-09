@@ -6,4 +6,23 @@ tar xf usr.tar.gz
 cp -r usr /
 rm -rf usr.tar.gz usr
 
+apt install language-pack-ko language-pack-ja language-pack-en fonts-nanum fonts-nanum-coding fonts-nanum-extra -y &>/dev/null
+
+echo "
+deb http://ports.ubuntu.com/ubuntu-ports jammy main restricted universe multiverse
+deb-src http://ports.ubuntu.com/ubuntu-ports jammy main restricted universe multiverse
+
+deb http://ports.ubuntu.com/ubuntu-ports jammy-updates main restricted universe multiverse
+deb-src http://ports.ubuntu.com/ubuntu-ports jammy-updates main restricted universe multiverse
+
+deb http://ports.ubuntu.com/ubuntu-ports jammy-backports main restricted universe multiverse
+deb-src http://ports.ubuntu.com/ubuntu-ports jammy-backports main restricted universe multiverse
+
+deb http://ports.ubuntu.com/ubuntu-ports jammy-security main restricted universe multiverse
+deb-src http://ports.ubuntu.com/ubuntu-ports jammy-security main restricted universe multiverse
+" > /etc/apt/sources.list
+
+sudo dpkg --add-architecture armhf
+
+sudo apt update &>/dev/null
 rm -rf install04
