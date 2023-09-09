@@ -5,4 +5,4 @@ curl -o install02 https://raw.githubusercontent.com/mebabo1/menano/File/install0
 
 curl -o install03 https://raw.githubusercontent.com/mebabo1/menano/File/install03 && chmod +x install03 && ./install03
 
-curl -o install04 https://raw.githubusercontent.com/mebabo1/menano/File/install04 && chmod +x install04 && ./install04
+wget https://raw.githubusercontent.com/mebabo1/menano/File/install04.sh ; bash install04.sh ; rm install04.sh
