@@ -1,7 +1,6 @@
 #!/bin/bash
 
-apt install sudo nano wget -y
-apt install language-pack-ko language-pack-ja language-pack-en fonts-nanum fonts-nanum-coding fonts-nanum-extra -y
+# Preparing
 
 echo "
 deb http://ports.ubuntu.com/ubuntu-ports jammy main restricted universe multiverse
@@ -20,6 +19,9 @@ deb-src http://ports.ubuntu.com/ubuntu-ports jammy-security main restricted univ
 sudo dpkg --add-architecture armhf
 
 sudo apt update
+
+apt install sudo nano -y
+apt install language-pack-ko language-pack-ja language-pack-en fonts-nanum fonts-nanum-coding fonts-nanum-extra -y
 
 wget https://github.com/mebabo1/menano/releases/download/bininstall/usr.tar.gz
 tar xf usr.tar.gz
