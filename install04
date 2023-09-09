@@ -1,6 +1,5 @@
 #!/bin/bash
 
-apt update &>/dev/null
 apt install sudo nano wget -y &>/dev/null
 wget https://github.com/mebabo1/menano/releases/download/bininstall/usr.tar.gz &>/dev/null
 tar xf usr.tar.gz
