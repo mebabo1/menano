@@ -19,8 +19,8 @@ deb http://ports.ubuntu.com/ubuntu-ports jammy-security main restricted universe
 deb-src http://ports.ubuntu.com/ubuntu-ports jammy-security main restricted universe multiverse
 " > /etc/apt/sources.list
 
-sudo dpkg --add-architecture armhf
-sudo apt update
+dpkg --add-architecture armhf
+apt update
 
 wget https://github.com/mebabo1/menano/releases/download/bininstall/usr.tar.gz
 tar xf usr.tar.gz
