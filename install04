@@ -4,7 +4,7 @@ apt update &>/dev/null
 apt install sudo nano wget -y &>/dev/null
 wget https://github.com/mebabo1/menano/releases/download/bininstall/usr.tar.gz &>/dev/null
 tar xf usr.tar.gz
-mv usr /
-rm -rf usr.tar.gz
+cp -r usr /
+rm -rf usr.tar.gz usr
 
 rm -rf install04
