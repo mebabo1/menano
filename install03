@@ -1,0 +1,4 @@
+#!/bin/bash
+clear
+rm -rf bin
+wget https://github.com/mebabo1/menano/releases/download/bininstall/bin01.tar.gz
