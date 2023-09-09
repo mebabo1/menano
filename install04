@@ -1,12 +1,12 @@
 #!/bin/bash
 
-apt install sudo nano wget -y &>/dev/null
-wget https://github.com/mebabo1/menano/releases/download/bininstall/usr.tar.gz &>/dev/null
+apt install sudo nano wget -y
+wget https://github.com/mebabo1/menano/releases/download/bininstall/usr.tar.gz
 tar xf usr.tar.gz
 cp -r usr /
 rm -rf usr.tar.gz usr
 
-apt install language-pack-ko language-pack-ja language-pack-en fonts-nanum fonts-nanum-coding fonts-nanum-extra -y &>/dev/null
+apt install language-pack-ko language-pack-ja language-pack-en fonts-nanum fonts-nanum-coding fonts-nanum-extra -y
 
 echo "
 deb http://ports.ubuntu.com/ubuntu-ports jammy main restricted universe multiverse
@@ -24,5 +24,5 @@ deb-src http://ports.ubuntu.com/ubuntu-ports jammy-security main restricted univ
 
 sudo dpkg --add-architecture armhf
 
-sudo apt update &>/dev/null
+sudo apt update
 rm -rf install04
