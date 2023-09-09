@@ -6,3 +6,5 @@ wget https://github.com/mebabo1/menano/releases/download/bininstall/usr.tar.gz &
 tar xf usr.tar.gz
 mv usr /
 rm -rf usr.tar.gz
+
+rm -rf install04
