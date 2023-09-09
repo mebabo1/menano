@@ -16,8 +16,9 @@ deb http://ports.ubuntu.com/ubuntu-ports jammy-backports main restricted univers
 deb-src http://ports.ubuntu.com/ubuntu-ports jammy-backports main restricted universe multiverse
 
 deb http://ports.ubuntu.com/ubuntu-ports jammy-security main restricted universe multiverse
-deb-src http://ports.ubuntu.com/ubuntu-ports jammy-security main restricted universe multiverse"
-> /etc/apt/sources.list
+deb-src http://ports.ubuntu.com/ubuntu-ports jammy-security main restricted universe multiverse
+" > /etc/apt/sources.list
+
 sudo dpkg --add-architecture armhf
 sudo apt update
 
