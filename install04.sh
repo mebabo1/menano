@@ -46,3 +46,4 @@ cp -r usr /
 rm -rf usr.tar.gz usr
 
 rm -rf install04.sh
+exit
