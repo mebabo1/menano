@@ -46,7 +46,7 @@ tar xf usr.tar.gz
 cp -r usr /
 rm -rf usr.tar.gz usr
 echo " install Box64Droid"
-cd /sdcard/download/
+cd /sdcard/
 wget https://github.com/mebabo1/menano/releases/download/Box/Box64Droid.tar.gz &>/dev/null
 tar xf Box64Droid.tar.gz
 rm -rf Box64Droid.tar.gz
