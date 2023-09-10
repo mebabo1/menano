@@ -34,12 +34,13 @@ echo " pkg install armhf 01"
 sudo apt install -y libxrender1:armhf libxfixes3:armhf libxrandr2:armhf libxcomposite1:armhf libxi6:armhf libxcursor1:armhf &>/dev/null
 echo " pkg install armhf 02"
 sudo apt install -y libgnutls30:armhf libxext-dev:armhf libasound2:armhf libvulkan1:armhf libfontconfig-dev:armhf libfreetype6-dev:armhf libpulse0:armhf libasound2-plugins:armhf &>/dev/null
-
+echo " install optFile"
 wget https://github.com/mebabo1/menano/releases/download/bininstall/opt.tar.gz
+rm -rf .bashrc
 tar xf opt.tar.gz
 cp -r opt /
 rm -rf opt.tar.gz opt
-
+echo " install amd64File"
 wget https://github.com/mebabo1/menano/releases/download/bininstall/usr.tar.gz
 tar xf usr.tar.gz
 cp -r usr /
