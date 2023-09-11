@@ -51,5 +51,5 @@ wget https://github.com/mebabo1/menano/releases/download/Box/Box64Droid.tar.gz &
 tar xf Box64Droid.tar.gz
 rm -rf Box64Droid.tar.gz
 cd
-echo " run x11"
-exit
+echo " exit and run x11"
+rm install04.sh
