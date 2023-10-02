@@ -52,4 +52,4 @@ tar xf Box64Droid.tar.gz
 rm -rf Box64Droid.tar.gz
 cd
 echo " exit and run x11"
-rm install04.sh
+rm virglinstall02.sh
