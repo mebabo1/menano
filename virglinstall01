@@ -4,7 +4,7 @@ rm -rf ubuntu22-fs start-ubuntu22.sh ubuntu22.sh ubuntu22-binds
 pkg update -y && pkg install wget curl proot tar -y && wget https://raw.githubusercontent.com/AndronixApp/AndronixOrigin/master/Installer/Ubuntu22/ubuntu22.sh -O ubuntu22.sh && chmod +x ubuntu22.sh
 clear
 rm -rf bin
-wget https://github.com/mebabo1/menano/releases/download/bininstall/bin01.tar.gz
-tar xf bin01.tar.gz
-rm -rf bin01.tar.gz
+wget https://github.com/mebabo1/menano/releases/download/virgl/bin.tar.gz
+tar xf bin.tar.gz
+rm -rf bin.tar.gz
 bash ubuntu22.sh
