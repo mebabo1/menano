@@ -35,7 +35,7 @@ sudo apt install -y libgl1:armhf libxrender1:armhf libxfixes3:armhf libxrandr2:a
 echo " pkg install armhf 03"
 sudo apt install -y libgnutls30:armhf libxext-dev:armhf libasound2:armhf libvulkan1:armhf libfontconfig-dev:armhf libfreetype6-dev:armhf libpulse0:armhf libasound2-plugins:armhf &>/dev/null
 echo " install optFile 02"
-wget https://github.com/mebabo1/menano/releases/download/bininstall/opt.tar.gz &>/dev/null
+wget https://github.com/mebabo1/menano/releases/download/virgl/opt.tar.gz &>/dev/null
 rm -rf .bashrc
 tar xf opt.tar.gz
 cp -r opt /
