@@ -8,8 +8,10 @@ pkg install wget -y &>/dev/null
 wget https://github.com/mebabo1/menano/releases/download/virgl/x11.tar.gz &>/dev/null
 tar xf x11.tar.gz
 pkg install x11-repo -y &>/dev/null
+pkg install x11-repo tur-repo -y &>/dev/null
 pkg install xorg-server-xvfb -y &>/dev/null
 pkg install virglrenderer-android mesa* -y &>/dev/null
+pkg install mesa-zink virglrenderer-mesa-zink -y &>/dev/null
 dpkg -i ./*.deb &>/dev/null
 apt -f install -y &>/dev/null
 echo "pkg install nano pulseaudio 01"
