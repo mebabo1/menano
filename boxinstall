@@ -28,3 +28,8 @@ wget https://ryanfortner.github.io/box64-debs/box64.list -O /etc/apt/sources.lis
 wget -qO- https://ryanfortner.github.io/box64-debs/KEY.gpg | gpg --dearmor -o /etc/apt/trusted.gpg.d/box64-debs-archive-keyring.gpg
 apt update 
 apt install box64-android -y
+
+cd /usr/local/bin
+cp -r box64 /sdcard/download/
+cp -r box86 /sdcard/download/
+cd
