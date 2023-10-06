@@ -27,8 +27,9 @@ pkg install proot-distro proot termux-x11-nightly wget git pulseaudio -y > /dev/
 termux-setup-storage > /dev/null 2>&1
 proot-distro install debian > /dev/null 2>&1
 wget https://raw.githubusercontent.com/mebabo1/menano/File/x11 > /dev/null 2>&1
-chmod +x x11 > /dev/null 2>&1
-cp -r x11 /data/data/com.termux/files/usr/bin > /dev/null 2>&1
+wget https://raw.githubusercontent.com/mebabo1/menano/File/start-droidbox > /dev/null 2>&1
+chmod +x start-droidbox && chmod +x x11 > /dev/null 2>&1
+cp -r start-droidbox x11 /data/data/com.termux/files/usr/bin > /dev/null 2>&1
 rm -rf x11 > /dev/null 2>&1
 
 # Countdown timer synchronized with execution
