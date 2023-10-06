@@ -26,7 +26,7 @@ apt install zlib1g-dev:arm64 libexpat1-dev:arm64 libdrm-dev:arm64 libx11-dev:arm
 cp /usr/include/libdrm/drm.h /usr/include/libdrm/drm_mode.h /usr/include/
 
 # Download mesa
-BUILD_PREFIX=~/Desktop
+BUILD_PREFIX=~/root
 MESA_PREFIX=${BUILD_PREFIX}/mesa-23.2.1
 
 wget --continue --directory-prefix ${BUILD_PREFIX}  https://archive.mesa3d.org/mesa-23.2.1.tar.xz
