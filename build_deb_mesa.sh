@@ -27,10 +27,10 @@ cp /usr/include/libdrm/drm.h /usr/include/libdrm/drm_mode.h /usr/include/
 
 # Download mesa
 BUILD_PREFIX=~/Desktop
-MESA_PREFIX=${BUILD_PREFIX}/mesa-main
+MESA_PREFIX=${BUILD_PREFIX}/mesa-23.2.1
 
-wget --continue --directory-prefix ${BUILD_PREFIX} https://gitlab.freedesktop.org/mesa/mesa/-/archive/main/mesa-main.tar.gz
-tar -xf ${BUILD_PREFIX}/*.tar.gz --directory ${BUILD_PREFIX}
+wget --continue --directory-prefix ${BUILD_PREFIX}  https://archive.mesa3d.org/mesa-23.2.1.tar.xz
+tar -xf ${BUILD_PREFIX}/*.tar.xz --directory ${BUILD_PREFIX}
 
 # Set env var
 
@@ -59,14 +59,19 @@ endian = 'little'
 
 # Build mesa 
 cd ${MESA_PREFIX}
+wget https://raw.githubusercontent.com/eirkkk/Droidbox/main/wsi_common_x11.c
+wget https://raw.githubusercontent.com/eirkkk/Droidbox/main/wsi-termux-x11-v3.patch
+git apply -v wsi-termux-x11-v3.patch
+rm -rf src/vulkan/wsi/wsi_common_x11.c
+cp -r wsi_common_x11.c src/vulkan/wsi/
 
-meson build64/ --prefix /usr --libdir lib/aarch64-linux-gnu/ -D platforms=x11 -D gallium-drivers=freedreno -D vulkan-drivers=freedreno -D freedreno-kmds=kgsl -D dri3=enabled -D buildtype=release -D glx=disabled -D egl=disabled -D gles1=disabled -D gles2=disabled -D gallium-xa=disabled -D opengl=false -D shared-glapi=false -D b_lto=true -D b_ndebug=true
-meson compile -C build64/
-meson install -C build64/ --destdir ${MESA_64}
+meson  build64/ --prefix /usr --libdir lib/aarch64-linux-gnu/ -D platforms=x11,wayland -D gallium-drivers=freedreno -D vulkan-drivers=freedreno -D freedreno-kmds=msm,kgsl -D dri3=enabled -D buildtype=release -D glx=disabled -D egl=disabled -D gles1=disabled -D gles2=disabled -D gallium-xa=disabled -D opengl=false -D shared-glapi=disabled -D b_lto=true -D b_ndebug=true -D cpp_rtti=false -D gbm=disabled -D llvm=disabled -D shared-llvm=disabled -D xmlconfig=disabled
+meson  compile -C build64/
+meson  install -C build64/ --destdir ${MESA_64}
 
-meson build32/ --cross-file arm.txt --prefix /usr --libdir lib/arm-linux-gnueabihf/ -D platforms=x11 -D gallium-drivers=freedreno -D vulkan-drivers=freedreno -D freedreno-kmds=kgsl -D dri3=enabled -D buildtype=release -D glx=disabled -D egl=disabled -D gles1=disabled -D gles2=disabled -D gallium-xa=disabled -D opengl=false -D shared-glapi=false -D b_lto=true -D b_ndebug=true
-meson compile -C build32/
-meson install -C build32/ --destdir ${MESA_32}
+meson  build32/ --cross-file arm.txt --prefix /usr --libdir lib/arm-linux-gnueabihf/ -D platforms=x11,wayland -D gallium-drivers=freedreno -D vulkan-drivers=freedreno -D freedreno-kmds=msm,kgsl -D dri3=enabled -D buildtype=release -D glx=disabled -D egl=disabled -D gles1=disabled -D gles2=disabled -D gallium-xa=disabled -D opengl=false -D shared-glapi=disabled -D b_lto=true -D b_ndebug=true -D cpp_rtti=false -D gbm=disabled -D llvm=disabled -D shared-llvm=disabled -D xmlconfig=disabled
+meson  compile -C build32/
+meson  install -C build32/ --destdir ${MESA_32}
 
 # Build deb64
 cd ${BUILD_PREFIX}
