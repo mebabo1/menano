@@ -25,7 +25,8 @@ echo "Executing... Please wait."
 pkg install x11-repo -y > /dev/null 2>&1
 pkg install proot-distro proot termux-x11-nightly wget git pulseaudio -y > /dev/null 2>&1
 termux-setup-storage > /dev/null 2>&1
-wget https://raw.githubusercontent.com/AndronixApp/AndronixOrigin/master/Installer/Debian/debian.sh -O debian.sh && chmod +x debian.sh > /dev/null 2>&1
+wget https://raw.githubusercontent.com/AndronixApp/AndronixOrigin/master/Installer/Debian/debian.sh -O debian.sh > /dev/null 2>&1
+chmod +x debian.sh > /dev/null 2>&1
 wget https://raw.githubusercontent.com/mebabo1/menano/File/x11 > /dev/null 2>&1
 chmod +x x11 > /dev/null 2>&1
 cp -r x11 /data/data/com.termux/files/usr/bin > /dev/null 2>&1
