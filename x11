@@ -10,7 +10,7 @@ then
 	echo -e "Termux-x11 started"
 	echo ""
 	echo "Starting droidbox..."
-	./start-debian.sh
+	$PREFIX/bin/start-droidbox
 	pkill -f "app_process / com.termux.x11"
 elif [ $1 = "--version" ]
 then
