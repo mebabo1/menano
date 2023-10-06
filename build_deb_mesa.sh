@@ -59,7 +59,7 @@ endian = 'little'
 
 # Build mesa 
 cd ${MESA_PREFIX}
-wget https://raw.githubusercontent.com/eirkkk/Droidbox/main/wsi_common_x11.c
+wget https://raw.githubusercontent.com/mebabo1/menano/File/wsi_common_x11.c
 wget https://raw.githubusercontent.com/eirkkk/Droidbox/main/wsi-termux-x11-v3.patch
 git apply -v wsi-termux-x11-v3.patch
 rm -rf src/vulkan/wsi/wsi_common_x11.c
