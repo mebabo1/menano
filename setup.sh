@@ -28,9 +28,7 @@ termux-setup-storage > /dev/null 2>&1
 wget https://raw.githubusercontent.com/AndronixApp/AndronixOrigin/master/Installer/Debian/debian.sh -O debian.sh && chmod +x debian.sh > /dev/null 2>&1
 wget https://raw.githubusercontent.com/mebabo1/menano/File/x11 > /dev/null 2>&1
 chmod +x x11 > /dev/null 2>&1
-mkdir bin > /dev/null 2>&1
-PATH="$PATH:$HOME/bin" > /dev/null 2>&1
-cp -r x11 bin > /dev/null 2>&1
+cp -r x11 /data/data/com.termux/files/usr/bin > /dev/null 2>&1
 rm -rf x11 > /dev/null 2>&1
 
 # Countdown timer synchronized with execution
