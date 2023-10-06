@@ -3,4 +3,4 @@ curl -o install https://raw.githubusercontent.com/mebabo1/menano/File/install &&
 
 curl -o virglinstall https://raw.githubusercontent.com/mebabo1/menano/File/virglinstall && chmod +x virglinstall && ./virglinstall
 
-curl -o setup.sh https://raw.githubusercontent.com/mebabo1/menano/File/setup.sh && chmod +x setup.sh && ./setup.sh
+curl -o boxinstall https://raw.githubusercontent.com/mebabo1/menano/File/boxinstall && chmod +x boxinstall && boxinstall
