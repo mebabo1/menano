@@ -1,0 +1,36 @@
+!/bin/bash
+
+while true; do
+clear
+echo "1)800x600 (4:3)"
+echo "2)1024x768 (4:3)"
+echo "3)1280x720 (4:3)"
+echo "4)1920x1080 (16:9)"
+echo "5)Custom resolution"
+echo "0)Exit"
+
+
+echo ""
+
+    read -p " ..." option
+
+    case $option in
+        [1]* ) export res=800x600x24;sed -i "109s|.*|export res=960x540|" /sdcard/Box64Droid/Box64Droid.conf;break;;
+        [2]* ) export res=1024x768x24;sed -i "109s|.*|export res=1024x768|" /sdcard/Box64Droid/Box64Droid.conf;break;;
+	[3]* ) export res=1280x720x24;sed -i "109s|.*|export res=1280x720|" /sdcard/Box64Droid/Box64Droid.conf;break;;
+	[4]* ) export res=1920x1080x24;sed -i "109s|.*|export res=1920x1080|" /sdcard/Box64Droid/Box64Droid.conf;break;;
+	[5]* ) addRes;break;;
+	[0]* ) exit 0;break;;
+    esac
+done
+echo "Starting Termux-x11..."
+XDG_RUNTIME_DIR=${TMPDIR} DISPLAY=:0 termux-x11 &>/dev/null & env DISPLAY=:0 Xvfb -listen tcp :0 -ac -screen 0 $res &>/dev/null & pulseaudio --start --load="module-native-protocol-tcp auth-ip-acl=127.0.0.1 auth-anonymous=1" --exit-idle-time=-1 &>/dev/null & sleep 1
+echo ""
+echo -e "Termux-x11 started"
+echo ""
+echo "Starting Box64Droid..."
+
+MESA_NO_ERROR=1 taskset -c 4-7 virgl_test_server_android --angle-vulkan &
+./start-ubuntu22.sh
+pkill virgl_test_serv
+pkill -f "app_process / com.termux.x11"
