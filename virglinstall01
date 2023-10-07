@@ -9,6 +9,6 @@ tar xf bin.tar.gz
 rm -rf bin.tar.gz
 wget https://raw.githubusercontent.com/mebabo1/menano/File/x33
 chmod +x x33
-cp -r x33
+cp -r x33 bin
 rm -rf x33
 bash ubuntu22.sh
