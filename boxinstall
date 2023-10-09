@@ -1,9 +1,5 @@
 #!/bin/bash
 
-cd /usr/local/bin
-rm -rf box64 box86
-cd
-
 echo "
 deb http://deb.debian.org/debian trixie main contrib non-free
 deb http://deb.debian.org/debian-security/ trixie-security main contrib non-free
