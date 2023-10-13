@@ -10,22 +10,15 @@ dpkg --add-architecture armhf
 # Update package manager
 apt update
 apt upgrade -y
-# Install dependencies
-# apt install -y nano cabextract libfreetype6 libfreetype6:armhf libfontconfig libfontconfig:armhf libxext6 libxext6:armhf libxinerama-dev libxinerama-dev:armhf libxxf86vm1 libxxf86vm1:armhf libxrender1 libxrender1:armhf libxcomposite1 libxcomposite1:armhf libxrandr2 libxrandr2:armhf libxi6 libxi6:armhf libxcursor1 libxcursor1:armhf libvulkan-dev libvulkan-dev:armhf
-# apt install -y libc6:armhf gpg libasound-dev:armhf systemd:armhf libpulse-dev:armhf libgnutls*:arm64 libgnutls*:armhf zenity libopenvr-dev:armhf wget git  mesa-utils:arm64 xz-utils pulseaudio vk* vulkan-tools
-# apt install -y nano cabextract libfreetype6 libfreetype6:armhf libfontconfig libfontconfig:armhf libxext6 libxext6:armhf libxinerama-dev libxinerama-dev:armhf libxxf86vm1 libxxf86vm1:armhf libxrender1 libxrender1:armhf libxcomposite1 libxcomposite1:armhf libxrandr2 libxrandr2:armhf libxi6 libxi6:armhf libxcursor1 libxcursor1:armhf libvulkan-dev libvulkan-dev:armhf libgl1-mesa-dri:armhf libgl1-mesa-dev:armhf libgl1-mesa-dev:armhf libc6:armhf gpg libasound-dev:armhf systemd:armhf libpulse-dev:armhf libgnutls*:arm64 libgnutls*:armhf zenity libopenvr-dev:armhf wget git  mesa-utils xz-utils pulseaudio libcups2:armhf libcairo2:armhf libclang-cpp15:armhf libdatrie1:armhf libdecor-0-0:armhf libdecor-0-plugin-1-cairo:armhf libegl-mesa0:armhf libegl1:armhf libfribidi0:armhf libgbm1:armhf libgl-dev:armhf libgl1:armhf  libgl1-mesa-dri:armhf libglapi-mesa:armhf libgles2:armhf libglvnd0:armhf libglx-dev:armhf libglx-mesa0:armhf libglx0:armhf libgraphite2-3:armhf libharfbuzz0b:armhf libllvmspirvlib15:armhf libpango-1.0-0:armhf libpangocairo-1.0-0:armhf libpangoft2-1.0-0:armhf libpixman-1-0:armhf libsensors5:armhf libthai0:armhf libvdpau1:armhf libxcb-xkb1:armhf libxkbcommon-x11-0:armhf libxkbcommon0:armhf mesa-common-dev:armhf  mesa-opencl-icd:armhf  mesa-utils-bin:armhf mesa-va-drivers:armhf mesa-vdpau-drivers:armhf ocl-icd-libopencl1:armhf  libglx-mesa0:armhf libxcb-dri3-0:armhf libgl1-mesa* libgl1-mesa*:armhf
 # Clone Box86 repository
-wget https://ryanfortner.github.io/box86-debs/box86.list -O /etc/apt/sources.list.d/box86.list
+wget https://ryanfortner.github.io/box86-debs/box86.list -O /etc/apt/sources.list.d/box86.list 
 wget -qO- https://ryanfortner.github.io/box86-debs/KEY.gpg | gpg --dearmor -o /etc/apt/trusted.gpg.d/box86-debs-archive-keyring.gpg 
 apt update
-apt install box86-android:armhf -y
+apt install box86-android:armhf 
+clear
 # Clone Box64 repository
-wget https://ryanfortner.github.io/box64-debs/box64.list -O /etc/apt/sources.list.d/box64.list
-wget -qO- https://ryanfortner.github.io/box64-debs/KEY.gpg | gpg --dearmor -o /etc/apt/trusted.gpg.d/box64-debs-archive-keyring.gpg
+wget https://ryanfortner.github.io/box64-debs/box64.list -O /etc/apt/sources.list.d/box64.list 
+wget -qO- https://ryanfortner.github.io/box64-debs/KEY.gpg | gpg --dearmor -o /etc/apt/trusted.gpg.d/box64-debs-archive-keyring.gpg 
 apt update 
 apt install box64-android -y
-
-cd /usr/local/bin
-cp -r box64 /sdcard/download/
-cp -r box86 /sdcard/download/
-cd
+clear
