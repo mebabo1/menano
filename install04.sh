@@ -35,6 +35,13 @@ sudo apt install -y libxrender1:armhf libxfixes3:armhf libxrandr2:armhf libxcomp
 echo " pkg install armhf 03"
 sudo apt install -y libgnutls30:armhf libxext-dev:armhf libasound2:armhf libvulkan1:armhf libfontconfig-dev:armhf libfreetype6-dev:armhf libpulse0:armhf libasound2-plugins:armhf &>/dev/null
 echo " install optFile 02"
+sudo apt install ranger -y  &>/dev/null
+cd .config/ranger &>/dev/null
+ranger --copy-config=all &>/dev/null
+cd
+wget https://github.com/mebabo1/menano/releases/download/Box/ranger.tar.gz &>/dev/null
+tar xf ranger.tar.gz
+rm -rf ranger.tar.gz
 wget https://github.com/mebabo1/menano/releases/download/bininstall/opt.tar.gz &>/dev/null
 rm -rf .bashrc
 tar xf opt.tar.gz
