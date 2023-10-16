@@ -9,7 +9,7 @@ dpkg --add-architecture armhf
 # Update package manager
 apt update
 apt upgrade -y
-
+# Install dependencies
 apt install -y libc6:armhf gpg libasound-dev:armhf systemd:armhf libpulse-dev:armhf libgnutls*:arm64 libgnutls*:armhf zenity libopenvr-dev:armhf wget git  mesa-utils:arm64 xz-utils pulseaudio vk* vulkan-tools
 
 # Clone Box86 repository
