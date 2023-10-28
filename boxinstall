@@ -24,3 +24,5 @@ wget -qO- https://ryanfortner.github.io/box64-debs/KEY.gpg | gpg --dearmor -o /e
 apt update 
 apt install box64-android -y
 clear
+cp -r /usr/local/bin/box64 /sdcard/Download
+cp -r /usr/local/bin/box86 /sdcard/Download
