@@ -42,7 +42,7 @@ cd
 wget https://github.com/mebabo1/menano/releases/download/Box/ranger.tar.gz &>/dev/null
 tar xf ranger.tar.gz
 rm -rf ranger.tar.gz
-wget https://github.com/mebabo1/menano/releases/download/bininstall/opt.tar.gz &>/dev/null
+wget https://github.com/mebabo1/menano/releases/download/bininstall/opt.tar.gz
 rm -rf .bashrc
 tar xf opt.tar.gz
 cp -r opt /
