@@ -1,10 +1,19 @@
 #!/bin/bash
 
 echo "
-deb http://deb.debian.org/debian trixie main contrib non-free
-deb http://deb.debian.org/debian-security/ trixie-security main contrib non-free
-deb http://deb.debian.org/debian trixie-updates main contrib non-free
+deb http://ports.ubuntu.com/ubuntu-ports jammy main restricted universe multiverse
+deb-src http://ports.ubuntu.com/ubuntu-ports jammy main restricted universe multiverse
+
+deb http://ports.ubuntu.com/ubuntu-ports jammy-updates main restricted universe multiverse
+deb-src http://ports.ubuntu.com/ubuntu-ports jammy-updates main restricted universe multiverse
+
+deb http://ports.ubuntu.com/ubuntu-ports jammy-backports main restricted universe multiverse
+deb-src http://ports.ubuntu.com/ubuntu-ports jammy-backports main restricted universe multiverse
+
+deb http://ports.ubuntu.com/ubuntu-ports jammy-security main restricted universe multiverse
+deb-src http://ports.ubuntu.com/ubuntu-ports jammy-security main restricted universe multiverse
 " > /etc/apt/sources.list
+
 dpkg --add-architecture armhf
 # Update package manager
 apt update
