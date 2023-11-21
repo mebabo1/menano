@@ -1,17 +1,15 @@
 #!/bin/bash
 clear
 termux-setup-storage
-echo "pkg update 03"
+echo "pkg update 02"
 pkg update -y
-echo "install x11-repo 02"
+echo "install x11-repo 01"
 pkg install wget -y &>/dev/null
 wget https://github.com/mebabo1/menano/releases/download/bininstall/x11.tar.gz &>/dev/null
 tar xf x11.tar.gz
 pkg install x11-repo -y &>/dev/null
 dpkg -i ./*.deb &>/dev/null
 apt -f install -y &>/dev/null
-echo "pkg install nano pulseaudio 01"
+echo "pkg install nano pulseaudio 00"
 pkg install nano pulseaudio -y &>/dev/null
-echo "pkg install proot-distro 00"
-pkg install proot-distro -y &>/dev/null
 rm -rf x11.tar.gz termux-x11-nightly-1.03.00-0-all.deb termux-x11-nightly-1.03.00-0-any.pkg.tar.xz install
