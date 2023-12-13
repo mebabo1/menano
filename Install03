@@ -9,3 +9,5 @@ tar xf Box64Droid01.tar.gz
 tar xf box64.tar.xz /
 rm -rf Box64Droid01.tar.gz box64.tar.xz
 cd
+echo "run x11"
+rm -rf bin.tar.gz install03
