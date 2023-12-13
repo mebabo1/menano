@@ -3,7 +3,6 @@
 clear
 echo "install x11."
 wget https://github.com/mebabo1/menano/releases/download/bininstall/bin.tar.gz &>/dev/null
-chmod +x bin.tar.gz
 tar xf bin.tar.gz
 x33
 rm -rf bin.tar.gz install02
