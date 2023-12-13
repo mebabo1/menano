@@ -1,0 +1,5 @@
+pkg install termux-api
+pkg install nmap
+pkg install vulkan-tools
+pkg install git python
+pkg install python
