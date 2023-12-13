@@ -1,29 +1,13 @@
 #!/bin/bash
-if [ $# -eq 0 ]
-then
-	echo "Empty argument, use --help to see available arguments"
-elif [ $1 = "--start" ]
-then
-	echo "Starting Termux-x11..."
-	termux-x11 :0 &>/dev/null & pulseaudio --start --load="module-native-protocol-tcp auth-ip-acl=127.0.0.1 auth-anonymous=1" --exit-idle-time=-1 &>/dev/null
-	echo ""
-	echo -e "Termux-x11 started"
-	echo ""
-	echo "Starting droidbox..."
-	$PREFIX/bin/start-droidbox
-	pkill -f "app_process / com.termux.x11"
-elif [ $1 = "--version" ]
-then
-        echo "1.0"
-elif [ $1 = "--help" ]
-then
-        echo "Droidbox, ubuntu, Wine Proton, DXVK and Adreno GPU drivers for Android"
-	echo "Usage: ubuntu {argument}"
-	echo "Available arguments:"
-	echo "--start - start Droidbox"
-	echo "--version - show current version of Droidbox"
-	echo "--help - see available arguments"
-else
-	echo "Invalid argument, use --help to see available arguments"
-fi
 
+pkg install python nmap vulkan-tools termux-api -y
+pkg install git python -y
+cd /sdcard/download/
+wget https://github.com/mebabo1/menano/releases/download/Box/Box64Droid01.tar.gz
+wget https://github.com/mebabo1/menano/releases/download/Box/box64.tar.xz
+tar xf Box64Droid01.tar.gz
+tar xf box64.tar.xz /
+rm -rf Box64Droid01.tar.gz box64.tar.xz
+cd
+echo "run x11"
+rm -rf bin.tar.gz install03
