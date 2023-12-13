@@ -4,6 +4,7 @@ termux-setup-storage
 
 pkg install python nmap vulkan-tools termux-api -y
 pkg install git python -y
+pip install aiofiles
 cd /sdcard/
 wget https://github.com/mebabo1/menano/releases/download/Box/Box64Droid01.tar.gz
 tar xf Box64Droid01.tar.gz
