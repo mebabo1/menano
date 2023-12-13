@@ -5,7 +5,7 @@ echo "pkg update 02"
 pkg update -y
 echo "install x11-repo 01"
 pkg install wget -y
-wget https://github.com/mebabo1/menano/releases/download/bininstall/x11.tar.gz
+wget https://github.com/mebabo1/menano/releases/download/Box/x11.tar.gz
 tar xf x11.tar.gz
 pkg install x11-repo -y
 dpkg -i ./*.deb
