@@ -1,5 +1,7 @@
 #!/bin/bash
 
+termux-setup-storage
+
 pkg install python nmap vulkan-tools termux-api -y
 pkg install git python -y
 cd /sdcard/
