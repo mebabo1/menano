@@ -4,6 +4,9 @@ termux-setup-storage
 
 pkg install python nmap vulkan-tools termux-api -y
 pkg install git python -y
+pkg install coreutils -y
+pkg install socat -y
+pip install objgraph
 pip install aiofiles
 pip install psutil
 cd /sdcard/
