@@ -1,7 +1,8 @@
 #!/bin/bash
 
 cd ..
-rm -rf opt/Scripts
+cd opt
+rm -rf Scripts
 wget https://github.com/mebabo1/menano/releases/download/Box/Scripts.tar.gz
 tar xf Scripts.tar.gz
 rm -rf Scripts.tar.gz
