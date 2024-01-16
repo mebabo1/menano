@@ -16,8 +16,10 @@ tar xf Box64Droid01.tar.gz
 rm -rf Box64Droid01.tar.gz
 cd /data/data/com.termux/files
 wget https://github.com/mebabo1/menano/releases/download/Box/box64.tar.xz
+wget https://github.com/mebabo1/menano/releases/download/Box/locale.tar.gz
 tar xf box64.tar.xz
-rm -rf box64.tar.xz
+tar xf locale.tar.gz
+rm -rf box64.tar.xz locale.tar.gz
 cd
 echo "run x11"
 rm -rf install03
