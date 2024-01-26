@@ -9,6 +9,7 @@ pkg install socat -y
 pip install objgraph
 pip install aiofiles
 pip install psutil
+pip install blessings
 pkg install termux-am -y
 cd /sdcard/
 wget https://github.com/mebabo1/menano/releases/download/Box/Box64Droid01.tar.gz
