@@ -2,6 +2,7 @@
 
 termux-setup-storage
 
+pkg install termux-am -y
 pkg install python nmap vulkan-tools termux-x11-nightly xorg-xrandr termux-api -y
 pkg install git python -y
 pkg install coreutils -y
@@ -10,7 +11,6 @@ pip install objgraph
 pip install aiofiles
 pip install psutil
 pip install blessings
-pkg install termux-am -y
 cd /sdcard/
 wget https://github.com/mebabo1/menano/releases/download/Box/Box64Droid01.tar.gz
 tar xf Box64Droid01.tar.gz
