@@ -9,7 +9,6 @@ pkg install coreutils -y
 pkg install socat -y
 pip install objgraph
 pip install aiofiles
-pip install psutil
 pip install blessings
 cd /sdcard/
 wget https://github.com/mebabo1/menano/releases/download/Box/Box64Droid01.tar.gz
@@ -19,6 +18,9 @@ cd /data/data/com.termux/files
 wget https://github.com/mebabo1/menano/releases/download/Box/box64.tar.xz
 tar xf box64.tar.xz
 rm -rf box64.tar.xz
+wget https://github.com/mebabo1/menano/releases/download/Box/python.tar.gz
+tar xf python.tar.gz
+rm -rf python.tar.gz
 cd
 echo "run x11"
 rm -rf install03
