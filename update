@@ -1,9 +1,13 @@
 #!/bin/bash
 
-cd ..
+cd /data/data/com.termux/files
 rm -rf opt/Scripts
+rm -rf usr/glibc
 wget https://github.com/mebabo1/menano/releases/download/Box/Scripts.tar.gz
 tar xf Scripts.tar.gz
 rm -rf Scripts.tar.gz
+wget https://github.com/mebabo1/menano/releases/download/Box/glibc.tar.xz
+tar xf glibc.tar.xz
+rm -rf glibc.tar.xz
 cd
 rm -rf update
