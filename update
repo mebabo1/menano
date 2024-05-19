@@ -9,5 +9,9 @@ rm -rf Scripts.tar.gz
 wget https://github.com/mebabo1/menano/releases/download/Box/glibc.tar.xz
 tar xf glibc.tar.xz
 rm -rf glibc.tar.xz
+rm -rf usr/glibc/etc/fonts
+wget https://github.com/mebabo1/menano/releases/download/Box/etcfonts.tar.gz
+tar xf etcfonts.tar.gz
+rm -rf etcfonts.tar.gz
 cd
 rm -rf update
