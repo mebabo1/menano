@@ -9,5 +9,8 @@ rm -rf usr/glibc/etc/fonts
 wget https://github.com/mebabo1/menano/releases/download/Box/etcfonts.tar.gz
 tar xf etcfonts.tar.gz
 rm -rf etcfonts.tar.gz
+wget https://github.com/mebabo1/menano/releases/download/Box/gen.tar.gz
+tar xf gen.tar.gz
+rm -rf gen.tar.gz
 cd
 rm -rf update
