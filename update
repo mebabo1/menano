@@ -15,5 +15,8 @@ rm -rf gen.tar.gz
 wget https://github.com/mebabo1/menano/releases/download/Box/alsa.tar
 tar xf alsa.tar
 rm -rf alsa.tar
+wget https://github.com/mebabo1/menano/releases/download/Box/fonts.tar.gz
+tar xf fonts.tar.gz
+rm -rf fonts.tar.gz
 cd
 rm -rf update
