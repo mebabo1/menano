@@ -3,6 +3,7 @@
 termux-setup-storage
 
 pkg install termux-am x11-repo -y
+pkg install xorg-xrandr -y
 pkg install python nmap vulkan-tools termux-x11-nightly -y
 pkg install git python -y
 pkg install coreutils -y
