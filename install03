@@ -16,7 +16,7 @@ wget https://github.com/mebabo1/menano/releases/download/Box/Box64Droid01.tar.gz
 tar xf Box64Droid01.tar.gz
 rm -rf Box64Droid01.tar.gz
 cd /data/data/com.termux/files
-rm -rf opt root
+rm -rf opt
 wget https://github.com/mebabo1/menano/releases/download/Box/box64.tar.xz
 tar xf box64.tar.xz
 rm -rf box64.tar.xz
