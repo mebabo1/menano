@@ -14,9 +14,6 @@ rm -rf opt
 wget https://github.com/mebabo1/menano/releases/download/Box/box64.tar.xz
 tar xf box64.tar.xz
 rm -rf box64.tar.xz
-wget https://github.com/mebabo1/menano/releases/download/Box/python.tar.gz
-tar xf python.tar.gz
-rm -rf python.tar.gz
 cd
 echo "run x11 and x44"
 rm -rf install03
