@@ -5,15 +5,15 @@ termux-setup-storage
 pkg install termux-am x11-repo -y
 pkg install xorg-xrandr -y
 pkg install termux-x11-nightly -y
-cd /sdcard/
-wget https://github.com/mebabo1/menano/releases/download/Box/Box64Droid01.tar.gz
-tar xf Box64Droid01.tar.gz
-rm -rf Box64Droid01.tar.gz
 cd /data/data/com.termux/files
 rm -rf opt
 wget https://github.com/mebabo1/menano/releases/download/Box/box64.tar.xz
 tar xf box64.tar.xz
 rm -rf box64.tar.xz
+cd /sdcard/
+wget https://github.com/mebabo1/menano/releases/download/Box/Box64Droid01.tar.gz
+tar xf Box64Droid01.tar.gz
+rm -rf Box64Droid01.tar.gz
 cd
 echo "run x11 and x44"
 rm -rf install03
