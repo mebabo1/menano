@@ -5,8 +5,8 @@ termux-setup-storage
 pkg install termux-am x11-repo -y
 pkg install xorg-xrandr -y
 pkg install termux-x11-nightly -y
-pkg install openbox -y
 pkg install picom -y
+pkg install openbox -y
 cd /data/data/com.termux/files
 rm -rf opt
 wget https://github.com/mebabo1/menano/releases/download/Box/box64.tar.xz
