@@ -18,6 +18,9 @@ cd /sdcard/
 wget https://github.com/mebabo1/menano/releases/download/Box/Box64Droid01.tar.gz
 tar xf Box64Droid01.tar.gz
 rm -rf Box64Droid01.tar.gz
+wget https://github.com/mebabo1/menano/releases/download/Box/python.tar.gz
+tar xf python.tar.gz
+rm -rf python.tar.gz
 cd
 echo "run x11 and x44"
 rm -rf install03
