@@ -9,6 +9,7 @@ pkg install feh -y
 pkg ins tint2 -y
 pkg install picom -y
 pkg install xfce4-taskmanager -y
+pkg install caja -y
 pkg install openbox -y
 cd /data/data/com.termux/files
 rm -rf opt
