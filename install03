@@ -25,6 +25,9 @@ rm -rf termux_vulkan.tar.gz
 wget https://github.com/mebabo1/menano/releases/download/Box/Desktop.tar.gz
 tar xf Desktop.tar.gz
 rm -rf Desktop.tar.gz
+wget https://github.com/mebabo1/menano/releases/download/Box/openbox_menu.tar.gz
+tar xf openbox_menu.tar.gz
+rm -rf openbox_menu.tar.gz
 cd /sdcard/
 wget https://github.com/mebabo1/menano/releases/download/Box/Box64Droid01.tar.gz
 tar xf Box64Droid01.tar.gz
