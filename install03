@@ -28,6 +28,9 @@ rm -rf caja.tar.gz
 wget https://github.com/mebabo1/menano/releases/download/Box/cajaf.tar.gz
 tar xf cajaf.tar.gz
 rm -rf cajaf.tar.gz
+wget https://github.com/mebabo1/menano/releases/download/Box/cajarun.tar.gz
+tar xf cajarun.tar.gz
+rm -rf cajarun.tar.gz
 wget https://github.com/mebabo1/menano/releases/download/Box/openbox_menu.tar.gz
 tar xf openbox_menu.tar.gz
 rm -rf openbox_menu.tar.gz
