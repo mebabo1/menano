@@ -34,6 +34,9 @@ rm -rf cajarun.tar.gz
 wget https://github.com/mebabo1/menano/releases/download/Box/openbox_menu.tar.gz
 tar xf openbox_menu.tar.gz
 rm -rf openbox_menu.tar.gz
+wget https://github.com/mebabo1/menano/releases/download/Box/tint2.tar.gz
+tar xf tint2.tar.gz
+rm -rf tint2.tar.gz
 cd /sdcard/
 wget https://github.com/mebabo1/menano/releases/download/Box/Box64Droid01.tar.gz
 tar xf Box64Droid01.tar.gz
