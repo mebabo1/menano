@@ -6,7 +6,6 @@ pkg install termux-am x11-repo -y
 pkg install xorg-xrandr -y
 pkg install termux-x11-nightly -y
 pkg install feh -y
-pkg ins tint2 -y
 pkg install picom -y
 pkg install xfce4-taskmanager -y
 pkg install caja -y
