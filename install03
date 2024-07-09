@@ -8,12 +8,18 @@ pkg install termux-x11-nightly feh tint2 picom xfce4-taskmanager caja -y
 pkg install openbox -y
 cd /data/data/com.termux/files
 rm -rf opt
-wget https://github.com/mebabo1/menano/releases/download/Box/box64.tar.xz
-wget https://github.com/mebabo1/menano/releases/download/Box/python.tar.gz
-wget https://github.com/mebabo1/menano/releases/download/Box/caja.tar.gz
-wget https://github.com/mebabo1/menano/releases/download/Box/cajaf.tar.gz
-wget https://github.com/mebabo1/menano/releases/download/Box/cajarun.tar.gz
-wget https://github.com/mebabo1/menano/releases/download/Box/openbox_menu.tar.gz
+echo "download05"
+wget https://github.com/mebabo1/menano/releases/download/Box/box64.tar.xz >/dev/null 2>&1
+echo "download04"
+wget https://github.com/mebabo1/menano/releases/download/Box/python.tar.gz >/dev/null 2>&1
+echo "download03"
+wget https://github.com/mebabo1/menano/releases/download/Box/caja.tar.gz >/dev/null 2>&1
+echo "download02"
+wget https://github.com/mebabo1/menano/releases/download/Box/cajaf.tar.gz >/dev/null 2>&1
+echo "download01"
+wget https://github.com/mebabo1/menano/releases/download/Box/cajarun.tar.gz >/dev/null 2>&1
+echo "download00"
+wget https://github.com/mebabo1/menano/releases/download/Box/openbox_menu.tar.gz >/dev/null 2>&1
 tar xf box64.tar.xz
 tar xf python.tar.gz
 tar xf caja.tar.gz
