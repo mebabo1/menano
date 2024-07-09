@@ -21,7 +21,7 @@ wget https://github.com/mebabo1/menano/releases/download/Box/cajarun.tar.gz >/de
 echo "pkg download01"
 wget https://github.com/mebabo1/menano/releases/download/Box/openbox_menu.tar.gz >/dev/null 2>&1
 echo "pkg download00"
-wget https://github.com/mebabo1/menano/releases/download/Box/Box64Droid01.tar.gz
+wget https://github.com/mebabo1/menano/releases/download/Box/Box64Droid01.tar.gz  >/dev/null 2>&1
 echo "pkg tar xf"
 tar xf box64.tar.xz
 tar xf python.tar.gz
