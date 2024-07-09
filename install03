@@ -19,9 +19,6 @@ rm -rf box64.tar.xz
 wget https://github.com/mebabo1/menano/releases/download/Box/python.tar.gz
 tar xf python.tar.gz
 rm -rf python.tar.gz
-wget https://github.com/mebabo1/menano/releases/download/Box/termux_vulkan.tar.gz
-tar xf termux_vulkan.tar.gz
-rm -rf termux_vulkan.tar.gz
 wget https://github.com/mebabo1/menano/releases/download/Box/caja.tar.gz
 tar xf caja.tar.gz
 rm -rf caja.tar.gz
@@ -34,6 +31,7 @@ rm -rf cajarun.tar.gz
 wget https://github.com/mebabo1/menano/releases/download/Box/openbox_menu.tar.gz
 tar xf openbox_menu.tar.gz
 rm -rf openbox_menu.tar.gz
+
 cd /sdcard/
 wget https://github.com/mebabo1/menano/releases/download/Box/Box64Droid01.tar.xz
 tar xf Box64Droid01.tar.gz
