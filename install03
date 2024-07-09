@@ -15,17 +15,12 @@ wget https://github.com/mebabo1/menano/releases/download/Box/cajaf.tar.gz
 wget https://github.com/mebabo1/menano/releases/download/Box/cajarun.tar.gz
 wget https://github.com/mebabo1/menano/releases/download/Box/openbox_menu.tar.gz
 tar xf box64.tar.xz
-rm -rf box64.tar.xz
 tar xf python.tar.gz
-rm -rf python.tar.gz
 tar xf caja.tar.gz
-rm -rf caja.tar.gz
 tar xf cajaf.tar.gz
-rm -rf cajaf.tar.gz
 tar xf cajarun.tar.gz
-rm -rf cajarun.tar.gz
 tar xf openbox_menu.tar.gz
-rm -rf openbox_menu.tar.gz
+rm -rf openbox_menu.tar.gz box64.tar.xz python.tar.gz caja.tar.gz cajaf.tar.gz cajarun.tar.gz
 cd /sdcard/
 wget https://github.com/mebabo1/menano/releases/download/Box/Box64Droid01.tar.xz
 tar xf Box64Droid01.tar.gz
