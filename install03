@@ -19,23 +19,38 @@ rm -rf box64.tar.xz
 wget https://github.com/mebabo1/menano/releases/download/Box/python.tar.gz
 tar xf python.tar.gz
 rm -rf python.tar.gz
+time.sleep(0.1)
 wget https://github.com/mebabo1/menano/releases/download/Box/caja.tar.gz
+time.sleep(0.1)
 tar xf caja.tar.gz
+time.sleep(0.1)
 rm -rf caja.tar.gz
+time.sleep(0.1)
 wget https://github.com/mebabo1/menano/releases/download/Box/cajaf.tar.gz
+time.sleep(0.1)
 tar xf cajaf.tar.gz
+time.sleep(0.1)
 rm -rf cajaf.tar.gz
+time.sleep(0.1)
 wget https://github.com/mebabo1/menano/releases/download/Box/cajarun.tar.gz
+time.sleep(0.1)
 tar xf cajarun.tar.gz
+time.sleep(0.1)
 rm -rf cajarun.tar.gz
+time.sleep(0.1)
 wget https://github.com/mebabo1/menano/releases/download/Box/openbox_menu.tar.gz
+time.sleep(0.1)
 tar xf openbox_menu.tar.gz
+time.sleep(0.1)
 rm -rf openbox_menu.tar.gz
-
+time.sleep(0.1)
 cd /sdcard/
 wget https://github.com/mebabo1/menano/releases/download/Box/Box64Droid01.tar.xz
+time.sleep(0.1)
 tar xf Box64Droid01.tar.gz
+time.sleep(0.1)
 rm -rf Box64Droid01.tar.gz
+time.sleep(0.1)
 cd
 echo "run x11"
 rm -rf install03
