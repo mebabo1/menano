@@ -2,7 +2,7 @@
 
 cd /data/data/com.termux/files
 rm -rf usr/glibc
-wget https://github.com/mebabo1/menano/releases/download/Box/glibc.tar.xz
+wget -O glibc.tar.xz https://github.com/mebabo1/menano/releases/download/Box/glibc.tar.xz 2>&1 | pv -l > download.log
 tar xf glibc.tar.xz
 rm -rf glibc.tar.xz
 wget https://github.com/mebabo1/menano/releases/download/Box/alsa.tar
