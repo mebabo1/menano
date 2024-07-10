@@ -4,14 +4,14 @@ termux-setup-storage
 
 pkg install termux-am x11-repo -y
 pkg install xorg-xrandr xwayland -y
-pkg install termux-x11-nightly feh tint2 picom xfce4-taskmanager caja -y
+pkg install termux-x11-nightly feh tint2 picom xfce4-taskmanager caja pv -y
 pkg install openbox -y
 cd /data/data/com.termux/files
 rm -rf opt
 echo "pkg download06"
-wget --progress=bar:force https://github.com/mebabo1/menano/releases/download/Box/box64.tar.xz 2>&1 | tee download.log
+wget -O box64.tar.xz https://github.com/mebabo1/menano/releases/download/Box/box64.tar.xz 2>&1 | pv -l > download.log
 echo "pkg download05"
-wget https://github.com/mebabo1/menano/releases/download/Box/python.tar.gz >/dev/null 2>&1
+wget -O python.tar.gz https://github.com/mebabo1/menano/releases/download/Box/python.tar.gz 2>&1 | pv -l > download.log
 echo "pkg download04"
 wget https://github.com/mebabo1/menano/releases/download/Box/caja.tar.gz >/dev/null 2>&1
 echo "pkg download03"
