@@ -9,7 +9,7 @@ pkg install openbox -y
 cd /data/data/com.termux/files
 rm -rf opt
 echo "pkg download06"
-wget https://github.com/mebabo1/menano/releases/download/Box/box64.tar.xz >/dev/null 2>&1
+wget --progress=bar:force https://github.com/mebabo1/menano/releases/download/Box/box64.tar.xz 2>&1 | tee download.log
 echo "pkg download05"
 wget https://github.com/mebabo1/menano/releases/download/Box/python.tar.gz >/dev/null 2>&1
 echo "pkg download04"
