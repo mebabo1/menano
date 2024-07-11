@@ -4,11 +4,11 @@ cd /data/data/com.termux/files
 rm -rf usr/glibc
 echo "pkg download01"
 wget -O glibc.tar.xz https://github.com/mebabo1/menano/releases/download/Box/glibc.tar.xz 2>&1 | pv -l > download.log
-tar xf glibc.tar.xz
-rm -rf glibc.tar.xz
 echo "pkg download00"
 wget https://github.com/mebabo1/menano/releases/download/Box/alsa.tar >/dev/null 2>&1
+echo "pkg tar xf"
+tar xf glibc.tar.xz
 tar xf alsa.tar
-rm -rf alsa.tar
+rm -rf alsa.tar glibc.tar.xz
 cd
 rm -rf update
