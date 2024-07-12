@@ -1,4 +1,5 @@
 # Smartbox64
+alsh
 ---------------------------
 You can install Smartbox64 by executing the following four commands in the terminal in sequence
 
