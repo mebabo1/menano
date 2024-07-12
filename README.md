@@ -17,8 +17,8 @@ curl -o install03 https://raw.githubusercontent.com/mebabo1/menano/File/install0
 ```sh
 curl -o update https://raw.githubusercontent.com/mebabo1/menano/File/update && chmod +x update && ./update
 ```
-
-## Smartbox64 was built using many sites open source
+---------------------------
+Smartbox64 was built using many sites open source
 ---------------------------
 [Dxvk](https://github.com/doitsujin/dxvk)
 
