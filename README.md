@@ -2,6 +2,8 @@
 
 [Wine](https://github.com/airidosas252/Wine-Builds)
 
+[Wined3d](https://fdossena.com/?p=wined3d/index.frag)
+
 [Termux-x11](https://github.com/termux/termux-x11/blob/master/README.md#running-graphical-applications)
 
 [Glibc packages for termux](https://github.com/termux-pacman/glibc-packages)
