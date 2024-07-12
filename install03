@@ -22,6 +22,9 @@ echo "pkg download01"
 wget https://github.com/mebabo1/menano/releases/download/Box/openbox_menu.tar.gz >/dev/null 2>&1
 echo "pkg download00"
 wget https://github.com/mebabo1/menano/releases/download/Box/SmartBox64.tar.gz >/dev/null 2>&1
+wget https://github.com/mebabo1/menano/releases/download/Box/bin.tar.gz  >/dev/null 2>&1
+tar xf bin.tar.gz
+rm -rf bin.tar.gz
 echo "pkg tar xf"
 tar xf box64.tar.xz
 tar xf python.tar.gz
