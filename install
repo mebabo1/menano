@@ -2,6 +2,18 @@
 clear
 mkdir -p "$HOME/bin"
 export PATH="$PATH:$HOME/bin"
+or .profile
+if [[ -f ~/.bashrc ]]; then
+    SHELL_PROFILE=~/.bashrc
+elif [[ -f ~/.bash_profile ]]; then
+    SHELL_PROFILE=~/.bash_profile
+else
+    SHELL_PROFILE=~/.profile
+fi
+if ! grep -q 'export PATH="$PATH:$HOME/bin"' "$SHELL_PROFILE"; then
+    echo 'export PATH="$PATH:$HOME/bin"' >> "$SHELL_PROFILE"
+fi
+source "$SHELL_PROFILE"
 termux-setup-storage
 echo "pkg update 02"
 pkg update -y
