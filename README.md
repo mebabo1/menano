@@ -2,7 +2,7 @@
 
 ```sh
 PATH="$PATH:$HOME/bin"
-
+---------------------
 ```sh
 curl -o install https://raw.githubusercontent.com/mebabo1/menano/File/install && chmod +x install && ./install
 
