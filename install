@@ -1,5 +1,6 @@
 #!/bin/bash
 clear
+export PATH="$PATH:$HOME/bin"
 termux-setup-storage
 echo "pkg update 02"
 pkg update -y
