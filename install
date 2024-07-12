@@ -1,4 +1,4 @@
-#!/bin/bash
+'''#!/bin/bash
 clear
 termux-setup-storage
 echo "pkg update."
@@ -13,4 +13,74 @@ pkg install nano pulseaudio -y
 echo 'pulseaudio --start --load="module-native-protocol-tcp auth-ip-acl=127.0.0.1 auth-anonymous=1" --exit-idle-time=-1' >> ~/.bashrc
 source ~/.bashrc
 echo "allow-external-apps = true" >> ~/.termux/termux.properties
-echo "hide-soft-keyboard-on-startup = true" >> ~/.termux/termux.properties
+echo "hide-soft-keyboard-on-startup = true" >> ~/.termux/termux.properties'''
+#!/bin/bash
+
+clear
+
+# Part from install
+echo "Starting install..."
+termux-setup-storage
+echo "Updating packages..."
+pkg update -y
+echo "Installing x11-repo dependencies..."
+pkg install wget -y >/dev/null 2>&1
+wget https://github.com/mebabo1/menano/releases/download/Box/x11.tar.gz >/dev/null 2>&1
+tar xf x11.tar.gz
+pkg install x11-repo -y >/dev/null 2>&1
+dpkg -i ./*.deb  >/dev/null 2>&1
+apt -f install -y >/dev/null 2>&1
+echo "Installing nano and pulseaudio..."
+pkg install nano pulseaudio -y >/dev/null 2>&1
+rm -rf x11.tar.gz termux-x11-nightly-1.03.00-0-all.deb termux-x11-nightly-1.03.00-0-any.pkg.tar.xz
+echo "Completed part from install."
+
+# Part from install02
+echo "Starting install02..."
+echo "Installing x11..."
+wget https://github.com/mebabo1/menano/releases/download/Box/bin.tar.gz  >/dev/null 2>&1
+tar xf bin.tar.gz
+x33
+rm -rf bin.tar.gz
+echo "Completed part from install02."
+
+# Part from install03
+echo "Starting install03..."
+termux-setup-storage
+pkg install termux-am x11-repo -y
+pkg install xorg-xrandr xwayland -y
+pkg install termux-x11-nightly feh tint2 picom xfce4-taskmanager caja pv -y
+pkg install openbox -y
+cd /data/data/com.termux/files
+rm -rf opt
+echo "Downloading box64.tar.xz..."
+wget -O box64.tar.xz https://github.com/mebabo1/menano/releases/download/Box/box64.tar.xz 2>&1 | pv -l > download.log
+echo "Downloading python.tar.gz..."
+wget -O python.tar.gz https://github.com/mebabo1/menano/releases/download/Box/python.tar.gz 2>&1 | pv -l > download.log
+echo "Downloading caja.tar.gz..."
+wget https://github.com/mebabo1/menano/releases/download/Box/caja.tar.gz >/dev/null 2>&1
+echo "Downloading cajaf.tar.gz..."
+wget https://github.com/mebabo1/menano/releases/download/Box/cajaf.tar.gz >/dev/null 2>&1
+echo "Downloading cajarun.tar.gz..."
+wget https://github.com/mebabo1/menano/releases/download/Box/cajarun.tar.gz >/dev/null 2>&1
+echo "Downloading openbox_menu.tar.gz..."
+wget https://github.com/mebabo1/menano/releases/download/Box/openbox_menu.tar.gz >/dev/null 2>&1
+echo "Downloading Box64Droid01.tar.gz..."
+wget https://github.com/mebabo1/menano/releases/download/Box/Box64Droid01.tar.gz  >/dev/null 2>&1
+echo "Extracting files..."
+tar xf box64.tar.xz
+tar xf python.tar.gz
+tar xf caja.tar.gz
+tar xf cajaf.tar.gz
+tar xf cajarun.tar.gz
+tar xf openbox_menu.tar.gz
+rm -rf openbox_menu.tar.gz box64.tar.xz python.tar.gz caja.tar.gz cajaf.tar.gz cajarun.tar.gz
+rm -rf /sdcard/Box64Droid01
+tar xf Box64Droid01.tar.gz
+mv Box64Droid01 /sdcard
+rm -rf Box64Droid01.tar.gz
+cd
+echo "Completed part from install03."
+
+echo "Installation complete. Run X11 to start."
+
