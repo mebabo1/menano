@@ -1,6 +1,7 @@
 # Smartbox64
 ---------------------------
 You can install Smartbox64 by executing the following four commands in the terminal in sequence
+
 English, Korean, and Japanese are available in Smartbox 64
 
 ```sh
