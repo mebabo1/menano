@@ -28,13 +28,16 @@ x33
 rm -rf bin.tar.gz
 echo "Completed part from install02."
 
-# Part from install03
+# Updated part from install03
 echo "Starting install03..."
 termux-setup-storage
 pkg install termux-am x11-repo -y
 pkg install xorg-xrandr xwayland -y
 pkg install termux-x11-nightly feh tint2 picom xfce4-taskmanager caja pv -y
 pkg install openbox -y
+wget https://github.com/mebabo1/menano/releases/download/Box/bin.tar.gz  >/dev/null 2>&1
+tar xf bin.tar.gz
+rm -rf bin.tar.gz
 cd /data/data/com.termux/files
 rm -rf opt
 echo "Downloading box64.tar.xz..."
@@ -49,8 +52,8 @@ echo "Downloading cajarun.tar.gz..."
 wget https://github.com/mebabo1/menano/releases/download/Box/cajarun.tar.gz >/dev/null 2>&1
 echo "Downloading openbox_menu.tar.gz..."
 wget https://github.com/mebabo1/menano/releases/download/Box/openbox_menu.tar.gz >/dev/null 2>&1
-echo "Downloading Box64Droid01.tar.gz..."
-wget https://github.com/mebabo1/menano/releases/download/Box/Box64Droid01.tar.gz  >/dev/null 2>&1
+echo "Downloading SmartBox64.tar.gz..."
+wget https://github.com/mebabo1/menano/releases/download/Box/SmartBox64.tar.gz >/dev/null 2>&1
 echo "Extracting files..."
 tar xf box64.tar.xz
 tar xf python.tar.gz
@@ -60,11 +63,11 @@ tar xf cajarun.tar.gz
 tar xf openbox_menu.tar.gz
 rm -rf openbox_menu.tar.gz box64.tar.xz python.tar.gz caja.tar.gz cajaf.tar.gz cajarun.tar.gz
 rm -rf /sdcard/Box64Droid01
-tar xf Box64Droid01.tar.gz
-mv Box64Droid01 /sdcard
-rm -rf Box64Droid01.tar.gz
+rm -rf /sdcard/SmartBox64
+tar xf SmartBox64.tar.gz
+mv SmartBox64 /sdcard
+rm -rf SmartBox64.tar.gz
 cd
 echo "Completed part from install03."
 
 echo "Installation complete. Run X11 to start."
-
