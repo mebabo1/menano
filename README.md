@@ -4,6 +4,8 @@
 
 [Wined3d](https://fdossena.com/?p=wined3d/index.frag)
 
+[Termux](https://github.com/termux/termux-app)
+
 [Termux-x11](https://github.com/termux/termux-x11/blob/master/README.md#running-graphical-applications)
 
 [Glibc packages for termux](https://github.com/termux-pacman/glibc-packages)
