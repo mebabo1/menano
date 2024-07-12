@@ -4,6 +4,7 @@ termux-setup-storage
 
 pkg install termux-am x11-repo -y
 pkg install xorg-xrandr xwayland -y
+pkg install angle-android -y
 pkg install termux-x11-nightly feh tint2 picom xfce4-taskmanager caja pv -y
 pkg install openbox -y
 wget https://github.com/mebabo1/menano/releases/download/Box/bin.tar.gz  >/dev/null 2>&1
