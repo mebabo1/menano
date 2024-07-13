@@ -42,5 +42,4 @@ tar xf SmartBox64.tar.gz
 mv SmartBox64 /sdcard
 rm -rf SmartBox64.tar.gz
 cd
-echo "run x11"
 rm -rf install03
