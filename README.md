@@ -2,6 +2,8 @@
 ---------------------------
 You can install Smartbox64 by executing the following four commands in the terminal in sequence
 
+You can run limited Windows games on your smartphone using termux
+
 English, Korean, and Japanese are available in Smartbox64
 
 ```sh
