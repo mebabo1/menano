@@ -24,6 +24,8 @@ curl -o update https://raw.githubusercontent.com/mebabo1/menano/File/update && c
 
 [How do I change my desktop image?](https://youtu.be/37OT0TS5n1Q?si=XWKP_RtksVkA_rUs)
 
+[How do I enroll a CD-ROM drive?](https://youtu.be/-RGOKmRupRw?si=AqYzyfw9uGhoIwK4)
+
 ## Smartbox64 was built using many sites open source
 ---------------------------
 [Dxvk](https://github.com/doitsujin/dxvk)
