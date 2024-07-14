@@ -1,7 +1,7 @@
 #!/bin/bash
 
 termux-setup-storage
-
+termux-change-repo
 pkg install termux-am x11-repo -y
 pkg install xorg-xrandr xwayland -y
 pkg install angle-android -y
