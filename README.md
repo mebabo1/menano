@@ -28,6 +28,8 @@ curl -o update https://raw.githubusercontent.com/mebabo1/menano/File/update && c
 
 [How do I enroll a CD-ROM drive?](https://youtu.be/-RGOKmRupRw?si=AqYzyfw9uGhoIwK4)
 
+[Can I run the program quickly?](https://youtu.be/nofblx0pbA0?si=DT0d13iLas9IFel1)
+
 ## Smartbox64 was built using many sites open source
 ---------------------------
 [Dxvk](https://github.com/doitsujin/dxvk)
