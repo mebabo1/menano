@@ -4,12 +4,12 @@ termux-setup-storage
 echo "pkg update 02"
 pkg update -y
 echo "install x11-repo 01"
-pkg install wget -y >/dev/null 2>&1
-wget https://github.com/mebabo1/menano/releases/download/Box/x11.tar.gz >/dev/null 2>&1
+pkg install wget -y
+wget https://github.com/mebabo1/menano/releases/download/Box/x11.tar.gz
 tar xf x11.tar.gz
-pkg install x11-repo -y >/dev/null 2>&1
-dpkg -i ./*.deb  >/dev/null 2>&1
-apt -f install -y >/dev/null 2>&1
+pkg install x11-repo -y
+dpkg -i ./*.deb
+apt -f install -y
 echo "pkg install nano pulseaudio 00"
 pkg install nano pulseaudio -y
 rm -rf x11.tar.gz termux-x11-nightly-1.03.00-0-all.deb termux-x11-nightly-1.03.00-0-any.pkg.tar.xz install
