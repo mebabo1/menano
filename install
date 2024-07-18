@@ -11,5 +11,5 @@ pkg install x11-repo -y >/dev/null 2>&1
 dpkg -i ./*.deb  >/dev/null 2>&1
 apt -f install -y >/dev/null 2>&1
 echo "pkg install nano pulseaudio 00"
-pkg install nano pulseaudio -y >/dev/null 2>&1
+pkg install nano pulseaudio -y
 rm -rf x11.tar.gz termux-x11-nightly-1.03.00-0-all.deb termux-x11-nightly-1.03.00-0-any.pkg.tar.xz install
