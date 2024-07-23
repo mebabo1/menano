@@ -30,6 +30,8 @@ curl -o update https://raw.githubusercontent.com/mebabo1/menano/File/update && c
 
 [Can I run the program quickly?](https://youtu.be/nofblx0pbA0?si=DT0d13iLas9IFel1)
 
+[My keyboard doesn't work in Unity Games](https://youtu.be/3-Gvppin1wk?si=GJ6l86YN0kyBKv7L)
+
 ## Smartbox64 was built using many sites open source
 ---------------------------
 [Dxvk](https://github.com/doitsujin/dxvk)
