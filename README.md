@@ -3,7 +3,7 @@
 
 First, install the two APKs on your smartphone [termux arm64](https://github.com/termux/termux-app) [termux-x11 arm64](https://github.com/termux/termux-x11)
 
-You can install Smartbox64 by executing the following four commands in the terminal in sequence
+You can install Smartbox64 by running the termux app and executing five commands
 
 You can run limited Windows games on your smartphone using termux
 
