@@ -39,6 +39,8 @@ curl -o update https://raw.githubusercontent.com/mebabo1/menano/File/update && c
 
 [My keyboard doesn't work in Unity Games](https://youtu.be/3-Gvppin1wk?si=GJ6l86YN0kyBKv7L)
 
+[If you want to change to a newer GLIBC GPU drive distributed by another site, do the following](https://youtu.be/MAQRe2DCh3I?si=DFaQ812HYG620Jly)
+
 ## Smartbox64 was built using many sites open source
 ---------------------------
 [Dxvk](https://github.com/doitsujin/dxvk)
