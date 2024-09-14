@@ -28,6 +28,8 @@ curl -o install03 https://raw.githubusercontent.com/mebabo1/menano/File/install0
 ```sh
 curl -o update https://raw.githubusercontent.com/mebabo1/menano/File/update && chmod +x update && ./update
 ```
+Command to uninstall the latest wine and install wine9.15
+
 ```sh
 curl -o wine https://raw.githubusercontent.com/mebabo1/menano/File/wine && chmod +x wine && ./wine
 ```
