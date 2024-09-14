@@ -28,6 +28,7 @@ curl -o install03 https://raw.githubusercontent.com/mebabo1/menano/File/install0
 ```sh
 curl -o update https://raw.githubusercontent.com/mebabo1/menano/File/update && chmod +x update && ./update
 ```
+If you experience a lot of bugs in the latest version of wine, you can use wine9.15
 Command to uninstall the latest wine and install wine9.15
 
 ```sh
