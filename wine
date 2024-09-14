@@ -1,0 +1,5 @@
+cd /data/data/com.termux/files
+rm -rf opt/wine
+wget https://github.com/mebabo1/menano/releases/download/Box/wine.tar.xz
+tar xf wine.tar.xz
+rm -rf wine.tar.xz
