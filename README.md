@@ -35,6 +35,10 @@ Command to uninstall the latest wine and install wine9.15
 curl -o wine https://raw.githubusercontent.com/mebabo1/menano/File/wine && chmod +x wine && ./wine
 ```
 
+```sh
+curl -o wine9_9 https://raw.githubusercontent.com/mebabo1/menano/File/wine9_9 && chmod +x wine9_9 && ./wine9_9
+```
+
 [How do I work with exe files?](https://youtu.be/2_HRNpfYb4E?si=xfyPsoTDXvwhWlmM)
 
 [How do I change my desktop image?](https://youtu.be/37OT0TS5n1Q?si=XWKP_RtksVkA_rUs)
