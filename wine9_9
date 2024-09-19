@@ -1,5 +1,6 @@
 #!/bin/bash
 
+
 cd /data/data/com.termux/files
 rm -rf opt/wine
 wget https://github.com/mebabo1/menano/releases/download/Box/wine9_9.tar.xz
