@@ -6,4 +6,4 @@ wget https://github.com/mebabo1/menano/releases/download/Box/wine9_9.tar.xz
 tar xf wine9_9.tar.xz
 rm -rf wine9_9.tar.xz
 cd
-rm -rf wine9_9.tar.xz
+rm -rf wine9_9
