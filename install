@@ -3,6 +3,7 @@ clear
 termux-setup-storage
 echo "pkg update 02"
 pkg update -y
+apt update -y
 echo "install x11-repo 01"
 pkg install wget -y
 wget https://github.com/mebabo1/menano/releases/download/Box/x11.tar.gz
