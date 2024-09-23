@@ -1,0 +1,7 @@
+rm -rf /data/data/com.termux/files/home/collect_process_info
+cd /data/data/com.termux/files
+wget https://github.com/mebabo1/menano/releases/download/Box/startx.tar.gz
+tar xf startx.tar.gz
+rm -rf startx.tar.gz
+cd
+rm -rf startx
