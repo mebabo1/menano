@@ -13,4 +13,4 @@ dpkg -i ./*.deb
 apt -f install -y
 echo "pkg install nano pulseaudio 00"
 pkg install nano pulseaudio -y
-rm -rf x11.tar.gz termux-x11-nightly-1.03.00-0-all.deb termux-x11-nightly-1.03.00-0-any.pkg.tar.xz install
+rm -rf x11.tar.gz termux-x11-nightly-1.03.01-0-all.deb termux-x11-nightly-1.03.01-0-any.pkg.tar.xz install
