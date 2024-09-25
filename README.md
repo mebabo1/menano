@@ -11,6 +11,10 @@ English, Korean, and Japanese are available in Smartbox64
 
 Smartbox64 requires 5GB of space to install, including the wine installation
 
+The library with the FFmpeg codec is ready on SmartBox64
+Two codecs now work with wine9.18: GStreamer and FFmpeg
+Therefore, you may not need to install K-Lite Codec Pack in wine9.18
+
 In-game, GStreamer is suitable for playing videos If you want to watch more videos, install the [K-Lite Codec Pack](https://codecguide.com/download_kl.htm) After selecting the Basic version and clicking the Next button, we recommend that you do not adjust any options during installation.
 
 ```sh
