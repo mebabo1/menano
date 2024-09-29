@@ -43,7 +43,7 @@ rm -rf openbox_menu.tar.gz box64.tar.xz python.tar.gz caja.tar.gz cajaf.tar.gz c
 rm -rf /sdcard/Box64Droid01
 rm -rf /sdcard/SmartBox64
 tar xf SmartBox64.tar.gz
-mv SmartBox64 /sdcard
-rm -rf SmartBox64.tar.gz
+cp -r SmartBox64 /sdcard
+rm -rf SmartBox64.tar.gz SmartBox64
 cd
 rm -rf install03
