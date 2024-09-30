@@ -58,6 +58,10 @@ curl -o wine9_9 https://raw.githubusercontent.com/mebabo1/menano/File/wine9_9 &&
 
 [If you want to change to a newer GLIBC GPU drive distributed by another site, do the following](https://youtu.be/MAQRe2DCh3I?si=DFaQ812HYG620Jly)
 
+I've been playing my favorite game lately, and I can't stand the hassle.
+[1](https://youtu.be/zkExc3zT42w?si=rCkb0e-UxmX8E5_R)
+[2](https://youtu.be/ferTypykBg4?si=mMJ1DN7hnw0_z0bN)
+
 ## Smartbox64 was built using many sites open source
 ---------------------------
 [Dxvk](https://github.com/doitsujin/dxvk)
