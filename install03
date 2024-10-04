@@ -37,7 +37,7 @@ tar xf caja.tar.gz
 tar xf cajaf.tar.gz
 tar xf cajarun.tar.gz
 tar xf openbox_menu.tar.gz
-#tar xf termux_vulkan.tar.gz
+tar xf termux_vulkan.tar.gz
 tar xf xfce4_settings.tar.gz
 rm -rf openbox_menu.tar.gz box64.tar.xz python.tar.gz caja.tar.gz cajaf.tar.gz cajarun.tar.gz termux_vulkan.tar.gz xfce4_settings.tar.gz
 rm -rf /sdcard/Box64Droid01
