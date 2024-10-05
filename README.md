@@ -9,7 +9,7 @@ You can run limited Windows games on your smartphone using termux
 
 English, Korean, and Japanese are available in Smartbox64
 
-Smartbox64 requires 5GB of space to install, including the wine installation
+Smartbox64 requires 6GB of space to install, including the wine installation
 
 The library with the FFmpeg codec is ready on SmartBox64
 Two codecs now work with wine9.18: GStreamer and FFmpeg
