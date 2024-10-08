@@ -9,6 +9,7 @@ pkg install termux-x11-nightly feh tint2 picom xfce4-taskmanager caja pv -y
 #pkg install vulkan-loader-android -y
 pkg install openbox -y
 pip install psutil
+pip install asyncio
 wget https://github.com/mebabo1/menano/releases/download/Box/bin.tar.gz  >/dev/null 2>&1
 tar xf bin.tar.gz
 rm -rf bin.tar.gz
