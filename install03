@@ -15,8 +15,8 @@ cd /data/data/com.termux/files
 rm -rf opt
 echo "pkg download06"
 wget -O box64.tar.xz https://github.com/mebabo1/menano/releases/download/Box/box64.tar.xz 2>&1 | pv -l > download.log
-echo "pkg download05"
-wget -O python.tar.gz https://github.com/mebabo1/menano/releases/download/Box/python.tar.gz 2>&1 | pv -l > download.log
+#echo "pkg download05"
+#wget -O python.tar.gz https://github.com/mebabo1/menano/releases/download/Box/python.tar.gz 2>&1 | pv -l > download.log
 echo "pkg download04"
 wget https://github.com/mebabo1/menano/releases/download/Box/caja.tar.gz >/dev/null 2>&1
 echo "pkg download03"
@@ -32,7 +32,7 @@ wget https://github.com/mebabo1/menano/releases/download/Box/xfce4_settings.tar.
 echo "pkg tar xf"
 rm -rf home/.local
 tar xf box64.tar.xz
-tar xf python.tar.gz
+#tar xf python.tar.gz
 tar xf caja.tar.gz
 tar xf cajaf.tar.gz
 tar xf cajarun.tar.gz
