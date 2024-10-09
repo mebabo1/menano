@@ -11,9 +11,6 @@ tar xf glibc.tar.xz
 tar xf alsa.tar
 rm -rf alsa.tar glibc.tar.xz
 cd /data/data/com.termux/files/usr
-echo "/data/data/com.termux/files/usr noindex"
-find -type d -exec touch {}/.noindex \;
-rm -rf /data/data/com.termux/files/usr/etc/termux/mirrors/russia/.noindex /data/data/com.termux/files/usr/etc/termux/mirrors/oceania/.noindex /data/data/com.termux/files/usr/etc/termux/mirrors/north_america/.noindex /data/data/com.termux/files/usr/etc/termux/mirrors/chinese_mainland/.noindex /data/data/com.termux/files/usr/etc/termux/mirrors/asia/.noindex
 cd
 echo "SmartBox64 can be operated using x11 commands"
 echo "If your script is broken or your wine file is broken, restore it with the following command"
