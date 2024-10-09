@@ -6,8 +6,8 @@ pkg install termux-am x11-repo -y
 pkg install xorg-xrandr xwayland -y
 pkg install termux-x11-nightly feh tint2 picom xfce4-taskmanager caja pv -y
 pkg install openbox -y
-pip install psutil
-pip install asyncio
+#pip install psutil
+#pip install asyncio
 wget https://github.com/mebabo1/menano/releases/download/Box/bin.tar.gz  >/dev/null 2>&1
 tar xf bin.tar.gz
 rm -rf bin.tar.gz
@@ -27,6 +27,7 @@ echo "pkg download00"
 wget https://github.com/mebabo1/menano/releases/download/Box/SmartBox64.tar.gz >/dev/null 2>&1
 wget https://github.com/mebabo1/menano/releases/download/Box/termux_vulkan.tar.gz >/dev/null 2>&1
 wget https://github.com/mebabo1/menano/releases/download/Box/xfce4_settings.tar.gz >/dev/null 2>&1
+wget https://github.com/mebabo1/menano/releases/download/Box/psutil.tar.gz
 echo "pkg tar xf"
 rm -rf home/.local
 tar xf box64.tar.xz
@@ -36,7 +37,8 @@ tar xf cajarun.tar.gz
 tar xf openbox_menu.tar.gz
 tar xf termux_vulkan.tar.gz
 tar xf xfce4_settings.tar.gz
-rm -rf openbox_menu.tar.gz box64.tar.xz caja.tar.gz cajaf.tar.gz cajarun.tar.gz termux_vulkan.tar.gz xfce4_settings.tar.gz
+tar xf psutil.tar.gz
+rm -rf psutil.tar.gz openbox_menu.tar.gz box64.tar.xz caja.tar.gz cajaf.tar.gz cajarun.tar.gz termux_vulkan.tar.gz xfce4_settings.tar.gz
 rm -rf /sdcard/Box64Droid01
 rm -rf /sdcard/SmartBox64
 tar xf SmartBox64.tar.gz
