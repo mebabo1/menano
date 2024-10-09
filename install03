@@ -27,7 +27,7 @@ echo "pkg download00"
 wget https://github.com/mebabo1/menano/releases/download/Box/SmartBox64.tar.gz >/dev/null 2>&1
 wget https://github.com/mebabo1/menano/releases/download/Box/termux_vulkan.tar.gz >/dev/null 2>&1
 wget https://github.com/mebabo1/menano/releases/download/Box/xfce4_settings.tar.gz >/dev/null 2>&1
-wget https://github.com/mebabo1/menano/releases/download/Box/psutil.tar.gz
+wget https://github.com/mebabo1/menano/releases/download/Box/psutil.tar.gz >/dev/null 2>&1
 echo "pkg tar xf"
 rm -rf home/.local
 tar xf box64.tar.xz
