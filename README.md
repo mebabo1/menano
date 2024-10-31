@@ -2,7 +2,7 @@
 If you experience a lot of bugs in the latest version of wine, you can use wine9.15
 Command to uninstall the latest wine and install wine9.15
 GStreamer on wine9.15 only works on 64-bit
-
+```
 ```sh
 curl -o wine https://raw.githubusercontent.com/mebabo1/menano/File/wine && chmod +x wine && ./wine
 ```
