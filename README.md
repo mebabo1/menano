@@ -15,6 +15,9 @@ The library with the FFmpeg codec is ready on SmartBox64
 Two codecs now work with wine9.18: GStreamer and FFmpeg
 Therefore, you may not need to install K-Lite Codec Pack in wine9.18
 
+If your game worked with dxvk, you will need to set quartz_builtin_native.bat You can easily find the quartz_builtin_native.bat file in your quartz folder quartz_native_builtin.bat setting is appropriate for games that did not work with dxvk
+It also works with Windows Media Player and allows you to watch videos that you can't watch on your smartphone.
+
 ```sh
 PATH="$PATH:$HOME/bin"
 ```
