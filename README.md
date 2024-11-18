@@ -9,14 +9,7 @@ You can run limited Windows games on your smartphone using termux
 
 English, Korean, and Japanese are available in Smartbox64
 
-Smartbox64 requires 6GB of space to install, including the wine installation
-
-The library with the FFmpeg codec is ready on SmartBox64
-Two codecs now work with wine9.18: GStreamer and FFmpeg
-Therefore, you may not need to install K-Lite Codec Pack in wine9.18
-
-If your game worked with dxvk, you will need to set quartz_builtin_native.bat You can easily find the quartz_builtin_native.bat file in your quartz folder quartz_native_builtin.bat setting is appropriate for games that did not work with dxvk
-It also works with Windows Media Player and allows you to watch videos that you can't watch on your smartphone.
+Smartbox64 requires 6GB of space to install, including the wine installation 
 
 ```sh
 PATH="$PATH:$HOME/bin"
