@@ -45,6 +45,8 @@ I've been playing my favorite game lately, and I can't stand the hassle.
 [Guide2](https://youtu.be/ferTypykBg4?si=mMJ1DN7hnw0_z0bN)
 
 [The logging feature of the Termux app is slowing down my game](https://youtu.be/ngjYrhapfbE?si=xbu0VEFElgX5a5-A)
+
+[We recommend that you set the default settings for termux-x11 apps as follows](https://youtu.be/bc4qL2jcHq4?si=qIpY-HFm2kjEFACW)
 ## Smartbox64 was built using many sites open source
 ---------------------------
 [Dxvk](https://github.com/doitsujin/dxvk)
