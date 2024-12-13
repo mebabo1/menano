@@ -5,7 +5,7 @@ First, install the two APKs on your smartphone use v0.118.0 [termux arm64](https
 
 You can install Smartbox64 by running the termux app and executing five commands
 
-You can run limited Windows games on your smartphone using termux
+You can run limited Windows games on your Snapdragon GPU smartphone using termux
 
 English, Korean, and Japanese are available in Smartbox64
 
