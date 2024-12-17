@@ -26,7 +26,7 @@ echo "pkg download01"
 wget https://github.com/mebabo1/menano/releases/download/Box/openbox_menu.tar.gz >/dev/null 2>&1
 echo "pkg download00"
 wget https://github.com/mebabo1/menano/releases/download/Box/SmartBox64.tar.gz >/dev/null 2>&1
-wget https://github.com/mebabo1/menano/releases/download/Box/termux_vulkan.tar.gz >/dev/null 2>&1
+#wget https://github.com/mebabo1/menano/releases/download/Box/termux_vulkan.tar.gz >/dev/null 2>&1
 wget https://github.com/mebabo1/menano/releases/download/Box/xfce4_settings.tar.gz >/dev/null 2>&1
 echo "pkg tar xf"
 rm -rf home/.local
@@ -35,7 +35,7 @@ tar xf caja.tar.gz
 tar xf cajaf.tar.gz
 tar xf cajarun.tar.gz
 tar xf openbox_menu.tar.gz
-tar xf termux_vulkan.tar.gz
+#tar xf termux_vulkan.tar.gz
 tar xf xfce4_settings.tar.gz
 rm -rf openbox_menu.tar.gz box64.tar.xz caja.tar.gz cajaf.tar.gz cajarun.tar.gz termux_vulkan.tar.gz xfce4_settings.tar.gz
 rm -rf /sdcard/Box64Droid01
