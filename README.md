@@ -1,7 +1,7 @@
 # Smartbox64
 ---------------------------
 
-First, install the two APKs on your smartphone use v0.118.0 [termux arm64](https://github.com/termux/termux-app) [termux-x11 arm64](https://github.com/ar37-rs/termux-x11/actions/runs/12483415698)
+First, install the two APKs on your smartphone use v0.118.0 [termux arm64](https://github.com/termux/termux-app) [termux-x11 arm64](https://github.com/termux/termux-x11)
 
 You can install Smartbox64 by running the termux app and executing five commands
 
