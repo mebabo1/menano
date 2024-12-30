@@ -47,6 +47,8 @@ I've been playing my favorite game lately, and I can't stand the hassle.
 [The logging feature of the Termux app is slowing down my game](https://youtu.be/ngjYrhapfbE?si=xbu0VEFElgX5a5-A)
 
 [We recommend that you set the default settings for termux-x11 apps as follows](https://youtu.be/bc4qL2jcHq4?si=qIpY-HFm2kjEFACW)
+
+[My mouse cursor is ugly and I want to change it](https://youtu.be/b-hP879cKaE?si=IVLFYCPxWaYzNDcn)
 ## Smartbox64 was built using many sites open source
 ---------------------------
 [Dxvk](https://github.com/doitsujin/dxvk)
