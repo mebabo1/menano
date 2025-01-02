@@ -55,6 +55,8 @@ I've been playing my favorite game lately, and I can't stand the hassle.
 
 [Wine](https://github.com/airidosas252/Wine-Builds)
 
+[wine-staging](https://github.com/ar37-rs/xow64-wine)
+
 [Wined3d](https://fdossena.com/?p=wined3d/index.frag)
 
 [Termux](https://github.com/termux/termux-app)
