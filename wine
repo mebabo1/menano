@@ -3,9 +3,7 @@
 cd /data/data/com.termux/files
 rm -rf opt/wine
 wget https://github.com/mebabo1/menano/releases/download/Box/wine.tar.xz
-wget https://github.com/mebabo1/menano/releases/download/Box/Scripts.tar.gz
 tar xf wine.tar.xz
-tar xf Scripts.tar.gz
-rm -rf wine.tar.xz Scripts.tar.gz
+rm -rf wine.tar.xz
 cd
 rm -rf wine
