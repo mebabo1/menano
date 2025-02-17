@@ -1,0 +1,10 @@
+#!/bin/bash
+
+
+cd /data/data/com.termux/files/opt
+rm -rf wine
+wget https://github.com/mebabo1/menano/releases/download/Box/wine9_13.tar.xz
+tar xf wine9_13.tar.xz
+rm -rf wine9_13.tar.xz
+cd
+rm -rf wine9_13
