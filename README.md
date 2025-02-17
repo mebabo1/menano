@@ -10,5 +10,5 @@ curl -o wine https://raw.githubusercontent.com/mebabo1/menano/File/wine && chmod
 If you want your GStreamer video to work on both 32-bit and 64-bit, you can install wime9.9
 
 ```sh
-curl -o wine9_9 https://raw.githubusercontent.com/mebabo1/menano/File/wine9_9 && chmod +x wine9_9 && ./wine9_9
+curl -o wine9_13 https://raw.githubusercontent.com/mebabo1/menano/File/wine9_13 && chmod +x wine9_13 && ./wine9_13
 ```
