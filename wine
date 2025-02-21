@@ -3,7 +3,11 @@
 cd /data/data/com.termux/files
 rm -rf opt
 wget https://github.com/mebabo1/menano/releases/download/Box/wine.tar.xz
+wget https://github.com/mebabo1/menano/releases/download/Box/SmartBox64.tar.gz >/dev/null 2>&1
+rm -rf /sdcard/SmartBox64
+tar xf SmartBox64.tar.gz
+cp -r SmartBox64 /sdcard
 tar xf wine.tar.xz
-rm -rf wine.tar.xz
+rm -rf wine.tar.xz SmartBox64.tar.gz
 cd
 rm -rf wine
