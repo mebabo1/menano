@@ -8,6 +8,6 @@ rm -rf /sdcard/SmartBox64
 tar xf SmartBox64.tar.gz
 cp -r SmartBox64 /sdcard
 tar xf wine.tar.xz
-rm -rf wine.tar.xz SmartBox64.tar.gz
+rm -rf wine.tar.xz SmartBox64.tar.gz SmartBox64
 cd
 rm -rf wine
