@@ -66,6 +66,8 @@ Gamepads are now available on SmartBox
 
 You need an app distributed by someone else to use the gamepad
 
+[termux-x11 game pad](https://github.com/moio9/termux-x11-extra/releases)
+
 After installing the app and completing a few setup steps, you can start using the gamepad
 
 Using a gamepad replaces a few DLL files, and if this has resulted in poor game compatibility, repair the files
