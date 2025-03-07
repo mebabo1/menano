@@ -62,6 +62,21 @@ I've been playing my favorite game lately, and I can't stand the hassle.
 
 [Changing screen resolution in openbox is now possible with the latest termux-x11 app](https://youtu.be/Ybe_ronblBU?si=4m2AIqjGO0N3--gy)
 
+Gamepads are now available on SmartBox
+
+You need an app distributed by someone else to use the gamepad
+
+After installing the app and completing a few setup steps, you can start using the gamepad
+
+Using a gamepad replaces a few DLL files, and if this has resulted in poor game compatibility, repair the files
+
+From the menu on the right mouse button, the gamepad dll file is installed once and does not need to be reinstalled in the future
+
+Install only once after updating your wine version
+
+[Guide1](https://youtu.be/3VpoA9ej980?si=pMMds-13z6x55Z0H)
+[Guide2](https://youtu.be/oEqhKcIRaT0?si=duhX_y2Zo0d34bIf)
+
 ## Smartbox64 was built using many sites open source
 ---------------------------
 [Dxvk](https://github.com/doitsujin/dxvk)
