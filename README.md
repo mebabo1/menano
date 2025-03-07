@@ -76,6 +76,8 @@ I've been playing my favorite game lately, and I can't stand the hassle.
 
 [Termux-x11](https://github.com/termux/termux-x11/blob/master/README.md#running-graphical-applications)
 
+[Termux-x11 game pad](https://github.com/moio9)
+
 [Glibc packages for termux](https://github.com/termux-pacman/glibc-packages)
 
 [Box64](https://github.com/ptitSeb/box64)
