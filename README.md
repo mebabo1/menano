@@ -36,6 +36,14 @@ curl -o install03 https://raw.githubusercontent.com/mebabo1/menano/File/install0
 ```sh
 curl -o update https://raw.githubusercontent.com/mebabo1/menano/File/update && chmod +x update && ./update
 ```
+The latest development version of wine may have many problems
+If you do not want the development version and want the stable version, install the files with the following command and then reinstall wine
+
+wine stable 10.0
+```sh
+curl -o wine https://raw.githubusercontent.com/mebabo1/menano/File/wine && chmod +x wine && ./wine
+```
+
 
 [How do I work with exe files?](https://youtu.be/2_HRNpfYb4E?si=xfyPsoTDXvwhWlmM)
 
