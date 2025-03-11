@@ -85,7 +85,7 @@ From the menu on the right mouse button, the gamepad dll file is installed once 
 Install only once after updating your wine version
 
 Tested game controllers
-xbox controller, ps5 controller
+xbox controller, ps5 controller, GameSir g8 plus
 
 [Guide1](https://youtu.be/3VpoA9ej980?si=pMMds-13z6x55Z0H)
 [Guide2](https://youtu.be/oEqhKcIRaT0?si=duhX_y2Zo0d34bIf)
