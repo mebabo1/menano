@@ -39,7 +39,7 @@ curl -o update https://raw.githubusercontent.com/mebabo1/menano/File/update && c
 The latest development version of wine may have many problems
 If you do not want the development version and want the stable version, install the files with the following command and then reinstall wine
 
-wine stable 10.0
+wine stable 10.3
 ```sh
 curl -o wine https://raw.githubusercontent.com/mebabo1/menano/File/wine && chmod +x wine && ./wine
 ```
