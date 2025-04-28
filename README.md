@@ -43,7 +43,9 @@ wine stable 10.3
 ```sh
 curl -o wine https://raw.githubusercontent.com/mebabo1/menano/File/wine && chmod +x wine && ./wine
 ```
+Recently, many people's glibc wine builds have stopped updating.
 
+To use DXVK on Smartbox you need to install WINED3D first and then install DXVK
 
 [How do I work with exe files?](https://youtu.be/2_HRNpfYb4E?si=xfyPsoTDXvwhWlmM)
 
