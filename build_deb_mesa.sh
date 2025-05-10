@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Preparing
-https://gofile.io/d/BXjuQo
+
 echo "
 deb http://ports.ubuntu.com/ubuntu-ports jammy main restricted universe multiverse
 deb-src http://ports.ubuntu.com/ubuntu-ports jammy main restricted universe multiverse
