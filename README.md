@@ -94,6 +94,8 @@ xbox controller, ps5 controller, GameSir g8 plus
 ---------------------------
 [Dxvk](https://github.com/doitsujin/dxvk)
 
+[DXVK-Sarek](https://github.com/pythonlover02/DXVK-Sarek)
+
 [Wine](https://github.com/airidosas252/Wine-Builds)
 
 [wine-staging](https://github.com/ar37-rs/xow64-wine)
