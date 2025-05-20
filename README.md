@@ -45,6 +45,10 @@ curl -o wine https://raw.githubusercontent.com/mebabo1/menano/File/wine && chmod
 ```
 Recently, many people's glibc wine builds have stopped updating.
 
+32-bit games do not recognize 8-core cpu 4-7 set
+
+Some games are CPU intensive, and even with the correct settings, the game will crash unexpectedly. In these cases, switching the game to windowed mode will help.
+
 [How do I work with exe files?](https://youtu.be/2_HRNpfYb4E?si=xfyPsoTDXvwhWlmM)
 
 [How do I change my desktop image?](https://youtu.be/37OT0TS5n1Q?si=XWKP_RtksVkA_rUs)
