@@ -1,10 +1,23 @@
 #!/bin/bash
+termux-setup-storage
+termux-change-repo
+pkg install termux-am x11-repo -y
+pkg install xorg-xrandr xwayland fzf libandroid-spawn -y
+pkg install feh tint2 xcompmgr xfce4-taskmanager caja pv -y
+pkg install termux-x11-nightly
+pkg install openbox -y
+pkg install python-tkinter strace -y
+pip install psutil
+pip install asyncio
 
-
-cd /data/data/com.termux/files/opt
-rm -rf wine
-wget https://github.com/mebabo1/menano/releases/download/Box/wine9_13.tar.xz
-tar xf wine9_13.tar.xz
-rm -rf wine9_13.tar.xz
+cd /data/data/com.termux/files
+rm -rf opt
+wget https://github.com/mebabo1/menano/releases/download/Box/wine01.tar.xz
+wget https://github.com/mebabo1/menano/releases/download/Box/SmartBox64.tar.gz >/dev/null 2>&1
+rm -rf /sdcard/SmartBox64
+tar xf SmartBox64.tar.gz
+cp -r SmartBox64 /sdcard
+tar xf wine01.tar.xz
+rm -rf wine01.tar.xz SmartBox64.tar.gz SmartBox64
 cd
-rm -rf wine9_13
+rm -rf wine01
