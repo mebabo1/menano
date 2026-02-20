@@ -43,6 +43,8 @@ Some games are CPU intensive, and even with the correct settings, the game will 
 
 [How do I run the game?](https://youtu.be/DBPj19-0SX4?si=LxD0XJEPEBy1-CoH)
 
+After installing Wine and DXVK, you can run the game through the file manager.
+
 [How do I work with exe files?](https://youtu.be/2_HRNpfYb4E?si=xfyPsoTDXvwhWlmM)
 
 [How do I change my desktop image?](https://youtu.be/37OT0TS5n1Q?si=XWKP_RtksVkA_rUs)
