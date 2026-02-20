@@ -94,9 +94,9 @@ xbox controller, ps5 controller, GameSir g8 plus
 [Guide1](https://youtu.be/3VpoA9ej980?si=pMMds-13z6x55Z0H)
 [Guide2](https://youtu.be/oEqhKcIRaT0?si=duhX_y2Zo0d34bIf)
 
-[termux-x11-xodmod](https://github.com/xodiosx/termux-x11-xodmod?tab=readme-ov-file)
-
 An app supporting the same virtual keyboard as Winlator has been released.
+
+[termux-x11-xodmod](https://github.com/xodiosx/termux-x11-xodmod?tab=readme-ov-file)
 
 ## Smartbox64 was built using many sites open source
 ---------------------------
