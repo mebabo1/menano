@@ -116,6 +116,8 @@ An app supporting the same virtual keyboard as Winlator has been released.
 
 [Termux-x11 game pad](https://github.com/moio9)
 
+[Termux-X11 APK with Winlator Virtual Touch Controller](https://github.com/xodiosx/termux-x11-xodmod)
+
 [Glibc packages for termux](https://github.com/termux-pacman/glibc-packages)
 
 [Box64](https://github.com/ptitSeb/box64)
