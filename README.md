@@ -41,6 +41,8 @@ curl -o update https://raw.githubusercontent.com/mebabo1/menano/File/update && c
 
 Some games are CPU intensive, and even with the correct settings, the game will crash unexpectedly. In these cases, switching the game to windowed mode will help.
 
+[How do I run the game?](https://youtu.be/DBPj19-0SX4?si=LxD0XJEPEBy1-CoH)
+
 [How do I work with exe files?](https://youtu.be/2_HRNpfYb4E?si=xfyPsoTDXvwhWlmM)
 
 [How do I change my desktop image?](https://youtu.be/37OT0TS5n1Q?si=XWKP_RtksVkA_rUs)
