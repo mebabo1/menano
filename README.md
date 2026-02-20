@@ -37,10 +37,6 @@ curl -o install03 https://raw.githubusercontent.com/mebabo1/menano/File/install0
 curl -o update https://raw.githubusercontent.com/mebabo1/menano/File/update && chmod +x update && ./update
 ```
 
-32-bit games do not recognize 8-core cpu 4-7 set
-
-Some games are CPU intensive, and even with the correct settings, the game will crash unexpectedly. In these cases, switching the game to windowed mode will help.
-
 run openbox mode
 
 [How do I run the game?](https://youtu.be/DBPj19-0SX4?si=LxD0XJEPEBy1-CoH)
@@ -48,6 +44,8 @@ run openbox mode
 After installing Wine and DXVK, you can run the game through the file manager
 Language default value: Korean
 GPU default value: User GPU
+32-bit games do not recognize 8-core cpu 4-7 set
+Some games are CPU intensive, and even with the correct settings, the game will crash unexpectedly. In these cases, switching the game to windowed mode will help.
 
 [How do I work with exe files?](https://youtu.be/2_HRNpfYb4E?si=xfyPsoTDXvwhWlmM)
 
