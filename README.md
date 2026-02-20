@@ -76,7 +76,7 @@ Gamepads are now available on SmartBox
 
 You need an app distributed by someone else to use the gamepad
 
-[termux-x11 game pad](https://github.com/moio9/termux-x11-extra/releases)
+[termux-x11 game pad](https://github.com/mebabo1/menano/releases/download/Box/termux-x11-game_pad-app-arm64-v8a-debug.zip)
 
 After installing the app and completing a few setup steps, you can start using the gamepad
 
