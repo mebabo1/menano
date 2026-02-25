@@ -35,4 +35,5 @@ tar xf SmartBox64.tar.gz
 cp -r SmartBox64 /sdcard
 rm -rf SmartBox64.tar.gz SmartBox64
 cd
+echo "end"
 rm -rf install03
