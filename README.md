@@ -14,7 +14,7 @@ Smartbox64 requires 5GB of space to install, including the wine installation
 For file maintenance, the smartbox doesn't check the Internet for anything after you install it to reduce the delay in desktop operation.
 Smartboxes also don't support automatic updates.
 
-#Enter the two commands in order to install SmartBox.
+# Enter the two commands in order to install SmartBox.
 
 
 ```sh
@@ -24,7 +24,7 @@ PATH="$PATH:$HOME/bin"
 curl -o install https://raw.githubusercontent.com/mebabo1/menano/File/install && chmod +x install && ./install
 ```
 
-#command to update your files or repair corrupted files
+# command to update your files or repair corrupted files
 
 glibc
 ```sh
