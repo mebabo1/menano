@@ -14,10 +14,6 @@ Smartbox64 requires 5GB of space to install, including the wine installation
 For file maintenance, the smartbox doesn't check the Internet for anything after you install it to reduce the delay in desktop operation.
 Smartboxes also don't support automatic updates.
 
-If there is an error in the game, you can check the date your file was uploaded when you need to and
-
-curl -o install03 https://raw.githubusercontent.com/mebabo1/menano/File/install03 && chmod +x install03 && ./install03
-
 #Enter the two commands in order to install SmartBox.
 
 
