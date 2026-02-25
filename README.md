@@ -18,7 +18,7 @@ If there is an error in the game, you can check the date your file was uploaded 
 
 curl -o install03 https://raw.githubusercontent.com/mebabo1/menano/File/install03 && chmod +x install03 && ./install03
 
-command to update your files or repair corrupted files
+#Enter the two commands in order to install SmartBox.
 
 
 ```sh
@@ -27,12 +27,14 @@ PATH="$PATH:$HOME/bin"
 ```sh
 curl -o install https://raw.githubusercontent.com/mebabo1/menano/File/install && chmod +x install && ./install
 ```
-```sh
-curl -o install02 https://raw.githubusercontent.com/mebabo1/menano/File/install02 && chmod +x install02 && ./install02
-```
+
+#command to update your files or repair corrupted files
+
+glibc
 ```sh
 curl -o install03 https://raw.githubusercontent.com/mebabo1/menano/File/install03 && chmod +x install03 && ./install03
 ```
+wine&dxvk
 ```sh
 curl -o update https://raw.githubusercontent.com/mebabo1/menano/File/update && chmod +x update && ./update
 ```
