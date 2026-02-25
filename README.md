@@ -26,7 +26,7 @@ curl -o install https://raw.githubusercontent.com/mebabo1/menano/File/install &&
 
 # command to update your files or repair corrupted files
 
-glibc
+glibc&box64
 ```sh
 curl -o install03 https://raw.githubusercontent.com/mebabo1/menano/File/install03 && chmod +x install03 && ./install03
 ```
