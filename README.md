@@ -94,7 +94,7 @@ An app supporting the same virtual keyboard as Winlator has been released.
 
 [termux-x11-xodmod](https://github.com/xodiosx/termux-x11-xodmod?tab=readme-ov-file)
 
-If you install the gamepad DLL file and run this app through the wfm.exe file manager, the game controller should also work.
+If you install the Winlator pad DLL file and run this app through the wfm.exe file manager, the game controller should also work.
 
 ## Smartbox64 was built using many sites open source
 ---------------------------
