@@ -21,8 +21,7 @@ pkg install xorg-xrandr xwayland fzf libandroid-spawn -y
 pkg install feh tint2 xcompmgr xfce4-taskmanager caja pv -y
 pkg install termux-x11-nightly
 pkg install openbox mesa-vulkan-icd-freedreno -y
-pkg install python-tkinter strace libvpx -y
-pip install psutil
+pkg install python-tkinter python-psutil strace libvpx -y
 pip install asyncio
 wget https://github.com/mebabo1/menano/releases/download/Box/bin.tar.gz  >/dev/null 2>&1
 tar xf bin.tar.gz
