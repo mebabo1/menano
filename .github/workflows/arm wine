@@ -1,4 +1,4 @@
-name: Wine ARM64 WOW64 构建（基于 llvm-mingw，Debian 12 容器）
+name: Wine ARM64 WOW64（llvm-mingw，Debian 12）
 
 on:
   schedule:
