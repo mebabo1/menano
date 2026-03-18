@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
     inputs:
       wine_branch:
-        description: 'Wine 分支'
+        description: 'Wine'
         required: false
         default: 'vanilla'
         type: choice
@@ -16,7 +16,7 @@ on:
         - staging-tkg
         - staging-tkg-fsync
       wine_version:
-        description: 'Wine 版本 (例如 9.22，或 latest)'
+        description: 'Wine ( 9.22，latest)'
         required: false
         default: 'latest'
         type: string
