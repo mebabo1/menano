@@ -1,5 +1,5 @@
 # build-mesa.yml
-name: Build Mesa for Linbox (aarch64)
+name: Build Mesa glibc(aarch64)
 
 on:
   workflow_dispatch:
