@@ -369,6 +369,7 @@ jobs:
             --enable-win64 \
             --enable-nls \
             --disable-win16 \
+            --disable-winemenubuilder \
             --disable-tests \
             --with-pulse \
             --with-vulkan \
