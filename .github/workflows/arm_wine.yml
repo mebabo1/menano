@@ -366,8 +366,12 @@ jobs:
             --with-mingw=clang \
             --enable-archs=arm64ec,aarch64,i386 \
             --enable-tools \
-            --enable-fex \
+            --enable-win64 \
+            --enable-nls \
+            --disable-win16 \
+            --disable-opencl \
             --disable-tests \
+            --with-pulse \
             --with-vulkan \
             --with-gstreamer \
             --host=aarch64-linux-gnu \
