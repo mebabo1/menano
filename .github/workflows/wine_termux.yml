@@ -123,34 +123,33 @@ jobs:
           --host=aarch64-linux-android \
           --with-mingw=clang \
           --with-wine-tools=./wine-tools \
-          --enable-win64 \
-          --enable-nls \
+          --with-x \
+          --with-alsa \
           --with-pulse \
+          --with-freetype \
+          --with-fontconfig \
+          --with-gettext \
+          --with-sdl \
+          --enable-nls \
+          --disable-winemenubuilder \
           --disable-win16 \
-          --disable-opencl \
-          --without-alsa \
           --disable-tests \
+          --without-ldap \
           --without-capi \
-          --without-coreaudio \
+          --without-oss \
           --without-cups \
           --without-dbus \
+          --without-coreaudio \
           --without-gphoto \
-          --without-gssapi \
-          --without-krb5 \
-          --without-alsa \
-          --without-netapi \
-          --without-oss \
+          --without-osmesa \
+          --without-sane \
           --without-pcap \
           --without-pcsclite \
-          --without-sane \
           --without-udev \
           --without-unwind \
           --without-usb \
           --without-v4l2 \
-          --without-wayland \
-          --without-xinerama \
-          --without-xxf86vm \
-          --enable-wineandroid_drv=no
+          --without-wayland"
           make -j$(nproc)
           #make install -j$(nproc) DESTDIR=compiled-files
         continue-on-error: true
@@ -185,34 +184,33 @@ jobs:
           --host=aarch64-linux-android \
           --with-mingw=clang \
           --with-wine-tools=./wine-tools \
-          --enable-win64 \
-          --enable-nls \
+          --with-x \
+          --with-alsa \
           --with-pulse \
+          --with-freetype \
+          --with-fontconfig \
+          --with-gettext \
+          --with-sdl \
+          --enable-nls \
+          --disable-winemenubuilder \
           --disable-win16 \
-          --disable-opencl \
-          --without-alsa \
           --disable-tests \
+          --without-ldap \
           --without-capi \
-          --without-coreaudio \
+          --without-oss \
           --without-cups \
           --without-dbus \
+          --without-coreaudio \
           --without-gphoto \
-          --without-gssapi \
-          --without-krb5 \
-          --without-alsa \
-          --without-netapi \
-          --without-oss \
+          --without-osmesa \
+          --without-sane \
           --without-pcap \
           --without-pcsclite \
-          --without-sane \
           --without-udev \
           --without-unwind \
           --without-usb \
           --without-v4l2 \
-          --without-wayland \
-          --without-xinerama \
-          --without-xxf86vm \
-          --enable-wineandroid_drv=no
+          --without-wayland"
           make -j$(nproc)
           make install -j$(nproc) DESTDIR=compiled-files
       - name: Uploading Wine files
