@@ -119,7 +119,7 @@ jobs:
        sudo make install -j$(nproc) DESTDIR=./Wine-Build
        
     - name: Tar Wine
-      run: tar cf Wine-Build.tar Wine-Build/
+      run: tar cJf Wine-Build.tar.xz Wine-Build/
 
     - name: Upload wine
       if: always()
