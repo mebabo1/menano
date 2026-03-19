@@ -87,7 +87,10 @@ jobs:
         cd box64
         mkdir build && cd build
         cmake .. \
-            -DARM_DYNAREC=1 -DCMAKE_BUILD_TYPE=RelWithDebInfo -DBAD_SIGNAL=ON -DSD845=ON \
+            -DARM_DYNAREC=1 \
+            -DCMAKE_BUILD_TYPE=RelWithDebInfo \
+            -DBAD_SIGNAL=ON \
+            -DSD845=ON
         make -j4
         patchelf --set-interpreter /data/data/com.termux/files/usr/glibc/lib/ld-linux-aarch64.so.1 box64 || true
 
