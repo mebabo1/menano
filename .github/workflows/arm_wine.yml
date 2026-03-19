@@ -366,6 +366,7 @@ jobs:
             --with-mingw=clang \
             --enable-archs=arm64ec,aarch64,i386 \
             --enable-tools \
+            --enable-fex \
             --disable-tests \
             --with-vulkan \
             --with-gstreamer \
