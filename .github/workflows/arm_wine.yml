@@ -368,9 +368,6 @@ jobs:
             --enable-tools \
             --enable-win64 \
             --enable-nls \
-            --disable-win16 \
-            --disable-opencl \
-            --disable-tests \
             --with-pulse \
             --with-vulkan \
             --with-gstreamer \
