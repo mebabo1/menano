@@ -126,4 +126,3 @@ jobs:
       uses: actions/upload-artifact@v4
       with:
        name: wine-build.tar.xz
-       path: ./Wine-Build.tar
