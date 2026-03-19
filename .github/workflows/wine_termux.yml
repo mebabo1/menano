@@ -103,7 +103,7 @@ jobs:
           export PKG_CONFIG_LIBDIR=$deps/lib/pkgconfig:$deps/share/pkgconfig
           export CPPFLAGS="-I$deps/include"
           export CFLAGS="-I$deps/include -Wno-declaration-after-statement -Wno-implicit-function-declaration -Wno-int-conversion"
-          export CXXFLAGS="-Os -s
+          export CXXFLAGS="-Os -s"
           export LDFLAGS="-L$deps/lib"
           export LIBRARY_PATH="$deps/lib${LIBRARY_PATH:+:$LIBRARY_PATH}"
           export FREETYPE_CFLAGS="-I$deps/include/freetype2"
@@ -127,6 +127,10 @@ jobs:
           --enable-win64 \
           --enable-nls \
           --with-pulse \
+          --with-freetype \
+          --with-fontconfig \
+          --with-gettext \
+          --with-sdl \
           --disable-win16 \
           --disable-opencl \
           --without-alsa \
@@ -168,7 +172,7 @@ jobs:
           export PKG_CONFIG_LIBDIR=$deps/lib/pkgconfig:$deps/share/pkgconfig
           export CPPFLAGS="-I$deps/include"
           export CFLAGS="-I$deps/include -Wno-declaration-after-statement -Wno-implicit-function-declaration -Wno-int-conversion"
-          export CXXFLAGS="-Os -s
+          export CXXFLAGS="-Os -s"
           export LDFLAGS="-L$deps/lib -landroid-shmem -landroid-spawn"
           export LIBRARY_PATH="$deps/lib${LIBRARY_PATH:+:$LIBRARY_PATH}"
           export FREETYPE_CFLAGS="-I$deps/include/freetype2"
@@ -190,6 +194,10 @@ jobs:
           --enable-win64 \
           --enable-nls \
           --with-pulse \
+          --with-freetype \
+          --with-fontconfig \
+          --with-gettext \
+          --with-sdl \
           --disable-win16 \
           --disable-opencl \
           --without-alsa \
@@ -264,7 +272,7 @@ jobs:
           export PKG_CONFIG_LIBDIR=$deps/lib/pkgconfig:$deps/share/pkgconfig
           export CPPFLAGS="-I$deps/include"
           export CFLAGS="-I$deps/include -Wno-declaration-after-statement -Wno-implicit-function-declaration -Wno-int-conversion"
-          export CXXFLAGS="-Os -s
+          export CXXFLAGS="-Os -s"
           export LDFLAGS="-L$deps/lib"
           export LIBRARY_PATH="$deps/lib${LIBRARY_PATH:+:$LIBRARY_PATH}"
           export FREETYPE_CFLAGS="-I$deps/include/freetype2"
@@ -288,6 +296,10 @@ jobs:
           --with-x \
           --with-alsa \
           --with-pulse \
+          --with-freetype \
+          --with-fontconfig \
+          --with-gettext \
+          --with-sdl \
           --with-freetype \
           --with-fontconfig \
           --with-gettext \
@@ -328,7 +340,7 @@ jobs:
           export PKG_CONFIG_LIBDIR=$deps/lib/pkgconfig:$deps/share/pkgconfig
           export CPPFLAGS="-I$deps/include"
           export CFLAGS="-I$deps/include -Wno-declaration-after-statement -Wno-implicit-function-declaration -Wno-int-conversion"
-          export CXXFLAGS="-Os -s
+          export CXXFLAGS="-Os -s"
           export LDFLAGS="-L$deps/lib -landroid-shmem -landroid-spawn"
           export LIBRARY_PATH="$deps/lib${LIBRARY_PATH:+:$LIBRARY_PATH}"
           export FREETYPE_CFLAGS="-I$deps/include/freetype2"
