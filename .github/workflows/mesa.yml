@@ -233,66 +233,66 @@ jobs:
           ${{ env.PACKAGE_NAME }}-*.tar.gz
           checksums.txt
 
-    - name: 创建轻量级发布
-      uses: softprops/action-gh-release@v1
-      if: ${{ github.event_name == 'workflow_dispatch' }}
-      with:
-        tag_name: glibcmesa-${{ env.MESA_VERSION }}-${{ env.BUILD_DATE }}
-        name: Mesa glibc ${{ env.MESA_VERSION }} (aarch64)
-        body: |
-          Mesa 3D Graphics Library for Termux glibc (glibc) on aarch64
-          
-          构建信息:
-          - **版本**: ${{ env.MESA_VERSION }}
-          - **Git 描述**: ${{ env.GIT_DESCRIBE }}
-          - **提交哈希**: ${{ env.MESA_GIT_HASH }}
-          - **构建日期**: ${{ env.BUILD_DATE }}
-          - **分支**: ${{ env.MESA_BRANCH }}
-          - **仓库**: $(if [ "${{ env.USE_UPSTREAM }}" = "true" ]; then echo "上游官方"; else echo "lfdevs/android-container"; fi)
-          
-          包含文件:
-          - `${{ env.FULL_PACKAGE }}` - 完整 Mesa 安装包
-          - `*-vulkan.tar.gz` - 仅 Vulkan 驱动 (可选)
-          - `checksums.txt` - 校验和文件
-          
-          安装说明:
-          1. 下载完整的 tar.gz 包
-          2. 在 glibc 环境中解压到根目录: `tar -xzf package.tar.gz -C /`
-          3. 或者解压到自定义目录并设置环境变量:
-             ```bash
-             export LD_LIBRARY_PATH=/path/to/mesa/lib:$LD_LIBRARY_PATH
-             export LIBGL_DRIVERS_PATH=/path/to/mesa/lib/dri
-             ```
-          
-          注意:
-          - 需要 Termux 的 glibc 环境 (如 glibcdistro 的 Ubuntu/Debian)
-          - 推荐在 glibc 容器中使用
-        files: |
-          ${{ env.PACKAGE_NAME }}-*.tar.gz
-          checksums.txt
-        draft: false
-        prerelease: false
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+     - name: Create Lightweight Release
+       uses: softprops/action-gh-release@v1
+       if: ${{ github.event_name == 'workflow_dispatch' }}
+       with:
+         tag_name: glibcmesa-${{ env.MESA_VERSION }}-${{ env.BUILD_DATE }}
+         name: Mesa glibc ${{ env.MESA_VERSION }} (aarch64)
+         body: |
+           Mesa 3D Graphics Library for Termux glibc (glibc) on aarch64
+      
+           Build Information:
+           - **Version**: ${{ env.MESA_VERSION }}
+           - **Git Describe**: ${{ env.GIT_DESCRIBE }}
+           - **Commit Hash**: ${{ env.MESA_GIT_HASH }}
+           - **Build Date**: ${{ env.BUILD_DATE }}
+           - **Branch**: ${{ env.MESA_BRANCH }}
+           - **Repository**: $(if [ "${{ env.USE_UPSTREAM }}" = "true" ]; then echo "Official Upstream"; else echo "lfdevs/android-container"; fi)
+      
+           Included Files:
+           - `${{ env.FULL_PACKAGE }}` - Full Mesa installation package
+           - `*-vulkan.tar.gz` - Vulkan drivers only (optional)
+           - `checksums.txt` - Checksum file
+      
+           Installation Instructions:
+           1. Download the full tar.gz package
+           2. Extract to root directory in a glibc environment: `tar -xzf package.tar.gz -C /`
+           3. Or extract to a custom directory and set environment variables:
+              ```bash
+              export LD_LIBRARY_PATH=/path/to/mesa/lib:$LD_LIBRARY_PATH
+              export LIBGL_DRIVERS_PATH=/path/to/mesa/lib/dri
+              ```
+      
+           Notes:
+           - Requires Termux glibc environment (e.g., Ubuntu/Debian via glibcdistro)
+           - Recommended to use inside a glibc container
+         files: |
+           ${{ env.PACKAGE_NAME }}-*.tar.gz
+           checksums.txt
+         draft: false
+         prerelease: false
+       env:
+         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-    - name: 输出总结
-      run: |
-        echo "✅ Mesa glibc 构建完成!"
-        echo "================================"
-        echo "版本: $MESA_VERSION"
-        echo "提交: $MESA_GIT_HASH"
-        echo "构建日期: $BUILD_DATE"
-        echo "分支: $MESA_BRANCH"
-        echo "目标架构: aarch64"
-        echo "环境: Termux (glibc)"
-        echo ""
-        echo "📦 生成的文件:"
-        ls -1 *.tar.gz | while read file; do
+     - name: Output Summary
+       run: |
+         echo "✅ Mesa glibc build completed!"
+         echo "================================"
+         echo "Version: $MESA_VERSION"
+         echo "Commit: $MESA_GIT_HASH"
+         echo "Build Date: $BUILD_DATE"
+         echo "Branch: $MESA_BRANCH"
+         echo "Target Architecture: aarch64"
+         echo "Environment: Termux (glibc)"
+         echo ""
+         echo "📦 Generated Files:"
+         ls -1 *.tar.gz | while read file; do
           echo "  - $file"
-        done
-        echo ""
-        echo "驱动支持:"
-        echo "  ✓ Gallium: zink, freedreno, llvmpipe, softpipe"
-        echo "  ✓ Vulkan: freedreno, swrast"
-        echo "  ✓ OpenGL, OpenGL ES 1.x/2.x"
-        echo "  ✓ EGL, GBM"
+         done
+         echo ""
+         echo "Driver Support:"
+         echo "  ✓ Gallium: zink, freedreno, llvmpipe, softpipe"
+         echo "  ✓ Vulkan: freedreno, swrast"
+         echo "  ✓ OpenGL, OpenGL ES 1.x/2.x"
+         echo "  ✓ EGL, GBM"
