@@ -87,6 +87,7 @@ jobs:
           mkdir wine-tools
           mkdir wine-tools-build
           cd wine-tools-build
+          ../configure
           make -j$(nproc) __tooldeps__ nls/all
           ls
           mv ./* ../wine-tools
