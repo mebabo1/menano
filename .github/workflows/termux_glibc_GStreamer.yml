@@ -181,35 +181,30 @@ jobs:
           retention-days: 365
 
       # 🚀 发布到 GitHub Release（整合详细信息）
-      - name: 发布到 GitHub Release
+      - name: Publish to GitHub Release
         if: steps.check_build.outputs.skip_build == 'false'
         uses: softprops/action-gh-release@v1
         with:
           tag_name: ${{ env.VERSION }}
           name: "GStreamer Decoders ${{ env.VERSION }} (aarch64, Termux glibc)"
           body: |
-            ## GStreamer
-            - : `${{ env.VERSION }}`
-            - : aarch64
-            - : Termux glibc
-            - : [`${{ env.COMMIT_SHORT }}`](https://gitlab.freedesktop.org/gstreamer/gstreamer/-/commit/${{ env.LATEST_COMMIT }})
-            - : ${{ env.COMMIT_DATE }}
-            - : `${{ env.AUTHOR }}`
-            - : `${{ env.BUILD_DATE }}`
+            ## 🎯 GStreamer Stable Build
+            ### 📋 Build Information
+            - **Version**: `${{ env.VERSION }}`
+            - **Architecture**: aarch64
+            - **Environment**: Termux glibc
+            - **Commit**: [`${{ env.COMMIT_SHORT }}`](https://gitlab.freedesktop.org/gstreamer/gstreamer/-/commit/${{ env.LATEST_COMMIT }})
+            - **Commit Date**: ${{ env.COMMIT_DATE }}
+            - **Author**: `${{ env.AUTHOR }}`
+            - **Build Time**: `${{ env.BUILD_DATE }}`
             
-            - ✅ (base)
-            - ✅ (good) 
-            - ✅ (ugly)
-            - ✅ (bad)
-            - ✅ LibAV
-            - ✅ GPL
-            
-            - : `${{ env.TAR_NAME }}`
-            - : GStreamer
-            
-            1. : Termux `/data/data/com.termux/files/usr/`
-            2. : `export GST_PLUGIN_PATH=/data/data/com.termux/files/usr/glibc/lib/gstreamer-1.0`
-            3. : `gst-inspect-1.0 --version`
-          files: /home/runner/${{ env.TAR_NAME }}
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+            ### 🛠️ Build Features
+            - ✅ Base plugins (base)
+            - ✅ Good plugins (good) 
+            - ✅ Ugly plugins (ugly)
+            - ✅ Bad plugins (bad)
+            - ✅ LibAV support
+            - ✅ GPL plugins
+            - ✅ Development tools
+            - ❌ RTSP server (disabled)
+            - 🏗️ Build type: release
