@@ -188,35 +188,28 @@ jobs:
           tag_name: ${{ env.VERSION }}
           name: "GStreamer Decoders ${{ env.VERSION }} (aarch64, Termux glibc)"
           body: |
-            ## 🎯 GStreamer 稳定版构建
-            ### 📋 构建信息
-            - **版本**: `${{ env.VERSION }}`
-            - **架构**: aarch64
-            - **环境**: Termux glibc
-            - **提交**: [`${{ env.COMMIT_SHORT }}`](https://gitlab.freedesktop.org/gstreamer/gstreamer/-/commit/${{ env.LATEST_COMMIT }})
-            - **提交日期**: ${{ env.COMMIT_DATE }}
-            - **作者**: `${{ env.AUTHOR }}`
-            - **构建时间**: `${{ env.BUILD_DATE }}`
+            ## GStreamer
+            - : `${{ env.VERSION }}`
+            - : aarch64
+            - : Termux glibc
+            - : [`${{ env.COMMIT_SHORT }}`](https://gitlab.freedesktop.org/gstreamer/gstreamer/-/commit/${{ env.LATEST_COMMIT }})
+            - : ${{ env.COMMIT_DATE }}
+            - : `${{ env.AUTHOR }}`
+            - : `${{ env.BUILD_DATE }}`
             
-            ### 🛠️ 构建特性
-            - ✅ 基础插件 (base)
-            - ✅ 优质插件 (good) 
-            - ✅ 丑陋插件 (ugly)
-            - ✅ 不良插件 (bad)
-            - ✅ LibAV 支持
-            - ✅ GPL 插件
-            - ✅ 开发工具
-            - ❌ RTSP 服务器 (已禁用)
-            - 🏗️ 构建类型: release
+            - ✅ (base)
+            - ✅ (good) 
+            - ✅ (ugly)
+            - ✅ (bad)
+            - ✅ LibAV
+            - ✅ GPL
             
-            ### 📦 文件信息
-            - **文件名**: `${{ env.TAR_NAME }}`
-            - **包含**: 完整的 GStreamer 稳定版安装
+            - : `${{ env.TAR_NAME }}`
+            - : GStreamer
             
-            ### 📥 使用方法
-            1. 下载并解压到 Termux 的 `/data/data/com.termux/files/usr/`
-            2. 设置环境变量: `export GST_PLUGIN_PATH=/data/data/com.termux/files/usr/glibc/lib/gstreamer-1.0`
-            3. 测试: `gst-inspect-1.0 --version`
+            1. : Termux `/data/data/com.termux/files/usr/`
+            2. : `export GST_PLUGIN_PATH=/data/data/com.termux/files/usr/glibc/lib/gstreamer-1.0`
+            3. : `gst-inspect-1.0 --version`
           files: /home/runner/${{ env.TAR_NAME }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
