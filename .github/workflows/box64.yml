@@ -121,30 +121,30 @@ jobs:
         echo "RELEASE_TAG=$RELEASE_TAG" >> $GITHUB_ENV
         echo "Release 标签: $RELEASE_TAG"
 
-    - name: 发布到 GitHub Release
+    - name: Publish to GitHub Release
       uses: softprops/action-gh-release@v1
       with:
         tag_name: ${{ env.RELEASE_TAG }}
         name: Box64 ${{ env.BOX64_VERSION }} (aarch64, Termux glibc)
         body: |
-          ### Box64 构建信息
-          - **版本**: ${{ env.BOX64_VERSION }}
-          - **构建日期**: ${{ env.BUILD_DATE }}
-          - **提交哈希**: ${{ env.COMMIT_HASH }}
-          - **分支/标签**: ${{ env.BRANCH_OR_TAG }}
-          - **请求的版本**: ${{ env.BOX64_REF }}
+          ### Box64 Build Information
+          - **Version**: ${{ env.BOX64_VERSION }}
+          - **Build Date**: ${{ env.BUILD_DATE }}
+          - **Commit Hash**: ${{ env.COMMIT_HASH }}
+          - **Branch/Tag**: ${{ env.BRANCH_OR_TAG }}
+          - **Requested Version**: ${{ env.BOX64_REF }}
           
-          此构建针对 Termux glibc 环境优化。
+          This build is optimized for the Termux glibc environment.
         files: box64/build/box64-${{ env.BOX64_VERSION }}-${{ env.BUILD_DATE }}.tar.xz
         draft: false
         prerelease: false
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-    - name: 输出完成信息
+    - name: Output Completion Info
       run: |
-        echo "✅ Box64 构建完成并发布 Release"
-        echo "文件名: box64-$BOX64_VERSION-$BUILD_DATE.tar.xz"
-        echo "Release 标签: $RELEASE_TAG"
-        echo "构建版本: $BOX64_VERSION"
-        echo "提交: $COMMIT_HASH"
+        echo "✅ Box64 build completed and released"
+        echo "Filename: box64-$BOX64_VERSION-$BUILD_DATE.tar.xz"
+        echo "Release Tag: $RELEASE_TAG"
+        echo "Build Version: $BOX64_VERSION"
+        echo "Commit: $COMMIT_HASH"
