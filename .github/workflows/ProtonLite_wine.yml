@@ -607,7 +607,7 @@ jobs:
           wine-*.tar.*
         retention-days: 7
 
-    - name: 发布到 GitHub Release
+    - name: Publish to GitHub Release
       uses: softprops/action-gh-release@v1
       with:
         tag_name: ${{ env.RELEASE_TAG }}
@@ -615,21 +615,21 @@ jobs:
         body: |
           # Wine Proton WOW64 for Termux
           
-          ## 构建信息
-          - **版本**: ${{ env.PROTON_VERSION }}
-          - **Proton 分支**: ${{ github.event.inputs.proton_branch }}
-          - **构建类型**: ${{ github.event.inputs.build_type }}
-          - **优化级别**: ${{ github.event.inputs.optimization_level }}
-          - **启用功能**: ${{ github.event.inputs.enable_features }}
+          ## Build Information
+          - **Version**: ${{ env.PROTON_VERSION }}
+          - **Proton Branch**: ${{ github.event.inputs.proton_branch }}
+          - **Build Type**: ${{ github.event.inputs.build_type }}
+          - **Optimization Level**: ${{ github.event.inputs.optimization_level }}
+          - **Enabled Features**: ${{ github.event.inputs.enable_features }}
           
-          ## 包含的功能
-          ${{ env.ENABLE_VULKAN == '1' && '- ✅ Vulkan 图形 API 支持' || '- ❌ Vulkan 图形 API 支持' }}
-          ${{ env.ENABLE_GSTREAMER == '1' && '- ✅ GStreamer 多媒体支持' || '- ❌ GStreamer 多媒体支持' }}
-          ${{ env.ENABLE_OPENAL == '1' && '- ✅ OpenAL 3D 音频支持' || '- ❌ OpenAL 3D 音频支持' }}
-          ${{ env.ENABLE_MPG123 == '1' && '- ✅ MPG123 音频支持' || '- ❌ MPG123 音频支持' }}
-          - ✅ 完整中文语言支持
-          - ✅ WOW64 架构 (同时支持 32/64 位应用)
-          - ✅ 游戏优化和兼容性改进
+          ## Included Features
+          ${{ env.ENABLE_VULKAN == '1' && '- ✅ Vulkan Graphics API support' || '- ❌ Vulkan Graphics API support' }}
+          ${{ env.ENABLE_GSTREAMER == '1' && '- ✅ GStreamer multimedia support' || '- ❌ GStreamer multimedia support' }}
+          ${{ env.ENABLE_OPENAL == '1' && '- ✅ OpenAL 3D audio support' || '- ❌ OpenAL 3D audio support' }}
+          ${{ env.ENABLE_MPG123 == '1' && '- ✅ MPG123 audio support' || '- ❌ MPG123 audio support' }}
+          - ✅ Full Chinese language support
+          - ✅ WOW64 architecture (supports both 32/64-bit applications)
+          - ✅ Game optimizations and compatibility improvements
           
         files: |
           wine-*.tar.*
@@ -638,48 +638,48 @@ jobs:
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-    - name: 输出版本信息和使用说明
+    - name: Output Version Info and Usage Instructions
       run: |
         PACKAGE_NAME="wine-${{ env.PROTON_VERSION }}-wow64"
         
-        echo "✅ Wine Proton WOW64 构建完成"
+        echo "✅ Wine Proton WOW64 build completed"
         echo ""
-        echo "构建配置:"
-        echo "- Proton 分支: $PROTON_BRANCH"
-        echo "- 构建类型: $BUILD_TYPE"
-        echo "- 优化级别: $OPT_LEVEL"
-        echo "- 启用功能: Vulkan=$ENABLE_VULKAN, GStreamer=$ENABLE_GSTREAMER, OpenAL=$ENABLE_OPENAL, MPG123=$ENABLE_MPG123"
+        echo "Build Configuration:"
+        echo "- Proton Branch: $PROTON_BRANCH"
+        echo "- Build Type: $BUILD_TYPE"
+        echo "- Optimization Level: $OPT_LEVEL"
+        echo "- Enabled Features: Vulkan=$ENABLE_VULKAN, GStreamer=$ENABLE_GSTREAMER, OpenAL=$ENABLE_OPENAL, MPG123=$ENABLE_MPG123"
         echo ""
-        echo "构建产物:"
-        echo "- 主包: ${PACKAGE_NAME}.tar.xz"
-        echo "- Termux 安装包: ${PACKAGE_NAME}-termux.tar.gz"
-        echo "- Release 标签: ${{ env.RELEASE_TAG }}"
+        echo "Build Artifacts:"
+        echo "- Main package: ${PACKAGE_NAME}.tar.xz"
+        echo "- Termux package: ${PACKAGE_NAME}-termux.tar.gz"
+        echo "- Release Tag: ${{ env.RELEASE_TAG }}"
         echo ""
-        echo "启用的功能:"
-        [ "$ENABLE_VULKAN" = "1" ] && echo "✓ Vulkan 图形 API 支持"
-        [ "$ENABLE_GSTREAMER" = "1" ] && echo "✓ GStreamer 多媒体支持"
-        [ "$ENABLE_OPENAL" = "1" ] && echo "✓ OpenAL 3D 音频支持"
-        [ "$ENABLE_MPG123" = "1" ] && echo "✓ MPG123 音频支持"
-        echo "✓ 完整中文语言支持 (NLS 已启用)"
-        echo "✓ 游戏优化和兼容性改进"
+        echo "Enabled Features:"
+        [ "$ENABLE_VULKAN" = "1" ] && echo "✓ Vulkan Graphics API support"
+        [ "$ENABLE_GSTREAMER" = "1" ] && echo "✓ GStreamer multimedia support"
+        [ "$ENABLE_OPENAL" = "1" ] && echo "✓ OpenAL 3D audio support"
+        [ "$ENABLE_MPG123" = "1" ] && echo "✓ MPG123 audio support"
+        echo "✓ Full Chinese language support (NLS enabled)"
+        echo "✓ Game optimizations and compatibility improvements"
         echo ""
-        echo "中文支持增强:"
-        echo "✓ 构建时启用 NLS 和 gettext"
-        echo "✓ 包含中文语言环境"
-        echo "✓ 环境变量强制设置为中文"
-        echo "✓ 设置 WINELANG 环境变量"
+        echo "Chinese Support Enhancements:"
+        echo "✓ NLS and gettext enabled during build"
+        echo "✓ Includes Chinese locale"
+        echo "✓ Environment variables forced to Chinese"
+        echo "✓ WINELANG environment variable configured"
         echo ""
-        echo "使用说明:"
-        echo "1. 下载 ${PACKAGE_NAME}-termux.tar.gz"
-        echo "2. 解压: tar -xzf ${PACKAGE_NAME}-termux.tar.gz"
-        echo "3. 进入目录: cd termux-package"
-        echo "4. 运行安装: ./install.sh"
-        echo "5. 重新加载环境: source ~/.bashrc"
-        echo "6. 初始化: wine wineboot"
+        echo "Usage Instructions:"
+        echo "1. Download ${PACKAGE_NAME}-termux.tar.gz"
+        echo "2. Extract: tar -xzf ${PACKAGE_NAME}-termux.tar.gz"
+        echo "3. Enter directory: cd termux-package"
+        echo "4. Run installer: ./install.sh"
+        echo "5. Reload environment: source ~/.bashrc"
+        echo "6. Initialize: wine wineboot"
         echo ""
-        echo "注意:"
-        echo "- 这是基于 Valve Proton 的 WOW64 构建"
-        echo "- 单一二进制支持 32/64 位应用"
-        echo "- 已修复 Termux 路径问题"
-        echo "- 专为游戏和兼容性优化"
-        echo "- 强制启用中文界面支持"
+        echo "Notes:"
+        echo "- This is a WOW64 build based on Valve Proton"
+        echo "- Single binary supports both 32/64-bit applications"
+        echo "- Fixed Termux path issues"
+        echo "- Optimized for gaming and compatibility"
+        echo "- Chinese UI support is enforced"
