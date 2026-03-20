@@ -167,7 +167,7 @@ jobs:
           case "$WINE_BRANCH" in
             staging-tkg|staging-tkg-fsync)
               echo "处理 TKG 系列分支: $WINE_BRANCH"
-              git clone https://github.com/Kron4ek/wine-tkg.git source
+              git clone https://github.com/AndreRH/wine/tree/arm64ec.git source
               cd source
               if [ "$WINE_BRANCH" = "staging-tkg-fsync" ]; then
                 git checkout fsync
@@ -183,7 +183,7 @@ jobs:
               ;;
             staging)
               echo "处理 Staging 分支"
-              git clone https://github.com/AndreRH/wine/tree/arm64ec.git source
+              git clone https://github.com/AndreRH/FEX/tree/arm64ec.git source
               cd source
               git config advice.detachedHead false
               if [ "$WINE_VERSION" != "latest" ]; then
@@ -211,7 +211,7 @@ jobs:
               ;;
             vanilla)
               echo "处理 Vanilla 分支"
-              git clone https://github.com/AndreRH/wine/tree/arm64ec.git source
+              git clone https://github.com/AndreRH/FEX/tree/arm64ec.git source
               cd source
               git config advice.detachedHead false
               if [ "$WINE_VERSION" != "latest" ]; then
