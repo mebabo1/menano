@@ -521,7 +521,7 @@ jobs:
             checksums.txt
           retention-days: 30
 
-      - name: 发布 Wine 到 GitHub Release
+      - name: Publish Wine to GitHub Release
         uses: softprops/action-gh-release@v1
         if: github.event_name == 'workflow_dispatch'
         with:
@@ -530,32 +530,32 @@ jobs:
           body: |
             # Wine ${{ github.event.inputs.wine_branch || 'staging' }} ${{ github.event.inputs.wine_version || 'latest' }} - ARM64 WOW64 for Termux
 
-            ## 版本信息
-            - **Wine 分支**: ${{ github.event.inputs.wine_branch || 'staging' }}
-            - **Wine 版本**: ${{ github.event.inputs.wine_version || 'latest' }}
-            - **主机架构**: ARM64 (aarch64)
-            - **目标 Windows 架构**: i386, x86_64, arm64ec (通过 WOW64 模拟)
-            - **平台**: Termux (Android)
-            - **图形 API**: Vulkan 支持已启用
-            - **多媒体**: GStreamer 支持已启用
-            - **工具链**: llvm-mingw + 系统 gcc
+            ## Version Information
+            - **Wine Branch**: ${{ github.event.inputs.wine_branch || 'staging' }}
+            - **Wine Version**: ${{ github.event.inputs.wine_version || 'latest' }}
+            - **Host Architecture**: ARM64 (aarch64)
+            - **Target Windows Architectures**: i386, x86_64, arm64ec (via WOW64 emulation)
+            - **Platform**: Termux (Android)
+            - **Graphics API**: Vulkan support enabled
+            - **Multimedia**: GStreamer support enabled
+            - **Toolchain**: llvm-mingw + system gcc
 
-            ## 特性
-            ✓ ARM64 原生 Wine 可执行文件
-            ✓ 支持运行 32/64 位 Windows 应用程序
-            ✓ Vulkan 渲染
-            ✓ GStreamer 多媒体后端
-            ✓ 中文环境支持
-            ✓ 应用了关键补丁提升兼容性
-            ✓ 包含完整的运行时文件：wine.inf、wineboot、wineserver 等所有必要程序
+            ## Features
+            ✓ ARM64 native Wine executable
+            ✓ Supports running 32/64-bit Windows applications
+            ✓ Vulkan rendering
+            ✓ GStreamer multimedia backend
+            ✓ Chinese locale support
+            ✓ Applied critical patches for improved compatibility
+            ✓ Includes full runtime files: wine.inf, wineboot, wineserver, and all required programs
 
-            ## 安装说明
-            解压后，将 `${{ env.BUILD_NAME }}` 文件夹放置在 Termux 的合适位置（建议 `/data/data/com.termux/files/usr/glibc`），并设置环境变量。
+            ## Installation Instructions
+            After extraction, place the `${{ env.BUILD_NAME }}` folder in an appropriate location in Termux (recommended: `/data/data/com.termux/files/usr/glibc`) and set environment variables.
 
-            ## 构建信息
-            - 构建时间: ${{ github.event.head_commit.timestamp }}
-            - 提交: ${{ github.sha }}
-            - 工作流: ${{ github.workflow }}
+            ## Build Information
+            - Build Time: ${{ github.event.head_commit.timestamp }}
+            - Commit: ${{ github.sha }}
+            - Workflow: ${{ github.workflow }}
           files: |
             ${{ github.workspace }}/${{ env.BUILD_NAME }}.tar.xz
             ${{ github.workspace }}/checksums.txt
