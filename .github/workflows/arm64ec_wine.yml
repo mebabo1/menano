@@ -183,7 +183,7 @@ jobs:
               ;;
             staging)
               echo "处理 Staging 分支"
-              git clone https://github.com/afeimod/wine-arm.git source
+              git clone https://github.com/AndreRH/wine/tree/arm64ec.git source
               cd source
               git config advice.detachedHead false
               if [ "$WINE_VERSION" != "latest" ]; then
