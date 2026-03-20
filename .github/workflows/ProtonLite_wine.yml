@@ -523,10 +523,12 @@ jobs:
         
         echo "安装启动脚本..."
         cp bin/wine "\$BIN_DIR"/
+        cp bin/wine64 "\$BIN_DIR"/
         cp bin/wineserver "\$BIN_DIR"/
         cp bin/winecfg "\$BIN_DIR"/
         
         chmod +x "\$BIN_DIR"/wine
+        chmod +x "\$BIN_DIR"/wine64
         chmod +x "\$BIN_DIR"/wineserver
         chmod +x "\$BIN_DIR"/winecfg
         
