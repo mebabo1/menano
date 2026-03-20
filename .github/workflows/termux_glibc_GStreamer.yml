@@ -159,6 +159,7 @@ jobs:
         run: |
           cd /data/data/com.termux/files/usr
           TAR_NAME="termux-glibc-gst-decoders-${VERSION}.tar.gz"
+          rm -rf glibc/etc
           tar -czvf /home/runner/$TAR_NAME glibc
           echo "$LATEST_COMMIT" > ${{ env.LAST_COMMIT_FILE }}
           echo "TAR_NAME=$TAR_NAME" >> $GITHUB_ENV
