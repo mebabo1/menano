@@ -248,7 +248,6 @@ jobs:
       # 7. 应用 mfplat 补丁
       # ------------------------------------------------------------
       - name: Apply mfplat patches
-      - name: Apply mfplat patches
         run: |
           cd ${{ env.WINE_SOURCE_DIR }}/source
 
