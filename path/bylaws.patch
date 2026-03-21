@@ -1,3 +1,18 @@
+From 58c942999f94dc9ae91adb840c78fadad4244f51 Mon Sep 17 00:00:00 2001
+From: Billy Laws <blaws05@gmail.com>
+Date: Thu, 27 Jul 2023 08:00:43 -0700
+Subject: [PATCH 01/15] ntdll: Implement WOW64 thread suspension helpers.
+
+---
+ dlls/ntdll/loader.c         |  2 ++
+ dlls/ntdll/ntdll.spec       |  1 +
+ dlls/ntdll/ntdll_misc.h     |  1 +
+ dlls/ntdll/signal_arm64.c   | 17 +++++++++++++++++
+ dlls/ntdll/signal_arm64ec.c |  7 +++++++
+ dlls/ntdll/signal_x86_64.c  |  7 +++++++
+ include/winternl.h          |  1 +
+ 7 files changed, 36 insertions(+)
+
 diff --git a/dlls/ntdll/unwind.h b/dlls/ntdll/unwind.h
 index faca8a259fb6..71a4d23da043 100644
 --- a/dlls/ntdll/unwind.h
