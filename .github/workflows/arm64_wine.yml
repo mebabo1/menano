@@ -252,7 +252,7 @@ jobs:
           cd ${{ env.WINE_SOURCE_DIR }}/source
 
           # ✅ Always apply universal patch (all Wine versions)
-          echo "Applying universal patch (2025.09.17_bylaws.patch)"
+          echo "Applying universal patch (2025.08.22_bylaws-wine_upstream-arm64ec_hack_v2.patch)"
           wget -q https://github.com/lacamar/wine-arm64ec-rpm/blob/main/wine/2025.08.22_bylaws-wine_upstream-arm64ec_hack_v2.patch || { echo "Download failed"; exit 1; }
 
           patch -p1 < 2025.08.22_bylaws-wine_upstream-arm64ec_hack_v2.patch || { echo "Universal patch failed"; exit 1; }
