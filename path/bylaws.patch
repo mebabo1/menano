@@ -78,43 +78,6 @@ index 78833c2b1195..961e115a831e 100644
  #define CONTEXT_ARM64_FULL (CONTEXT_ARM64_CONTROL | CONTEXT_ARM64_INTEGER | CONTEXT_ARM64_FLOATING_POINT)
  #define CONTEXT_ARM64_ALL  (CONTEXT_ARM64_FULL | CONTEXT_ARM64_DEBUG_REGISTERS | CONTEXT_ARM64_X18)
 
-diff --git a/programs/wineboot/wineboot.c b/programs/wineboot/wineboot.c
-index 2a50d38275d5..fec7bf39535e 100644
---- a/programs/wineboot/wineboot.c
-+++ b/programs/wineboot/wineboot.c
-@@ -376,6 +376,21 @@ static UINT64 read_tsc_frequency(void)
-
- static void initialize_xstate_features(struct _KUSER_SHARED_DATA *data)
- {
-+    XSTATE_CONFIGURATION *xstate = &data->XState;
-+
-+    xstate->EnabledFeatures = (1 << XSTATE_LEGACY_FLOATING_POINT) | (1 << XSTATE_LEGACY_SSE) | (1 << XSTATE_AVX);
-+    xstate->EnabledVolatileFeatures = xstate->EnabledFeatures;
-+    xstate->AllFeatureSize = 0x340;
-+
-+    xstate->OptimizedSave = 0;
-+    xstate->CompactionEnabled = 0;
-+
-+    xstate->Features[0].Size = xstate->AllFeatures[0] = offsetof(XSAVE_FORMAT, XmmRegisters);
-+    xstate->Features[1].Size = xstate->AllFeatures[1] = sizeof(M128A) * 16;
-+    xstate->Features[1].Offset = xstate->Features[0].Size;
-+    xstate->Features[2].Offset = 0x240;
-+    xstate->Features[2].Size = 0x100;
-+    xstate->Size = 0x340;
- }
-
- static UINT64 read_tsc_frequency(void)
-
-From 9a12b778fbd7399eb8c8df59b88317d5e1937bbf Mon Sep 17 00:00:00 2001
-From: Billy Laws <blaws05@gmail.com>
-Date: Fri, 27 Sep 2024 11:29:21 +0000
-Subject: [PATCH 09/14] HACK: define some extra arm64ec symbols to workaround
- llvm bugs
-
----
- aclocal.m4 | 6 ++++++
- 1 file changed, 6 insertions(+)
-
 diff --git a/aclocal.m4 b/aclocal.m4
 index 598a82d1e6b2..b3981a0377a4 100644
 --- a/aclocal.m4
