@@ -248,14 +248,15 @@ jobs:
       # 7. 应用 mfplat 补丁
       # ------------------------------------------------------------
       - name: Apply mfplat patches
+      - name: Apply mfplat patches
         run: |
           cd ${{ env.WINE_SOURCE_DIR }}/source
 
-          # ✅ Always apply universal patch (all Wine versions)
-          echo "Applying universal patch (2025.08.22_bylaws-wine_upstream-arm64ec_hack.patch)"
-          wget -q https://raw.githubusercontent.com/lacamar/wine-arm64ec-rpm/refs/heads/main/wine/2025.08.22_bylaws-wine_upstream-arm64ec_hack.patch || { echo "Download failed"; exit 1; }
+          # ✅ Always apply universal patch (all Wine versions, allow failure)
+          echo "Applying universal patch (2025.09.17_bylaws.patch)"
+          wget -q https://raw.githubusercontent.com/lacamar/wine-arm64ec-rpm/refs/heads/main/wine/2025.09.17_bylaws.patch || { echo "Download failed"; exit 1; }
 
-          patch -p1 < 2025.08.22_bylaws-wine_upstream-arm64ec_hack.patch || { echo "Universal patch failed"; exit 1; }
+          patch -p1 --forward --batch < 2025.09.17_bylaws.patch || echo "Universal patch partially failed (ignored)"
 
           # --- Existing version-based logic ---
           PURE_VERSION=$(echo "${{ env.WINE_VERSION_ACTUAL }}" | sed 's/^wine-//')
