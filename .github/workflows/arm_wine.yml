@@ -1,4 +1,4 @@
-name: Build Wine arm bootBuilder
+name: Build Wine Proton&Wine bootBuilder
 
 on:
   schedule:
