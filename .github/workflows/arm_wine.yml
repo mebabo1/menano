@@ -715,7 +715,7 @@ jobs:
             ${{ github.workspace }}/checksums.txt
           retention-days: 30
 
-      - name: 发布 Wine 到 GitHub Release
+      - name: Publish Wine to GitHub Release
         uses: softprops/action-gh-release@v1
         if: github.event_name == 'workflow_dispatch' && github.event.inputs.build_type == 'wine-wow64'
         with:
@@ -724,31 +724,29 @@ jobs:
           body: |
             # Wine ${{ github.event.inputs.wine_branch || 'staging' }} ${{ github.event.inputs.wine_version || 'latest' }} - WOW64 with Vulkan & GStreamer for Termux
             
-            ## 版本信息
-            - **Wine 分支**: ${{ github.event.inputs.wine_branch || 'staging' }}
-            - **Wine 版本**: ${{ github.event.inputs.wine_version || 'latest' }}
-            - **架构**: True WOW64 (同时支持 32 位和 64 位 Windows 应用程序)
-            - **平台**: Termux (Android)
-            - **图形 API**: Vulkan 支持已启用
-            - **多媒体**: 完整 GStreamer 支持
+            ## Version Information
+            - **Wine Branch**: ${{ github.event.inputs.wine_branch || 'staging' }}
+            - **Wine Version**: ${{ github.event.inputs.wine_version || 'latest' }}
+            - **Architecture**: True WOW64 (supports both 32-bit and 64-bit Windows applications)
+            - **Platform**: Termux (Android)
+            - **Graphics API**: Vulkan support enabled
+            - **Multimedia**: Full GStreamer support
             
-            ## 特性
-            ✓ 真正的 WOW64 架构
-            ✓ 同时支持 32 位和 64 位 Windows 应用程序
-            ✓ Vulkan 图形 API 支持
-            ✓ 完整的 GStreamer 支持
-            ✓ 中文环境支持
-            ✓ 应用了关键补丁提升兼容性
+            ## Features
+            ✓ True WOW64 architecture
+            ✓ Supports both 32-bit and 64-bit Windows applications
+            ✓ Vulkan graphics API support
+            ✓ Full GStreamer support
+            ✓ Chinese locale support
+            ✓ Applied critical patches for improved compatibility
             
-            ## 安装说明
-            解压后，将 `${{ env.BUILD_NAME }}` 文件夹放置在 Termux 的合适位置，并设置环境变量。
+            ## Installation Instructions
+            After extraction, place the `${{ env.BUILD_NAME }}` folder in an appropriate location in Termux and configure environment variables.
 
-            ## 构建信息
-            - 构建时间: ${{ github.event.head_commit.timestamp }}
-            - 提交: ${{ github.sha }}
-            - 工作流: ${{ github.workflow }}
+            ## Build Information
+            - Build Time: ${{ github.event.head_commit.timestamp }}
+            - Commit: ${{ github.sha }}
+            - Workflow: ${{ github.workflow }}
           files: |
             ${{ github.workspace }}/${{ env.BUILD_NAME }}.tar.xz
             ${{ github.workspace }}/checksums.txt
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
