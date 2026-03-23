@@ -1,4 +1,4 @@
-name: Build Wine arm无bootBuilder
+name: Build Wine arm bootBuilder
 
 on:
   schedule:
