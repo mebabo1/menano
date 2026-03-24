@@ -8,10 +8,10 @@ on:
       wine_branch:
         description: 'Wine 分支'
         required: false
-        default: 'vanilla'
+        default: 'proton'
         type: choice
         options:
-        - vanilla
+        - proton
         - staging
         - staging-tkg
         - staging-tkg-fsync
@@ -209,10 +209,10 @@ jobs:
                 echo "警告: 无法下载 staging 补丁，继续构建无补丁版本"
               fi
               ;;
-            vanilla)
-              echo "处理 Vanilla 分支"
-              git clone https://github.com/ValveSoftware/wine source
-              cd source
+            proton)
+              echo "处理 proton 分支"
+              git clone https://github.com/ValveSoftware/wine
+              cd wine
               git config advice.detachedHead false
               if [ "$WINE_VERSION" != "latest" ]; then
                 git checkout "wine-$WINE_VERSION"
