@@ -247,36 +247,9 @@ jobs:
       # ------------------------------------------------------------
       # 7. 应用 mfplat 补丁
       # ------------------------------------------------------------
-      - name: 应用 mfplat 补丁
+      - name: Skip mfplat patch
         run: |
-          cd ${{ env.WINE_SOURCE_DIR }}/source
-
-          # 🔒 Disable mfplat patch globally
-          if [ "$DISABLE_MFPLAT_PATCH" = "1" ]; then
-            echo "Skipping mfplat patches for all versions"
-            exit 0
-          fi
-
-          PURE_VERSION=$(echo "${{ env.WINE_VERSION_ACTUAL }}" | sed 's/^wine-//')
-          VERSION_MAJOR=$(echo "$PURE_VERSION" | cut -d. -f1)
-          VERSION_MINOR=$(echo "$PURE_VERSION" | cut -d. -f2)
-
-          if [ "$VERSION_MAJOR" -gt 9 ] || [ "$VERSION_MAJOR" -eq 9 -a "$VERSION_MINOR" -ge 10 ]; then
-            echo "Applying 9.10+ patch (wine_do_not_create_dxgi_manager2.patch)"
-            wget -q https://github.com/afeimod/linbox/raw/main/path/wine_do_not_create_dxgi_manager2.patch || { echo "Download failed"; exit 1; }
-
-            if [ -f "dlls/mfplat/main.c" ]; then
-              patch -p1 < wine_do_not_create_dxgi_manager2.patch || { echo "Patch failed"; exit 1; }
-            else
-              echo "Error: dlls/mfplat/main.c not found"
-              exit 1
-            fi
-          else
-            echo "Applying pre-9.10 patch (fix_wine9.2_mfplat.sh)"
-            wget -q -O fix_wine9.2_mfplat.sh https://github.com/afeimod/linbox/raw/main/path/fix_wine9.2_mfplat.sh || { echo "Download failed"; exit 1; }
-            chmod +x fix_wine9.2_mfplat.sh
-            ./fix_wine9.2_mfplat.sh
-          fi
+          echo "Skipping mfplat patches for all versions"
 
       # ------------------------------------------------------------
       # 8. 生成 configure 脚本
