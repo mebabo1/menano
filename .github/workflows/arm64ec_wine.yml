@@ -211,8 +211,8 @@ jobs:
               ;;
             proton)
               echo "处理 proton 分支"
-              git clone https://github.com/ValveSoftware/wine
-              cd wine
+              git clone https://github.com/ValveSoftware/Proton.git source
+              cd source
               git config advice.detachedHead false
               if [ "$WINE_VERSION" != "latest" ]; then
                 git checkout "wine-$WINE_VERSION"
