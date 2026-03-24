@@ -348,15 +348,6 @@ jobs:
             --with-mingw=clang \
             --enable-archs=arm64ec,aarch64,i386 \
             --enable-tools \
-            --with-vulkan \
-            --with-x \
-            --with-alsa \
-            --with-pulse \
-            --with-freetype \
-            --with-fontconfig \
-            --with-gettext \
-            --with-sdl \
-            --enable-nls \
             --disable-winemenubuilder \
             --disable-win16 \
             --disable-tests \
@@ -375,7 +366,6 @@ jobs:
             --without-unwind \
             --without-usb \
             --without-v4l2 \
-            --without-wayland \
             --host=aarch64-linux-gnu \
             host_alias=aarch64-linux-gnu \
             build_alias=x86_64-linux-gnu \
