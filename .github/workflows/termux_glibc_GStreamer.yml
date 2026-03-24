@@ -209,3 +209,15 @@ jobs:
             - ✅ Development tools
             - ❌ RTSP server (disabled)
             - 🏗️ Build type: release
+
+            ### 📦 File Information
+            - **File Name**: `${{ env.TAR_NAME }}`
+            - **Contents**: Complete GStreamer stable installation
+            
+            ### 📥 Usage Instructions
+            1. Download and extract to Termux `/data/data/com.termux/files/usr/`
+            2. Set environment variable: `export GST_PLUGIN_PATH=/data/data/com.termux/files/usr/glibc/lib/gstreamer-1.0`
+            3. Test: `gst-inspect-1.0 --version`
+          files: /home/runner/${{ env.TAR_NAME }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
