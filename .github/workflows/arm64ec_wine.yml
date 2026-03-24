@@ -379,6 +379,8 @@ jobs:
             --host=aarch64-linux-gnu \
             host_alias=aarch64-linux-gnu \
             build_alias=x86_64-linux-gnu \
+            --with-wine-tools=/opt/wine64-native \
+            CC=aarch64-linux-gnu-gcc
 
           make -j$(nproc)
           make install
