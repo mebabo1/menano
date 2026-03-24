@@ -351,8 +351,6 @@ jobs:
             --disable-tests \
             --with-vulkan \
             --disable-winemenubuilder \
-            --disable-win16 \
-            --disable-tests \
             --without-ldap \
             --without-capi \
             --without-oss \
