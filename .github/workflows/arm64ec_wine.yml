@@ -366,7 +366,7 @@ jobs:
             --without-unwind \
             --without-usb \
             --without-v4l2 \
-            --without-wayland"
+            --without-wayland \
             --host=aarch64-linux-gnu \
             host_alias=aarch64-linux-gnu \
             build_alias=x86_64-linux-gnu \
