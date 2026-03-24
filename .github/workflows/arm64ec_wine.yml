@@ -343,11 +343,13 @@ jobs:
           echo "WINE_NLS_DIR=$WINE_NLS_DIR"
 
           # 关键修改：仅使用 --with-wine-tools，不使用 --with-wine64
+          CFLAGS="-Wno-error=deprecated-declarations" \
           ../configure \
             --prefix=/tmp/wine-install-wow64 \
             --with-mingw=clang \
             --enable-archs=arm64ec,aarch64,i386 \
             --enable-tools \
+            --with-vulkan \
             --disable-winemenubuilder \
             --disable-win16 \
             --disable-tests \
