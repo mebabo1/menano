@@ -347,10 +347,16 @@ jobs:
             --prefix=/tmp/wine-install-wow64 \
             --with-mingw=clang \
             --enable-archs=arm64ec,aarch64,i386 \
-            --enable-tools \
-            --disable-tests \
-            --with-vulkan \
+            --with-x \
+            --with-alsa \
+            --with-pulse \
+            --with-freetype \
+            --with-fontconfig \
+            --with-gettext \
+            --with-sdl \
+            --enable-nls \
             --disable-winemenubuilder \
+            --disable-win16 \
             --without-ldap \
             --without-capi \
             --without-oss \
