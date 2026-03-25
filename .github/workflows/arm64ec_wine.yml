@@ -356,9 +356,10 @@ jobs:
           ../configure \
             --prefix=/tmp/wine-install-wow64 \
             --with-mingw=clang \
-            --enable-archs=arm64ec,aarch64,i386 \
+            --enable-archs=aarch64,i386 \
             --enable-tools \
             --enable-nls \
+            --disable-winedmo \
             --disable-winemenubuilder \
             --disable-win16 \
             --disable-tests \
@@ -381,8 +382,7 @@ jobs:
             --host=aarch64-linux-gnu \
             host_alias=aarch64-linux-gnu \
             build_alias=x86_64-linux-gnu \
-            --with-wine-tools=/opt/wine64-native \
-            CC=aarch64-linux-gnu-gcc
+            --with-wine-tools=/opt/wine64-native
 
           make -j$(nproc)
           make install
