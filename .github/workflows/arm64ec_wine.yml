@@ -377,7 +377,6 @@ jobs:
             --without-gphoto \
             --with-gnutls \
             --without-gssapi \
-            --with-gstreamer \
             --without-inotify \
             --without-krb5 \
             --without-netapi \
