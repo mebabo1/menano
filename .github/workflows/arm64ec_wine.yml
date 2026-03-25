@@ -354,6 +354,7 @@ jobs:
             --disable-winemenubuilder \
             --disable-win16 \
             --disable-tests \
+            --without-ffmpeg \
             --without-ldap \
             --without-capi \
             --without-oss \
