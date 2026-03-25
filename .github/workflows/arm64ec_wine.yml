@@ -356,7 +356,7 @@ jobs:
           ../configure \
             --prefix=/tmp/wine-install-wow64 \
             --with-mingw=clang \
-            --enable-archs=aarch64,i386 \
+            --enable-archs=arm64ec,aarch64,i386 \
             --enable-tools \
             --enable-nls \
             --disable-winedmo \
