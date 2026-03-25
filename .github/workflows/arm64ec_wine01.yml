@@ -367,6 +367,10 @@ jobs:
             --enable-archs=arm64ec,aarch64,i386 \
             --enable-tools \
             --disable-tests \
+            --with-pthread \
+            --with-freetype \
+            --with-fontconfig \
+            --with-opengl \
             --with-vulkan \
             --with-gstreamer \
             --host=aarch64-linux-gnu \
