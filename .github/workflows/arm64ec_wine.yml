@@ -210,14 +210,16 @@ jobs:
               fi
               ;;
             proton)
-              echo "处理 proton 分支"
-              git clone https://github.com/Stredohori/proton-wine.git source
+              echo "Processing Proton branch"
+
+              PROTON_BRANCH="${{ github.event.inputs.proton_branch || 'proton_10.0' }}"
+
+              git clone -b "$PROTON_BRANCH" https://github.com/ValveSoftware/wine.git source
               cd source
               git config advice.detachedHead false
-              if [ "$WINE_VERSION" != "latest" ]; then
-                git checkout "wine-$WINE_VERSION"
-              fi
-              WINE_VERSION_ACTUAL=$(git describe --tags --abbrev=0 2>/dev/null || echo "$WINE_VERSION")
+
+              WINE_VERSION_ACTUAL="$PROTON_BRANCH"
+
               ;;
             *)
               echo "未知的 Wine 分支: $WINE_BRANCH"
