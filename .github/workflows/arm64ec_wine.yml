@@ -258,6 +258,7 @@ jobs:
       # 7. 应用 mfplat 补丁
       # ------------------------------------------------------------
       - name: 应用 proton-wine patch 集
+        shell: bash
         run: |
           cd ${{ env.WINE_SOURCE_DIR }}/source
 
@@ -307,11 +308,12 @@ jobs:
 
             if git apply --check "$FILE" 2>/dev/null; then
               git apply "$FILE"
-              echo "✅ Applied: $patch"
+              echo "Applied: $patch"
             else
-              echo "⚠️ Skipped (conflict): $patch"
+              echo "Skipped (conflict): $patch"
             fi
           done
+    
       # ------------------------------------------------------------
       # 8. 生成 configure 脚本
       # ------------------------------------------------------------
