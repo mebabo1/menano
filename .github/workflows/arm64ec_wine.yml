@@ -403,7 +403,6 @@ jobs:
             --without-xfixes \
             --without-xinerama \
             --without-xinput \
-            --without-xinput2 \
             --without-xrandr \
             --without-xrender \
             --without-xshape \
