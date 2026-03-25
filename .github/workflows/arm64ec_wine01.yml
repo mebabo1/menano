@@ -250,24 +250,52 @@ jobs:
       - name: 应用 mfplat 补丁
         run: |
           cd ${{ env.WINE_SOURCE_DIR }}/source
+
           PURE_VERSION=$(echo "${{ env.WINE_VERSION_ACTUAL }}" | sed 's/^wine-//')
           VERSION_MAJOR=$(echo "$PURE_VERSION" | cut -d. -f1)
           VERSION_MINOR=$(echo "$PURE_VERSION" | cut -d. -f2)
-          if [ "$VERSION_MAJOR" -gt 9 ] || [ "$VERSION_MAJOR" -eq 9 -a "$VERSION_MINOR" -ge 10 ]; then
-            echo "应用 9.10+ 补丁 (wine_do_not_create_dxgi_manager2.patch)"
-            wget -q https://github.com/afeimod/linbox/raw/main/path/wine_do_not_create_dxgi_manager2.patch
-            if [ -f "dlls/mfplat/main.c" ]; then
-              patch -p1 < wine_do_not_create_dxgi_manager2.patch || { echo "补丁应用失败"; exit 1; }
-            else
-              echo "错误: dlls/mfplat/main.c 不存在"
-              exit 1
-            fi
+
+          echo "Detected Wine version: $VERSION_MAJOR.$VERSION_MINOR"
+
+          if [ "$VERSION_MAJOR" -lt 10 ] || { [ "$VERSION_MAJOR" -eq 10 ] && [ "$VERSION_MINOR" -le 8 ]; }; then
+            echo "Applying bylaws patch (<= 10.8)"
+
+            wget -q https://raw.githubusercontent.com/lacamar/wine-arm64ec-rpm/refs/heads/main/wine/2025.04.30_bylaws-wine_upstream-arm64ec.patch \
+              || { echo "Download failed"; exit 1; }
+
+            patch -p1 < 2025.04.30_bylaws-wine_upstream-arm64ec.patch \
+              || { echo "Bylaws patch failed"; exit 1; }
+
           else
-            echo "应用 9.10 以下补丁 (fix_wine9.2_mfplat.sh)"
-            wget -q -O fix_wine9.2_mfplat.sh https://github.com/afeimod/linbox/raw/main/path/fix_wine9.2_mfplat.sh
-            chmod +x fix_wine9.2_mfplat.sh
-            ./fix_wine9.2_mfplat.sh
+            echo "Skipping bylaws patch (>= 10.9)"
           fi
+
+    # ------------------------------------------------------------
+    # ✅ 2️⃣ 기존 mfplat 패치
+    # ------------------------------------------------------------
+    if [ "$VERSION_MAJOR" -gt 9 ] || [ "$VERSION_MAJOR" -eq 9 -a "$VERSION_MINOR" -ge 10 ]; then
+      echo "Applying 9.10+ patch (wine_do_not_create_dxgi_manager2.patch)"
+
+      wget -q https://github.com/afeimod/linbox/raw/main/path/wine_do_not_create_dxgi_manager2.patch \
+        || { echo "Download failed"; exit 1; }
+
+      if [ -f "dlls/mfplat/main.c" ]; then
+        patch -p1 < wine_do_not_create_dxgi_manager2.patch \
+          || { echo "Patch failed"; exit 1; }
+      else
+        echo "Error: dlls/mfplat/main.c not found"
+        exit 1
+      fi
+
+    else
+      echo "Applying pre-9.10 patch (fix_wine9.2_mfplat.sh)"
+
+      wget -q -O fix_wine9.2_mfplat.sh https://github.com/afeimod/linbox/raw/main/path/fix_wine9.2_mfplat.sh \
+        || { echo "Download failed"; exit 1; }
+
+      chmod +x fix_wine9.2_mfplat.sh
+      ./fix_wine9.2_mfplat.sh
+    fi
 
       # ------------------------------------------------------------
       # 8. 生成 configure 脚本
