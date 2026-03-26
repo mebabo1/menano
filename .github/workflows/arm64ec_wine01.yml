@@ -367,6 +367,10 @@ jobs:
             --with-opengl \
             --with-vulkan \
             --with-gstreamer \
+            --without-xcomposite \
+            --without-xinerama \
+            --without-xshape \
+            --with-xshm \
             --host=aarch64-linux-gnu \
             host_alias=aarch64-linux-gnu \
             build_alias=x86_64-linux-gnu \
