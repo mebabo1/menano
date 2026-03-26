@@ -371,6 +371,13 @@ jobs:
             --without-xinerama \
             --without-xshape \
             --with-xshm \
+            --with-x \
+            --with-vulkan \
+            --with-alsa \
+            --with-pulse \
+            --with-gettext \
+            --with-sdl \
+            --enable-nls \
             --host=aarch64-linux-gnu \
             host_alias=aarch64-linux-gnu \
             build_alias=x86_64-linux-gnu \
