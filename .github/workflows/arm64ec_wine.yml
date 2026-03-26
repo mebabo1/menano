@@ -285,6 +285,7 @@ jobs:
 
             "dlls_ntdll_unix_signal_x86_64_c.patch"
             "dlls_winepulse_drv_pulse_c.patch"
+            "programs_explorer_desktop_c.patch"
 
             "dlls_ntdll_unix_server_c.patch"
             "dlls_advapi32_advapi_c.patch"
