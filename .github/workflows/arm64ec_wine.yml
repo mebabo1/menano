@@ -295,8 +295,9 @@ jobs:
         run: |
           cd ${{ env.WINE_SOURCE_DIR }}/source
           echo "Removing wdscore to avoid ARM64EC linker errors..."
-          rm -rf dlls/wdscore
-          sed -i '/wdscore/d' dlls/Makefile.in
+          rm -rf dlls/wdscore/wdscore.spec
+          wget -O dlls/wdscore/wdscore.spec https://github.com/mebabo1/menano/blob/main/dll/wdscore.spec
+          
     
       # ------------------------------------------------------------
       # 8. 生成 configure 脚本
