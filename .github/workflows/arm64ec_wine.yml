@@ -292,10 +292,6 @@ jobs:
             "programs_winebrowser_makefile_in.patch"
             "programs_winebrowser_main_c.patch"
 
-            "dlls_user32_makefile_in.patch"
-            "dlls_user32_clipboard_c.patch"
-            "dlls_win32u_clipboard_c.patch"
-
             "dlls_ntdll_loader_c.patch"
             "dlls_ntdll_unix_loader_c.patch"
             "dlls_wow64_syscall_c.patch"
