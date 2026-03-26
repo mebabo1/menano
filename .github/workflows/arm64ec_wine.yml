@@ -222,7 +222,7 @@ jobs:
 
               PROTON_BRANCH="${{ github.event.inputs.proton_branch || 'proton_10.0' }}"
 
-              git clone -b "$PROTON_BRANCH" https://github.com/Stredohori/proton-wine.git source
+              git clone -b "$PROTON_BRANCH" https://github.com/ValveSoftware/wine.git source
               cd source
               git config advice.detachedHead false
 
@@ -270,9 +270,6 @@ jobs:
           BASE_URL="https://raw.githubusercontent.com/Stredohori/proton-wine/refs/heads/proton_10.0/android/patches"
 
           PATCHES=(
-            "android_network.patch"
-            "dlls_nsiproxy_sys_ip_c.patch"
-            "midi_support.patch"
             "dlls_winebus_sys_bus_sdl_c.patch"
 
             "dlls_ntdll_unix_esync_c.patch"
@@ -284,14 +281,7 @@ jobs:
             "loader_preloader_c.patch"
 
             "dlls_ntdll_unix_signal_x86_64_c.patch"
-            "dlls_winepulse_drv_pulse_c.patch"
             "programs_explorer_desktop_c.patch"
-
-            "dlls_ntdll_unix_server_c.patch"
-            "dlls_advapi32_advapi_c.patch"
-
-            "programs_winebrowser_makefile_in.patch"
-            "programs_winebrowser_main_c.patch"
 
             "dlls_ntdll_loader_c.patch"
             "dlls_ntdll_unix_loader_c.patch"
