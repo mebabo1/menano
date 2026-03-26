@@ -222,9 +222,8 @@ jobs:
 
               PROTON_BRANCH="${{ github.event.inputs.proton_branch || 'proton_10.0' }}"
 
-              git clone -b "$PROTON_BRANCH" https://github.com/ValveSoftware/wine.git source
-              cd source
-              git config advice.detachedHead false
+              git clone https://github.com/ValveSoftware/wine
+              cd wine
 
               WINE_VERSION_ACTUAL="$PROTON_BRANCH"
 
