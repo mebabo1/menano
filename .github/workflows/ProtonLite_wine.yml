@@ -285,6 +285,7 @@ jobs:
           --without-unwind \
           --without-usb \
           --without-v4l2 \
+          --with-xshm \
           --without-wayland"
         
         # 根据功能添加配置选项
