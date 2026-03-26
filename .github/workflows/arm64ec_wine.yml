@@ -224,12 +224,13 @@ jobs:
 
               git clone -b "$PROTON_BRANCH" https://github.com/Stredohori/proton-wine.git source
               cd source
+              git config advice.detachedHead false
 
-              WINE_VERSION_ACTUAL="$PROTON_BRANCH"
+              WINE_VERSION_ACTUAL=$(git describe --tags --abbrev=0 2>/dev/null || echo "$PROTON_BRANCH")
 
               ;;
             *)
-              echo "未知的 Wine 分支: $WINE_BRANCH"
+              echo "Detected version: $WINE_VERSION_ACTUAL"
               exit 1
               ;;
           esac
