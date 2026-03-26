@@ -290,6 +290,12 @@ jobs:
             wget -q -O "$PATCH_DIR/$patch" "$BASE_URL/$patch"
             git apply --3way --reject --whitespace=fix "$PATCH_DIR/$patch" || true
           done
+
+      - name: Remove problematic wdscore module
+        run: |
+          cd ${{ env.WINE_SOURCE_DIR }}/source
+          echo "Removing wdscore to avoid ARM64EC linker errors..."
+          rm -rf dlls/wdscore
     
       # ------------------------------------------------------------
       # 8. 生成 configure 脚本
