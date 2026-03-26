@@ -459,9 +459,7 @@ jobs:
             --without-vosk \
             --with-vulkan \
             --without-wayland \
-            --without-xcomposite \
             --without-xinerama \
-            --without-xshape \
             --with-xshm \
             --host=aarch64-linux-gnu \
             host_alias=aarch64-linux-gnu \
