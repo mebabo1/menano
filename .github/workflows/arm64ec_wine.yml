@@ -225,9 +225,10 @@ jobs:
               git clone -b "$PROTON_BRANCH" https://github.com/Stredohori/proton-wine.git source
               cd source
               git config advice.detachedHead false
-
-              WINE_VERSION_ACTUAL=$(git describe --tags --abbrev=0 2>/dev/null || echo "$PROTON_BRANCH")
-
+              if [ "$WINE_VERSION" != "latest" ]; then
+                git checkout "wine-$WINE_VERSION"
+              fi
+              WINE_VERSION_ACTUAL=$(git describe --tags --abbrev=0 2>/dev/null || echo "$WINE_VERSION")
               ;;
             *)
               echo "Detected version: $WINE_VERSION_ACTUAL"
