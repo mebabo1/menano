@@ -1,4 +1,4 @@
- @ stub WdsGetPointer
+@ stub WdsGetPointer
 #@ extern g_Kernel32
 #@ extern g_bEnableDiagnosticMode
 @ stub ConstructPartialMsgIfA
