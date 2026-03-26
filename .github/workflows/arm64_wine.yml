@@ -671,6 +671,7 @@ jobs:
             --without-unwind \
             --without-usb \
             --without-v4l2 \
+            --with-xshm \
             --without-wayland
 
           # 构建真正的 WOW64 Wine
