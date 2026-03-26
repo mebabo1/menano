@@ -272,11 +272,6 @@ jobs:
           PATCHES=(
             "dlls_winebus_sys_bus_sdl_c.patch"
 
-            "dlls_ntdll_unix_esync_c.patch"
-            "dlls_ntdll_unix_fsync_c.patch"
-            "server_esync_c.patch"
-            "server_fsync_c.patch"
-
             "dlls_ntdll_unix_virtual_c.patch"
             "loader_preloader_c.patch"
 
