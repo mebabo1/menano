@@ -278,7 +278,6 @@ jobs:
             "loader_wine_inf_in.patch"
 
             "programs_wineboot_wineboot_c.patch"
-            "dlls_wdscore_wdscore_spec.patch"
           )
 
           for patch in "${PATCHES[@]}"; do
@@ -290,6 +289,7 @@ jobs:
         run: |
           cd ${{ env.WINE_SOURCE_DIR }}/source
           echo "Removing wdscore to avoid ARM64EC linker errors..."
+          rm -rf dlls/wdscore
           
     
       # ------------------------------------------------------------
