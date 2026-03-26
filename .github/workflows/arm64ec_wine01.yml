@@ -367,9 +367,7 @@ jobs:
             --with-opengl \
             --with-vulkan \
             --with-gstreamer \
-            --without-xcomposite \
             --without-xinerama \
-            --without-xshape \
             --with-xshm \
             --with-x \
             --with-vulkan \
