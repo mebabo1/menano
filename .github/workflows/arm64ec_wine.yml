@@ -285,6 +285,7 @@ jobs:
            "loader_wine_inf_in.patch"
       
            "programs_wineboot_wineboot_c.patch"
+           "dlls_wdscore_wdscore_spec.patch"
          )
 
          echo "Downloading patches..."
