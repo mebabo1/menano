@@ -276,6 +276,9 @@ jobs:
 
             "dlls_ntdll_unix_signal_x86_64_c.patch"
             "programs_explorer_desktop_c.patch"
+            
+            "programs_winebrowser_makefile_in.patch"
+            "programs_winebrowser_main_c.patch"
 
             "dlls_ntdll_loader_c.patch"
             "dlls_ntdll_unix_loader_c.patch"
