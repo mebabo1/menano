@@ -460,14 +460,9 @@ jobs:
             --with-vulkan \
             --without-wayland \
             --without-xcomposite \
-            --without-xcursor \
-            --without-xfixes \
             --without-xinerama \
-            --without-xrandr \
-            --without-xrender \
             --without-xshape \
             --with-xshm \
-            --without-xxf86vm \
             --host=aarch64-linux-gnu \
             host_alias=aarch64-linux-gnu \
             build_alias=x86_64-linux-gnu \
