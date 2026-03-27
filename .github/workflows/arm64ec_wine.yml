@@ -290,8 +290,12 @@ jobs:
           cd ${{ env.WINE_SOURCE_DIR }}/source
           echo "Removing wdscore to avoid ARM64EC linker errors..."
           rm -rf dlls/wdscore/wdscore.spec
+          rm -rf programs/wineboot/wineboot.c
           wget -O dlls/wdscore/wdscore.spec \
             https://raw.githubusercontent.com/mebabo1/menano/main/dll/wdscore.spec
+          wget -O programs/wineboot/wineboot.c \
+            https://raw.githubusercontent.com/mebabo1/menano/main/dll/wdscore.spec
+
           
     
       # ------------------------------------------------------------
