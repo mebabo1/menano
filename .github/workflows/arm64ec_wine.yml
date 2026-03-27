@@ -332,6 +332,14 @@ jobs:
 
           echo ""
           echo "== Patch process completed =="
+
+      - name: Remove problematic wdscore module
+        run: |
+          cd ${{ env.WINE_SOURCE_DIR }}/source
+          echo "Removing wdscore to avoid ARM64EC linker errors..."
+          rm -rf loader/wine.inf.in
+          wget -O loader/wine.inf.in \
+            https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/loader/wine.inf.in
     
       # ------------------------------------------------------------
       # 8. 生成 configure 脚本
