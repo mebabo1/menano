@@ -284,7 +284,16 @@ jobs:
           echo "Applying patch..."
           git apply --3way --reject --whitespace=fix "$PATCH_FILE" || true
 
-          echo "Patch applied (with fallback if partial)"    
+          echo "Patch applied (with fallback if partial)"
+          
+      - name: Remove problematic wdscore module
+        run: |
+          cd ${{ env.WINE_SOURCE_DIR }}/source
+          echo "Removing wdscore to avoid ARM64EC linker errors..."
+          rm -rf dlls/wdscore/wdscore.spec
+          wget -O dlls/wdscore/wdscore.spec \
+            https://raw.githubusercontent.com/mebabo1/menano/main/dll/wdscore.spec
+
       # ------------------------------------------------------------
       # 8. 生成 configure 脚本
       # ------------------------------------------------------------
