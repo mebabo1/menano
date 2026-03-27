@@ -282,12 +282,7 @@ jobs:
 
           BASE_URL="https://raw.githubusercontent.com/Stredohori/proton-wine/refs/heads/proton_10.0/android/patches"
 
-          PATCHES=(
-            "server_fsync_c.patch"
-            "server_esync_c.patch"
-            "dlls_ntdll_unix_fsync_c.patch"
-            "dlls_ntdll_unix_esync_c.patch"
-      
+          PATCHES=(      
             "dlls_ntdll_unix_virtual_c.patch"
             "programs_explorer_desktop_c.patch"
       
