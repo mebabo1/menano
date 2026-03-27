@@ -366,7 +366,6 @@ static const char *get_pe_dir( WORD machine )
     case IMAGE_FILE_MACHINE_AMD64: return "/aarch64-windows";
     case IMAGE_FILE_MACHINE_AMD64: return "/x86_64-windows";
     case IMAGE_FILE_MACHINE_ARMNT: return "/arm-windows";
-    case IMAGE_FILE_MACHINE_ARM64: return "/aarch64-windows";
     default: return "";
     }
 }
