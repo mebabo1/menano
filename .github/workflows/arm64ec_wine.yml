@@ -294,7 +294,7 @@ jobs:
           wget -O dlls/wdscore/wdscore.spec \
             https://raw.githubusercontent.com/mebabo1/menano/main/dll/wdscore.spec
           wget -O programs/wineboot/wineboot.c \
-            https://raw.githubusercontent.com/mebabo1/menano/main/dll/wdscore.spec
+            https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/dll/wineboot.c
 
           
     
