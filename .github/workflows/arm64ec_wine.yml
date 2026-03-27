@@ -283,7 +283,7 @@ jobs:
           BASE_URL="https://raw.githubusercontent.com/Stredohori/proton-wine/refs/heads/proton_10.0/android/patches"
 
           PATCHES=(      
-            "dlls_ntdll_unix_virtual_c.patch"
+            
             "programs_explorer_desktop_c.patch"
       
             "dlls_ntdll_loader_c.patch"
@@ -296,7 +296,7 @@ jobs:
           )
 
           echo "== Normalize line endings (CRLF → LF) =="
-          find . -type f -exec sed -i 's/\r$//' {} +
+          find . -type f -exec file {} \; | grep text | cut -d: -f1 | xargs sed -i 's/\r$//'
 
           git config core.autocrlf false
           git config core.eol lf
