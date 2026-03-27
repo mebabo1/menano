@@ -429,11 +429,7 @@ jobs:
             --prefix=/tmp/wine-install-wow64 \
             --with-mingw=clang \
             --enable-archs=arm64ec,aarch64,i386 \
-            --enable-win64 \
-            --disable-win16 \
-            --enable-nls \
             --disable-amd_ags_x64 \
-            --enable-wineandroid_drv=no \
             --disable-tests \
             --with-alsa \
             --without-capi \
@@ -448,12 +444,6 @@ jobs:
             --with-gettextpo=no \
             --without-gphoto \
             --with-gnutls \
-            --without-gssapi \
-            --without-inotify \
-            --without-krb5 \
-            --without-netapi \
-            --without-opencl \
-            --with-opengl \
             --without-osmesa \
             --without-oss \
             --without-pcap \
@@ -462,20 +452,14 @@ jobs:
             --with-pthread \
             --with-pulse \
             --without-sane \
-            --with-sdl \
-            --without-udev \
-            --without-unwind \
-            --without-usb \
-            --without-v4l2 \
-            --without-vosk \
             --with-vulkan \
             --without-wayland \
-            --without-xinerama \
             --with-xshm \
             --host=aarch64-linux-gnu \
             host_alias=aarch64-linux-gnu \
             build_alias=x86_64-linux-gnu \
-            --with-wine-tools=/opt/wine64-native
+            --with-wine-tools=/opt/wine64-native \
+            CC=aarch64-linux-gnu-gcc
 
           make -j$(nproc) 2>&1 | grep -i error
           make install
