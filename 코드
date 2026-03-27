@@ -1,4 +1,13 @@
 sed -i '/get_pe_dir/,/}/ {/case IMAGE_FILE_MACHINE_AMD64:/,/return/d}' dlls/ntdll/unix/loader.c
 
-grep -q '"/aarch64-windows"' dlls/ntdll/unix/loader.c || \
-sed -i '/get_pe_dir/,/}/ a\    case IMAGE_FILE_MACHINE_AMD64: return "/aarch64-windows";' dlls/ntdll/unix/loader.c
+grep -q 'case IMAGE_FILE_MACHINE_AMD64: return "/aarch64-windows";' dlls/ntdll/unix/loader.c || \
+
+sed -i '/get_pe_dir/,/}/ {
+    /case IMAGE_FILE_MACHINE_ARM64:/a\    case IMAGE_FILE_MACHINE_AMD64: return "/aarch64-windows";
+}' dlls/ntdll/unix/loader.c
+
+grep -q 'case IMAGE_FILE_MACHINE_AMD64:' dlls/ntdll/unix/loader.c || \
+sed -i '/get_pe_dir/,/}/ {
+    /case IMAGE_FILE_MACHINE_I386:/a\    case IMAGE_FILE_MACHINE_AMD64: return "/aarch64-windows";
+}' dlls/ntdll/unix/loader.c
+
