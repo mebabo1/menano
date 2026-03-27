@@ -277,7 +277,6 @@ jobs:
             "dlls_wow64_syscall_c.patch"
             "loader_wine_inf_in.patch"
 
-            "programs_wineboot_wineboot_c.patch"
           )
 
           for patch in "${PATCHES[@]}"; do
@@ -291,12 +290,22 @@ jobs:
           echo "Removing wdscore to avoid ARM64EC linker errors..."
           rm -rf dlls/wdscore/wdscore.spec
           rm -rf programs/wineboot/wineboot.c
+          rm -rf loader/wine.inf.in
+          rm -rf dlls/wow64/syscall.c
+          rm -rf dlls/ntdll/unix/loader.c
+          rm -rf dlls/ntdll/loader.c
           wget -O dlls/wdscore/wdscore.spec \
             https://raw.githubusercontent.com/mebabo1/menano/main/dll/wdscore.spec
           wget -O programs/wineboot/wineboot.c \
             https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/dll/wineboot.c
-
-          
+          wget -O loader/wine.inf.in \
+            https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/loader/wine.inf.in
+          wget -O dlls/wow64/syscall.c \
+            https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/dll/wow64/syscall.c
+          wget -O dlls/ntdll/unix/loader.c \
+            https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/dll/ntdll/unix/loader.c
+          wget -O dlls/ntdll/loader.c \
+            https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/dll/ntdll/loader.c
     
       # ------------------------------------------------------------
       # 8. 生成 configure 脚本
