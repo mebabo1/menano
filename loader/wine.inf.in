@@ -473,7 +473,7 @@ HKLM,%CurrentVersion%,"CommonFilesDir (x86)",,"%16428%"
 HKLM,%CurrentVersion%,"ProgramFilesDir (Arm)",,"C:\Program Files (Arm)"
 HKLM,%CurrentVersion%,"CommonFilesDir (Arm)",,"C:\Program Files (Arm)\Common Files"
 HKLM,Software\Microsoft\Wow64\amd64,,2,"libarm64ecfex.dll"
-HKLM,Software\Microsoft\Wow64\arm,,2,"wowarmhw.dll"
+HKLM,Software\Microsoft\Wow64\arm64,,2,"libarm64ecfex.dll"
 HKLM,Software\Microsoft\Wow64\x86,,2,"libwow64fex.dll"
 
 [CurrentVersionWow64.ntx86]
