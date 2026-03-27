@@ -281,13 +281,22 @@ jobs:
           BASE_URL="https://raw.githubusercontent.com/Stredohori/proton-wine/refs/heads/proton_10.0/android/patches"
 
           PATCHES=(
-          
+
+            "server_fsync_c.patch"
+            "server_esync_c.patch"
+            "dlls_ntdll_unix_fsync_c.patch"
+            "dlls_ntdll_unix_esync_c.patch"
+            
+            "dlls_ntdll_unix_virtual_c.patch"
             "programs_explorer_desktop_c.patch"
             
             "dlls_ntdll_loader_c.patch"
             "dlls_ntdll_unix_loader_c.patch"
             "dlls_wow64_syscall_c.patch"
             "loader_wine_inf_in.patch"
+            
+            "dlls_wdscore_wdscore_spec.patch"
+            "programs_wineboot_wineboot_c.patch"
 
           )
 
@@ -296,28 +305,6 @@ jobs:
             git apply --3way --reject --whitespace=fix "$PATCH_DIR/$patch" || true
           done
 
-      - name: Remove problematic wdscore module
-        run: |
-          cd ${{ env.WINE_SOURCE_DIR }}/source
-          echo "Removing wdscore to avoid ARM64EC linker errors..."
-          rm -rf dlls/wdscore/wdscore.spec
-          rm -rf programs/wineboot/wineboot.c
-          rm -rf loader/wine.inf.in
-          rm -rf dlls/wow64/syscall.c
-          rm -rf dlls/ntdll/unix/loader.c
-          rm -rf dlls/ntdll/loader.c
-          wget -O dlls/wdscore/wdscore.spec \
-            https://raw.githubusercontent.com/mebabo1/menano/main/dll/wdscore.spec
-          wget -O programs/wineboot/wineboot.c \
-            https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/dll/wineboot.c
-          wget -O loader/wine.inf.in \
-            https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/loader/wine.inf.in
-          wget -O dlls/wow64/syscall.c \
-            https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/dll/wow64/syscall.c
-          wget -O dlls/ntdll/unix/loader.c \
-            https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/dll/ntdll/unix/loader.c
-          wget -O dlls/ntdll/loader.c \
-            https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/dll/ntdll/loader.c
     
       # ------------------------------------------------------------
       # 8. 生成 configure 脚本
