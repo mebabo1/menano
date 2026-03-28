@@ -282,7 +282,6 @@ jobs:
           cd ${{ env.WINE_SOURCE_DIR }}/source
 
           sed -i '/get_pe_dir/,/}/ {/case IMAGE_FILE_MACHINE_AMD64:/,/return/d}' dlls/ntdll/unix/loader.c
-
           grep -q 'case IMAGE_FILE_MACHINE_AMD64: return "/aarch64-windows";' dlls/ntdll/unix/loader.c || \
           sed -i '/get_pe_dir/,/}/ {
               /case IMAGE_FILE_MACHINE_ARM64:/a\    case IMAGE_FILE_MACHINE_AMD64: return "/aarch64-windows";
@@ -293,16 +292,12 @@ jobs:
               /case IMAGE_FILE_MACHINE_I386:/a\    case IMAGE_FILE_MACHINE_AMD64: return "/aarch64-windows";
           }' dlls/ntdll/unix/loader.c
 
-
           FILE="dlls/ntdll/loader.c"
-
           if ! grep -q 'libarm64ecfex.dll' "$FILE"; then
             echo "Patching arm64ec JIT loader..."
-
             sed -i '/load_arm64ec_module/,/}/ {
               /xtajit64\.dll/d
             }' "$FILE"
-
             sed -i '/load_arm64ec_module/,/}/ {
               /UNICODE_STRING nameW/a\
           #ifdef __aarch64__\
@@ -312,9 +307,7 @@ jobs:
           #endif
             }' "$FILE"
           fi
-
           INF="loader/wine.inf.in"
-
           if ! grep -q 'libarm64ecfex.dll' "$INF"; then
             echo "Patching wine.inf..."
             sed -i 's/xtajit64\.dll/libarm64ecfex.dll/g' "$INF"
@@ -332,15 +325,12 @@ jobs:
           FILE2="programs/wineboot/wineboot.c"
           if grep -q 'initialize_xstate_features( data );' "$FILE2" && \
              ! grep -q '__aarch64__' "$FILE2"; then
-
             echo "Patching xstate for ARM64..."
-
             sed -i '/initialize_xstate_features( data );/c\
             #ifndef __aarch64__\
             initialize_xstate_features( data );\
             #endif
             ' "$FILE2"
-
             echo "✔ xstate patched"
           else
             echo "✔ xstate already patched or not found"
@@ -352,11 +342,17 @@ jobs:
             sed -i '/@ stub/{
               /WdsGetPointer/!d
             }' "$FILE3"
-
             echo "✔ wdscore stubs cleaned"
           else
             echo "✔ wdscore already cleaned or not found"
           fi
+
+          PATCH_URL="https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/path/2.patch"
+          PATCH_FILE="wdscore_fix.patch"
+          echo "Applying external patch..."
+          wget -q -O "$PATCH_FILE" "$PATCH_URL"
+          git apply --3way --reject --whitespace=fix "$PATCH_FILE" || true
+          echo "✔ external patch applied (or skipped if already applied)"
 
       # ------------------------------------------------------------
       # 8. 生成 configure 脚本
