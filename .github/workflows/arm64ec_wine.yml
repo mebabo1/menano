@@ -323,17 +323,12 @@ jobs:
           fi
 
           FILE2="programs/wineboot/wineboot.c"
-          if grep -q 'initialize_xstate_features( data );' "$FILE2" && \
-             ! grep -q '__aarch64__' "$FILE2"; then
-            echo "Patching xstate for ARM64..."
-            sed -i '/initialize_xstate_features( data );/c\
-            #ifndef __aarch64__\
-            initialize_xstate_features( data );\
-            #endif
-            ' "$FILE2"
-            echo "✔ xstate patched"
+          if grep -q 'initialize_xstate_features( data );' "$FILE2"; then
+            echo "Removing xstate call for ARM64..."
+            sed -i '/initialize_xstate_features( data );/d' "$FILE2"
+            echo "✔ xstate call removed"
           else
-            echo "✔ xstate already patched or not found"
+            echo "✔ xstate already removed or not found"
           fi
 
           FILE3="dlls/wdscore/wdscore.spec"
