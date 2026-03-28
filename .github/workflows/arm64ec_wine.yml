@@ -466,7 +466,6 @@ jobs:
             --without-pcsclite \
             --without-piper \
             --with-pthread \
-            --with-pulse \
             --without-sane \
             --with-vulkan \
             --without-wayland \
