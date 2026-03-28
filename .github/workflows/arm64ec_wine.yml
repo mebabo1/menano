@@ -460,7 +460,6 @@ jobs:
             --without-gettext \
             --with-gettextpo=no \
             --without-gphoto \
-            --with-gnutls \
             --without-osmesa \
             --without-oss \
             --without-pcap \
