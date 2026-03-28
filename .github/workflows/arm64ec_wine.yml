@@ -475,7 +475,7 @@ jobs:
             host_alias=aarch64-linux-gnu \
             build_alias=x86_64-linux-gnu \
             --with-wine-tools=/opt/wine64-native \
-            CC=aarch64-linux-gnu-gcc
+            CC=aarch64-linux-gnu-clang
 
           make -j$(nproc) 2>&1 | grep -i error
           make install
