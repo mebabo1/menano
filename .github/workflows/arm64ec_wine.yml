@@ -449,6 +449,9 @@ jobs:
             --disable-amd_ags_x64 \
             --disable-tests \
             --with-alsa \
+            --with-gnutls \
+            --with-pulse \
+            --with-vulkan \
             --without-capi \
             --without-coreaudio \
             --without-cups \
@@ -473,8 +476,7 @@ jobs:
             host_alias=aarch64-linux-gnu \
             build_alias=x86_64-linux-gnu \
             --with-wine-tools=/opt/wine64-native \
-            CC=clang
-
+            CC=clangCC=aarch64-linux-gnu-clang
           make -j$(nproc) 2>&1 | grep -i error
           make install
 
