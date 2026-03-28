@@ -335,10 +335,11 @@ jobs:
 
             echo "Patching xstate for ARM64..."
 
-            sed -i 's|initialize_xstate_features( data );|
+            sed -i '/initialize_xstate_features( data );/c\
             #ifndef __aarch64__\
             initialize_xstate_features( data );\
-            #endif|g' "$FILE2"
+            #endif
+            ' "$FILE2"
 
             echo "✔ xstate patched"
           else
