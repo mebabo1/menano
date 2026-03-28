@@ -471,10 +471,12 @@ jobs:
             --without-sane \
             --without-wayland \
             --with-xshm \
+            --host=aarch64-linux-gnu \
             host_alias=aarch64-linux-gnu \
             build_alias=x86_64-linux-gnu \
             --with-wine-tools=/opt/wine64-native \
-            CC=aarch64-linux-gnu-gcc
+            CC=aarch64-linux-gnu-gcc \
+            CROSSCC="clang --target=aarch64-w64-mingw32"
           make -j$(nproc) 2>&1 | grep -i error
           make install
 
