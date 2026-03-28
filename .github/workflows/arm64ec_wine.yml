@@ -467,7 +467,6 @@ jobs:
             --without-piper \
             --with-pthread \
             --without-sane \
-            --with-vulkan \
             --without-wayland \
             --with-xshm \
             --host=aarch64-linux-gnu \
