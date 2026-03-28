@@ -1,60 +1,60 @@
       - name: arm64ec
-  run: |
-    cd ${{ env.WINE_SOURCE_DIR }}/source
+        run: |
+          cd ${{ env.WINE_SOURCE_DIR }}/source
 
-    ########################################
-    # 1. get_pe_dir 패치
-    ########################################
+          ########################################
+          # 1. get_pe_dir 패치
+          ########################################
 
-    sed -i '/get_pe_dir/,/}/ {/case IMAGE_FILE_MACHINE_AMD64:/,/return/d}' dlls/ntdll/unix/loader.c
+          sed -i '/get_pe_dir/,/}/ {/case IMAGE_FILE_MACHINE_AMD64:/,/return/d}' dlls/ntdll/unix/loader.c
 
-    grep -q 'case IMAGE_FILE_MACHINE_AMD64: return "/aarch64-windows";' dlls/ntdll/unix/loader.c || \
-    sed -i '/get_pe_dir/,/}/ {
-        /case IMAGE_FILE_MACHINE_ARM64:/a\    case IMAGE_FILE_MACHINE_AMD64: return "/aarch64-windows";
-    }' dlls/ntdll/unix/loader.c
+          grep -q 'case IMAGE_FILE_MACHINE_AMD64: return "/aarch64-windows";' dlls/ntdll/unix/loader.c || \
+          sed -i '/get_pe_dir/,/}/ {
+              /case IMAGE_FILE_MACHINE_ARM64:/a\    case IMAGE_FILE_MACHINE_AMD64: return "/aarch64-windows";
+          }' dlls/ntdll/unix/loader.c
 
-    grep -q 'case IMAGE_FILE_MACHINE_AMD64:' dlls/ntdll/unix/loader.c || \
-    sed -i '/get_pe_dir/,/}/ {
-        /case IMAGE_FILE_MACHINE_I386:/a\    case IMAGE_FILE_MACHINE_AMD64: return "/aarch64-windows";
-    }' dlls/ntdll/unix/loader.c
+          grep -q 'case IMAGE_FILE_MACHINE_AMD64:' dlls/ntdll/unix/loader.c || \
+          sed -i '/get_pe_dir/,/}/ {
+              /case IMAGE_FILE_MACHINE_I386:/a\    case IMAGE_FILE_MACHINE_AMD64: return "/aarch64-windows";
+          }' dlls/ntdll/unix/loader.c
 
 
-    ########################################
-    # 2. arm64ec JIT DLL 교체 (loader.c)
-    ########################################
+          ########################################
+          # 2. arm64ec JIT DLL 교체 (loader.c)
+          ########################################
 
-    FILE="dlls/ntdll/loader.c"
+          FILE="dlls/ntdll/loader.c"
 
-    if ! grep -q 'libarm64ecfex.dll' "$FILE"; then
-      echo "Patching arm64ec JIT loader..."
+          if ! grep -q 'libarm64ecfex.dll' "$FILE"; then
+            echo "Patching arm64ec JIT loader..."
 
-      sed -i '/load_arm64ec_module/,/}/ {
-        /xtajit64\.dll/d
-      }' "$FILE"
+            sed -i '/load_arm64ec_module/,/}/ {
+              /xtajit64\.dll/d
+            }' "$FILE"
 
-      sed -i '/load_arm64ec_module/,/}/ {
-        /UNICODE_STRING nameW/a\
+            sed -i '/load_arm64ec_module/,/}/ {
+              /UNICODE_STRING nameW/a\
 #ifdef __aarch64__\
     WCHAR module[64] = L"C:\\\\windows\\\\system32\\\\libarm64ecfex.dll";\
 #else\
     WCHAR module[64] = L"C:\\\\windows\\\\system32\\\\xtajit64.dll";\
 #endif
-      }' "$FILE"
-    fi
+            }' "$FILE"
+          fi
 
 
-    ########################################
-    # 3. wine.inf (레지스트리 JIT 교체)
-    ########################################
+          ########################################
+          # 3. wine.inf (레지스트리 JIT 교체)
+          ########################################
 
-    INF="loader/wine.inf.in"
+          INF="loader/wine.inf.in"
 
-    if ! grep -q 'libarm64ecfex.dll' "$INF"; then
-      echo "Patching wine.inf..."
+          if ! grep -q 'libarm64ecfex.dll' "$INF"; then
+            echo "Patching wine.inf..."
 
-      # amd64 JIT 교체
-      sed -i 's/xtajit64\.dll/libarm64ecfex.dll/g' "$INF"
+            # amd64 JIT 교체
+            sed -i 's/xtajit64\.dll/libarm64ecfex.dll/g' "$INF"
 
-      # x86 JIT 교체
-      sed -i 's/xtajit\.dll/libwow64fex.dll/g' "$INF"
-    fi
+            # x86 JIT 교체
+            sed -i 's/xtajit\.dll/libwow64fex.dll/g' "$INF"
+          fi
