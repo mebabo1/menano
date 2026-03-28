@@ -266,11 +266,17 @@ jobs:
           find . -name "loader.c" -exec sed -i 's|"/tmp"|"/data/data/com.termux/files/usr/tmp"|g' {} + 2>/dev/null || true
           find . -name "server.c" -exec sed -i 's|"/tmp"|"/data/data/com.termux/files/usr/tmp"|g' {} + 2>/dev/null || true
           echo "路径修复完成"
+          FILE="dlls/atiadlxx/atiadlxx_main.c"
+          if grep -q 'InterlockedOr(&dummy, 0)' "$FILE"; then
+            sed -i 's|InterlockedOr(&dummy, 0)|InterlockedOr((volatile long *)&dummy, 0)|g' "$FILE"
+            echo "✔ InterlockedOr patched"
+          else
+            echo "✔ InterlockedOr already patched or not found"
+          fi         
 
       # ------------------------------------------------------------
       # 7. 应用 mfplat 补丁
       # ------------------------------------------------------------
-
               
       # ------------------------------------------------------------
       # 8. 生成 configure 脚本
