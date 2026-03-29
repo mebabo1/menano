@@ -471,6 +471,7 @@ jobs:
             --without-sane \
             --without-wayland \
             --with-xshm \
+            --host=aarch64-linux-gnu \
             --with-wine-tools=/opt/wine64-native \
             host_alias=aarch64-linux-gnu \
             build_alias=x86_64-linux-gnu \
