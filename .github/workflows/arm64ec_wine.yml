@@ -477,8 +477,8 @@ jobs:
             --with-wine-tools=/opt/wine64-native \
             --host_alias=aarch64-linux-gnu \
             --build_alias=x86_64-linux-gnu \
-            CC=aarch64-linux-gnu-gcc \
-            CROSSCC="clang --target=aarch64-w64-mingw32"
+            --CC=aarch64-linux-gnu-gcc \
+            --CROSSCC="clang --target=aarch64-w64-mingw32"
           make -j$(nproc) 2>&1 | grep -i error
           make install
 
