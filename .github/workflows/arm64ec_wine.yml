@@ -447,6 +447,7 @@ jobs:
             --with-mingw=clang \
             --enable-archs=arm64ec,aarch64,i386 \
             --host=aarch64-linux-gnu \
+            --with-wine-tools=/opt/wine64-native \
             --disable-amd_ags_x64 \
             --disable-tests \
             --with-alsa \
@@ -474,7 +475,6 @@ jobs:
             --without-sane \
             --without-wayland \
             --with-xshm \
-            --with-wine-tools=/opt/wine64-native \
             host_alias=aarch64-linux-gnu \
             build_alias=x86_64-linux-gnu \
             CC=aarch64-linux-gnu-gcc \
