@@ -135,6 +135,7 @@ jobs:
             libcups2-dev:arm64 \
             libxkbcommon-dev:arm64 \
             libxkbregistry-dev:arm64 \
+            ocl-icd-opencl-dev:arm64 \
             libwayland-dev:arm64
 
       # ------------------------------------------------------------
