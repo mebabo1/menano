@@ -446,6 +446,7 @@ jobs:
             --prefix=/tmp/wine-install-wow64 \
             --with-mingw=clang \
             --enable-archs=arm64ec,aarch64,i386 \
+            --host=aarch64-linux-gnu \
             --disable-amd_ags_x64 \
             --disable-tests \
             --with-alsa \
@@ -473,12 +474,11 @@ jobs:
             --without-sane \
             --without-wayland \
             --with-xshm \
-            --host=aarch64-linux-gnu \
             --with-wine-tools=/opt/wine64-native \
-            --host_alias=aarch64-linux-gnu \
-            --build_alias=x86_64-linux-gnu \
-            --CC=aarch64-linux-gnu-gcc \
-            --CROSSCC="clang --target=aarch64-w64-mingw32"
+            host_alias=aarch64-linux-gnu \
+            build_alias=x86_64-linux-gnu \
+            CC=aarch64-linux-gnu-gcc \
+            CROSSCC="clang --target=aarch64-w64-mingw32"
           make -j$(nproc) 2>&1 | grep -i error
           make install
 
