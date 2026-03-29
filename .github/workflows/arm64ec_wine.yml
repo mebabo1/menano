@@ -345,7 +345,7 @@ jobs:
           fi
 
           PATCH_URL="https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/path/2.patch"
-          PATCH_FILE="wdscore_fix.patch"
+          PATCH_FILE="syscall.patch"
           echo "Applying external patch..."
           wget -q -O "$PATCH_FILE" "$PATCH_URL"
           git apply --3way --reject --whitespace=fix "$PATCH_FILE" || true
