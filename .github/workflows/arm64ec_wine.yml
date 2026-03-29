@@ -12,7 +12,7 @@ on:
         type: choice
         options:
         - proton
-        - staging
+        - proton01
         - staging-tkg
         - staging-tkg-fsync
       wine_version:
@@ -189,9 +189,9 @@ jobs:
                 WINE_VERSION_ACTUAL=$(git describe --tags --abbrev=0 2>/dev/null || echo "$WINE_VERSION")
               fi
               ;;
-            staging)
+            proton01)
               echo "处理 Staging 分支"
-              git clone https://github.com/afeimod/wine-arm.git source
+              git clone -b proton_10.0-4 https://github.com/Waim908/wine-termux.git source
               cd source
               git config advice.detachedHead false
               if [ "$WINE_VERSION" != "latest" ]; then
