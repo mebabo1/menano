@@ -459,7 +459,8 @@ jobs:
             --without-coreaudio \
             --without-cups \
             --without-dbus \
-            --without-ffmpeg \
+            --with-ffmpeg \
+            --with-gstreamer \
             --with-fontconfig \
             --with-freetype \
             --without-gcrypt \
