@@ -465,8 +465,7 @@ jobs:
             --without-gettext \
             --with-gettextpo=no \
             --without-gphoto \
-            --without-opencl
-            --without-osmesa \
+            --without-opencl \
             --without-oss \
             --without-pcap \
             --without-pcsclite \
