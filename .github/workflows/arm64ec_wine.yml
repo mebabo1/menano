@@ -319,6 +319,14 @@ jobs:
             }' "$FILE"
           fi
 
+          FILE="include/winnt.h"
+          if ! grep -q 'CONTEXT_ARM64_FEX_YMMSTATE' "$FILE"; then
+            echo "Patching winnt.h for FEX YMM state define..."
+            sed -i '/CONTEXT_ARM64_XSTATE/a\
+          #define CONTEXT_ARM64_FEX_YMMSTATE   (CONTEXT_ARM64 | 0x00000040)
+            ' "$FILE"
+          fi
+
           FILE="dlls/atiadlxx/atiadlxx_main.c"
           if grep -q 'InterlockedOr(&dummy, 0)' "$FILE"; then
             sed -i 's|InterlockedOr(&dummy, 0)|InterlockedOr((volatile long *)&dummy, 0)|g' "$FILE"
