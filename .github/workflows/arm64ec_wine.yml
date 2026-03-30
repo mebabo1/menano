@@ -452,6 +452,7 @@ jobs:
             --without-dbus \
             --without-ffmpeg \
             --without-gstreamer \
+            --without-opencl \
             --with-fontconfig \
             --with-freetype \
             --without-gcrypt \
