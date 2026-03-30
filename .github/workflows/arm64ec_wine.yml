@@ -303,9 +303,9 @@ jobs:
             sed -i '/load_arm64ec_module/,/}/ {
               /UNICODE_STRING nameW/a\
           #ifdef __aarch64__\
-          WCHAR module[64] = L"C:\\windows\\system32\\libarm64ecfex.dll";\
+          WCHAR module[64] = L"C:\\\\windows\\\\system32\\\\libarm64ecfex.dll";\
           #else\
-          WCHAR module[64] = L"C:\\windows\\system32\\xtajit64.dll";\
+          WCHAR module[64] = L"C:\\\\windows\\\\system32\\\\xtajit64.dll";\
           #endif
             }' "$FILE"
           fi
