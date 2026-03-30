@@ -70,12 +70,12 @@ jobs:
           fi
 
           grep -v '^#' /etc/apt/sources.list | sed 's/^deb /deb [arch=arm64] /g' > /tmp/arm64.list
-          sed -e 's/\[arch=arm64\]/[arch=amd64]/g' /tmp/arm64.list > /tmp/amd64.list
-          cat /tmp/arm64.list /tmp/amd64.list > /etc/apt/sources.list
+          sed -e 's/\[arch=arm64\]/[arch=i386]/g' /tmp/arm64.list > /tmp/i386.list
+          cat /tmp/arm64.list /tmp/i386.list > /etc/apt/sources.list
 
-          dpkg --add-architecture amd64
+          dpkg --add-architecture i386
           apt-get update
-          apt-get install -y --no-install-recommends hello:arm64 || { echo "arm64 repo test failed"; exit 1; }
+          apt-get install -y --no-install-recommends hello:i386 || { echo "i386 repo test failed"; exit 1; }
 
       # ------------------------------------------------------------
       # 2. 安装所有依赖（完全参照 Dockerfile 的包列表）
