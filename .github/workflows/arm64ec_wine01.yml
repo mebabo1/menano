@@ -69,11 +69,11 @@ jobs:
             echo "deb http://security.debian.org/debian-security bookworm-security main contrib non-free" >> /etc/apt/sources.list
           fi
 
-          grep -v '^#' /etc/apt/sources.list | sed 's/^deb /deb [arch=amd64] /g' > /tmp/amd64.list
-          sed -e 's/\[arch=amd64\]/[arch=arm64]/g' /tmp/amd64.list > /tmp/arm64.list
-          cat /tmp/amd64.list /tmp/arm64.list > /etc/apt/sources.list
+          grep -v '^#' /etc/apt/sources.list | sed 's/^deb /deb [arch=arm64] /g' > /tmp/arm64.list
+          sed -e 's/\[arch=arm64\]/[arch=amd64]/g' /tmp/arm64.list > /tmp/amd64.list
+          cat /tmp/arm64.list /tmp/amd64.list > /etc/apt/sources.list
 
-          dpkg --add-architecture arm64
+          dpkg --add-architecture amd64
           apt-get update
           apt-get install -y --no-install-recommends hello:arm64 || { echo "arm64 repo test failed"; exit 1; }
 
