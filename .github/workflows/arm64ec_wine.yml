@@ -302,6 +302,23 @@ jobs:
             sed -i 's/xtajit\.dll/libwow64fex.dll/g' "$INF"
           fi
 
+          FILE="dlls/ntdll/unwind.h"
+          if ! grep -q 'CONTEXT_ARM64_FEX_YMMSTATE' "$FILE"; then
+            echo "Patching unwind flags for FEX YMM state..."
+            sed -i '/ctx_flags_x64_to_arm/,/}/ {
+              /CONTEXT_AMD64_FLOATING_POINT/ {
+                s/^\(\s*\)\(.*CONTEXT_AMD64_FLOATING_POINT.*\)$/\1\2\
+          \1if (flags \& CONTEXT_AMD64_XSTATE) ret |= CONTEXT_ARM64_FEX_YMMSTATE;/
+              }
+            }' "$FILE"
+            sed -i '/ctx_flags_arm_to_x64/,/}/ {
+              /CONTEXT_ARM64_FLOATING_POINT/ {
+                s/^\(\s*\)\(.*CONTEXT_ARM64_FLOATING_POINT.*\)$/\1\2\
+          \1if (flags \& CONTEXT_ARM64_FEX_YMMSTATE) ret |= CONTEXT_AMD64_XSTATE;/
+              }
+            }' "$FILE"
+          fi
+
           FILE="dlls/atiadlxx/atiadlxx_main.c"
           if grep -q 'InterlockedOr(&dummy, 0)' "$FILE"; then
             sed -i 's|InterlockedOr(&dummy, 0)|InterlockedOr((volatile long *)&dummy, 0)|g' "$FILE"
