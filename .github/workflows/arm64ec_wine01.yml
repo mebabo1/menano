@@ -85,13 +85,13 @@ jobs:
           apt-get install -y --no-install-recommends \
             binutils-aarch64-linux-gnu gcc-aarch64-linux-gnu \
             ca-certificates nano python3 python3-setuptools clang screen llvm lld wget curl \
-            flex bison nasm \
-            libfreetype6-dev \
-            libglib2.0-dev \
-            libltdl-dev \
-            libxcb1-dev \
-            libx11-dev \
-            librsvg2-bin \
+            flex bison nasm:i386 \
+            libfreetype6-dev:i386 \
+            libglib2.0-dev:i386 \
+            libltdl-dev:i386 \
+            libxcb1-dev:i386 \
+            libx11-dev:i386 \
+            librsvg2-bin:i386 \
             git gettext make automake autoconf pkg-config libtool gtk-doc-tools clang \
             dpkg-dev \
             libglib2.0-dev:arm64 \
@@ -100,7 +100,7 @@ jobs:
             libxcb1-dev:arm64 \
             libx11-dev:arm64 \
             build-essential libc-dev-arm64-cross less libc-devtools libidn2-0:arm64 \
-            libx11-dev libxinerama-dev libfreetype-dev libfontconfig-dev \
+            libx11-dev libxinerama-dev libfreetype-dev libfontconfig-dev:i386 \
             cmake \
             libstdc++6-arm64-cross \
             libstdc++-12-dev-arm64-cross \
