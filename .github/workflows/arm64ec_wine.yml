@@ -321,11 +321,17 @@ jobs:
 
           FILE="include/winnt.h"
           if ! grep -q 'CONTEXT_ARM64_FEX_YMMSTATE' "$FILE"; then
-            echo "Patching winnt.h for FEX YMM state define..."
-            sed -i '/CONTEXT_ARM64_X18/a\
-          #define CONTEXT_ARM64_FEX_YMMSTATE   (CONTEXT_ARM64 | 0x00000040)
-            ' "$FILE"
-          fi
+            echo "Patching winnt.h to match FEX diff..."
+            sed -i 's/^#define CONTEXT_ARM64_X18.*/#define CONTEXT_ARM64_X18             (CONTEXT_ARM64 | 0x00000010)/' "$FILE"
+            if ! grep -q 'CONTEXT_ARM64_XSTATE' "$FILE"; then
+              sed -i '/CONTEXT_ARM64_X18/a\
+          #define CONTEXT_ARM64_XSTATE          (CONTEXT_ARM64 | 0x00000020)
+          ' "$FILE"
+            fi
+            sed -i '/CONTEXT_ARM64_XSTATE/a\
+           #define CONTEXT_ARM64_FEX_YMMSTATE   (CONTEXT_ARM64 | 0x00000040)
+           ' "$FILE"
+           fi
 
           FILE="dlls/atiadlxx/atiadlxx_main.c"
           if grep -q 'InterlockedOr(&dummy, 0)' "$FILE"; then
