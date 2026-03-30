@@ -283,16 +283,11 @@ jobs:
         run: |
           cd ${{ env.WINE_SOURCE_DIR }}/source
 
-          sed -i '/get_pe_dir/,/}/ {/case IMAGE_FILE_MACHINE_AMD64:/,/return/d}' dlls/ntdll/unix/loader.c
-          grep -q 'case IMAGE_FILE_MACHINE_AMD64: return "/aarch64-windows";' dlls/ntdll/unix/loader.c || \
-          sed -i '/get_pe_dir/,/}/ {
-              /case IMAGE_FILE_MACHINE_ARM64:/a\    case IMAGE_FILE_MACHINE_AMD64: return "/aarch64-windows";
-          }' dlls/ntdll/unix/loader.c
-
-          grep -q 'case IMAGE_FILE_MACHINE_AMD64:' dlls/ntdll/unix/loader.c || \
-          sed -i '/get_pe_dir/,/}/ {
-              /case IMAGE_FILE_MACHINE_I386:/a\    case IMAGE_FILE_MACHINE_AMD64: return "/aarch64-windows";
-          }' dlls/ntdll/unix/loader.c
+          FILE="dlls/ntdll/unix/loader.c"
+          if ! grep -q '/aarch64-windows' "$FILE"; then
+            echo "Patching PE directory mapping..."
+            sed -i 's|/x86_64-windows|/aarch64-windows|g' "$FILE"
+          fi
 
           FILE="dlls/ntdll/loader.c"
           if grep -q 'xtajit64\.dll' "$FILE"; then
