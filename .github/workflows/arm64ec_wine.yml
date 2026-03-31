@@ -276,13 +276,6 @@ jobs:
             echo "✔ InterlockedOr already patched or not found"
           fi         
 
-      # ------------------------------------------------------------
-      # 7. 应用 mfplat 补丁
-      # ------------------------------------------------------------
-      - name: arm64ec
-        run: |
-          cd ${{ env.WINE_SOURCE_DIR }}/source
-
           FILE="dlls/ntdll/unix/loader.c"
           if ! grep -q '/aarch64-windows' "$FILE"; then
             echo "Patching PE directory mapping..."
@@ -332,14 +325,6 @@ jobs:
            #define CONTEXT_ARM64_FEX_YMMSTATE   (CONTEXT_ARM64 | 0x00000040)
            ' "$FILE"
            fi
-
-          FILE="dlls/atiadlxx/atiadlxx_main.c"
-          if grep -q 'InterlockedOr(&dummy, 0)' "$FILE"; then
-            sed -i 's|InterlockedOr(&dummy, 0)|InterlockedOr((volatile long *)&dummy, 0)|g' "$FILE"
-            echo "✔ InterlockedOr patched"
-          else
-            echo "✔ InterlockedOr already patched or not found"
-          fi
 
           FILE2="programs/wineboot/wineboot.c"
           if grep -q 'initialize_xstate_features( data );' "$FILE2"; then
