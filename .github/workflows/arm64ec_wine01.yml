@@ -86,7 +86,7 @@ jobs:
             dpkg-dev fakeroot debhelper dh-make \
             cmake ninja-build \
             build-essential less libc-devtools \
-            libfreetype6-dev:arm64 \
+            libfreetype6-dev \
             libglib2.0-dev \
             libltdl-dev \
             libxcb1-dev \
