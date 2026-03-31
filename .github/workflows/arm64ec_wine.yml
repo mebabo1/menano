@@ -490,9 +490,6 @@ jobs:
           if [ -f "$TARGET_INF" ]; then
             sed -i 's/xtajit64\.dll/libarm64ecfex.dll/g' "$TARGET_INF"
             sed -i 's/xtajit\.dll/libwow64fex.dll/g' "$TARGET_INF"
-            echo "✔ wine.inf 수정 완료"
-          else
-            echo "⚠ 경고: $TARGET_INF 파일을 찾을 수 없습니다."
           fi
 
           # 验证安装是否生成 bin 目录（若缺失则报错）
