@@ -338,8 +338,8 @@ jobs:
           FILE="programs/wineboot/wineboot.c"
           if ! grep -q 'initialize_xstate_features.*{' "$FILE"; then
             sed -i '/return tsc_frequency;/{
-              n
-              a\
+             n
+             a\
           \
           static void initialize_xstate_features(struct _KUSER_SHARED_DATA *data)\
           {\
