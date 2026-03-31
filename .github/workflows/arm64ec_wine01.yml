@@ -51,92 +51,112 @@ jobs:
       # ------------------------------------------------------------
       # 1. 配置 APT 源（支持 amd64 和 arm64）
       # ------------------------------------------------------------
-      - name: 配置 APT 源
-        run: |
-          echo "🧹 Freeing disk space..."
-          sudo rm -rf /usr/share/dotnet
-          sudo rm -rf /opt/ghc
-          sudo rm -rf /usr/local/share/boost
-          sudo rm -rf "$AGENT_TOOLSDIRECTORY"
-          df -h
+- name: 配置 APT 源
+  run: |
+    echo "🧹 Freeing disk space..."
+    sudo rm -rf /usr/share/dotnet
+    sudo rm -rf /opt/ghc
+    sudo rm -rf /usr/local/share/boost
+    sudo rm -rf "$AGENT_TOOLSDIRECTORY"
+    df -h
 
-          echo "📦 Configuring APT sources..."
-          if [ -f /etc/apt/sources.list ]; then
-            cp /etc/apt/sources.list /etc/apt/sources.list.bak
-          else
-            echo "deb http://deb.debian.org/debian bookworm main contrib non-free" > /etc/apt/sources.list
-            echo "deb http://deb.debian.org/debian bookworm-updates main contrib non-free" >> /etc/apt/sources.list
-            echo "deb http://security.debian.org/debian-security bookworm-security main contrib non-free" >> /etc/apt/sources.list
-          fi
+    echo "📦 Configuring APT sources..."
 
-          grep -v '^#' /etc/apt/sources.list | sed 's/^deb /deb [arch=amd64] /g' > /tmp/amd64.list
-          sed -e 's/\[arch=amd64\]/[arch=arm64]/g' /tmp/amd64.list > /tmp/arm64.list
-          cat /tmp/amd64.list /tmp/arm64.list > /etc/apt/sources.list
+    if [ -f /etc/apt/sources.list ]; then
+      cp /etc/apt/sources.list /etc/apt/sources.list.bak
+    else
+      echo "deb http://deb.debian.org/debian bookworm main contrib non-free" > /etc/apt/sources.list
+      echo "deb http://deb.debian.org/debian bookworm-updates main contrib non-free" >> /etc/apt/sources.list
+      echo "deb http://security.debian.org/debian-security bookworm-security main contrib non-free" >> /etc/apt/sources.list
+    fi
 
-          dpkg --add-architecture arm64
-          apt-get update
-          apt-get install -y --no-install-recommends hello:arm64 || { echo "arm64 repo test failed"; exit 1; }
+    # 👉 ARM64를 기본으로 설정
+    grep -v '^#' /etc/apt/sources.list | sed 's/^deb /deb [arch=arm64] /g' > /etc/apt/sources.list
 
+    # 👉 i386 추가 (WOW64용)
+    dpkg --add-architecture i386
+
+    apt-get update
+
+    # 테스트
+    apt-get install -y --no-install-recommends hello:i386 || { echo "i386 repo test failed"; exit 1; }
       # ------------------------------------------------------------
       # 2. 安装所有依赖（完全参照 Dockerfile 的包列表）
       # ------------------------------------------------------------
-      - name: 安装构建依赖
-        run: |
-          apt-get install -y --no-install-recommends \
-            binutils-aarch64-linux-gnu gcc-aarch64-linux-gnu \
-            ca-certificates nano python3 python3-setuptools clang screen llvm lld wget curl \
-            flex bison nasm \
-            libfreetype6-dev \
-            libglib2.0-dev \
-            libltdl-dev \
-            libxcb1-dev \
-            libx11-dev \
-            librsvg2-bin \
-            git gettext make automake autoconf pkg-config libtool gtk-doc-tools clang \
-            dpkg-dev \
-            libglib2.0-dev:arm64 \
-            libfreetype6-dev:arm64 \
-            libltdl-dev:arm64 \
-            libxcb1-dev:arm64 \
-            libx11-dev:arm64 \
-            build-essential libc-dev-arm64-cross less libc-devtools libidn2-0:arm64 \
-            libx11-dev libxinerama-dev libfreetype-dev libfontconfig-dev \
-            cmake \
-            libstdc++6-arm64-cross \
-            libstdc++-12-dev-arm64-cross \
-            libepoxy-dev:arm64 \
-            libsdl2-dev:arm64 \
-            ninja-build \
-            dpkg-dev fakeroot debhelper dh-make \
-            libxcursor-dev:arm64 \
-            libxi-dev:arm64 \
-            libxshmfence-dev:arm64 \
-            libxxf86vm-dev:arm64 \
-            libxrandr-dev:arm64 \
-            libxrender-dev:arm64 \
-            libxfixes-dev:arm64 \
-            libxcomposite-dev:arm64 \
-            libdbus-1-dev:arm64 \
-            libsane-dev:arm64 \
-            libusb-1.0-0-dev:arm64 \
-            libv4l-dev:arm64 \
-            libpulse-dev:arm64 \
-            libgstreamer1.0-dev:arm64 \
-            libgstreamer-plugins-base1.0-dev:arm64 \
-            libgstreamer-plugins-bad1.0-dev:arm64 \
-            libudev-dev:arm64 \
-            libunwind-dev:arm64 \
-            libsdl2-dev:arm64 \
-            libfontconfig1-dev:arm64 \
-            libkrb5-dev:arm64 \
-            libvulkan-dev:arm64 \
-            libgl-dev:arm64 \
-            libgnutls28-dev:arm64 \
-            libcups2-dev:arm64 \
-            libxkbcommon-dev:arm64 \
-            libxkbregistry-dev:arm64 \
-            ocl-icd-opencl-dev:arm64 \
-            libwayland-dev:arm64
+- name: 安装构建依赖
+  run: |
+    apt-get install -y --no-install-recommends \
+      ca-certificates nano python3 python3-setuptools \
+      clang llvm lld wget curl \
+      flex bison nasm \
+      git gettext make automake autoconf pkg-config libtool gtk-doc-tools \
+      dpkg-dev fakeroot debhelper dh-make \
+      cmake ninja-build \
+      build-essential less libc-devtools \
+      libfreetype6-dev \
+      libglib2.0-dev \
+      libltdl-dev \
+      libxcb1-dev \
+      libx11-dev \
+      libxinerama-dev \
+      libfontconfig-dev \
+      librsvg2-bin \
+      libepoxy-dev \
+      libsdl2-dev \
+      libxcursor-dev \
+      libxi-dev \
+      libxshmfence-dev \
+      libxxf86vm-dev \
+      libxrandr-dev \
+      libxrender-dev \
+      libxfixes-dev \
+      libxcomposite-dev \
+      libdbus-1-dev \
+      libsane-dev \
+      libusb-1.0-0-dev \
+      libv4l-dev \
+      libpulse-dev \
+      libgstreamer1.0-dev \
+      libgstreamer-plugins-base1.0-dev \
+      libgstreamer-plugins-bad1.0-dev \
+      libudev-dev \
+      libunwind-dev \
+      libfontconfig1-dev \
+      libkrb5-dev \
+      libvulkan-dev \
+      libgl-dev \
+      libgnutls28-dev \
+      libcups2-dev \
+      libxkbcommon-dev \
+      libxkbregistry-dev \
+      ocl-icd-opencl-dev \
+      libwayland-dev \
+      libfreetype6-dev:i386 \
+      libglib2.0-dev:i386 \
+      libltdl-dev:i386 \
+      libxcb1-dev:i386 \
+      libx11-dev:i386 \
+      libfontconfig-dev:i386 \
+      libepoxy-dev:i386 \
+      libsdl2-dev:i386 \
+      libxcursor-dev:i386 \
+      libxi-dev:i386 \
+      libxrandr-dev:i386 \
+      libxrender-dev:i386 \
+      libxfixes-dev:i386 \
+      libxcomposite-dev:i386 \
+      libdbus-1-dev:i386 \
+      libusb-1.0-0-dev:i386 \
+      libpulse-dev:i386 \
+      libgstreamer1.0-dev:i386 \
+      libgstreamer-plugins-base1.0-dev:i386 \
+      libudev-dev:i386 \
+      libunwind-dev:i386 \
+      libvulkan-dev:i386 \
+      libgl-dev:i386 \
+      libgnutls28-dev:i386 \
+      libcups2-dev:i386 \
+      libxkbcommon-dev:i386
 
       # ------------------------------------------------------------
       # 3. 安装 llvm-mingw 交叉编译工具链
