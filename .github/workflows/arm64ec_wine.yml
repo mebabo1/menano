@@ -358,8 +358,8 @@ jobs:
               xstate->Features[2].Offset = 0x240;\
               xstate->Features[2].Size = 0x100;\
               xstate->Size = 0x340;\
-          }
-          ' "$FILE"
+          }\
+             }' "$FILE"
           fi
 
           PATCH_URL="https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/path/2.patch"
