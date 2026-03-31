@@ -338,7 +338,7 @@ jobs:
           patch << 'EOF'
           --- a/programs/wineboot/wineboot.c
           +++ b/programs/wineboot/wineboot.c
-          @@
+          @@ -387,2 +387,21 @@
               return tsc_frequency;
           }
           +static void initialize_xstate_features(struct _KUSER_SHARED_DATA *data)
