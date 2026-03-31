@@ -329,9 +329,7 @@ jobs:
           FILE3="dlls/wdscore/wdscore.spec"
           if grep -q '@ stub' "$FILE3"; then
             echo "Cleaning wdscore.spec stubs..."
-            sed -i '/@ stub/{
-              /WdsGetPointer/!d
-            }' "$FILE3"
+            sed -i '/@ stub/!b; /WdsGetPointer/!d' "$FILE3"
             echo "✔ wdscore stubs cleaned"
           else
             echo "✔ wdscore already cleaned or not found"
