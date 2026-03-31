@@ -80,76 +80,76 @@ jobs:
         run: |
           apt-get install -y --no-install-recommends \
             ca-certificates nano python3 python3-setuptools \
-      clang llvm lld wget curl \
-      flex bison nasm \
-      git gettext make automake autoconf pkg-config libtool gtk-doc-tools \
-      dpkg-dev fakeroot debhelper dh-make \
-      cmake ninja-build \
-      build-essential less libc-devtools \
-      libfreetype6-dev \
-      libglib2.0-dev \
-      libltdl-dev \
-      libxcb1-dev \
-      libx11-dev \
-      libxinerama-dev \
-      libfontconfig-dev \
-      librsvg2-bin \
-      libepoxy-dev \
-      libsdl2-dev \
-      libxcursor-dev \
-      libxi-dev \
-      libxshmfence-dev \
-      libxxf86vm-dev \
-      libxrandr-dev \
-      libxrender-dev \
-      libxfixes-dev \
-      libxcomposite-dev \
-      libdbus-1-dev \
-      libsane-dev \
-      libusb-1.0-0-dev \
-      libv4l-dev \
-      libpulse-dev \
-      libgstreamer1.0-dev \
-      libgstreamer-plugins-base1.0-dev \
-      libgstreamer-plugins-bad1.0-dev \
-      libudev-dev \
-      libunwind-dev \
-      libfontconfig1-dev \
-      libkrb5-dev \
-      libvulkan-dev \
-      libgl-dev \
-      libgnutls28-dev \
-      libcups2-dev \
-      libxkbcommon-dev \
-      libxkbregistry-dev \
-      ocl-icd-opencl-dev \
-      libwayland-dev \
-      libfreetype6-dev:i386 \
-      libglib2.0-dev:i386 \
-      libltdl-dev:i386 \
-      libxcb1-dev:i386 \
-      libx11-dev:i386 \
-      libfontconfig-dev:i386 \
-      libepoxy-dev:i386 \
-      libsdl2-dev:i386 \
-      libxcursor-dev:i386 \
-      libxi-dev:i386 \
-      libxrandr-dev:i386 \
-      libxrender-dev:i386 \
-      libxfixes-dev:i386 \
-      libxcomposite-dev:i386 \
-      libdbus-1-dev:i386 \
-      libusb-1.0-0-dev:i386 \
-      libpulse-dev:i386 \
-      libgstreamer1.0-dev:i386 \
-      libgstreamer-plugins-base1.0-dev:i386 \
-      libudev-dev:i386 \
-      libunwind-dev:i386 \
-      libvulkan-dev:i386 \
-      libgl-dev:i386 \
-      libgnutls28-dev:i386 \
-      libcups2-dev:i386 \
-      libxkbcommon-dev:i386
+            clang llvm lld wget curl \
+            flex bison nasm \
+            git gettext make automake autoconf pkg-config libtool gtk-doc-tools \
+            dpkg-dev fakeroot debhelper dh-make \
+            cmake ninja-build \
+            build-essential less libc-devtools \
+            libfreetype6-dev \
+            libglib2.0-dev \
+            libltdl-dev \
+            libxcb1-dev \
+            libx11-dev \
+            libxinerama-dev \
+            libfontconfig-dev \
+            librsvg2-bin \
+            libepoxy-dev \
+            libsdl2-dev \
+            libxcursor-dev \
+            libxi-dev \
+            libxshmfence-dev \
+            libxxf86vm-dev \
+            libxrandr-dev \
+            libxrender-dev \
+            libxfixes-dev \
+            libxcomposite-dev \
+            libdbus-1-dev \
+            libsane-dev \
+            libusb-1.0-0-dev \
+            libv4l-dev \
+            libpulse-dev \
+            libgstreamer1.0-dev \
+            libgstreamer-plugins-base1.0-dev \
+            libgstreamer-plugins-bad1.0-dev \
+            libudev-dev \
+            libunwind-dev \
+            libfontconfig1-dev \
+            libkrb5-dev \
+            libvulkan-dev \
+            libgl-dev \
+            libgnutls28-dev \
+            libcups2-dev \
+            libxkbcommon-dev \
+            libxkbregistry-dev \
+            ocl-icd-opencl-dev \
+            libwayland-dev \
+            libfreetype6-dev:i386 \
+            libglib2.0-dev:i386 \
+            libltdl-dev:i386 \
+            libxcb1-dev:i386 \
+            libx11-dev:i386 \
+            libfontconfig-dev:i386 \
+            libepoxy-dev:i386 \
+            libsdl2-dev:i386 \
+            libxcursor-dev:i386 \
+            libxi-dev:i386 \
+            libxrandr-dev:i386 \
+            libxrender-dev:i386 \
+            libxfixes-dev:i386 \
+            libxcomposite-dev:i386 \
+            libdbus-1-dev:i386 \
+            libusb-1.0-0-dev:i386 \
+            libpulse-dev:i386 \
+            libgstreamer1.0-dev:i386 \
+            libgstreamer-plugins-base1.0-dev:i386 \
+            libudev-dev:i386 \
+            libunwind-dev:i386 \
+            libvulkan-dev:i386 \
+            libgl-dev:i386 \
+            libgnutls28-dev:i386 \
+            libcups2-dev:i386 \
+            libxkbcommon-dev:i386
 
       # ------------------------------------------------------------
       # 3. 安装 llvm-mingw 交叉编译工具链
@@ -477,7 +477,6 @@ jobs:
             --prefix=/tmp/wine-install-wow64 \
             --with-mingw=clang \
             --enable-archs=arm64ec,aarch64,i386 \
-            --host=aarch64-linux-gnu \
             --with-wine-tools=/opt/wine64-native \
             --disable-amd_ags_x64 \
             --disable-tests \
@@ -505,11 +504,7 @@ jobs:
             --with-pthread \
             --without-sane \
             --without-wayland \
-            --with-xshm \
-            host_alias=aarch64-linux-gnu \
-            build_alias=x86_64-linux-gnu \
-            CC=aarch64-linux-gnu-gcc \
-            CROSSCC="clang --target=aarch64-w64-mingw32"
+            --with-xshm
           make -j$(nproc) 2>&1 | grep -i error
           make install
 
