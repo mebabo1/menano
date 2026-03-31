@@ -86,7 +86,7 @@ jobs:
             dpkg-dev fakeroot debhelper dh-make \
             cmake ninja-build \
             build-essential less libc-devtools \
-            libfreetype6-dev \
+            libfreetype6-dev:arm64 \
             libglib2.0-dev \
             libltdl-dev \
             libxcb1-dev \
@@ -459,8 +459,6 @@ jobs:
           export PATH="/opt/${{ env.LLVMMINGW_NAME }}/bin:$PATH"
           export PKG_CONFIG_LIBDIR=/usr/lib/aarch64-linux-gnu/pkgconfig
           export PKG_CONFIG_PATH=/usr/lib/aarch64-linux-gnu/pkgconfig
-          export LDFLAGS="-L/usr/lib/aarch64-linux-gnu"
-          export CFLAGS="-I/usr/include/freetype2"
           export CFLAGS="-O3 -pipe"
           export CXXFLAGS="-O3 -pipe"
           export CROSSCFLAGS="-O3 -pipe"
