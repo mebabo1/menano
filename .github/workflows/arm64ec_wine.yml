@@ -345,8 +345,7 @@ jobs:
           ' "$FILE"
           fi
           if ! grep -q 'initialize_xstate_features.*{' "$FILE"; then
-            echo "Adding body..."
-            sed -i '/return tsc_frequency;/a\
+            sed -i '/^}$/a\
           \
           static void initialize_xstate_features(struct _KUSER_SHARED_DATA *data)\
           {\
