@@ -338,15 +338,10 @@ jobs:
           fi
 
           FILE="programs/wineboot/wineboot.c"
-          if ! grep -q 'initialize_xstate_features.*;' "$FILE"; then
-            echo "Adding declaration..."
-            sed -i '/#include <wine\/debug.h>/a\
-          static void initialize_xstate_features(struct _KUSER_SHARED_DATA *data);\
-          ' "$FILE"
-          fi
           if ! grep -q 'initialize_xstate_features.*{' "$FILE"; then
-            sed -i '/return tsc_frequency;/,/^}/{
-          /^}/a\
+            sed -i '/return tsc_frequency;/{
+              n
+              a\
           \
           static void initialize_xstate_features(struct _KUSER_SHARED_DATA *data)\
           {\
@@ -359,20 +354,14 @@ jobs:
               xstate->OptimizedSave = 0;\
               xstate->CompactionEnabled = 0;\
           \
-              xstate->Features[0].Size = xstate->AllFeatures[0] = offsetof(XSAVE_FORMAT, XmmRegisters);\
-              xstate->Features[1].Size = xstate->AllFeatures[1] = sizeof(M128A) * 16;\
+              xstate->Features[0].Size = offsetof(XSAVE_FORMAT, XmmRegisters);\
+              xstate->Features[1].Size = sizeof(M128A) * 16;\
               xstate->Features[1].Offset = xstate->Features[0].Size;\
               xstate->Features[2].Offset = 0x240;\
               xstate->Features[2].Size = 0x100;\
               xstate->Size = 0x340;\
-          }\
+          }
           ' "$FILE"
-          fi
-          if ! grep -q '#ifndef __aarch64__.*initialize_xstate_features' "$FILE"; then
-            sed -i '/initialize_xstate_features(data);/c\
-          #ifndef __aarch64__\
-              initialize_xstate_features(data);\
-          #endif' "$FILE"
           fi
 
           PATCH_URL="https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/path/2.patch"
