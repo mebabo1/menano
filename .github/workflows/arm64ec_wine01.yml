@@ -51,42 +51,35 @@ jobs:
       # ------------------------------------------------------------
       # 1. 配置 APT 源（支持 amd64 和 arm64）
       # ------------------------------------------------------------
-- name: 配置 APT 源
-  run: |
-    echo "🧹 Freeing disk space..."
-    sudo rm -rf /usr/share/dotnet
-    sudo rm -rf /opt/ghc
-    sudo rm -rf /usr/local/share/boost
-    sudo rm -rf "$AGENT_TOOLSDIRECTORY"
-    df -h
+      - name: 配置 APT 源
+        run: |
+          echo "🧹 Freeing disk space..."
+          sudo rm -rf /usr/share/dotnet
+          sudo rm -rf /opt/ghc
+          sudo rm -rf /usr/local/share/boost
+          sudo rm -rf "$AGENT_TOOLSDIRECTORY"
+          df -h
+          echo "📦 Configuring APT sources..."
 
-    echo "📦 Configuring APT sources..."
+          if [ -f /etc/apt/sources.list ]; then
+            cp /etc/apt/sources.list /etc/apt/sources.list.bak
+          else
+            echo "deb http://deb.debian.org/debian bookworm main contrib non-free" > /etc/apt/sources.list
+            echo "deb http://deb.debian.org/debian bookworm-updates main contrib non-free" >> /etc/apt/sources.list
+            echo "deb http://security.debian.org/debian-security bookworm-security main contrib non-free" >> /etc/apt/sources.list
+          fi
 
-    if [ -f /etc/apt/sources.list ]; then
-      cp /etc/apt/sources.list /etc/apt/sources.list.bak
-    else
-      echo "deb http://deb.debian.org/debian bookworm main contrib non-free" > /etc/apt/sources.list
-      echo "deb http://deb.debian.org/debian bookworm-updates main contrib non-free" >> /etc/apt/sources.list
-      echo "deb http://security.debian.org/debian-security bookworm-security main contrib non-free" >> /etc/apt/sources.list
-    fi
-
-    # 👉 ARM64를 기본으로 설정
-    grep -v '^#' /etc/apt/sources.list | sed 's/^deb /deb [arch=arm64] /g' > /etc/apt/sources.list
-
-    # 👉 i386 추가 (WOW64용)
-    dpkg --add-architecture i386
-
-    apt-get update
-
-    # 테스트
-    apt-get install -y --no-install-recommends hello:i386 || { echo "i386 repo test failed"; exit 1; }
+          grep -v '^#' /etc/apt/sources.list | sed 's/^deb /deb [arch=arm64] /g' > /etc/apt/sources.list
+          dpkg --add-architecture i386
+          apt-get update
+          apt-get install -y --no-install-recommends hello:i386 || { echo "i386 repo test failed"; exit 1; }
       # ------------------------------------------------------------
       # 2. 安装所有依赖（完全参照 Dockerfile 的包列表）
       # ------------------------------------------------------------
-- name: 安装构建依赖
-  run: |
-    apt-get install -y --no-install-recommends \
-      ca-certificates nano python3 python3-setuptools \
+      - name: 安装构建依赖
+        run: |
+          apt-get install -y --no-install-recommends \
+            ca-certificates nano python3 python3-setuptools \
       clang llvm lld wget curl \
       flex bison nasm \
       git gettext make automake autoconf pkg-config libtool gtk-doc-tools \
