@@ -482,7 +482,7 @@ jobs:
             --disable-tests \
             --with-alsa \
             --with-gnutls \
-            --with-pulse \
+            --without-pulse \
             --with-vulkan \
             --without-capi \
             --without-coreaudio \
@@ -492,7 +492,7 @@ jobs:
             --without-gstreamer \
             --without-opencl \
             --with-fontconfig \
-            --with-freetype \
+            --without-freetype \
             --without-gcrypt \
             --without-gettext \
             --with-gettextpo=no \
