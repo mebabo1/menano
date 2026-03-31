@@ -338,8 +338,12 @@ jobs:
           fi
 
           FILE="programs/wineboot/wineboot.c"
-          if ! grep -q 'initialize_xstate_features' "$FILE"; then
-            echo "Patching wineboot.c (XSTATE)..."
+          if ! grep -q 'initialize_xstate_features(struct _KUSER_SHARED_DATA' "$FILE"; then
+            sed -i '/#include/a\
+          static void initialize_xstate_features(struct _KUSER_SHARED_DATA *data);\
+          ' "$FILE"
+          fi
+          if ! grep -q 'static void initialize_xstate_features' "$FILE"; then
             sed -i '/return tsc_frequency;/a\
           \
           static void initialize_xstate_features(struct _KUSER_SHARED_DATA *data)\
