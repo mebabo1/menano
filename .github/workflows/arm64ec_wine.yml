@@ -196,7 +196,7 @@ jobs:
               PROTON_BRANCH="${{ github.event.inputs.proton_branch || 'proton_10.0' }}"
               PROTON_COMMIT="${{ github.event.inputs.proton_commit || '' }}"
 
-              git clone -b "proton-9.0-arm64ec" https://github.com/Pipetto-crypto/wine.git source
+              git clone -b "upstream-arm64ec" https://github.com/bylaws/wine.git source
               cd source
               git config advice.detachedHead false
                 if [ -n "$PROTON_COMMIT" ]; then
