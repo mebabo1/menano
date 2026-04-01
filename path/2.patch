@@ -55,17 +55,6 @@ diff --git a/dlls/ntdll/signal_arm64ec.c b/dlls/ntdll/signal_arm64ec.c
 index 3d53dc91459f..0657ae41fb8a 100644
 --- a/dlls/ntdll/signal_arm64ec.c
 +++ b/dlls/ntdll/signal_arm64ec.c
-@@ -36,6 +36,11 @@
- #include "wine/debug.h"
- #include "ntsyscalls.h"
-
-+union ARM64EC_NT_XCONTEXT {
-+    ARM64EC_NT_CONTEXT context;
-+    BYTE buffer[0x800];
-+};
-+
- WINE_DEFAULT_DEBUG_CHANNEL(seh);
- WINE_DECLARE_DEBUG_CHANNEL(relay);
 @@ -90,6 +90,7 @@ static inline BOOL enter_syscall_callback(void)
  static inline void leave_syscall_callback(void)
  {
