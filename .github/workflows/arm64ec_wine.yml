@@ -339,8 +339,20 @@ jobs:
           PATCH_FILE="syscall.patch"
           echo "Applying external patch..."
           wget -q -O "$PATCH_FILE" "$PATCH_URL"
-          git apply --3way --reject --whitespace=fix "$PATCH_FILE" || true
-          echo "✔ external patch applied (or skipped if already applied)"
+          if git apply --check "$PATCH_FILE"; then
+              echo "✔ Patch can be applied cleanly"
+              git apply --whitespace=fix "$PATCH_FILE"
+          elif git apply --3way --check "$PATCH_FILE"; then
+              echo "⚠ Applying patch with 3-way merge"
+              git apply --3way --whitespace=fix "$PATCH_FILE"
+          else
+              echo "❌ Patch failed, generating rejects"
+              git apply --reject --whitespace=fix "$PATCH_FILE" || true
+              echo "❌ Patch could not be fully applied"
+              find . -name "*.rej"
+              exit 1
+          fi
+          echo "✔ Patch applied successfully"
 
       # ------------------------------------------------------------
       # 8. 生成 configure 脚本
