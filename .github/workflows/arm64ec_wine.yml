@@ -335,7 +335,7 @@ jobs:
             echo "✔ wdscore already cleaned or not found"
           fi
 
-          PATCH_URL="https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/path/2.patch"
+          PATCH_URL="https://raw.githubusercontent.com/lacamar/wine-arm64ec-rpm/refs/heads/main/wine/2026.03.15_bylaws.patch"
           PATCH_FILE="syscall.patch"
           echo "Applying external patch..."
           wget -q -O "$PATCH_FILE" "$PATCH_URL"
