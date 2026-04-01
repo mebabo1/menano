@@ -201,23 +201,10 @@ jobs:
               git config advice.detachedHead false
 
                 if [ -n "$PROTON_COMMIT" ]; then
-                echo "Using fixed commit: $PROTON_COMMIT"
-                git checkout "$PROTON_COMMIT"
-              else
-                echo "No commit specified, locking current branch HEAD"
-                PROTON_COMMIT=$(git rev-parse HEAD)
-                echo "Locked commit: $PROTON_COMMIT"
-              fi
-
               if [ "$WINE_VERSION" != "latest" ]; then
-                git checkout "wine-$WINE_VERSION" 2>/dev/null || echo "wine-$WINE_VERSION not found, staying on commit"
+                git checkout "wine-$WINE_VERSION"
               fi
-
-              COMMIT_HASH=$(git rev-parse --short HEAD)
-              WINE_VERSION_ACTUAL=$(git describe --tags --abbrev=0 2>/dev/null || echo "$COMMIT_HASH")
-
-              echo "WINE_VERSION_ACTUAL=$WINE_VERSION_ACTUAL" >> $GITHUB_ENV
-              echo "COMMIT_HASH=$COMMIT_HASH" >> $GITHUB_ENV
+              WINE_VERSION_ACTUAL=$(git describe --tags --abbrev=0 2>/dev/null || echo "$WINE_VERSION")
               ;;
             proton)
               echo "Processing Proton branch"
