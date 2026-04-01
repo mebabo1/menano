@@ -262,6 +262,15 @@ jobs:
             echo "✔ InterlockedOr already patched or not found"
           fi         
 
+          FILE3="dlls/wdscore/wdscore.spec"
+          if grep -q '@ stub' "$FILE3"; then
+            echo "Cleaning wdscore.spec stubs..."
+            sed -i '/CDynamicArray/d' "$FILE3"
+            echo "✔ wdscore stubs cleaned"
+          else
+            echo "✔ wdscore already cleaned or not found"
+          fi
+
       # ------------------------------------------------------------
       # 8. 生成 configure 脚本
       # ------------------------------------------------------------
