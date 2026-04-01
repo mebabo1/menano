@@ -61,7 +61,6 @@ index 3d53dc91459f..0657ae41fb8a 100644
      get_arm64ec_cpu_area()->InSyscallCallback = 0;
 +    if (get_arm64ec_cpu_area()->SuspendDoorbell && *get_arm64ec_cpu_area()->SuspendDoorbell) arm64ec_suspend_point();
  }
-
 diff --git a/dlls/ntdll/signal_arm64ec.c b/dlls/ntdll/signal_arm64ec.c
 index 8a6f3628097c..3d53dc91459f 100644
 --- a/dlls/ntdll/signal_arm64ec.c
@@ -77,7 +76,6 @@ index 8a6f3628097c..3d53dc91459f 100644
 +
  WINE_DEFAULT_DEBUG_CHANNEL(seh);
  WINE_DECLARE_DEBUG_CHANNEL(relay);
-
 diff --git a/programs/wineboot/wineboot.c b/programs/wineboot/wineboot.c
 index 636b6d7..72d361a 100644
 --- a/programs/wineboot/wineboot.c
