@@ -243,8 +243,8 @@ jobs:
              }' "$FILE"
          fi
 
-         PATCH_LIST="https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/path/1.patch 
-                     https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/path/2.patch"
+        PATCH_LIST="https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/path/1.patch 
+                    https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/path/2.patch"
 
          echo "Applying external patches..."
          for URL in $PATCH_LIST; do
@@ -265,9 +265,9 @@ jobs:
                find . -name "*.rej"
                echo "⚠ Continuing to next patch despite failure..."
            fi
-         done
-         echo "--------------------------------------------"
-         echo "✔ All patch processes completed"
+        done
+        echo "--------------------------------------------"
+        echo "✔ All patch processes completed"
     
         # 生成 configure 脚本
         echo "生成 configure 脚本..."
