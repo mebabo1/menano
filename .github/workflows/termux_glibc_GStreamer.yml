@@ -142,13 +142,18 @@ jobs:
 
       # 🧬 克隆并构建 FEX-Emu
       - name: 克隆并构建 FEX-Emu
-        if: steps.check_build.outputs.skip_build == 'false'
         run: |
-          # FEX 빌드에 필요한 추가 의존성 설치
+          sudo apt-get update
+          # FEX 빌드에 필요한 필수 및 Qt5 관련 패키지 전체 설치
           sudo apt-get install -y \
-            cmake ninja-build clang lld llvm-dev libsdl2-dev \
-            libepoxy-dev python3-setuptools libvulkan-dev \
-            qtbase5-dev qtchooser qt5-qmake qtbase5-dev-tools
+            cmake ninja-build clang lld llvm-dev \
+            libsdl2-dev libepoxy-dev python3-setuptools libvulkan-dev \
+            qtbase5-dev \
+            qtdeclarative5-dev \
+            qttools5-dev \
+            qttools5-dev-tools \
+            libqt5svg5-dev \
+            qtchooser
 
           echo "🚀 Cloning FEX-Emu..."
           git clone --recurse-submodules https://github.com/FEX-Emu/FEX.git
