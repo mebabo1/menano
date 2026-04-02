@@ -147,7 +147,8 @@ jobs:
           # FEX 빌드에 필요한 추가 의존성 설치
           sudo apt-get install -y \
             cmake ninja-build clang lld llvm-dev libsdl2-dev \
-            libepoxy-dev python3-setuptools libvulkan-dev
+            libepoxy-dev python3-setuptools libvulkan-dev \
+            qtbase5-dev qtchooser qt5-qmake qtbase5-dev-tools
 
           echo "🚀 Cloning FEX-Emu..."
           git clone --recurse-submodules https://github.com/FEX-Emu/FEX.git
