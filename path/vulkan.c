@@ -439,6 +439,30 @@ static VkResult wine_vk_physical_device_init(struct wine_phys_dev *object, VkPhy
 
     instance->p_vkGetPhysicalDeviceMemoryProperties(host_physical_device, &object->memory_properties);
 
+    {
+        const char *vram_env = getenv("WINE_VRAM_SIZE");
+        uint64_t fake_vram_size;
+        uint32_t k;
+
+        /* 환경변수가 있으면 해당 값을 MB단위로 계산, 없으면 2048MB 기본값 사용 */
+        if (vram_env) 
+            fake_vram_size = (uint64_t)atoll(vram_env) * 1024 * 1024;
+        else 
+            fake_vram_size = (uint64_t)2048 * 1024 * 1024;
+
+        for (k = 0; k < object->memory_properties.memoryHeapCount; k++)
+        {
+            /* GPU 전용 메모리(DEVICE_LOCAL) 플래그가 있는 힙의 크기를 강제 수정 */
+            if (object->memory_properties.memoryHeaps[k].flags & VK_MEMORY_HEAP_DEVICE_LOCAL_BIT)
+            {
+                object->memory_properties.memoryHeaps[k].size = fake_vram_size;
+                TRACE("VRAM Faking: Heap[%u] size set to %llu bytes (%s MB)\n", 
+                      k, (unsigned long long)fake_vram_size, vram_env ? vram_env : "2048");
+            }
+        }
+    }
+    /* --- VRAM Faking Patch End --- */
+    
     instance->p_vkGetPhysicalDeviceProperties(host_physical_device, &physdev_properties);
     object->obj.api_version = physdev_properties.apiVersion;
 
