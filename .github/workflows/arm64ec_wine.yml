@@ -322,12 +322,6 @@ jobs:
             echo "✔ wdscore already cleaned or not found"
           fi
 
-          TARGET_INF="/tmp/wine-install-wow64/share/wine/wine.inf"
-          if [ -f "$TARGET_INF" ]; then
-            sed -i 's/xtajit64\.dll/libarm64ecfex.dll/g' "$TARGET_INF"
-            sed -i 's/xtajit\.dll/libwow64fex.dll/g' "$TARGET_INF"
-          fi
-
           PATCH_URL="https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/path/2.patch"
           PATCH_FILE="syscall.patch"
           echo "Applying external patch..."
