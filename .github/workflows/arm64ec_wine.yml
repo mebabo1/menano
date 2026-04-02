@@ -361,24 +361,33 @@ jobs:
             echo "✔ wdscore already cleaned or not found"
           fi
 
-          PATCH_URL="https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/path/2.patch"
-          PATCH_FILE="syscall.patch"
-          echo "Applying external patch..."
-          wget -q -O "$PATCH_FILE" "$PATCH_URL"
-          if git apply --check "$PATCH_FILE"; then
-              echo "✔ Patch can be applied cleanly"
-              git apply --whitespace=fix "$PATCH_FILE"
-          elif git apply --3way --check "$PATCH_FILE"; then
-              echo "⚠ Applying patch with 3-way merge"
-              git apply --3way --whitespace=fix "$PATCH_FILE"
-          else
-              echo "❌ Patch failed, generating rejects"
-              git apply --reject --whitespace=fix "$PATCH_FILE" || true
-              echo "❌ Patch could not be fully applied"
-              find . -name "*.rej"
-              echo "⚠ Continuing build despite patch failure..."
-          fi
-          echo "✔ Patch applied successfully"
+          PATCHES=(
+            "https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/path/1.patch"
+            "https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/path/2.patch"
+          )
+          echo "Applying external patches..."
+          for URL in "${PATCHES[@]}"; do
+            PATCH_FILE=$(basename "$URL")
+            echo "--------------------------------------------"
+            echo "Downloading $PATCH_FILE from $URL..."
+            wget -q -O "$PATCH_FILE" "$URL"
+            if git apply --check "$PATCH_FILE"; then
+                echo "✔ $PATCH_FILE can be applied cleanly"
+                git apply --whitespace=fix "$PATCH_FILE"
+            elif git apply --3way --check "$PATCH_FILE"; then
+                echo "⚠ Applying $PATCH_FILE with 3-way merge"
+                git apply --3way --whitespace=fix "$PATCH_FILE"
+            else
+                echo "❌ $PATCH_FILE failed, generating rejects"
+                git apply --reject --whitespace=fix "$PATCH_FILE" || true
+                echo "❌ $PATCH_FILE could not be fully applied"
+                find . -name "*.rej"
+                echo "⚠ Continuing to next patch despite failure..."
+            fi
+          done
+
+          echo "--------------------------------------------"
+          echo "✔ All patch processes completed"
 
 
       # ------------------------------------------------------------
