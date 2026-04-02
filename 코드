@@ -81,3 +81,22 @@
             sed -i 's/xtajit64\.dll/libarm64ecfex.dll/g' "$TARGET_INF"
             sed -i 's/xtajit\.dll/libwow64fex.dll/g' "$TARGET_INF"
           fi
+
+          FILE="dlls/xtajit64/Makefile.in"
+          if [ -f "$FILE" ]; then
+         echo "Renaming xtajit64 module to libarm64ecfex..."
+            sed -i 's|MODULE    = xtajit64\.dll|MODULE    = libarm64ecfex\.dll|g' "$FILE"
+          fi
+          DIR="dlls/xtajit64"
+          if [ -d "$DIR" ]; then
+            echo "Renaming physical files in $DIR..."
+            # xtajit64.spec -> libarm64ecfex.spec
+            if [ -f "$DIR/xtajit64.spec" ]; then
+                mv "$DIR/xtajit64.spec" "$DIR/libarm64ecfex.spec"
+            fi
+          fi
+          FILE="$DIR/Makefile.in"
+          if [ -f "$FILE" ]; then
+            echo "Adjusting Makefile.in for new spec file..."
+            sed -i 's|xtajit64\.spec|libarm64ecfex\.spec|g' "$FILE"
+          fi
