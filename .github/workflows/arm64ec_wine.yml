@@ -363,7 +363,7 @@ jobs:
           cd ${{ env.WINE64_DIR }}
           mkdir -p amd64
           cd amd64
-          ../source/configure --enable-win64 --prefix=/usr/local
+          ../source/configure --enable-win64 --disable-tests --prefix=/usr/local
           make __tooldeps__ -j$(nproc)
           echo "构建 NLS 目录..."
           make -C nls
