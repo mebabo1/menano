@@ -342,20 +342,23 @@ jobs:
             echo "✔ wdscore already cleaned or not found"
           fi
 
-          PATCHES=(
-            "https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/path/1.patch"
-            "https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/path/2.patch"
-          )
+          PATCH_LIST="https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/path/1.patch 
+                      https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/path/2.patch"
+
           echo "Applying external patches..."
-          for URL in "${PATCHES[@]}"; do
-            PATCH_FILE=$(basename "$URL")
+
+          for URL in $PATCH_LIST; do
+            # URL에서 파일명만 추출
+            PATCH_FILE="${URL##*/}"
+            
             echo "--------------------------------------------"
-            echo "Downloading $PATCH_FILE from $URL..."
+            echo "Downloading $PATCH_FILE..."
             wget -q -O "$PATCH_FILE" "$URL"
-            if git apply --check "$PATCH_FILE"; then
+
+            if git apply --check "$PATCH_FILE" > /dev/null 2>&1; then
                 echo "✔ $PATCH_FILE can be applied cleanly"
                 git apply --whitespace=fix "$PATCH_FILE"
-            elif git apply --3way --check "$PATCH_FILE"; then
+            elif git apply --3way --check "$PATCH_FILE" > /dev/null 2>&1; then
                 echo "⚠ Applying $PATCH_FILE with 3-way merge"
                 git apply --3way --whitespace=fix "$PATCH_FILE"
             else
@@ -369,7 +372,6 @@ jobs:
 
           echo "--------------------------------------------"
           echo "✔ All patch processes completed"
-
 
       # ------------------------------------------------------------
       # 8. 生成 configure 脚本
