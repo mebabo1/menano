@@ -282,13 +282,6 @@ jobs:
             sed -i 's/xtajit\.dll/libwow64fex.dll/g' "$INF"
           fi
           
-          INF="loader/wine.inf.in"
-          if [ -f "$INF" ]; then
-            echo "Deep patching wine.inf for KnownDLLs..."
-            sed -i 's|_xtajit\.dll|libarm64ecfex.dll|g' "$INF"
-            sed -i 's|_xtajit|libarm64ecfex|g' "$INF"
-          fi
-
           FILE="dlls/ntdll/signal_arm64ec.c"
           if [ -f "$FILE" ]; then
             echo "Patching signal_arm64ec.c for FEX..."
@@ -346,15 +339,11 @@ jobs:
                       https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/path/2.patch"
 
           echo "Applying external patches..."
-
           for URL in $PATCH_LIST; do
-            # URL에서 파일명만 추출
-            PATCH_FILE="${URL##*/}"
-            
+            PATCH_FILE="${URL##*/}"            
             echo "--------------------------------------------"
             echo "Downloading $PATCH_FILE..."
             wget -q -O "$PATCH_FILE" "$URL"
-
             if git apply --check "$PATCH_FILE" > /dev/null 2>&1; then
                 echo "✔ $PATCH_FILE can be applied cleanly"
                 git apply --whitespace=fix "$PATCH_FILE"
