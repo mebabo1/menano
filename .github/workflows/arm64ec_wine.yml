@@ -281,6 +281,32 @@ jobs:
             sed -i 's/xtajit64\.dll/libarm64ecfex.dll/g' "$INF"
             sed -i 's/xtajit\.dll/libwow64fex.dll/g' "$INF"
           fi
+          
+          INF="loader/wine.inf.in"
+          if [ -f "$INF" ]; then
+            echo "Deep patching wine.inf for KnownDLLs..."
+            sed -i 's|_xtajit\.dll|libarm64ecfex.dll|g' "$INF"
+            sed -i 's|_xtajit|libarm64ecfex|g' "$INF"
+          fi
+
+          FILE="dlls/ntdll/signal_arm64ec.c"
+          if [ -f "$FILE" ]; then
+            echo "Patching signal_arm64ec.c for FEX..."
+            sed -i 's|xtajit64\.dll|libarm64ecfex.dll|g' "$FILE"
+          fi
+
+          FILE="dlls/xtajit64/Makefile.in"
+          if [ -f "$FILE" ]; then
+            echo "Renaming xtajit64 module to libarm64ecfex..."
+            sed -i 's|MODULE    = xtajit64\.dll|MODULE    = libarm64ecfex\.dll|g' "$FILE"
+          fi
+
+          FILE="dlls/ntdll/tests/wow64.c"
+          if [ -f "$FILE" ]; then
+            echo "Patching ntdll tests..."
+            sed -i 's|xtajit64\.dll|libarm64ecfex.dll|g' "$FILE"
+            sed -i 's|xtajit\.dll|libwow64fex.dll|g' "$FILE"
+          fi
 
           FILE="dlls/ntdll/unwind.h"
           if ! grep -q 'CONTEXT_ARM64_FEX_YMMSTATE' "$FILE"; then
