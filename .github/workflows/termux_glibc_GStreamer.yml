@@ -140,12 +140,46 @@ jobs:
           ninja -C build -j$(nproc)
           ninja -C build install
 
-      # 🧩 修补 ELF 解释器
-      - name: 修补 ELF 可执行文件
+      # 🧬 克隆并构建 FEX-Emu
+      - name: 克隆并构建 FEX-Emu
+        if: steps.check_build.outputs.skip_build == 'false'
+        run: |
+          # FEX 빌드에 필요한 추가 의존성 설치
+          sudo apt-get install -y \
+            cmake ninja-build clang lld llvm-dev libsdl2-dev \
+            libepoxy-dev python3-setuptools libvulkan-dev
+
+          echo "🚀 Cloning FEX-Emu..."
+          git clone --recurse-submodules https://github.com/FEX-Emu/FEX.git
+          cd FEX
+          mkdir Build
+          cd Build
+
+          # ⚙️ CMake 설정
+          # -DCMAKE_INSTALL_PREFIX=$INSTALL_ROOT 를 사용하여 glibc 폴더 내로 설치 경로 지정
+          CC=clang CXX=clang++ cmake .. \
+            -G Ninja \
+            -DCMAKE_INSTALL_PREFIX=${{ env.INSTALL_ROOT }} \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DUSE_LINKER=lld \
+            -DENABLE_LTO=True \
+            -DBUILD_TESTING=False \
+            -DENABLE_ASSERTIONS=False \
+            -DENABLE_X86_HOST_COMPILATION=False
+
+          echo "🏗️ Building FEX..."
+          ninja -j$(nproc)
+          
+          echo "📥 Installing FEX to $INSTALL_ROOT..."
+          sudo ninja install
+
+      # 🧩 修补 ELF 解释器 (기존 단계 수정 권장)
+      - name: 修补 ELF 可执行文件 (FEX 포함)
         if: steps.check_build.outputs.skip_build == 'false'
         run: |
           INTERP=$INSTALL_ROOT/lib/ld-linux-aarch64.so.1
-          for DIR in bin libexec/gstreamer-1.0; do
+          # bin, libexec 뿐만 아니라 FEX가 설치된 경로도 포함
+          for DIR in bin lib/FEX-Emu; do
             if [ -d "$INSTALL_ROOT/$DIR" ]; then
               find "$INSTALL_ROOT/$DIR" -type f -exec file {} \; | grep ELF | cut -d: -f1 | while read f; do
                 patchelf --set-interpreter "$INTERP" "$f" 2>/dev/null || true
