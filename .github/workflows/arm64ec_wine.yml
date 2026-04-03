@@ -103,6 +103,7 @@ jobs:
             libx11-dev libxinerama-dev libfreetype-dev libfontconfig-dev \
             cmake \
             libstdc++6-arm64-cross \
+            libgcc-s1-arm64-cross \
             libstdc++-12-dev-arm64-cross \
             libepoxy-dev:arm64 \
             libsdl2-dev:arm64 \
