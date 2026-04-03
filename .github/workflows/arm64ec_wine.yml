@@ -559,7 +559,11 @@ jobs:
           fi
           if [ -n "$WINE_INF_SRC" ]; then
               mkdir -p "$TARGET_PREFIX/share/wine"
-              cp -v "$WINE_INF_SRC" "$TARGET_PREFIX/share/wine/wine.inf"
+              TARGET_INF="$TARGET_PREFIX/share/wine/wine.inf"
+              cp -v "$WINE_INF_SRC" "$TARGET_INF"
+              sed -i 's/xtajit64\.dll/libarm64ecfex.dll/g' "$TARGET_INF"
+              sed -i 's/xtajit\.dll/libwow64fex.dll/g' "$TARGET_INF"
+              grep -E 'arm64ecfex|wow64fex|xtajit' "$TARGET_INF" || true
           else
               echo "警告: 未找到 wine.inf 文件"
           fi
