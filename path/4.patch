@@ -62,7 +62,7 @@ index 4b4d9d6cd7f6..e43b50180fc2 100644
 
  /***********************************************************************
   *             NtQueryVirtualMemory   (NTDLL.@)
-@@ -6377,6 +6377,14 @@
+@@ -6376,6 +6379,14 @@            }
              return STATUS_INVALID_HANDLE;
  
 +        case MemoryFexStatsShm:
