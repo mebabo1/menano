@@ -62,17 +62,21 @@ index 4b4d9d6cd7f6..e43b50180fc2 100644
 
  /***********************************************************************
   *             NtQueryVirtualMemory   (NTDLL.@)
-@@ -5986,6 +6032,13 @@ NTSTATUS WINAPI NtQueryVirtualMemory( HANDLE process, LPCVOID addr,
+@@ -6373,6 +6373,15 @@
+                 status = get_builtin_unix_funcs( module, info_class == MemoryWineUnixWow64Funcs, &funcs );
+                 if (!status) *(unixlib_handle_t *)buffer = (UINT_PTR)funcs;
+                 return status;
              }
              return STATUS_INVALID_HANDLE;
-
+ 
 +        case MemoryFexStatsShm:
-+#if defined(linux) && defined(__aarch64__)
++#if defined(linux) && (defined(__aarch64__) || defined(__arm64ec__))
 +            return get_memory_fex_stats_shm( process, addr, buffer, len, res_len );
 +#else
-+            FIXME("MemoryFexStatsShm unsupported\n");
-+            break;
++            FIXME("MemoryFexStatsShm unsupported on this platform\n");
++            return STATUS_INVALID_PARAMETER;
 +#endif
++
          default:
              FIXME("(%p,%p,info_class=%d,%p,%ld,%p) Unknown information class\n",
                    process, addr, info_class, buffer, len, res_len);
