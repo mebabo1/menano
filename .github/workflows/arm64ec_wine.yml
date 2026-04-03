@@ -469,6 +469,7 @@ jobs:
           export PKG_CONFIG_LIBDIR=/usr/lib/aarch64-linux-gnu/pkgconfig
           export CC="clang --target=aarch64-linux-gnu"
           export CXX="clang++ --target=aarch64-linux-gnu"
+          export AS=$CC
           export CFLAGS="-O3 -pipe"
           export CXXFLAGS="-O3 -pipe"
           export CROSSCFLAGS="-O3 -pipe"
