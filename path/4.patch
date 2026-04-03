@@ -62,11 +62,7 @@ index 4b4d9d6cd7f6..e43b50180fc2 100644
 
  /***********************************************************************
   *             NtQueryVirtualMemory   (NTDLL.@)
-@@ -6373,6 +6373,15 @@
-                 status = get_builtin_unix_funcs( module, info_class == MemoryWineUnixWow64Funcs, &funcs );
-                 if (!status) *(unixlib_handle_t *)buffer = (UINT_PTR)funcs;
-                 return status;
-             }
+@@ -6377,6 +6377,14 @@
              return STATUS_INVALID_HANDLE;
  
 +        case MemoryFexStatsShm:
