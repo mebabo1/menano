@@ -472,7 +472,7 @@ jobs:
             --prefix=/tmp/wine-install-wow64 \
             --host=aarch64-linux-gnu \
             --with-mingw=clang \
-            --enable-archs=arm64ec,aarch64,i386 \
+            --enable-archs=i386,aarch64,arm64ec \
             --with-wine-tools=/opt/wine64-native \
             --disable-amd_ags_x64 \
             --disable-tests \
