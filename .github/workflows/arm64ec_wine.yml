@@ -193,10 +193,25 @@ jobs:
             proton01)
               echo "Processing Proton tarball"
 
+              mkdir -p source
               curl -L "https://github.com/airidosas252/wine-test/releases/download/Proton-9.0-fix/wine-proton-10.0-arm64ec.tar.xz" -o wine-source.tar.xz
-              tar -xf wine-source.tar.xz
-              mv wine source              
+              
+              tar -xf wine-source.tar.xz -C source --strip-components=1
+              
               cd source
+
+              # --- 아래 설정을 추가하세요 ---
+              # 현재 디렉토리를 Git 안전 디렉토리로 등록
+              git config --global --add safe.directory /opt/wine-src/source
+              
+              # 만약 압축파일이라 .git 폴더가 없다면, 이후 git 명령을 위해 초기화가 필요할 수 있습니다.
+              if [ ! -d ".git" ]; then
+                git init
+                git add .
+                git commit -m "Initial source from tarball"
+              fi
+              # ----------------------------
+
               WINE_VERSION_ACTUAL="proton-10.0-arm64ec"
               ;;
             proton)
