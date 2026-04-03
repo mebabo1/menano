@@ -12,7 +12,7 @@ index 4b4d9d6cd7f6..e43b50180fc2 100644
  struct range_entry
  {
      void *base;
-@@ -5941,6 +5944,49 @@ static unsigned int get_memory_image_info( HANDLE process, LPCVOID addr, MEMORY_
+@@ -6297,6 +6300,49 @@ static unsigned int get_memory_image_info( HANDLE process, LPCVOID addr, MEMORY_
      return status;
  }
 
