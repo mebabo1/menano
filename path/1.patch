@@ -44,5 +44,5 @@ index 963ebd2..7a70299 100644
 +    TRACE( "Kernel writewatches are disabled by force\n" );
 +    use_kernel_writewatch = 0;
  }
--
+
  static void kernel_writewatch_reset( void *start, SIZE_T len )
