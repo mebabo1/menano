@@ -550,27 +550,6 @@ jobs:
 
           # 关键修改：仅使用 --with-wine-tools，不使用 --with-wine64
           ../configure \
-            --host=aarch64-linux-gnu \
-            --prefix=/tmp/wine-install-wow64 \
-            --with-mingw=clang \
-            --enable-archs=arm64ec,aarch64,i386 \
-            --enable-tools \
-            --disable-tests \
-            --with-vulkan \
-            --with-gstreamer \       
-            host_alias=aarch64-linux-gnu \
-            build_alias=x86_64-linux-gnu \
-            --with-wine-tools=/opt/wine64-native \
-            CC=aarch64-linux-gnu-gcc
-
-          make -j$(nproc)
-          make install
-
-          # 验证安装是否生成 bin 目录（若缺失则报错）
-          if [ ! -d /tmp/wine-install-wow64/bin ]; then
-            echo "错误: /tmp/wine-install-wow64/bin 目录不存在，安装可能不完整"
-            exit 1
-          fi
 
       # ------------------------------------------------------------
       # 12. 全面补全安装目录的运行时文件（增强版：优先从 programs/ 查找）
