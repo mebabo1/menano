@@ -470,66 +470,100 @@ jobs:
           cd ${{ env.WINE_SOURCE_DIR }}/source
           sed -i 's/xtajit64\.dll/libarm64ecfex.dll/g' loader/wine.inf.in
           sed -i 's/xtajit\.dll/libwow64fex.dll/g' loader/wine.inf.in
+      - name: 构建 native wine64 工具和 NLS（带完整备份）
+        run: |
+          set -e
+          mkdir -p ${{ env.WINE64_DIR }}
+          cp -r ${{ env.WINE_SOURCE_DIR }}/source ${{ env.WINE64_DIR }}/source
+          cd ${{ env.WINE64_DIR }}
+          mkdir -p amd64
+          cd amd64
+          ../source/configure --enable-win64 --prefix=/usr/local
+          make __tooldeps__ -j$(nproc)
+          echo "构建 NLS 目录..."
+          make -C nls
+          # 备份整个 nls 目录（跟随符号链接）
+          mkdir -p /opt/nls-backup
+          cp -aL nls/. /opt/nls-backup/
+          echo "nls 目录已完整备份到 /opt/nls-backup"
+          ls -la /opt/nls-backup/
+
+      # ------------------------------------------------------------
+      # 10. 复制构建目录，跟随符号链接，并验证 NLS（带恢复机制）
+      # ------------------------------------------------------------
+      - name: 复制构建目录并验证 NLS（带恢复机制）
+        run: |
+          set -e
+          mkdir -p /opt/wine64-native
+          # 检查源文件，若不存在则从备份恢复（备份包含所有 nls 文件）
+          if [ ! -f ${{ env.WINE64_DIR }}/amd64/nls/locale.nls ] && [ ! -L ${{ env.WINE64_DIR }}/amd64/nls/locale.nls ]; then
+            echo "警告: 源目录中 nls/locale.nls 不存在，尝试从备份恢复"
+            if [ -d /opt/nls-backup ]; then
+              mkdir -p ${{ env.WINE64_DIR }}/amd64/nls
+              cp -af /opt/nls-backup/. ${{ env.WINE64_DIR }}/amd64/nls/
+              echo "已从备份恢复完整 nls 目录"
+            else
+              echo "错误: 无法恢复 nls 目录"
+              exit 1
+            fi
+          fi
+          # 复制整个构建目录，使用 -aL 选项（归档且跟随符号链接）
+          cp -aL ${{ env.WINE64_DIR }}/amd64/. /opt/wine64-native/
+          chmod -R +x /opt/wine64-native/tools/*/
+          chmod -R +r /opt/wine64-native/nls
+          # 验证复制后的文件是否为普通文件（不是符号链接）
+          if [ ! -f /opt/wine64-native/nls/locale.nls ]; then
+            echo "警告: 复制后 locale.nls 丢失或为无效符号链接，尝试从备份恢复"
+            if [ -d /opt/nls-backup ]; then
+              mkdir -p /opt/wine64-native/nls
+              cp -af /opt/nls-backup/. /opt/wine64-native/nls/
+              echo "已从备份恢复 nls 目录到目标目录"
+            else
+              echo "错误: 无法恢复 nls 目录"
+              exit 1
+            fi
+          fi
+          echo "复制后 locale.nls 存在，大小: $(wc -c < /opt/wine64-native/nls/locale.nls) 字节"
+
+      # ------------------------------------------------------------
+      # 11. 交叉编译 ARM64 WOW64（使用复制后的目录作为工具目录）
+      #     修改：移除 --with-wine64，仅使用 --with-wine-tools 以强制重新编译 programs
+      # ------------------------------------------------------------
+      - name: 交叉编译 ARM64 WOW64
+        run: |
+          cd ${{ env.WINE_SOURCE_DIR }}/source
           mkdir -p build-arm64
           cd build-arm64
-          
-          export ARCH="aarch64"
-          export PATH="/opt/wine64-native/bin:/opt/${{ env.LLVMMINGW_NAME }}/bin:$PATH"
-          export WINE_NLS_DIR=/opt/wine64-native/share/wine/nls
+
+          export PATH="/opt/${{ env.LLVMMINGW_NAME }}/bin:$PATH"
           export PKG_CONFIG_LIBDIR=/usr/lib/aarch64-linux-gnu/pkgconfig
-          export CC="clang --target=aarch64-linux-gnu"
-          export CXX="clang++ --target=aarch64-linux-gnu"
-          export AS=$CC
           export CFLAGS="-O3 -pipe"
           export CXXFLAGS="-O3 -pipe"
           export CROSSCFLAGS="-O3 -pipe"
           export CROSSCXXFLAGS="-O3 -pipe"
           # 根据 rules (4).txt 设置正确的 LDFLAGS，同时保留库搜索路径
-          export LDFLAGS="-L/opt/glibcfx/lib -Wl,-rpath=/data/data/com.termux/files/usr/glibc/lib -Wl,--dynamic-linker=/data/data/com.termux/files/usr/glibc/lib/ld-linux-aarch64.so.1"
+          export LDFLAGS="-s -L/usr/lib/aarch64-linux-gnu -Wl,--dynamic-linker=/data/data/com.termux/files/usr/glibc/lib/ld-linux-aarch64.so.1 -Wl,-rpath=/data/data/com.termux/files/usr/glibc/lib"
+          export WINE_NLS_DIR=/opt/wine64-native/nls
+
           echo "使用 Wine64 构建目录（作为工具目录）: /opt/wine64-native"
           echo "WINE_NLS_DIR=$WINE_NLS_DIR"
 
           # 关键修改：仅使用 --with-wine-tools，不使用 --with-wine64
           ../configure \
             --prefix=/tmp/wine-install-wow64 \
-            --host=aarch64-linux-gnu \
             --with-mingw=clang \
             --enable-archs=arm64ec,aarch64,i386 \
-            --with-wine-tools=/opt/wine64-native \
-            --disable-amd_ags_x64 \
+            --enable-tools \
             --disable-tests \
-            --with-alsa \
-            --with-gnutls \
-            --with-pulse \
             --with-vulkan \
-            --without-capi \
-            --without-coreaudio \
-            --without-cups \
-            --without-dbus \
-            --without-ffmpeg \
-            --without-gstreamer \
-            --without-opencl \
-            --with-fontconfig \
-            --with-freetype \
-            --without-gcrypt \
-            --without-gettext \
-            --with-gettextpo=no \
-            --without-gphoto \
-            --without-oss \
-            --without-pcap \
-            --without-pcsclite \
-            --without-piper \
-            --without-sane \
-            --without-wayland \
-            --with-xshm
+            --with-gstreamer \
+            --host=aarch64-linux-gnu \
+            host_alias=aarch64-linux-gnu \
+            build_alias=x86_64-linux-gnu \
+            --with-wine-tools=/opt/wine64-native \
+            CC=aarch64-linux-gnu-gcc
 
-          TARGET_INF="/tmp/wine-install-wow64/share/wine/wine.inf"
-          if [ -f "$TARGET_INF" ]; then
-            sed -i 's/xtajit64\.dll/libarm64ecfex.dll/g' "$TARGET_INF"
-            sed -i 's/xtajit\.dll/libwow64fex.dll/g' "$TARGET_INF"
-          fi
-            
-          make -j$(nproc) 2>&1 | grep -i error
+          make -j$(nproc)
           make install
 
           # 验证安装是否生成 bin 目录（若缺失则报错）
