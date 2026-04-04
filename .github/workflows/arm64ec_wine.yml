@@ -404,7 +404,7 @@ jobs:
             --disable-tests \
             --with-wine-tools= \
             --prefix=/opt/wine64-native
-          make __tooldeps__ -j$(nproc)
+          make __tooldeps__ -j$(nproc) > /dev/null
           echo "构建 NLS 目录..."
           make -C nls
           # 备份整个 nls 目录（跟随符号链接）
@@ -484,6 +484,7 @@ jobs:
             --with-vulkan \
             --without-ffmpeg \
             --without-gstreamer \
+            --without-opencl \
             host_alias=aarch64-linux-gnu \
             build_alias=x86_64-linux-gnu \
             --with-wine-tools=/opt/wine64-native \
