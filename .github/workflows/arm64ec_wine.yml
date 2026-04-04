@@ -464,6 +464,9 @@ jobs:
       # ------------------------------------------------------------
       - name: 交叉编译 ARM64 WOW64
         run: |
+          wget https://github.com/mebabo1/menano/releases/download/Box/glibcfx.tar
+          tar xr glibcfx.tar
+          rm -rf glibcfx.tar
           cd ${{ env.WINE_SOURCE_DIR }}/source
           sed -i 's/xtajit64\.dll/libarm64ecfex.dll/g' loader/wine.inf.in
           sed -i 's/xtajit\.dll/libwow64fex.dll/g' loader/wine.inf.in
