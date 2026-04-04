@@ -491,6 +491,7 @@ jobs:
             --disable-tests \
             --with-vulkan \
             --without-ffmpeg \
+            --without-gstreamer \
             host_alias=aarch64-linux-gnu \
             build_alias=x86_64-linux-gnu \
             --with-wine-tools=/opt/wine64-native \
