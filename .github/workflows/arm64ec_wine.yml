@@ -352,8 +352,7 @@ jobs:
           fi
 
           PATCH_LIST="https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/path/1.patch 
-                      https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/path/2.patch
-                      https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/path/4.patch"
+                      https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/path/2.patch"
 
           echo "Applying external patches..."
           for URL in $PATCH_LIST; do
