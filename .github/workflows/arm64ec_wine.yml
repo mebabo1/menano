@@ -265,96 +265,88 @@ jobs:
           find . -name "server.c" -exec sed -i 's|"/tmp"|"/data/data/com.termux/files/usr/tmp"|g' {} + 2>/dev/null || true
           echo "路径修复完成"
                     
+          # 1. InterlockedOr 타입 캐스팅 수정 (atiadlxx)
           FILE="dlls/atiadlxx/atiadlxx_main.c"
-          if grep -q 'InterlockedOr(&dummy, 0)' "$FILE"; then
-            sed -i 's|InterlockedOr(&dummy, 0)|InterlockedOr((volatile long *)&dummy, 0)|g' "$FILE"
-            echo "✔ InterlockedOr patched"
-          else
-            echo "✔ InterlockedOr already patched or not found"
-          fi         
+          if [ -f "$FILE" ]; then
+            if grep -q 'InterlockedOr(&dummy, 0)' "$FILE"; then
+              # dummy 변수 선언을 long으로 변경하여 _InterlockedOr와의 호환성 확보
+              sed -i 's/LONG dummy/long dummy/g' "$FILE"
+              sed -i 's|InterlockedOr(&dummy, 0)|_InterlockedOr((long volatile *)\&dummy, 0)|g' "$FILE"
+              echo "✔ InterlockedOr patched with explicit casting"
+            else
+              echo "✔ InterlockedOr already patched or not found"
+            fi
+          fi
 
+          # 2. ntdll virtual.c 미초기화 변수 방어 (컴파일러 경고 해결)
+          FILE="dlls/ntdll/unix/virtual.c"
+          if [ -f "$FILE" ]; then
+            if grep -q 'unsigned int vprot, sec_flags;' "$FILE"; then
+              echo "Fixing uninitialized vprot in virtual.c..."
+              sed -i 's/unsigned int vprot, sec_flags;/unsigned int vprot = 0, sec_flags = 0;/g' "$FILE"
+            fi
+          fi
+
+          # 3. PE 디렉토리 매핑 패치 (aarch64 강제)
           FILE="dlls/ntdll/unix/loader.c"
-          if ! grep -q '/aarch64-windows' "$FILE"; then
+          if [ -f "$FILE" ] && ! grep -q '/aarch64-windows' "$FILE"; then
             echo "Patching PE directory mapping..."
             sed -i 's|/x86_64-windows|/aarch64-windows|g' "$FILE"
           fi
 
-          FILE="dlls/ntdll/loader.c"
-          if grep -q 'xtajit64\.dll' "$FILE"; then
-            echo "Replacing xtajit64.dll with libarm64ecfex.dll..."
-            sed -i 's|xtajit64\.dll|libarm64ecfex.dll|g' "$FILE"
-          fi
+          # 4. 에뮬레이터 로더 패치 (xtajit -> libarm64ecfex)
+          # ntdll과 wine.inf 등 여러 파일 통합 처리
+          FILES="dlls/ntdll/loader.c dlls/ntdll/signal_arm64ec.c dlls/ntdll/tests/wow64.c loader/wine.inf.in"
+          for F in $FILES; do
+            if [ -f "$F" ] && grep -q 'xtajit64\.dll' "$F"; then
+              echo "Replacing xtajit64.dll with libarm64ecfex.dll in $F..."
+              sed -i 's|xtajit64\.dll|libarm64ecfex.dll|g' "$F"
+              sed -i 's|xtajit\.dll|libwow64fex.dll|g' "$F"
+            fi
+          done
 
-          INF="loader/wine.inf.in"
-          if ! grep -q 'libarm64ecfex.dll' "$INF"; then
-            echo "Patching wine.inf..."
-            sed -i 's/xtajit64\.dll/libarm64ecfex.dll/g' "$INF"
-            sed -i 's/xtajit\.dll/libwow64fex.dll/g' "$INF"
-          fi
-          
-          FILE="dlls/ntdll/signal_arm64ec.c"
-          if [ -f "$FILE" ]; then
-            echo "Patching signal_arm64ec.c for FEX..."
-            sed -i 's|xtajit64\.dll|libarm64ecfex.dll|g' "$FILE"
-          fi
-
-          FILE="dlls/ntdll/tests/wow64.c"
-          if [ -f "$FILE" ]; then
-            echo "Patching ntdll tests..."
-            sed -i 's|xtajit64\.dll|libarm64ecfex.dll|g' "$FILE"
-            sed -i 's|xtajit\.dll|libwow64fex.dll|g' "$FILE"
-          fi
-
+          # 5. FEX YMM State 대응 (unwind.h)
           FILE="dlls/ntdll/unwind.h"
-          if ! grep -q 'CONTEXT_ARM64_FEX_YMMSTATE' "$FILE"; then
+          if [ -f "$FILE" ] && ! grep -q 'CONTEXT_ARM64_FEX_YMMSTATE' "$FILE"; then
             echo "Patching unwind flags for FEX YMM state..."
             sed -i '/ctx_flags_x64_to_arm/,/}/ {
-              /CONTEXT_AMD64_FLOATING_POINT/ {
-                s/^\(\s*\)\(.*CONTEXT_AMD64_FLOATING_POINT.*\)$/\1\2\
-          \1if (flags \& CONTEXT_AMD64_XSTATE) ret |= CONTEXT_ARM64_FEX_YMMSTATE;/
-              }
+              /CONTEXT_AMD64_FLOATING_POINT/ s/$/\n          if (flags \& CONTEXT_AMD64_XSTATE) ret |= CONTEXT_ARM64_FEX_YMMSTATE;/
             }' "$FILE"
             sed -i '/ctx_flags_arm_to_x64/,/}/ {
-              /CONTEXT_ARM64_FLOATING_POINT/ {
-                s/^\(\s*\)\(.*CONTEXT_ARM64_FLOATING_POINT.*\)$/\1\2\
-          \1if (flags \& CONTEXT_ARM64_FEX_YMMSTATE) ret |= CONTEXT_AMD64_XSTATE;/
-              }
+              /CONTEXT_ARM64_FLOATING_POINT/ s/$/\n          if (flags \& CONTEXT_ARM64_FEX_YMMSTATE) ret |= CONTEXT_AMD64_XSTATE;/
             }' "$FILE"
           fi
 
+          # 6. winnt.h FEX 플래그 정의 추가
           FILE="include/winnt.h"
-          if ! grep -q 'CONTEXT_ARM64_FEX_YMMSTATE' "$FILE"; then
+          if [ -f "$FILE" ] && ! grep -q 'CONTEXT_ARM64_FEX_YMMSTATE' "$FILE"; then
             echo "Patching winnt.h to match FEX diff..."
             sed -i 's/^#define CONTEXT_ARM64_X18.*/#define CONTEXT_ARM64_X18             (CONTEXT_ARM64 | 0x00000010)/' "$FILE"
             if ! grep -q 'CONTEXT_ARM64_XSTATE' "$FILE"; then
-              sed -i '/CONTEXT_ARM64_X18/a\
-          #define CONTEXT_ARM64_XSTATE          (CONTEXT_ARM64 | 0x00000020)
-          ' "$FILE"
+              sed -i '/CONTEXT_ARM64_X18/a #define CONTEXT_ARM64_XSTATE          (CONTEXT_ARM64 | 0x00000020)' "$FILE"
             fi
-            sed -i '/CONTEXT_ARM64_XSTATE/a\
-           #define CONTEXT_ARM64_FEX_YMMSTATE   (CONTEXT_ARM64 | 0x00000040)
-           ' "$FILE"
-           fi
-
-          FILE3="dlls/wdscore/wdscore.spec"
-          if grep -q '@ stub' "$FILE3"; then
-            echo "Cleaning wdscore.spec stubs..."
-            sed -i '/CDynamicArray/d' "$FILE3"
-            echo "✔ wdscore stubs cleaned"
-          else
-            echo "✔ wdscore already cleaned or not found"
+            sed -i '/CONTEXT_ARM64_XSTATE/a #define CONTEXT_ARM64_FEX_YMMSTATE   (CONTEXT_ARM64 | 0x00000040)' "$FILE"
           fi
 
+          # 7. wdscore.spec 스텁 정리
+          FILE="dlls/wdscore/wdscore.spec"
+          if [ -f "$FILE" ] && grep -q '@ stub' "$FILE"; then
+            echo "Cleaning wdscore.spec stubs..."
+            sed -i '/CDynamicArray/d' "$FILE"
+            echo "✔ wdscore stubs cleaned"
+          fi
+
+          # 8. Vulkan VRAM Faking 적용
           FILE="dlls/winevulkan/vulkan.c"
-          if [ -f "$FILE" ]; then
-            echo "Applying VRAM faking to winevulkan with proper indentation..."
-            sed -i '/p_vkGetPhysicalDeviceMemoryProperties(host_physical_device, &object->memory_properties);/a \
+          if [ -f "$FILE" ] && ! grep -q 'WINE_VRAM_SIZE' "$FILE" ; then
+            echo "Applying VRAM faking to winevulkan..."
+            sed -i '/p_vkGetPhysicalDeviceMemoryProperties(host_physical_device, \&object->memory_properties);/a \
               { \
                   const char *v = getenv("WINE_VRAM_SIZE"); \
                   uint64_t s = v ? (uint64_t)atoll(v)*1024*1024 : (uint64_t)2048*1024*1024; \
                   uint32_t k; \
                   for (k=0; k<object->memory_properties.memoryHeapCount; k++) \
-                      if (object->memory_properties.memoryHeaps[k].flags & VK_MEMORY_HEAP_DEVICE_LOCAL_BIT) \
+                      if (object->memory_properties.memoryHeaps[k].flags \& VK_MEMORY_HEAP_DEVICE_LOCAL_BIT) \
                           object->memory_properties.memoryHeaps[k].size = s; \
               }' "$FILE"
           fi
