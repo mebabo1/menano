@@ -496,7 +496,7 @@ jobs:
             --with-wine-tools=/opt/wine64-native \
             CC=aarch64-linux-gnu-gcc
 
-          make -j$(nproc)
+          make -j$(nproc) > /dev/null
           make install
 
           # 验证安装是否生成 bin 目录（若缺失则报错）
