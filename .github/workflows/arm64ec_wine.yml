@@ -490,6 +490,7 @@ jobs:
             --enable-tools \
             --disable-tests \
             --with-vulkan \
+            --without-ffmpeg \
             host_alias=aarch64-linux-gnu \
             build_alias=x86_64-linux-gnu \
             --with-wine-tools=/opt/wine64-native \
