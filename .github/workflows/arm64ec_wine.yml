@@ -550,14 +550,14 @@ jobs:
 
           # 关键修改：仅使用 --with-wine-tools，不使用 --with-wine64
           ../configure \
+            --host=aarch64-linux-gnu \
             --prefix=/tmp/wine-install-wow64 \
             --with-mingw=clang \
             --enable-archs=arm64ec,aarch64,i386 \
             --enable-tools \
             --disable-tests \
             --with-vulkan \
-            --with-gstreamer \
-            --host=aarch64-linux-gnu \
+            --with-gstreamer \       
             host_alias=aarch64-linux-gnu \
             build_alias=x86_64-linux-gnu \
             --with-wine-tools=/opt/wine64-native \
