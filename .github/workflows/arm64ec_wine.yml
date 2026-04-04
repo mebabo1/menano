@@ -464,32 +464,46 @@ jobs:
       # ------------------------------------------------------------
       - name: 交叉编译 ARM64 WOW64
         run: |
-          wget https://github.com/mebabo1/menano/releases/download/Box/glibcfx.tar
-          mkdir -p /opt/glibcfx
-          tar -xf glibcfx.tar -C /opt/glibcfx
           cd ${{ env.WINE_SOURCE_DIR }}/source
-          sed -i 's/xtajit64\.dll/libarm64ecfex.dll/g' loader/wine.inf.in
-          sed -i 's/xtajit\.dll/libwow64fex.dll/g' loader/wine.inf.in
-      - name: 构建 native wine64 工具和 NLS（带完整备份）
-        run: |
-          set -e
-          mkdir -p ${{ env.WINE64_DIR }}
-          cp -r ${{ env.WINE_SOURCE_DIR }}/source ${{ env.WINE64_DIR }}/source
-          cd ${{ env.WINE64_DIR }}
-          mkdir -p amd64
-          cd amd64
-          ../source/configure --enable-win64 --prefix=/usr/local
-          make __tooldeps__ -j$(nproc)
-          echo "构建 NLS 目录..."
-          make -C nls
-          # 备份整个 nls 目录（跟随符号链接）
-          mkdir -p /opt/nls-backup
-          cp -aL nls/. /opt/nls-backup/
-          echo "nls 目录已完整备份到 /opt/nls-backup"
-          ls -la /opt/nls-backup/
+          mkdir -p build-arm64
+          cd build-arm64
 
+          export PATH="/opt/${{ env.LLVMMINGW_NAME }}/bin:$PATH"
+          export PKG_CONFIG_LIBDIR=/usr/lib/aarch64-linux-gnu/pkgconfig
+          export CFLAGS="-O3 -pipe"
+          export CXXFLAGS="-O3 -pipe"
+          export CROSSCFLAGS="-O3 -pipe"
+          export CROSSCXXFLAGS="-O3 -pipe"
+          # 根据 rules (4).txt 设置正确的 LDFLAGS，同时保留库搜索路径
+          export LDFLAGS="-s -L/usr/lib/aarch64-linux-gnu -Wl,--dynamic-linker=/data/data/com.termux/files/usr/glibc/lib/ld-linux-aarch64.so.1 -Wl,-rpath=/data/data/com.termux/files/usr/glibc/lib"
+          export WINE_NLS_DIR=/opt/wine64-native/nls
 
+          echo "使用 Wine64 构建目录（作为工具目录）: /opt/wine64-native"
+          echo "WINE_NLS_DIR=$WINE_NLS_DIR"
 
+          # 关键修改：仅使用 --with-wine-tools，不使用 --with-wine64
+          ../configure \
+            --host=aarch64-linux-gnu \
+            --prefix=/tmp/wine-install-wow64 \
+            --with-mingw=clang \
+            --enable-archs=arm64ec,aarch64,i386 \
+            --enable-tools \
+            --disable-tests \
+            --with-vulkan \
+            --with-gstreamer \
+            host_alias=aarch64-linux-gnu \
+            build_alias=x86_64-linux-gnu \
+            --with-wine-tools=/opt/wine64-native \
+            CC=aarch64-linux-gnu-gcc
+
+          make -j$(nproc)
+          make install
+
+          # 验证安装是否生成 bin 目录（若缺失则报错）
+          if [ ! -d /tmp/wine-install-wow64/bin ]; then
+            echo "错误: /tmp/wine-install-wow64/bin 目录不存在，安装可能不完整"
+            exit 1
+          fi
       # ------------------------------------------------------------
       # 12. 全面补全安装目录的运行时文件（增强版：优先从 programs/ 查找）
       # ------------------------------------------------------------
