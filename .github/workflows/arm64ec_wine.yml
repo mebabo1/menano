@@ -461,6 +461,8 @@ jobs:
       - name: 交叉编译 ARM64 WOW64
         run: |
           cd ${{ env.WINE_SOURCE_DIR }}/source
+          sed -i 's/xtajit64\.dll/libarm64ecfex.dll/g' loader/wine.inf.in
+          sed -i 's/xtajit\.dll/libwow64fex.dll/g' loader/wine.inf.in
           mkdir -p build-arm64
           cd build-arm64
           
