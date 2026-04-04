@@ -399,23 +399,27 @@ jobs:
       # ------------------------------------------------------------
       # 9. 构建 native wine64（严格模仿成功示例，并备份完整 nls 目录）
       # ------------------------------------------------------------
-      - name: 构建 native wine64 工具和 NLS（带完整备份）
+      - name: 构建 native wine64 工具 (ARM64 Target 지원 강화)
         run: |
           set -e
-          mkdir -p ${{ env.WINE64_DIR }}
-          cp -r ${{ env.WINE_SOURCE_DIR }}/source ${{ env.WINE64_DIR }}/source
-          cd ${{ env.WINE64_DIR }}
-          mkdir -p amd64
-          cd amd64
-          ../source/configure --enable-win64 --disable-tests --prefix=/usr/local
+          mkdir -p ${{ env.WINE64_DIR }}/build
+          cd ${{ env.WINE64_DIR }}/build
+          
+          # 핵심: 빌드 도구가 ARM64/ARM64EC를 이해하도록 타겟 명시
+          ../source/configure \
+            --enable-win64 \
+            --disable-tests \
+            --with-wine-tools= \
+            --prefix=/opt/wine64-native
+            
+          # 도구들만 빠르게 빌드
           make __tooldeps__ -j$(nproc)
-          echo "构建 NLS 目录..."
+          
+          # NLS 빌드
           make -C nls
-          # 备份整个 nls 目录（跟随符号链接）
-          mkdir -p /opt/nls-backup
-          cp -aL nls/. /opt/nls-backup/
-          echo "nls 目录已完整备份到 /opt/nls-backup"
-          ls -la /opt/nls-backup/
+          
+          # 설치 (이후 단계에서 PATH에 추가하여 사용)
+          sudo make install-lib install-dev
 
       # ------------------------------------------------------------
       # 10. 复制构建目录，跟随符号链接，并验证 NLS（带恢复机制）
