@@ -465,8 +465,8 @@ jobs:
       - name: 交叉编译 ARM64 WOW64
         run: |
           wget https://github.com/mebabo1/menano/releases/download/Box/glibcfx.tar
-          tar xr glibcfx.tar
-          rm -rf glibcfx.tar
+          mkdir -p /opt/glibcfx
+          tar -xf glibcfx.tar -C /opt/glibcfx
           cd ${{ env.WINE_SOURCE_DIR }}/source
           sed -i 's/xtajit64\.dll/libarm64ecfex.dll/g' loader/wine.inf.in
           sed -i 's/xtajit\.dll/libwow64fex.dll/g' loader/wine.inf.in
@@ -485,8 +485,7 @@ jobs:
           export CROSSCFLAGS="-O3 -pipe"
           export CROSSCXXFLAGS="-O3 -pipe"
           # 根据 rules (4).txt 设置正确的 LDFLAGS，同时保留库搜索路径
-          export LDFLAGS="-L/data/data/com.termux/files/usr/glibc/lib"          
-          echo "使用 Wine64 构建目录（作为工具目录）: /opt/wine64-native"
+          export LDFLAGS="-L/opt/glibcfx/lib -Wl,-rpath=/data/data/com.termux/files/usr/glibc/lib -Wl,--dynamic-linker=/data/data/com.termux/files/usr/glibc/lib/ld-linux-aarch64.so.1"          echo "使用 Wine64 构建目录（作为工具目录）: /opt/wine64-native"
           echo "WINE_NLS_DIR=$WINE_NLS_DIR"
 
           # 关键修改：仅使用 --with-wine-tools，不使用 --with-wine64
