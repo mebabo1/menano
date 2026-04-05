@@ -67,23 +67,6 @@
            ' "$FILE"
            fi
 
-          # 1. configure.ac 패치 (ARM64EC에서 wdscore 제외 로직 주입)
-          FILE="configure.ac"
-          if [ -f "$FILE" ] && ! grep -q 'WINE_IGNORE_FILE(dlls/wdscore)' "$FILE"; then
-            echo "Patching configure.ac to ignore wdscore on ARM64EC..."
-            # WINE_CONFIG_MAKEFILE(dlls/wdscore) 줄을 찾아서 조건문으로 교체
-            sed -i '/WINE_CONFIG_MAKEFILE(dlls\/wdscore)/c\
-dnl ARM64EC linker cannot handle the C++ mangled stub symbols in wdscore\
-case " $cross_archs " in\
-  *\\ arm64ec\\ *)\
-    WINE_IGNORE_FILE(dlls/wdscore) ;;\
-  *)\
-    WINE_CONFIG_MAKEFILE(dlls/wdscore) ;;\
-esac' "$FILE"
-            echo "✔ configure.ac patched"
-          fi
-
-          # 2. wdscore.spec 스텁 정리 (보조 조치)
           FILE3="dlls/wdscore/wdscore.spec"
           if [ -f "$FILE3" ]; then
             if grep -q '@ stub' "$FILE3"; then
