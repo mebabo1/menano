@@ -479,8 +479,6 @@ jobs:
             --prefix=/tmp/wine-install-wow64 \
             --with-mingw=clang \
             --enable-archs=arm64ec,aarch64,i386 \
-            --enable-tools \
-            --disable-tests \
             --with-vulkan \
             --without-ffmpeg \
             --without-gstreamer \
@@ -488,8 +486,16 @@ jobs:
             host_alias=aarch64-linux-gnu \
             build_alias=x86_64-linux-gnu \
             --with-wine-tools=/opt/wine64-native \
-            CC=aarch64-linux-gnu-gcc
-
+            CC="aarch64-linux-gnu-gcc" \
+            CXX="aarch64-linux-gnu-g++" \
+            LD="aarch64-linux-gnu-ld" \
+            AR="aarch64-linux-gnu-ar" \
+            NM="aarch64-linux-gnu-nm" \
+            STRIP="aarch64-linux-gnu-strip" \
+            RANLIB="aarch64-linux-gnu-ranlib" \
+            --enable-tools \
+            --disable-tests
+            
           make -j$(nproc) > /dev/null
           make install
 
