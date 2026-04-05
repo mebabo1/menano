@@ -79,6 +79,11 @@
             fi
           fi
 
+          FILE_CFG="configure.ac"
+          echo "Removing wdscore from configure.ac..."
+          sed -i '/WINE_CONFIG_MAKEFILE(dlls\/wdscore)/d' "$FILE_CFG"
+          echo "✔ wdscore entry removed"
+
           TARGET_INF="/tmp/wine-install-wow64/share/wine/wine.inf"
           if [ -f "$TARGET_INF" ]; then
             sed -i 's/xtajit64\.dll/libarm64ecfex.dll/g' "$TARGET_INF"
