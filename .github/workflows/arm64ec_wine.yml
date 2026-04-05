@@ -287,19 +287,13 @@ jobs:
             fi
           fi
 
-          # 3. PE 디렉토리 매핑 통합 패치 (aarch64 강제)
-          # 대상 파일: ntdll, dbghelp, setupapi, winecfg 등
+          # 3. PE 디렉토리 매핑 통합 패치 (sh/bash 모두 호환)
           echo "Patching PE directory mapping to aarch64-windows for all relevant files..."
           
-          # 대상 파일 리스트 정의
-          TARGET_FILES=(
-            "dlls/ntdll/unix/loader.c"
-            "dlls/dbghelp/path.c"
-            "dlls/setupapi/fakedll.c"
-            "programs/winecfg/libraries.c"
-          )
+          # 공백으로 구분된 파일 리스트 정의 (sh 호환 방식)
+          TARGET_FILES="dlls/ntdll/unix/loader.c dlls/dbghelp/path.c dlls/setupapi/fakedll.c programs/winecfg/libraries.c"
 
-          for FILE in "${TARGET_FILES[@]}"; do
+          for FILE in $TARGET_FILES; do
             if [ -f "$FILE" ]; then
               if grep -q '/x86_64-windows' "$FILE"; then
                 echo "✔ Patching $FILE..."
@@ -312,7 +306,7 @@ jobs:
             fi
           done
 
-          # 추가: ntdll.c.orig와 같은 백업 파일이 있다면 필요 시 처리 (선택 사항)
+          # ntdll.c.orig 파일이 존재할 경우 별도 처리
           if [ -f "dlls/ntdll/unix/loader.c.orig" ]; then
             sed -i 's|/x86_64-windows|/aarch64-windows|g' "dlls/ntdll/unix/loader.c.orig"
           fi
