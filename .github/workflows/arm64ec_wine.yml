@@ -287,11 +287,16 @@ jobs:
             fi
           fi
 
-          # 3. PE 및 Unix 디렉토리 매핑 통합 패치 (sh/bash 호환)
+          # loader.c의 get_pe_dir 함수를 에러 없이 수정
           FILE="dlls/ntdll/unix/loader.c"
-          if ! grep -q '/aarch64-windows' "$FILE"; then
-            echo "Patching PE directory mapping..."
-            sed -i 's|/x86_64-windows|/aarch64-windows|g' "$FILE"
+          if [ -f "$FILE" ]; then
+            echo "Applying clean fix for get_pe_dir..."           
+            # 1. 기존의 AMD64 리턴 줄을 삭제 (중복 방지)
+            sed -i '/case IMAGE_FILE_MACHINE_AMD64:/d' "$FILE"          
+            # 2. ARM64 케이스 바로 위에 AMD64 케이스를 병합
+            # 이렇게 하면 두 머신 타입 모두 "/aarch64-windows"를 반환합니다.
+            sed -i 's/case IMAGE_FILE_MACHINE_ARM64:/case IMAGE_FILE_MACHINE_AMD64:\n    case IMAGE_FILE_MACHINE_ARM64:/g' "$FILE"            
+            echo "✔ get_pe_dir patched: AMD64 now shares ARM64 path."
           fi
 
           FILE="dlls/ntdll/loader.c"
