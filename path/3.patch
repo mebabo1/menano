@@ -1,6 +1,6 @@
 --- a/configure.ac
 +++ b/configure.ac
-@@ -3385,7 +3385,13 @@
+@@ -3266,7 +3266,13 @@
  WINE_CONFIG_MAKEFILE(dlls/wbemdisp)
  WINE_CONFIG_MAKEFILE(dlls/wbemdisp/tests)
  WINE_CONFIG_MAKEFILE(dlls/wbemprox)
