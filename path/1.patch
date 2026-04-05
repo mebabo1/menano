@@ -1,48 +1,44 @@
 diff --git a/dlls/ntdll/unix/virtual.c b/dlls/ntdll/unix/virtual.c
-index 963ebd2..7a70299 100644
+index 963ebd2..android_fixed 100644
 --- a/dlls/ntdll/unix/virtual.c
 +++ b/dlls/ntdll/unix/virtual.c
-@@ -293,9 +293,10 @@ static void *address_space_start = (void *)0x110000; /* keep DOS area clear */
+@@ -293,9 +293,12 @@ static void *address_space_start = (void *)0x110000; /* keep DOS area clear */
  static void *address_space_start = (void *)0x10000;
  #endif
  #ifdef _WIN64
 -static void *address_space_limit = (void *)0x7fffffff0000;  /* top of the total available address space */
 -static void *user_space_limit    = (void *)0x7fffffff0000;  /* top of the user address space */
 -static void *working_set_limit   = (void *)0x7fffffff0000;  /* top of the current working set */
-+/* 모든 환경에서 안드로이드 수준의 메모리 제한(512GB)을 강제 적용 */
++/* Android-safe limits (reduced VA space for stability) */
 +static void *address_space_limit = (void *)0x7fffff0000;
 +static void *user_space_limit    = (void *)0x7fffff0000;
 +static void *working_set_limit   = (void *)0x7fffff0000;
  #else
  static void *address_space_limit = (void *)0xc0000000;
  static void *user_space_limit    = (void *)0x7fff0000;
-@@ -404,28 +405,10 @@ static void kernel_writewatch_softdirty_init(void)
- 
+@@ -404,6 +407,13 @@ static void kernel_writewatch_softdirty_init(void)
+
  static void kernel_writewatch_init(void)
  {
 -    struct uffdio_api uffdio_api;
 -
 -    uffd_fd = syscall( __NR_userfaultfd, O_CLOEXEC | O_NONBLOCK | UFFD_USER_MODE_ONLY );
+-
 -    if (uffd_fd == -1) return;
 -
 -    uffdio_api.api = UFFD_API;
 -    uffdio_api.features = 0;
--    if (syscall( __NR_uffdio_api, &uffdio_api ))
+-
+-    if (ioctl( uffd_fd, UFFDIO_API, &uffdio_api ) == -1)
 -    {
 -        close( uffd_fd );
--        uffd_fd = -1;
 -        return;
 -    }
--    if (!(uffdio_api.features & UFFD_FEATURE_THREAD_ID))
--    {
--        close( uffd_fd );
--        uffd_fd = -1;
--        return;
--    }
+-
 -    use_kernel_writewatch = 1;
-+    /* 모든 환경에서 커널 writewatch 기능을 비활성화 */
-+    TRACE( "Kernel writewatches are disabled by force\n" );
++    /* Android environment: disable kernel writewatch completely */
++    TRACE("Kernel writewatches are disabled (Android environment)\n");
 +    use_kernel_writewatch = 0;
  }
-
+ 
  static void kernel_writewatch_reset( void *start, SIZE_T len )
