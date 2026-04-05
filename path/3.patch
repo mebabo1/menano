@@ -1,166 +1,18 @@
-diff --git a/dlls/ntdll/unwind.h b/dlls/ntdll/unwind.h
-index faca8a259fb6..71a4d23da043 100644
---- a/dlls/ntdll/unwind.h
-+++ b/dlls/ntdll/unwind.h
-@@ -166,6 +168,13 @@ static inline void context_x64_to_arm( ARM64_NT_CONTEXT *arm_ctx, const ARM64EC_
-     fpcsr = mxcsr_to_fpcsr( ec_ctx->AMD64_MxCsr );
-     arm_ctx->Fpcr = fpcsr;
-     arm_ctx->Fpsr = fpcsr >> 32;
-+
-+    if ((ec_ctx->ContextFlags & CONTEXT_XSTATE) == CONTEXT_XSTATE)
-+    {
-+        CONTEXT_EX *ec_xctx = (CONTEXT_EX *)(ec_ctx + 1);
-+        YMMCONTEXT *ec_ymm = RtlLocateExtendedFeature( ec_xctx, XSTATE_AVX, NULL );
-+        memcpy( arm_ctx->V + 16, ec_ymm, sizeof(*ec_ymm) );
-+    }
- }
-
- static inline void context_arm_to_x64( ARM64EC_NT_CONTEXT *ec_ctx, const ARM64_NT_CONTEXT *arm_ctx )
-@@ -216,6 +225,13 @@ static inline void context_arm_to_x64( ARM64EC_NT_CONTEXT *ec_ctx, const ARM64_N
-     ec_ctx->X17_3 = arm_ctx->X17 >> 48;
-
-     memcpy( ec_ctx->V, arm_ctx->V, sizeof(ec_ctx->V) );
-+
-+    if ((arm_ctx->ContextFlags & CONTEXT_ARM64_FEX_YMMSTATE) == CONTEXT_ARM64_FEX_YMMSTATE)
-+    {
-+        CONTEXT_EX *ec_xctx = (CONTEXT_EX *)(ec_ctx + 1);
-+        YMMCONTEXT *ec_ymm = RtlLocateExtendedFeature( ec_xctx, XSTATE_AVX, NULL );
-+        memcpy( ec_ymm, arm_ctx->V + 16, sizeof(*ec_ymm) );
-+    }
- }
-
- #endif /* __aarch64__ || __arm64ec__ */
-
-diff --git a/include/winnt.h b/include/winnt.h
-index 80329281ea4b..a914996eb61f 100644
---- a/include/winnt.h
-+++ b/include/winnt.h
-@@ -1703,8 +1703,9 @@ typedef struct _KNONVOLATILE_CONTEXT_POINTERS
- #define CONTEXT_ARM64_INTEGER         (CONTEXT_ARM64 | 0x00000002)
- #define CONTEXT_ARM64_FLOATING_POINT  (CONTEXT_ARM64 | 0x00000004)
- #define CONTEXT_ARM64_DEBUG_REGISTERS (CONTEXT_ARM64 | 0x00000008)
--#define CONTEXT_ARM64_X18       (CONTEXT_ARM64 | 0x00000010)
--#define CONTEXT_ARM64_XSTATE    (CONTEXT_ARM64 | 0x00000020)
-+#define CONTEXT_ARM64_X18             (CONTEXT_ARM64 | 0x00000010)
-+#define CONTEXT_ARM64_XSTATE          (CONTEXT_ARM64 | 0x00000020)
-+#define CONTEXT_ARM64_FEX_YMMSTATE   (CONTEXT_ARM64 | 0x00000040)
- #define CONTEXT_ARM64_FULL (CONTEXT_ARM64_CONTROL | CONTEXT_ARM64_INTEGER | CONTEXT_ARM64_FLOATING_POINT)
- #define CONTEXT_ARM64_ALL  (CONTEXT_ARM64_FULL | CONTEXT_ARM64_DEBUG_REGISTERS | CONTEXT_ARM64_X18)
-
-
-From 510598df5bf0ad91ce6e2c2b25c6a469041ce13f Mon Sep 17 00:00:00 2001
-From: Billy Laws <blaws05@gmail.com>
-Date: Wed, 17 Apr 2024 23:44:33 +0000
-Subject: [PATCH 07/15] Use FEX wow64/ARM64EC dll names
-
----
- dlls/ntdll/loader.c  | 3 +--
- dlls/wow64/syscall.c | 2 +-
- loader/wine.inf.in   | 4 ++--
- 3 files changed, 4 insertions(+), 5 deletions(-)
-
-diff --git a/dlls/ntdll/signal_arm64ec.c b/dlls/ntdll/signal_arm64ec.c
-index 3d53dc91459f..0657ae41fb8a 100644
---- a/dlls/ntdll/signal_arm64ec.c
-+++ b/dlls/ntdll/signal_arm64ec.c
-@@ -90,6 +90,7 @@ static inline BOOL enter_syscall_callback(void)
- static inline void leave_syscall_callback(void)
- {
-     get_arm64ec_cpu_area()->InSyscallCallback = 0;
-+    if (get_arm64ec_cpu_area()->SuspendDoorbell && *get_arm64ec_cpu_area()->SuspendDoorbell) arm64ec_suspend_point();
- }
-
-diff --git a/dlls/ntdll/signal_arm64ec.c b/dlls/ntdll/signal_arm64ec.c
-index 8a6f3628097c..3d53dc91459f 100644
---- a/dlls/ntdll/signal_arm64ec.c
-+++ b/dlls/ntdll/signal_arm64ec.c
-@@ -36,6 +36,11 @@
- #include "wine/debug.h"
- #include "ntsyscalls.h"
-
-+union ARM64EC_NT_XCONTEXT {
-+    ARM64EC_NT_CONTEXT context;
-+    BYTE buffer[0x800];
-+};
-+
- WINE_DEFAULT_DEBUG_CHANNEL(seh);
- WINE_DECLARE_DEBUG_CHANNEL(relay);
-
-diff --git a/dlls/ntdll/unix/virtual.c b/dlls/ntdll/unix/virtual.c
-index 4b4d9d6cd7f6..e43b50180fc2 100644
---- a/dlls/ntdll/unix/virtual.c
-+++ b/dlls/ntdll/unix/virtual.c
-@@ -241,6 +241,9 @@ static void *preload_reserve_end;
- static BOOL force_exec_prot;  /* whether to force PROT_EXEC on all PROT_READ mmaps */
- static BOOL enable_write_exceptions;  /* raise exception on writes to executable memory */
-
-+#define FEX_STATS_SHM_MAX_SIZE 0x400000
-+static void *fex_stats_shm;
-+
- struct range_entry
- {
-     void *base;
-@@ -5941,6 +5944,49 @@ static unsigned int get_memory_image_info( HANDLE process, LPCVOID addr, MEMORY_
-     return status;
- }
-
-+#if defined(linux) && defined(__aarch64__)
-+NTSTATUS get_memory_fex_stats_shm( HANDLE process, LPCVOID addr, MEMORY_FEX_STATS_SHM_INFORMATION *info,
-+                                   SIZE_T len, SIZE_T *res_len)
-+{
-+    char buf[0x20];
-+    int fd;
-+    int oflag = O_RDWR;
-+
-+    if (len != sizeof(*info)) return STATUS_INFO_LENGTH_MISMATCH;
-+    if (process != GetCurrentProcess()) return STATUS_INVALID_HANDLE;
-+
-+    sprintf( buf, "fex-%d-stats", getpid() );
-+
-+    if (!fex_stats_shm) {
-+        fex_stats_shm = mmap( NULL, FEX_STATS_SHM_MAX_SIZE, PROT_NONE, MAP_PRIVATE | MAP_ANONYMOUS |
-+                              MAP_NORESERVE, -1, 0 );
-+        if (fex_stats_shm == MAP_FAILED) {
-+            fex_stats_shm = NULL;
-+            return STATUS_INTERNAL_ERROR;
-+        }
-+
-+        oflag |= O_CREAT | O_TRUNC;
-+    }
-+
-+    fd = shm_open( buf, oflag, S_IRWXU | S_IRWXG | S_IRWXO );
-+    if (fd == -1) return STATUS_INTERNAL_ERROR;
-+
-+    if (ftruncate( fd, info->map_size )) goto err;
-+
-+    if (mmap( fex_stats_shm, info->map_size, PROT_READ | PROT_WRITE, MAP_SHARED | MAP_FIXED, fd,
-+              0 ) == MAP_FAILED) goto err;
-+
-+    close( fd );
-+
-+    info->shm_base = fex_stats_shm;
-+    *res_len = len;
-+    return STATUS_SUCCESS;
-+
-+err:
-+    close( fd );
-+    return STATUS_INTERNAL_ERROR;
-+}
-+#endif
-
- /***********************************************************************
-  *             NtQueryVirtualMemory   (NTDLL.@)
-@@ -5986,6 +6032,13 @@ NTSTATUS WINAPI NtQueryVirtualMemory( HANDLE process, LPCVOID addr,
-             }
-             return STATUS_INVALID_HANDLE;
-
-+        case MemoryFexStatsShm:
-+#if defined(linux) && defined(__aarch64__)
-+            return get_memory_fex_stats_shm( process, addr, buffer, len, res_len );
-+#else
-+            FIXME("MemoryFexStatsShm unsupported\n");
-+            break;
-+#endif
-         default:
-             FIXME("(%p,%p,info_class=%d,%p,%ld,%p) Unknown information class\n",
-                   process, addr, info_class, buffer, len, res_len);
+--- a/configure.ac
++++ b/configure.ac
+@@ -3385,7 +3385,13 @@
+ WINE_CONFIG_MAKEFILE(dlls/wbemdisp)
+ WINE_CONFIG_MAKEFILE(dlls/wbemdisp/tests)
+ WINE_CONFIG_MAKEFILE(dlls/wbemprox)
+ WINE_CONFIG_MAKEFILE(dlls/wbemprox/tests)
+-WINE_CONFIG_MAKEFILE(dlls/wdscore)
++dnl ARM64EC linker cannot handle the C++ mangled stub symbols in wdscore
++case " $cross_archs " in
++  *\ arm64ec\ *)
++    WINE_IGNORE_FILE(dlls/wdscore) ;;
++  *)
++    WINE_CONFIG_MAKEFILE(dlls/wdscore) ;;
++esac
+ WINE_CONFIG_MAKEFILE(dlls/webservices)
+ WINE_CONFIG_MAKEFILE(dlls/webservices/tests)
+ WINE_CONFIG_MAKEFILE(dlls/websocket)
