@@ -287,29 +287,37 @@ jobs:
             fi
           fi
 
-          # 3. PE 디렉토리 매핑 통합 패치 (sh/bash 모두 호환)
-          echo "Patching PE directory mapping to aarch64-windows for all relevant files..."
+          # 3. PE 및 Unix 디렉토리 매핑 통합 패치 (sh/bash 호환)
+          echo "Patching PE/Unix directory mapping to aarch64 for all relevant files..."
           
-          # 공백으로 구분된 파일 리스트 정의 (sh 호환 방식)
+          # 대상 파일 리스트 (필요 시 파일 추가 가능)
           TARGET_FILES="dlls/ntdll/unix/loader.c dlls/dbghelp/path.c dlls/setupapi/fakedll.c programs/winecfg/libraries.c"
 
           for FILE in $TARGET_FILES; do
             if [ -f "$FILE" ]; then
+              # 1. Windows PE 경로 패치 (x86_64-windows -> aarch64-windows)
               if grep -q '/x86_64-windows' "$FILE"; then
-                echo "✔ Patching $FILE..."
+                echo "✔ Patching Windows path in $FILE..."
                 sed -i 's|/x86_64-windows|/aarch64-windows|g' "$FILE"
-              else
-                echo "ℹ $FILE: /x86_64-windows not found or already patched."
+              fi
+              
+              # 2. Unix 라이브러리 경로 패치 (x86_64-unix -> aarch64-unix)
+              if grep -q '/x86_64-unix' "$FILE"; then
+                echo "✔ Patching Unix path in $FILE..."
+                sed -i 's|/x86_64-unix|/aarch64-unix|g' "$FILE"
               fi
             else
               echo "⚠ $FILE not found, skipping."
             fi
           done
 
-          # ntdll.c.orig 파일이 존재할 경우 별도 처리
-          if [ -f "dlls/ntdll/unix/loader.c.orig" ]; then
-            sed -i 's|/x86_64-windows|/aarch64-windows|g' "dlls/ntdll/unix/loader.c.orig"
-          fi
+          # ntdll.c.orig 및 기타 백업 파일 존재 시 일괄 처리
+          for ORIG_FILE in dlls/ntdll/unix/loader.c.orig; do
+            if [ -f "$ORIG_FILE" ]; then
+              sed -i 's|/x86_64-windows|/aarch64-windows|g' "$ORIG_FILE"
+              sed -i 's|/x86_64-unix|/aarch64-unix|g' "$ORIG_FILE"
+            fi
+          done
 
           # 4. 에뮬레이터 로더 패치 (xtajit -> libarm64ecfex)
           # ntdll과 wine.inf 등 여러 파일 통합 처리
