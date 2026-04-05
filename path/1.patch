@@ -17,8 +17,7 @@ index 963ebd2..android_fixed 100644
  #else
  static void *address_space_limit = (void *)0xc0000000;
  static void *user_space_limit    = (void *)0x7fff0000;
-@@ -405,6 +405,13 @@
- static void kernel_writewatch_init(void)
+@@ -405,6 +405,13 @@ static void kernel_writewatch_init(void)
  {
 -    struct uffdio_api uffdio_api;
 -
