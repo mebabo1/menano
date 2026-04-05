@@ -329,14 +329,6 @@ jobs:
             sed -i '/CONTEXT_ARM64_XSTATE/a #define CONTEXT_ARM64_FEX_YMMSTATE   (CONTEXT_ARM64 | 0x00000040)' "$FILE"
           fi
 
-          # 7. wdscore.spec 스텁 정리
-          FILE="dlls/wdscore/wdscore.spec"
-          if [ -f "$FILE" ] && grep -q '@ stub' "$FILE"; then
-            echo "Cleaning wdscore.spec stubs..."
-            sed -i '/CDynamicArray/d' "$FILE"
-            echo "✔ wdscore stubs cleaned"
-          fi
-
           # 8. Vulkan VRAM Faking 적용
           FILE="dlls/winevulkan/vulkan.c"
           if [ -f "$FILE" ] && ! grep -q 'WINE_VRAM_SIZE' "$FILE" ; then
@@ -352,7 +344,8 @@ jobs:
               }' "$FILE"
           fi
 
-          PATCH_LIST="https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/path/1.patch 
+          PATCH_LIST="https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/path/1.patch
+                      https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/path/3.patch
                       https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/path/2.patch"
 
           echo "Applying external patches..."
