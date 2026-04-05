@@ -287,11 +287,34 @@ jobs:
             fi
           fi
 
-          # 3. PE 디렉토리 매핑 패치 (aarch64 강제)
-          FILE="dlls/ntdll/unix/loader.c"
-          if [ -f "$FILE" ] && ! grep -q '/aarch64-windows' "$FILE"; then
-            echo "Patching PE directory mapping..."
-            sed -i 's|/x86_64-windows|/aarch64-windows|g' "$FILE"
+          # 3. PE 디렉토리 매핑 통합 패치 (aarch64 강제)
+          # 대상 파일: ntdll, dbghelp, setupapi, winecfg 등
+          echo "Patching PE directory mapping to aarch64-windows for all relevant files..."
+          
+          # 대상 파일 리스트 정의
+          TARGET_FILES=(
+            "dlls/ntdll/unix/loader.c"
+            "dlls/dbghelp/path.c"
+            "dlls/setupapi/fakedll.c"
+            "programs/winecfg/libraries.c"
+          )
+
+          for FILE in "${TARGET_FILES[@]}"; do
+            if [ -f "$FILE" ]; then
+              if grep -q '/x86_64-windows' "$FILE"; then
+                echo "✔ Patching $FILE..."
+                sed -i 's|/x86_64-windows|/aarch64-windows|g' "$FILE"
+              else
+                echo "ℹ $FILE: /x86_64-windows not found or already patched."
+              fi
+            else
+              echo "⚠ $FILE not found, skipping."
+            fi
+          done
+
+          # 추가: ntdll.c.orig와 같은 백업 파일이 있다면 필요 시 처리 (선택 사항)
+          if [ -f "dlls/ntdll/unix/loader.c.orig" ]; then
+            sed -i 's|/x86_64-windows|/aarch64-windows|g' "dlls/ntdll/unix/loader.c.orig"
           fi
 
           # 4. 에뮬레이터 로더 패치 (xtajit -> libarm64ecfex)
