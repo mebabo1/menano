@@ -116,6 +116,8 @@ jobs:
           # 2. 컴파일러 및 도구 설정
           # --target과 --sysroot 외에 -fuse-ld=lld를 추가하여 lld 링커를 사용하게 합니다.
           export CC="clang --target=aarch64-linux-gnu --sysroot=$deps -fuse-ld=lld"
+          export CFLAGS="-O2 -march=armv8-a -I$deps/include -Wno-implicit-function-declaration -Wno-int-conversion"
+          export LDFLAGS="-L$deps/lib -march=armv8-a -Wl,-rpath-link,$deps/lib"
           export CXX="clang++ --target=aarch64-linux-gnu --sysroot=$deps -fuse-ld=lld"
           export STRIP="llvm-strip"
           export NM="llvm-nm"
@@ -127,8 +129,6 @@ jobs:
           export FREETYPE_CFLAGS="-I$deps/include/freetype2"
           export FREETYPE_LIBS="-L$deps/lib -lfreetype"
           export CPPFLAGS="-I$deps/include"
-          export LDFLAGS="-L$deps/lib -Wl,-rpath-link,$deps/lib -Wl,-dynamic-linker,/data/data/com.termux/files/usr/glibc/lib/ld-linux-aarch64.so.1"
-          export CFLAGS="-O2 -Wno-implicit-function-declaration -Wno-int-conversion"
           sed -i "s|/data/data/com.termux/files/usr/glibc/lib/||g" $deps/lib/libc.so
           sed -i "s|/usr/lib/aarch64-linux-gnu/||g" $deps/lib/libc.so || true          
           if [ -f "$deps/lib/libpthread.so" ]; then
