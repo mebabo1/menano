@@ -97,6 +97,8 @@ jobs:
           export CXX="clang++ --target=aarch64-linux-gnu --sysroot=$GLIBC_PATH"
           export PKG_CONFIG_LIBDIR="$GLIBC_PATH/lib/pkgconfig"
           export PKG_CONFIG_PATH="$GLIBC_PATH/lib/pkgconfig"
+          export ac_cv_sizeof_void_p=8
+          export ac_cv_c_bigendian=no
           
           export CPPFLAGS="-I$GLIBC_PATH/include"
           export CFLAGS="-O3 -pipe"          
