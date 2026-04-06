@@ -1,0 +1,106 @@
+name: Wine arm64ec for Termux (Bleeding Edge)
+
+on:
+  push:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      # 1. 특정 저장소 및 브랜치(bleeding-edge) 가져오기
+      - name: Checkout Wine repository
+        uses: actions/checkout@v4
+        with:
+          repository: ziad9267/wine
+          ref: bleeding-edge
+
+      - name: Install the required deps
+        run: |
+          sudo dpkg --add-architecture i386
+          sudo apt-get update
+          sudo apt install -y \
+          build-essential \
+          gcc-aarch64-linux-gnu \
+          g++-aarch64-linux-gnu \
+          lzma flex bison quilt unzip pkg-config \
+          libx11-dev:i386 libvulkan-dev:i386 libfreetype6-dev:i386 \
+          libxcursor-dev:i386 libxi-dev:i386 libxshmfence-dev:i386 \
+          libxxf86vm-dev:i386 libxrandr-dev:i386 libxinerama-dev:i386 \
+          libxcomposite-dev:i386 libglu1-mesa-dev:i386 libosmesa6-dev:i386 \
+          libdbus-1-dev:i386 libncurses5-dev:i386 libsane-dev:i386 \
+          libv4l-dev:i386 libgphoto2-dev:i386 liblcms2-dev:i386 \
+          libcapi20-dev:i386 libcups2-dev:i386 libfontconfig1-dev:i386 \
+          libgsm1-dev:i386 libtiff5-dev:i386 libmpg123-dev:i386 \
+          libopenal-dev:i386 libldap2-dev:i386 libjpeg-dev:i386 \
+          libdrm2:i386 libdrm-dev:i386 gettext
+          sudo apt-get purge -y llvm-18 clang-18
+
+      - name: Downloading and preparing glibc deps
+        run: |
+          sudo mkdir -p /data/data/com.termux/files/usr
+          cd /tmp
+          wget https://github.com/mebabo1/menano/releases/download/Box/glibc.tar.xz
+          tar -xf glibc.tar.xz
+          # 경로가 usr/glibc 인지 확인 후 복사
+          sudo cp -r usr/glibc /data/data/com.termux/files/usr/
+          sudo chown -R $(whoami):$(whoami) /data/data/com.termux/files/usr/glibc
+
+      - name: Download Bylaws toolchain
+        run: |
+          wget https://github.com/bylaws/llvm-mingw/releases/download/20250920/llvm-mingw-20250920-ucrt-ubuntu-22.04-x86_64.tar.xz
+          tar -xf llvm-mingw-20250920-ucrt-ubuntu-22.04-x86_64.tar.xz
+          sudo mv llvm-mingw-20250920-ucrt-ubuntu-22.04-x86_64 /opt/llvm-mingw
+
+      - name: Building Wine tools (Native x86_64)
+        run: |
+          ./autogen.sh
+          mkdir wine-tools-build
+          cd wine-tools-build
+          ../configure --without-x --without-gstreamer --without-vulkan --without-wayland --without-freetype
+          make -j$(nproc) __tooldeps__
+          cd ..
+          mkdir wine-tools
+          cp -r wine-tools-build/* ./wine-tools/
+
+      - name: Compiling Wine for glibc (ARM64EC)
+        run: |
+          export GLIBC_PATH="/data/data/com.termux/files/usr/glibc"
+          export LLVM_MINGW_TOOLCHAIN="/opt/llvm-mingw/bin"
+          export PATH="$LLVM_MINGW_TOOLCHAIN:$PATH"
+          
+          export CC="aarch64-linux-gnu-gcc"
+          export CXX="aarch64-linux-gnu-g++"
+          
+          export CPPFLAGS="-I$GLIBC_PATH/include"
+          export CFLAGS="-I$GLIBC_PATH/include -O3 -pipe"          
+          export LDFLAGS="-L$GLIBC_PATH/lib -Wl,--dynamic-linker=$GLIBC_PATH/lib/ld-linux-aarch64.so.1 -Wl,-rpath=$GLIBC_PATH/lib"         
+          export PKG_CONFIG_LIBDIR="$GLIBC_PATH/lib/pkgconfig:$GLIBC_PATH/share/pkgconfig"
+          
+          mkdir build-wine
+          cd build-wine
+          ../configure \
+            --host=aarch64-linux-gnu \
+            --prefix=/usr \
+            --with-mingw=clang \
+            --with-wine-tools=../wine-tools \
+            --enable-archs=arm64ec,aarch64,i386 \
+            --enable-win64 \
+            --enable-nls \
+            --disable-tests \
+            --without-x \
+            --without-wayland \
+            --enable-wineandroid_drv=no \
+            --with-vulkan \
+            --with-sdl
+            
+          make -j$(nproc)
+          make install DESTDIR=$(pwd)/../compiled-files
+        continue-on-error: true
+
+      - name: Uploading Wine files
+        uses: actions/upload-artifact@v4
+        with:
+          name: wine-bleeding-edge-build
+          path: compiled-files/
