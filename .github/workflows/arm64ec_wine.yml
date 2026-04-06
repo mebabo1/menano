@@ -291,6 +291,10 @@ jobs:
             --enable-win64 \
             --disable-tests \
             --with-wine-tools= \
+            --without-x \
+            --without-gstreamer \
+            --without-vulkan \
+            --without-wayland \
             --prefix=/opt/wine64-native
           make __tooldeps__ -j$(nproc) > /dev/null
           echo "构建 NLS 目录..."
