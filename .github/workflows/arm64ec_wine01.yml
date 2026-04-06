@@ -109,25 +109,26 @@ jobs:
 
       - name: Compiling Wine for glibc (ARM64EC)  
         run: |  
-          # 1. 크로스 컴파일러 기반 도구 설치
           sudo apt-get install -y clang llvm lld
-
           export LLVM_MINGW_TOOLCHAIN="/opt/llvm-mingw/bin"
           export PATH="$LLVM_MINGW_TOOLCHAIN:$PATH"
-          export deps="/data/data/com.termux/files/usr/glibc"
-          
-          # 2. 컴파일러 설정: sysroot를 추가하여 $deps 내부 라이브러리를 사용하도록 강제
-          export CC="clang --target=aarch64-linux-gnu --sysroot=$deps"
-          export AS="$CC"
-          export CXX="clang++ --target=aarch64-linux-gnu --sysroot=$deps"
-          
-          # 3. 환경 변수 최적화
+          export deps="/data/data/com.termux/files/usr/glibc"          
+          # 2. 컴파일러 및 도구 설정
+          # --target과 --sysroot 외에 -fuse-ld=lld를 추가하여 lld 링커를 사용하게 합니다.
+          export CC="clang --target=aarch64-linux-gnu --sysroot=$deps -fuse-ld=lld"
+          export CXX="clang++ --target=aarch64-linux-gnu --sysroot=$deps -fuse-ld=lld"
+          export STRIP="llvm-strip"
+          export NM="llvm-nm"
+          export RANLIB="llvm-ranlib"          
+          # 3. 환경 변수 보강 (가장 중요)
+          # -Wl,-z,nostartfiles 등을 피하기 위해 표준 라이브러리 경로를 명시합니다.
           export PKG_CONFIG_LIBDIR="$deps/lib/pkgconfig:$deps/share/pkgconfig"
           export CPPFLAGS="-I$deps/include"
-          export LDFLAGS="-L$deps/lib -Wl,-rpath-link,$deps/lib"
-          export CFLAGS="-O2 -Wno-implicit-function-declaration -Wno-int-conversion"          
+          export LDFLAGS="-L$deps/lib -Wl,-rpath-link,$deps/lib -Wl,-dynamic-linker,/data/data/com.termux/files/usr/glibc/lib/ld-linux-aarch64.so.1"
+          export CFLAGS="-O2 -Wno-implicit-function-declaration -Wno-int-conversion"
+          
           mkdir -p build-wine  
-          cd build-wine  
+          cd build-wine
           
           # 4. Configure 실행
           ../configure \
@@ -151,3 +152,9 @@ jobs:
         with:  
           name: wine-bleeding-edge-build  
           path: compiled-files/
+      - name: Upload Config Log
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: wine-config-log
+          path: build-wine/config.log
