@@ -104,10 +104,12 @@ jobs:
           export LLVM_MINGW_TOOLCHAIN="/opt/llvm-mingw/bin"
           export PATH="$LLVM_MINGW_TOOLCHAIN:$PATH"
           export deps="/data/data/com.termux/files/usr/glibc"
-
-          export PKG_CONFIG_PATH="$deps/lib/pkgconfig:$deps/share/pkgconfig:/usr/lib/i386-linux-gnu/pkgconfig"
+          export CC="$TOOLCHAIN/clang --target=aarch64-linux-gnu"
+          export AS=$CC
+          export CXX="$TOOLCHAIN/clang++ --aarch64-linux-gnu"
+          export PKG_CONFIG_LIBDIR=$deps/lib/pkgconfig:$deps/share/pkgconfig
           export CPPFLAGS="-I$deps/include"
-          export LDFLAGS="-L$deps/lib -L/usr/lib/i386-linux-gnu"
+          export LDFLAGS="-L$deps/lib"
           export CFLAGS="-I$deps/include -Wno-declaration-after-statement -Wno-implicit-function-declaration -Wno-int-conversion"
           export LIBRARY_PATH="$deps/lib${LIBRARY_PATH:+:$LIBRARY_PATH}"
           export FREETYPE_CFLAGS="-I$deps/include/freetype2"                
@@ -116,7 +118,6 @@ jobs:
           ../configure \
           --enable-archs=arm64ec,aarch64,i386 \
           --host=aarch64-linux-gnu \
-          --target=aarch64-linux-gnu \
           --with-mingw=clang \
           --with-wine-tools=../wine-tools \
           --prefix=/usr \
