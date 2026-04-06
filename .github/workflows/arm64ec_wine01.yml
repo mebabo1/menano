@@ -89,23 +89,17 @@ jobs:
       - name: Compiling Wine for glibc (ARM64EC)
         run: |
           export GLIBC_PATH="/data/data/com.termux/files/usr/glibc"
-          export LLVM_MINGW_TOOLCHAIN="/opt/llvm-mingw/bin"
-          export PATH="$LLVM_MINGW_TOOLCHAIN:$PATH"
-          
-          # [핵심 수정] 시스템 gcc 대신 clang을 사용하며 glibc 경로를 강제 주입
-          export CC="clang --target=aarch64-linux-gnu --sysroot=$GLIBC_PATH"
-          export CXX="clang++ --target=aarch64-linux-gnu --sysroot=$GLIBC_PATH"
-          export PKG_CONFIG_LIBDIR="$GLIBC_PATH/lib/pkgconfig"
-          export PKG_CONFIG_PATH="$GLIBC_PATH/lib/pkgconfig"
-          export ac_cv_sizeof_void_p=8
-          export ac_cv_c_bigendian=no
-          
-          export CPPFLAGS="-I$GLIBC_PATH/include"
-          export CFLAGS="-O3 -pipe"          
-          export LDFLAGS="-L$GLIBC_PATH/lib -Wl,--dynamic-linker=$GLIBC_PATH/lib/ld-linux-aarch64.so.1 -Wl,-rpath=$GLIBC_PATH/lib"         
-          
+          export LLVM_MINGW_PATH="/opt/llvm-mingw/bin"
+          export PATH="$LLVM_MINGW_PATH:$PATH"
+          export CC="clang"
+          export CXX="clang++"
+          export TARGET_FLAGS="--target=aarch64-linux-gnu --sysroot=$GLIBC_PATH"
+          export CFLAGS="-O3 $TARGET_FLAGS"
+          export LDFLAGS="-L$GLIBC_PATH/lib -Wl,-rpath=$GLIBC_PATH/lib -Wl,--dynamic-linker=$GLIBC_PATH/lib/ld-linux-aarch64.so.1"
+
           mkdir -p build-wine
           cd build-wine
+          
           ../configure \
             --host=aarch64-linux-gnu \
             --prefix=/usr \
