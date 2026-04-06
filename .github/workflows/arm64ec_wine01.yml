@@ -17,22 +17,21 @@ jobs:
           ref: bleeding-edge
 
       - name: Install the required deps
+      - name: Install the required deps
         run: |
           # 1. 32비트 아키텍처 추가
           sudo dpkg --add-architecture i386
           
-          # 2. 충돌을 일으킬 수 있는 기존 LLVM/Clang 강제 제거 및 클리닝
+          # 2. 충돌 원인이 되는 기존 LLVM/Clang 버전들 강제 제거 (청소)
           sudo apt-get purge -y llvm-18 clang-18 llvm-17 clang-17 llvm-16 clang-16
           sudo apt-get autoremove -y
           sudo apt-get update
           
-          # 3. 크로스 컴파일러와 필수 라이브러리 설치
-          # 버전을 특정하지 않고 설치하되, 빌드 필수 도구를 먼저 넣습니다.
+          # 3. 크로스 컴파일러 통합 패키지 및 필수 도구 설치
+          # 'crossbuild-essential-arm64'를 쓰면 의존성 문제를 알아서 더 잘 해결합니다.
           sudo apt install -y \
           build-essential \
           crossbuild-essential-arm64 \
-          gcc-aarch64-linux-gnu \
-          g++-aarch64-linux-gnu \
           gcc-multilib \
           g++-multilib \
           gettext \
