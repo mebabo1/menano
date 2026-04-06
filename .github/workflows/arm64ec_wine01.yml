@@ -126,7 +126,12 @@ jobs:
           export CPPFLAGS="-I$deps/include"
           export LDFLAGS="-L$deps/lib -Wl,-rpath-link,$deps/lib -Wl,-dynamic-linker,/data/data/com.termux/files/usr/glibc/lib/ld-linux-aarch64.so.1"
           export CFLAGS="-O2 -Wno-implicit-function-declaration -Wno-int-conversion"
-          
+          sed -i "s|/data/data/com.termux/files/usr/glibc/lib/||g" $deps/lib/libc.so
+          sed -i "s|/usr/lib/aarch64-linux-gnu/||g" $deps/lib/libc.so || true          
+          if [ -f "$deps/lib/libpthread.so" ]; then
+            sed -i "s|/data/data/com.termux/files/usr/glibc/lib/||g" $deps/lib/libpthread.so
+          fi
+
           mkdir -p build-wine  
           cd build-wine
           
