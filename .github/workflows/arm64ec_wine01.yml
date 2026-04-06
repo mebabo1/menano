@@ -59,14 +59,28 @@ jobs:
           sudo apt-get purge -y llvm-18 clang-18  
       - name: Downloading and preparing glibc deps  
         run: |  
-          sudo mkdir -p /data/data/com.termux/files/usr  
-          cd /tmp  
-          wget https://github.com/mebabo1/menano/releases/download/Box/glibc.tar.xz  
-          tar -xf glibc.tar.xz  
-          # 경로가 usr/glibc 인지 확인 후 복사  
-          sudo cp -r usr/glibc /data/data/com.termux/files/usr/  
-          sudo chown -R $(whoami):$(whoami) /data/data/com.termux/files/usr/glibc  
-
+          # 1. 대상 디렉토리 생성 (sudo 필요)
+          sudo mkdir -p /data/data/com.termux/files/usr
+          
+          # 2. 임시 디렉토리에서 압축 해제
+          cd /tmp
+          wget -q https://github.com/mebabo1/menano/releases/download/Box/glibc.tar.xz  
+          mkdir -p glibc_temp
+          tar -xf glibc.tar.xz -C glibc_temp
+          
+          # 3. 경로 정규화 (압축 파일 안에 usr/glibc가 있든, 바로 glibc가 있든 대응)
+          # 'glibc'라는 이름의 디렉토리를 찾아서 대상 경로로 이동시킵니다.
+          TARGET_DIR="/data/data/com.termux/files/usr/glibc"
+          sudo rm -rf "$TARGET_DIR"
+          REAL_SOURCE=$(find glibc_temp -type d -name "glibc" | head -n 1)          
+          if [ -z "$REAL_SOURCE" ]; then
+            echo "Error: glibc directory not found in the archive!"
+            exit 1
+          fi          
+          sudo cp -r "$REAL_SOURCE" /data/data/com.termux/files/usr/
+          sudo chown -R $(whoami):$(whoami) "$TARGET_DIR"
+          echo "Successfully prepared glibc at: $TARGET_DIR"
+          ls -ld "$TARGET_DIR"
       - name: Download Bylaws toolchain  
         run: |  
           wget https://github.com/bylaws/llvm-mingw/releases/download/20250920/llvm-mingw-20250920-ucrt-ubuntu-22.04-x86_64.tar.xz  
