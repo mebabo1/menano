@@ -18,27 +18,29 @@ jobs:
 
       - name: Install the required deps
         run: |
-          # 1. 충돌 가능성이 있는 기존 패키지 제거 (clean state)
+          # 1. 기존 충돌 패키지 강제 제거 및 클리닝
           sudo apt-get purge -y llvm-18 clang-18 llvm-17 clang-17 llvm-16 clang-16
           sudo apt-get autoremove -y
+          sudo apt-get update
 
-          # 2. i386 아키텍처 추가 및 업데이트
+          # 2. i386 아키텍처 추가
           sudo dpkg --add-architecture i386
           sudo apt-get update
 
-          # 3. 크로스 컴파일러와 빌드 도구를 '먼저' 설치 (i386 라이브러리보다 먼저)
-          # 여기서 버전을 명시하지 않고 시스템 기본형을 따릅니다.
+          # 3. 크로스 컴파일러 및 빌드 도구 설치 (버전 충돌 방지를 위해 명시적 설치)
+          # 'gcc-aarch64-linux-gnu' 대신 구체적인 버전을 포함하여 설치를 유도합니다.
           sudo apt install -y \
           build-essential \
+          gcc-13-aarch64-linux-gnu \
+          g++-13-aarch64-linux-gnu \
           gcc-aarch64-linux-gnu \
           g++-aarch64-linux-gnu \
           gcc-multilib \
           g++-multilib \
-          gettext \
-          lzma flex bison quilt unzip pkg-config
+          gettext lzma flex bison quilt unzip pkg-config
 
-          # 4. Wine 빌드용 i386 라이브러리들 설치
-          # 만약 여기서 또 에러가 나면 특정 패키지가 범인일 수 있으므로 하나씩 설치 권장
+          # 4. Wine 빌드용 i386 라이브러리 설치
+          # 의존성 오류를 줄이기 위해 필수 라이브러리 위주로 먼저 설치합니다.
           sudo apt install -y \
           libx11-dev:i386 libvulkan-dev:i386 libfreetype6-dev:i386 \
           libxcursor-dev:i386 libxi-dev:i386 libxshmfence-dev:i386 \
