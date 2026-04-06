@@ -128,8 +128,6 @@ jobs:
           --prefix=/usr \
           --enable-win64 \
           --disable-tests \
-          --without-x \
-          --without-vulkan \
           --without-wayland \
           --without-oss \
           --without-alsa \
