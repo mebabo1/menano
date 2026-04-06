@@ -359,6 +359,7 @@ jobs:
             --with-mingw=clang \
             --enable-archs=arm64ec,aarch64,i386 \
             --with-vulkan \
+            --enable-nls \
             --without-ffmpeg \
             --without-gstreamer \
             --without-opencl \
