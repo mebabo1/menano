@@ -24,6 +24,10 @@ jobs:
           build-essential \
           gcc-aarch64-linux-gnu \
           g++-aarch64-linux-gnu \
+          gcc-multilib \
+          g++-multilib \
+          pkg-config:i386 \
+          libc6-dev:i386 \
           lzma flex bison quilt unzip pkg-config \
           libx11-dev:i386 libvulkan-dev:i386 libfreetype6-dev:i386 \
           libxcursor-dev:i386 libxi-dev:i386 libxshmfence-dev:i386 \
