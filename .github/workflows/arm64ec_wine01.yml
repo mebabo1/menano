@@ -17,7 +17,6 @@ jobs:
           ref: bleeding-edge
 
       - name: Install the required deps
-      - name: Install the required deps
         run: |
           # 1. 32비트 아키텍처 추가
           sudo dpkg --add-architecture i386
