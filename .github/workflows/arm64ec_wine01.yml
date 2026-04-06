@@ -123,6 +123,9 @@ jobs:
           # 3. 환경 변수 보강 (가장 중요)
           # -Wl,-z,nostartfiles 등을 피하기 위해 표준 라이브러리 경로를 명시합니다.
           export PKG_CONFIG_LIBDIR="$deps/lib/pkgconfig:$deps/share/pkgconfig"
+          export PKG_CONFIG_PATH="$deps/lib/pkgconfig:$deps/share/pkgconfig"
+          export FREETYPE_CFLAGS="-I$deps/include/freetype2"
+          export FREETYPE_LIBS="-L$deps/lib -lfreetype"
           export CPPFLAGS="-I$deps/include"
           export LDFLAGS="-L$deps/lib -Wl,-rpath-link,$deps/lib -Wl,-dynamic-linker,/data/data/com.termux/files/usr/glibc/lib/ld-linux-aarch64.so.1"
           export CFLAGS="-O2 -Wno-implicit-function-declaration -Wno-int-conversion"
