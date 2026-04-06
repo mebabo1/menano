@@ -9,7 +9,6 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-
       - name: Checkout Wine repository  
         uses: actions/checkout@v4  
         with:  
