@@ -95,6 +95,8 @@ jobs:
           # [핵심 수정] 시스템 gcc 대신 clang을 사용하며 glibc 경로를 강제 주입
           export CC="clang --target=aarch64-linux-gnu --sysroot=$GLIBC_PATH"
           export CXX="clang++ --target=aarch64-linux-gnu --sysroot=$GLIBC_PATH"
+          export PKG_CONFIG_LIBDIR="$GLIBC_PATH/lib/pkgconfig"
+          export PKG_CONFIG_PATH="$GLIBC_PATH/lib/pkgconfig"
           
           export CPPFLAGS="-I$GLIBC_PATH/include"
           export CFLAGS="-O3 -pipe"          
