@@ -95,27 +95,23 @@ jobs:
 
       - name: Compiling Wine for glibc (ARM64EC)  
         run: |  
-          # 1. 크로스 컴파일러 설치 (시스템 clang이 ARM 타겟을 지원하게 함)
+          # 1. 크로스 컴파일러 기반 도구 설치
           sudo apt-get install -y clang llvm lld
 
           export LLVM_MINGW_TOOLCHAIN="/opt/llvm-mingw/bin"
           export PATH="$LLVM_MINGW_TOOLCHAIN:$PATH"
           export deps="/data/data/com.termux/files/usr/glibc"
           
-          # 2. 컴파일러 설정: sysroot를 명시하여 $deps 내부의 헤더/라이브러리 사용 강제
-          # --target과 --sysroot가 핵심입니다.
+          # 2. 컴파일러 설정: sysroot를 추가하여 $deps 내부 라이브러리를 사용하도록 강제
           export CC="clang --target=aarch64-linux-gnu --sysroot=$deps"
+          export AS="$CC"
           export CXX="clang++ --target=aarch64-linux-gnu --sysroot=$deps"
-          export STRIP="llvm-strip"
-          export NM="llvm-nm"
-          export RANLIB="llvm-ranlib"
           
-          # 3. 플래그 최적화
+          # 3. 환경 변수 최적화
           export PKG_CONFIG_LIBDIR="$deps/lib/pkgconfig:$deps/share/pkgconfig"
           export CPPFLAGS="-I$deps/include"
-          export LDFLAGS="-L$deps/lib -Wl,-rpath-link,$deps/lib" 
-          export CFLAGS="-O2 -Wno-implicit-function-declaration -Wno-int-conversion"
-          
+          export LDFLAGS="-L$deps/lib -Wl,-rpath-link,$deps/lib"
+          export CFLAGS="-O2 -Wno-implicit-function-declaration -Wno-int-conversion"          
           mkdir -p build-wine  
           cd build-wine  
           
