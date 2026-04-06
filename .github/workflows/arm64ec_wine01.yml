@@ -104,9 +104,7 @@ jobs:
           export LLVM_MINGW_TOOLCHAIN="/opt/llvm-mingw/bin"
           export PATH="$LLVM_MINGW_TOOLCHAIN:$PATH"
           export deps="/data/data/com.termux/files/usr/glibc"
-          export CC="$TOOLCHAIN/clang --target=aarch64-linux-gnu"
-          export AS=$CC
-          export CXX="$TOOLCHAIN/clang++ --target=aarch64-linux-gnu"
+
           export PKG_CONFIG_PATH="$deps/lib/pkgconfig:$deps/share/pkgconfig:/usr/lib/i386-linux-gnu/pkgconfig"
           export CPPFLAGS="-I$deps/include"
           export LDFLAGS="-L$deps/lib -L/usr/lib/i386-linux-gnu"
@@ -115,40 +113,35 @@ jobs:
           export FREETYPE_CFLAGS="-I$deps/include/freetype2"                
           mkdir -p build-wine  
           cd build-wine  
-          ./configure \
+          ../configure \
           --enable-archs=arm64ec,aarch64,i386 \
-          --prefix=/usr \
           --host=aarch64-linux-gnu \
+          --target=aarch64-linux-gnu \
           --with-mingw=clang \
-          --with-wine-tools=./wine-tools \
+          --with-wine-tools=../wine-tools \
+          --prefix=/usr \
           --enable-win64 \
-          --enable-nls \
-          --with-pulse \
-          --disable-win16 \
-          --disable-opencl \
-          --without-alsa \
           --disable-tests \
-          --without-capi \
-          --without-coreaudio \
+          --without-vulkan \
+          --without-x \
+          --without-wayland \
+          --enable-wineandroid_drv=no \
+          --without-oss \
+          --without-alsa \
           --without-cups \
           --without-dbus \
           --without-gphoto \
-          --without-gssapi \
-          --without-krb5 \
-          --without-alsa \
-          --without-netapi \
-          --without-oss \
-          --without-pcap \
-          --without-pcsclite \
           --without-sane \
           --without-udev \
-          --without-unwind \
-          --without-usb \
           --without-v4l2 \
-          --without-wayland \
+          --without-xcomposite \
+          --without-xcursor \
           --without-xinerama \
-          --without-xxf86vm \
-          --enable-wineandroid_drv=no
+          --without-xrandr \
+          --without-xrender \
+          --without-xshape \
+          --without-xshmfence \
+          --without-xxf86vm
           make -j$(nproc)  
           make install DESTDIR=$(pwd)/../compiled-files  
         continue-on-error: true  
