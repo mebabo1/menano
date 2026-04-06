@@ -102,18 +102,17 @@ jobs:
           mkdir -p build-wine  
           cd build-wine  
           ../configure \  
-            --host=aarch64-linux-gnu \  
-            --prefix=/usr \  
-            --with-mingw=clang \  
-            --with-wine-tools=../wine-tools \  
-            --enable-archs=arm64ec,aarch64,i386 \  
-            --enable-win64 \  
-            --disable-tests \  
-            --without-x \  
-            --without-wayland \  
-            --enable-wineandroid_drv=no \  
-            --with-vulkan \  
-            --with-sdl
+          --host=aarch64-linux-gnu \  
+          --prefix=/usr \  
+          --with-mingw=clang \  
+          --with-wine-tools=../wine-tools \  
+          --enable-archs=arm64ec,aarch64,i386 \  
+          --enable-win64 \  
+          --disable-tests \  
+          --without-wayland \  
+          --enable-wineandroid_drv=no \  
+          --with-vulkan \  
+          --with-sdl
           make -j$(nproc)  
           make install DESTDIR=$(pwd)/../compiled-files  
         continue-on-error: true  
