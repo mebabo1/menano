@@ -144,13 +144,15 @@ jobs:
       # ------------------------------------------------------------
       - name: llvm-mingw
         run: |
+          set -e
           mkdir -p /opt
           cd /opt
-          wget https://github.com/bylaws/llvm-mingw/releases/download/${{ env.LLVMMINGW_DATE }}/${{ env.LLVMMINGW_NAME }}.tar.xz
-          tar -xJf ${{ env.LLVMMINGW_NAME }}.tar.xz
-          rm ${{ env.LLVMMINGW_NAME }}.tar.xz
-          echo "/opt/${{ env.LLVMMINGW_NAME }}/bin" >> $GITHUB_PATH
-
+          LLVMMINGW_DATE=20250920
+          LLVMMINGW_NAME=llvm-mingw-20250920-ucrt-ubuntu-22.04-x86_64
+          wget https://github.com/bylaws/llvm-mingw/releases/download/${LLVMMINGW_DATE}/${LLVMMINGW_NAME}.tar.xz
+          tar -xJf ${LLVMMINGW_NAME}.tar.xz
+          rm ${LLVMMINGW_NAME}.tar.xz
+          echo "/opt/${LLVMMINGW_NAME}/bin" >> $GITHUB_PATH
       # ------------------------------------------------------------
       # 4. 设置中文语言环境
       # ------------------------------------------------------------
