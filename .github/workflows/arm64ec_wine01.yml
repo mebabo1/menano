@@ -93,7 +93,7 @@ jobs:
           mkdir wine-tools  
           cp -r wine-tools-build/* ./wine-tools/
 
-            - name: Compiling Wine for glibc (ARM64EC)  
+      - name: Compiling Wine for glibc (ARM64EC)  
         run: |  
           # 1. 크로스 컴파일러 설치 (시스템 clang이 ARM 타겟을 지원하게 함)
           sudo apt-get install -y clang llvm lld
