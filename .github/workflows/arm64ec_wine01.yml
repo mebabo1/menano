@@ -107,7 +107,7 @@ jobs:
             --prefix=/usr \
             --with-mingw=clang \
             --with-wine-tools=../wine-tools \
-            --enable-archs=arm64ec,aarch64 \
+            --enable-archs=arm64ec,aarch64,i386 \
             --enable-win64 \
             --disable-tests \
             --without-wayland \
