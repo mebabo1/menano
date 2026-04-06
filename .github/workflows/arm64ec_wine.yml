@@ -142,11 +142,11 @@ jobs:
       # ------------------------------------------------------------
       # 3. 安装 llvm-mingw 交叉编译工具链
       # ------------------------------------------------------------
-      - name: 下载并安装 llvm-mingw
+      - name: llvm-mingw
         run: |
           mkdir -p /opt
           cd /opt
-          wget https://github.com/mstorsjo/llvm-mingw/releases/download/${{ env.LLVMMINGW_DATE }}/${{ env.LLVMMINGW_NAME }}.tar.xz
+          wget https://github.com/bylaws/llvm-mingw/releases/download/${{ env.LLVMMINGW_DATE }}/${{ env.LLVMMINGW_NAME }}.tar.xz
           tar -xJf ${{ env.LLVMMINGW_NAME }}.tar.xz
           rm ${{ env.LLVMMINGW_NAME }}.tar.xz
           echo "/opt/${{ env.LLVMMINGW_NAME }}/bin" >> $GITHUB_PATH
