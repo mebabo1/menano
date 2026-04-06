@@ -101,9 +101,8 @@ jobs:
 
           # 2. 컴파일러 강제 지정 (시스템 gcc가 아닌 NDK clang 사용)
           # --target을 명시하면 'gcc -m32' 체크를 시도하지 않고 Clang의 멀티 아키텍처 기능을 사용합니다.
-          export TARGET_TRIPLE="aarch64-linux-gnu"
-          export CC="clang --target=$TARGET_TRIPLE --sysroot=$GLIBC_PATH"
-          export CXX="clang++ --target=$TARGET_TRIPLE --sysroot=$GLIBC_PATH"
+          export CC="$TOOLCHAIN/clang --target=aarch64-linux-gnu"
+          export CXX="$TOOLCHAIN/clang++ --target=aarch64-linux-gnu"
           
           # 3. 플래그 설정
           export PKG_CONFIG_LIBDIR="$GLIBC_PATH/lib/pkgconfig"
