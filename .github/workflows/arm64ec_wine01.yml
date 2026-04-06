@@ -97,6 +97,9 @@ jobs:
 
       - name: Compiling Wine for glibc (ARM64EC)  
         run: |  
+          sudo apt-get update
+          sudo apt-get install -y gcc-multilib g++-multilib
+
           export TOOLCHAIN="$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin"
           export LLVM_MINGW_TOOLCHAIN="/opt/llvm-mingw/bin"
           export PATH="$LLVM_MINGW_TOOLCHAIN:$PATH"
@@ -104,10 +107,10 @@ jobs:
           export CC="$TOOLCHAIN/clang --target=aarch64-linux-gnu"
           export AS=$CC
           export CXX="$TOOLCHAIN/clang++ --target=aarch64-linux-gnu"
-          export PKG_CONFIG_LIBDIR=$deps/lib/pkgconfig:$deps/share/pkgconfig
+          export PKG_CONFIG_PATH="$deps/lib/pkgconfig:$deps/share/pkgconfig:/usr/lib/i386-linux-gnu/pkgconfig"
           export CPPFLAGS="-I$deps/include"
+          export LDFLAGS="-L$deps/lib -L/usr/lib/i386-linux-gnu"
           export CFLAGS="-I$deps/include -Wno-declaration-after-statement -Wno-implicit-function-declaration -Wno-int-conversion"
-          export LDFLAGS="-L$deps/lib"
           export LIBRARY_PATH="$deps/lib${LIBRARY_PATH:+:$LIBRARY_PATH}"
           export FREETYPE_CFLAGS="-I$deps/include/freetype2"                
           mkdir -p build-wine  
