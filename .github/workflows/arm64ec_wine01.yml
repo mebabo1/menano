@@ -73,6 +73,17 @@ jobs:
           tar -xf llvm-mingw-20250920-ucrt-ubuntu-22.04-x86_64.tar.xz  
           sudo mv llvm-mingw-20250920-ucrt-ubuntu-22.04-x86_64 /opt/llvm-mingw  
 
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Setup NDK
+        uses: nttld/setup-ndk@v1
+        id: ndk
+        with:
+         ndk-version: r28c
+         add-to-path: false
+         link-to-sdk: true
+
       - name: Building Wine tools (Native x86_64)  
         run: |  
           ./autogen.sh  
@@ -86,17 +97,19 @@ jobs:
 
       - name: Compiling Wine for glibc (ARM64EC)  
         run: |  
-          export GLIBC_PATH="/data/data/com.termux/files/usr/glibc"  
-          export LLVM_MINGW_TOOLCHAIN="/opt/llvm-mingw/bin"  
-          export PATH="$LLVM_MINGW_TOOLCHAIN:$PATH"          
-          # [핵심 수정] 시스템 gcc 대신 clang을 사용하며 glibc 경로를 강제 주입  
-          export CC="clang --target=aarch64-linux-gnu --sysroot=$GLIBC_PATH"  
-          export CXX="clang++ --target=aarch64-linux-gnu --sysroot=$GLIBC_PATH"  
-          export PKG_CONFIG_LIBDIR="$GLIBC_PATH/lib/pkgconfig"  
-          export PKG_CONFIG_PATH="$GLIBC_PATH/lib/pkgconfig"         
-          export CPPFLAGS="-I$GLIBC_PATH/include"  
-          export CFLAGS="-O3 -pipe"            
-          export LDFLAGS="-L$GLIBC_PATH/lib -Wl,--dynamic-linker=$GLIBC_PATH/lib/ld-linux-aarch64.so.1 -Wl,-rpath=$GLIBC_PATH/lib"                
+          export TOOLCHAIN="/usr/local/lib/android/sdk/ndk/28.2.13676358/toolchains/llvm/prebuilt/linux-x86_64/bin"
+          export LLVM_MINGW_TOOLCHAIN="/opt/llvm-mingw/bin"
+          export PATH="$LLVM_MINGW_TOOLCHAIN:$PATH"
+          export deps="/data/data/com.termux/files/usr/glibc"
+          export CC="$TOOLCHAIN/clang --target=aarch64-linux-android28"
+          export AS=$CC
+          export CXX="$TOOLCHAIN/clang++ --target=aarch64-linux-android28"
+          export PKG_CONFIG_LIBDIR=$deps/lib/pkgconfig:$deps/share/pkgconfig
+          export CPPFLAGS="-I$deps/include"
+          export CFLAGS="-I$deps/include -Wno-declaration-after-statement -Wno-implicit-function-declaration -Wno-int-conversion"
+          export LDFLAGS="-L$deps/lib"
+          export LIBRARY_PATH="$deps/lib${LIBRARY_PATH:+:$LIBRARY_PATH}"
+          export FREETYPE_CFLAGS="-I$deps/include/freetype2"                
           mkdir -p build-wine  
           cd build-wine  
           ../configure \  
