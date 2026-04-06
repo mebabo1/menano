@@ -386,7 +386,8 @@ jobs:
             STRIP="aarch64-linux-gnu-strip" \
             RANLIB="aarch64-linux-gnu-ranlib" \
             --enable-tools \
-            --disable-tests
+            --disable-tests \
+            --enable-wineandroid_drv=no
             
           make -j$(nproc) > /dev/null
           make install
