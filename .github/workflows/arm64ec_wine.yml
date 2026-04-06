@@ -195,7 +195,7 @@ jobs:
               ;;
             proton01)
               echo "处理 Vanilla 分支"
-              git clone https://github.com/fathonix/wine-proton-arm64ec.git source
+              git clone -b "bleeding-edge" https://github.com/ziad9267/wine.git source
               cd source
               git config advice.detachedHead false
               if [ "$WINE_VERSION" != "latest" ]; then
@@ -367,24 +367,45 @@ jobs:
             --prefix=/tmp/wine-install-wow64 \
             --with-mingw=clang \
             --enable-archs=arm64ec,aarch64,i386 \
+            --with-wine-tools=/opt/wine64-native \
             --with-vulkan \
+            --enable-win64 \
             --enable-nls \
-            --without-ffmpeg \
-            --without-gstreamer \
-            --without-opencl \
+            --with-pulse \
+            --disable-win16 \
+            --disable-opencl \
+            --without-alsa \
+            --disable-tests \
+            --without-capi \
+            --without-coreaudio \
+            --without-cups \
+            --without-dbus \
+            --without-gphoto \
+            --without-gssapi \
+            --without-krb5 \
+            --without-alsa \
+            --without-netapi \
+            --without-oss \
+            --without-pcap \
+            --without-pcsclite \
+            --without-sane \
+            --without-udev \
+            --without-unwind \
+            --without-usb \
+            --without-v4l2 \
+            --without-wayland \
+            --without-xinerama \
+            --without-xxf86vm \
+            --enable-wineandroid_drv=no \
             host_alias=aarch64-linux-gnu \
             build_alias=x86_64-linux-gnu \
-            --with-wine-tools=/opt/wine64-native \
             CC="aarch64-linux-gnu-gcc" \
             CXX="aarch64-linux-gnu-g++" \
             LD="aarch64-linux-gnu-ld" \
             AR="aarch64-linux-gnu-ar" \
             NM="aarch64-linux-gnu-nm" \
             STRIP="aarch64-linux-gnu-strip" \
-            RANLIB="aarch64-linux-gnu-ranlib" \
-            --enable-tools \
-            --disable-tests \
-            --enable-wineandroid_drv=no
+            RANLIB="aarch64-linux-gnu-ranlib" 
             
           make -j$(nproc) > /dev/null
           make install
