@@ -92,28 +92,33 @@ jobs:
 
       - name: Compiling Wine for glibc
         run: |
-          # 1. 경로 설정
+          # 크로스 컴파일러 경로 확인 (apt로 설치한 경우 보통 /usr/bin에 있음)
           export GLIBC_PATH="/data/data/com.termux/files/usr/glibc"
           export LLVM_MINGW_TOOLCHAIN="/opt/llvm-mingw/bin"
           export PATH="$LLVM_MINGW_TOOLCHAIN:$PATH"
-          # 2. 크로스 컴파일러 지정 (Android NDK 대신 시스템 gcc 사용)
-          # Ubuntu/Debian 환경이므로 aarch64-linux-gnu-gcc 가 필요합니다. (위 단계에서 설치 확인)
+          
+          # 컴파일러 명시
           export CC="aarch64-linux-gnu-gcc"
           export CXX="aarch64-linux-gnu-g++"
-          # 3. 핵심 플래그: glibc 로더와 라이브러리 경로 강제 지정
-          export CPPFLAGS="-I$GLIBC_PATH/include"
-          export CFLAGS="-I$GLIBC_PATH/include -O3 -pipe"          
-          # [매우 중요] 실행 시 glibc 로더를 직접 바라보도록 설정
-          export LDFLAGS="-L$GLIBC_PATH/lib -Wl,--dynamic-linker=$GLIBC_PATH/lib/ld-linux-aarch64.so.1 -Wl,-rpath=$GLIBC_PATH/lib"         
-          # 4. 의존성 라이브러리 경로 (Pkg-config)
-          export PKG_CONFIG_LIBDIR="$GLIBC_PATH/lib/pkgconfig:$GLIBC_PATH/share/pkgconfig"
+          
+          # 환경 변수 강화
+          export PKG_CONFIG_PATH="$GLIBC_PATH/lib/pkgconfig:$GLIBC_PATH/share/pkgconfig"
+          export CFLAGS="-I$GLIBC_PATH/include -O3 -pipe"
+          export LDFLAGS="-L$GLIBC_PATH/lib -Wl,--dynamic-linker=$GLIBC_PATH/lib/ld-linux-aarch64.so.1 -Wl,-rpath=$GLIBC_PATH/lib"
+          
+          # 빌드 폴더 생성 및 이동
           mkdir -p build-wine
           cd build-wine
+          
+          # Wine Tools 절대 경로 사용 추천
+          WINE_TOOLS_PATH=$(realpath ../wine-tools)
+
           ../configure \
             --host=aarch64-linux-gnu \
+            --build=x86_64-pc-linux-gnu \
             --prefix=/usr \
             --with-mingw=clang \
-            --with-wine-tools=../wine-tools \
+            --with-wine-tools="$WINE_TOOLS_PATH" \
             --enable-archs=arm64ec,aarch64,i386 \
             --enable-win64 \
             --enable-nls \
@@ -123,8 +128,10 @@ jobs:
             --enable-wineandroid_drv=no \
             --with-vulkan \
             --with-sdl
+
           make -j$(nproc)
-          make install DESTDIR=../compiled-files
+          # DESTDIR은 절대 경로로 지정하는 것이 안전합니다.
+          make install DESTDIR=$(realpath ../compiled-files)
         continue-on-error: true
 
       - name: Uploading Wine files
