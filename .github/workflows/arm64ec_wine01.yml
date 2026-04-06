@@ -112,8 +112,9 @@ jobs:
             --enable-archs=arm64ec,aarch64,i386 \
             --enable-win64 \
             --disable-tests \
-            --without-x \
             --without-wayland \
+            --disable-win16 \
+            --disable-opencl \
             --enable-wineandroid_drv=no \
             --with-vulkan \
             --with-sdl
