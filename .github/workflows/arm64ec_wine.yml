@@ -282,14 +282,12 @@ jobs:
           mkdir -p amd64
           cd amd64
           ../source/configure \
-            --enable-win64 \
             --disable-tests \
             --with-wine-tools= \
             --without-x \
             --without-gstreamer \
             --without-vulkan \
-            --without-wayland \
-            --prefix=/opt/wine64-native
+            --without-wayland
           make __tooldeps__ -j$(nproc) > /dev/null
           echo "构建 NLS 目录..."
           make -C nls
