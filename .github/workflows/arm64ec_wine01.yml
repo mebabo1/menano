@@ -112,18 +112,40 @@ jobs:
           export FREETYPE_CFLAGS="-I$deps/include/freetype2"                
           mkdir -p build-wine  
           cd build-wine  
-          ../configure \  
-          --host=aarch64-linux-gnu \  
-          --prefix=/usr \  
-          --with-mingw=clang \  
-          --with-wine-tools=../wine-tools \  
-          --enable-archs=arm64ec,aarch64,i386 \  
-          --enable-win64 \  
-          --disable-tests \  
-          --without-wayland \  
-          --enable-wineandroid_drv=no \  
-          --with-vulkan \  
-          --with-sdl
+          ./configure \
+          --enable-archs=arm64ec,aarch64,i386 \
+          --prefix=/usr \
+          --host=aarch64-linux-gnu \
+          --with-mingw=clang \
+          --with-wine-tools=./wine-tools \
+          --enable-win64 \
+          --enable-nls \
+          --with-pulse \
+          --disable-win16 \
+          --disable-opencl \
+          --without-alsa \
+          --disable-tests \
+          --without-capi \
+          --without-coreaudio \
+          --without-cups \
+          --without-dbus \
+          --without-gphoto \
+          --without-gssapi \
+          --without-krb5 \
+          --without-alsa \
+          --without-netapi \
+          --without-oss \
+          --without-pcap \
+          --without-pcsclite \
+          --without-sane \
+          --without-udev \
+          --without-unwind \
+          --without-usb \
+          --without-v4l2 \
+          --without-wayland \
+          --without-xinerama \
+          --without-xxf86vm \
+          --enable-wineandroid_drv=no
           make -j$(nproc)  
           make install DESTDIR=$(pwd)/../compiled-files  
         continue-on-error: true  
