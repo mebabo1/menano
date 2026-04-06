@@ -73,17 +73,6 @@ jobs:
           tar -xf llvm-mingw-20250920-ucrt-ubuntu-22.04-x86_64.tar.xz  
           sudo mv llvm-mingw-20250920-ucrt-ubuntu-22.04-x86_64 /opt/llvm-mingw  
 
-      - name: Setup Android SDK
-        uses: android-actions/setup-android@v3
-
-      - name: Setup NDK
-        uses: nttld/setup-ndk@v1
-        id: ndk
-        with:
-         ndk-version: r28c
-         add-to-path: false
-         link-to-sdk: true
-
       - name: Building Wine tools (Native x86_64)  
         run: |  
           ./autogen.sh  
