@@ -106,13 +106,13 @@ jobs:
 
       - name: Compiling Wine for glibc (ARM64EC)  
         run: |  
-          export TOOLCHAIN="/usr/local/lib/android/sdk/ndk/28.2.13676358/toolchains/llvm/prebuilt/linux-x86_64/bin"
+          export TOOLCHAIN="$ANDROID_NDK_ROOT/toolchains/llvm/prebuilt/linux-x86_64/bin"
           export LLVM_MINGW_TOOLCHAIN="/opt/llvm-mingw/bin"
           export PATH="$LLVM_MINGW_TOOLCHAIN:$PATH"
           export deps="/data/data/com.termux/files/usr/glibc"
           export CC="$TOOLCHAIN/clang --target=aarch64-linux-gnu"
-          export AS=$CC
-          export CXX="$TOOLCHAIN/clang++ --aarch64-linux-gnu"
+          export AS="$CC"
+          export CXX="$TOOLCHAIN/clang++ --target=aarch64-linux-gnu"
           export PKG_CONFIG_LIBDIR=$deps/lib/pkgconfig:$deps/share/pkgconfig
           export CPPFLAGS="-I$deps/include"
           export LDFLAGS="-L$deps/lib"
