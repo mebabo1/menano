@@ -18,8 +18,8 @@ jobs:
 
       - name: Install the required deps
         run: |
-          # 1. 기존 충돌 패키지 강제 제거 및 클리닝
-          sudo apt-get purge -y llvm-18 clang-18 llvm-17 clang-17 llvm-16 clang-16
+          # 1. 충돌 패키지 정리
+          sudo apt-get purge -y llvm-18 clang-18 llvm-17 clang-17 llvm-16 clang-16 gcc-multilib g++-multilib
           sudo apt-get autoremove -y
           sudo apt-get update
 
@@ -27,20 +27,18 @@ jobs:
           sudo dpkg --add-architecture i386
           sudo apt-get update
 
-          # 3. 크로스 컴파일러 및 빌드 도구 설치 (버전 충돌 방지를 위해 명시적 설치)
-          # 'gcc-aarch64-linux-gnu' 대신 구체적인 버전을 포함하여 설치를 유도합니다.
+          # 3. 크로스 컴파일러와 32비트 라이브러리 병렬 설치 (multilib 제외)
+          # gcc-multilib 대신 필요한 32비트 헤더와 라이브러리를 직접 명시합니다.
           sudo apt install -y \
           build-essential \
-          gcc-13-aarch64-linux-gnu \
-          g++-13-aarch64-linux-gnu \
           gcc-aarch64-linux-gnu \
           g++-aarch64-linux-gnu \
-          gcc-multilib \
-          g++-multilib \
-          gettext lzma flex bison quilt unzip pkg-config
+          gettext lzma flex bison quilt unzip pkg-config \
+          libc6-dev-i386 \
+          lib32gcc-s1 \
+          lib32stdc++6
 
           # 4. Wine 빌드용 i386 라이브러리 설치
-          # 의존성 오류를 줄이기 위해 필수 라이브러리 위주로 먼저 설치합니다.
           sudo apt install -y \
           libx11-dev:i386 libvulkan-dev:i386 libfreetype6-dev:i386 \
           libxcursor-dev:i386 libxi-dev:i386 libxshmfence-dev:i386 \
@@ -49,7 +47,7 @@ jobs:
           libdbus-1-dev:i386 libncurses5-dev:i386 libsane-dev:i386 \
           libv4l-dev:i386 libgphoto2-dev:i386 liblcms2-dev:i386 \
           libcapi20-dev:i386 libcups2-dev:i386 libfontconfig1-dev:i386 \
-          libgsm1-dev:i386 libtiff5-dev:i386 libmpg123-dev:i386 \
+          libgsm1-dev:i386 libtiff-dev:i386 libmpg123-dev:i386 \
           libopenal-dev:i386 libldap2-dev:i386 libjpeg-dev:i386 \
           libdrm-dev:i386
 
