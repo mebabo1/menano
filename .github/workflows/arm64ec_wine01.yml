@@ -18,36 +18,46 @@ jobs:
 
       - name: Install the required deps
         run: |
-          # 1. 충돌을 일으키는 기존 LLVM 및 multilib 강제 제거 (청소)
-          sudo apt-get purge -y llvm-18 clang-18 llvm-17 clang-17 llvm-16 clang-16 gcc-multilib g++-multilib
-          sudo apt-get autoremove -y
-          sudo apt-get update
-
-          # 2. i386 아키텍처 추가
           sudo dpkg --add-architecture i386
           sudo apt-get update
-
-          # 3. 크로스 컴파일러와 32비트 호환 라이브러리 설치
-          # 핵심: gcc-multilib 대신 libc6-dev-i386을 설치하여 충돌을 피함
           sudo apt install -y \
           build-essential \
-          gcc-aarch64-linux-gnu \
-          g++-aarch64-linux-gnu \
-          libc6-dev-i386 \
-          gettext lzma flex bison quilt unzip pkg-config
-
-          # 4. Wine 빌드용 i386 라이브러리 설치 (최신 패키지명 반영)
-          sudo apt install -y \
-          libx11-dev:i386 libvulkan-dev:i386 libfreetype6-dev:i386 \
-          libxcursor-dev:i386 libxi-dev:i386 libxshmfence-dev:i386 \
-          libxxf86vm-dev:i386 libxrandr-dev:i386 libxinerama-dev:i386 \
-          libxcomposite-dev:i386 libglu1-mesa-dev:i386 libosmesa6-dev:i386 \
-          libdbus-1-dev:i386 libncurses5-dev:i386 libsane-dev:i386 \
-          libv4l-dev:i386 libgphoto2-dev:i386 liblcms2-dev:i386 \
-          libcapi20-dev:i386 libcups2-dev:i386 libfontconfig1-dev:i386 \
-          libgsm1-dev:i386 libtiff-dev:i386 libmpg123-dev:i386 \
-          libopenal-dev:i386 libldap2-dev:i386 libjpeg-dev:i386 \
+          lzma \
+          flex \
+          bison \
+          quilt \
+          unzip \
+          pkg-config \
+          libx11-dev:i386 \
+          libvulkan-dev:i386 \
+          libfreetype6-dev:i386 \
+          libxcursor-dev:i386 \
+          libxi-dev:i386 \
+          libxshmfence-dev:i386 \
+          libxxf86vm-dev:i386 \
+          libxrandr-dev:i386 \
+          libxinerama-dev:i386 \
+          libxcomposite-dev:i386 \
+          libglu1-mesa-dev:i386 \
+          libosmesa6-dev:i386 \
+          libdbus-1-dev:i386 \
+          libncurses5-dev:i386 \
+          libsane-dev:i386 \
+          libv4l-dev:i386 \
+          libgphoto2-dev:i386 \
+          liblcms2-dev:i386 \
+          libcapi20-dev:i386 \
+          libcups2-dev:i386 \
+          libfontconfig1-dev:i386 \
+          libgsm1-dev:i386 \
+          libtiff5-dev:i386 \
+          libmpg123-dev:i386 \
+          libopenal-dev:i386 \
+          libldap2-dev:i386 \
+          libjpeg-dev:i386 \
+          libdrm2:i386 \
           libdrm-dev:i386
+          sudo apt-get purge -y llvm-18 clang-18
 
       - name: Downloading and preparing glibc deps
         run: |
