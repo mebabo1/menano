@@ -129,26 +129,9 @@ jobs:
           --prefix=/usr \
           --enable-win64 \
           --disable-tests \
-          --without-vulkan \
-          --without-x \
           --without-wayland \
           --enable-wineandroid_drv=no \
-          --without-oss \
-          --without-alsa \
-          --without-cups \
-          --without-dbus \
-          --without-gphoto \
-          --without-sane \
-          --without-udev \
-          --without-v4l2 \
-          --without-xcomposite \
-          --without-xcursor \
-          --without-xinerama \
-          --without-xrandr \
-          --without-xrender \
-          --without-xshape \
-          --without-xshmfence \
-          --without-xxf86vm
+          --without-oss
           make -j$(nproc)  
           make install DESTDIR=$(pwd)/../compiled-files  
         continue-on-error: true  
