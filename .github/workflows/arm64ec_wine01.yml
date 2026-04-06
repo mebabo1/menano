@@ -15,49 +15,48 @@ jobs:
           repository: ziad9267/wine  
           ref: bleeding-edge  
 
-      - name: Install the required deps  
-        run: |  
-          sudo dpkg --add-architecture i386  
-          sudo apt-get update  
-          sudo apt install -y \  
-          build-essential \  
-          lzma \  
-          flex \  
-          bison \  
-          quilt \  
-          unzip \  
-          pkg-config \  
-          libx11-dev:i386 \  
-          libvulkan-dev:i386 \  
-          libfreetype6-dev:i386 \  
-          libxcursor-dev:i386 \  
-          libxi-dev:i386 \  
-          libxshmfence-dev:i386 \  
-          libxxf86vm-dev:i386 \  
-          libxrandr-dev:i386 \  
-          libxinerama-dev:i386 \  
-          libxcomposite-dev:i386 \  
-          libglu1-mesa-dev:i386 \  
-          libosmesa6-dev:i386 \  
-          libdbus-1-dev:i386 \  
-          libncurses5-dev:i386 \  
-          libsane-dev:i386 \  
-          libv4l-dev:i386 \  
-          libgphoto2-dev:i386 \  
-          liblcms2-dev:i386 \  
-          libcapi20-dev:i386 \  
-          libcups2-dev:i386 \  
-          libfontconfig1-dev:i386 \  
-          libgsm1-dev:i386 \  
-          libtiff5-dev:i386 \  
-          libmpg123-dev:i386 \  
-          libopenal-dev:i386 \  
-          libldap2-dev:i386 \  
-          libjpeg-dev:i386 \  
-          libdrm2:i386 \  
-          libdrm-dev:i386  
+      - name: Install the required deps
+        run: |
+          sudo dpkg --add-architecture i386
+          sudo apt-get update
+          sudo apt install -y \
+          build-essential \
+          lzma \
+          flex \
+          bison \
+          quilt \
+          unzip \
+          pkg-config \
+          libx11-dev:i386 \
+          libvulkan-dev:i386 \
+          libfreetype6-dev:i386 \
+          libxcursor-dev:i386 \
+          libxi-dev:i386 \
+          libxshmfence-dev:i386 \
+          libxxf86vm-dev:i386 \
+          libxrandr-dev:i386 \
+          libxinerama-dev:i386 \
+          libxcomposite-dev:i386 \
+          libglu1-mesa-dev:i386 \
+          libosmesa6-dev:i386 \
+          libdbus-1-dev:i386 \
+          libncurses5-dev:i386 \
+          libsane-dev:i386 \
+          libv4l-dev:i386 \
+          libgphoto2-dev:i386 \
+          liblcms2-dev:i386 \
+          libcapi20-dev:i386 \
+          libcups2-dev:i386 \
+          libfontconfig1-dev:i386 \
+          libgsm1-dev:i386 \
+          libtiff5-dev:i386 \
+          libmpg123-dev:i386 \
+          libopenal-dev:i386 \
+          libldap2-dev:i386 \
+          libjpeg-dev:i386 \
+          libdrm2:i386 \
+          libdrm-dev:i386
           sudo apt-get purge -y llvm-18 clang-18  
-
       - name: Downloading and preparing glibc deps  
         run: |  
           sudo mkdir -p /data/data/com.termux/files/usr  
