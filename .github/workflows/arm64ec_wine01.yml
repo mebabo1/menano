@@ -101,9 +101,9 @@ jobs:
           export LLVM_MINGW_TOOLCHAIN="/opt/llvm-mingw/bin"
           export PATH="$LLVM_MINGW_TOOLCHAIN:$PATH"
           export deps="/data/data/com.termux/files/usr/glibc"
-          export CC="$TOOLCHAIN/clang --target=aarch64-linux-android28"
+          export CC="$TOOLCHAIN/clang --target=aarch64-linux-gnu"
           export AS=$CC
-          export CXX="$TOOLCHAIN/clang++ --target=aarch64-linux-android28"
+          export CXX="$TOOLCHAIN/clang++ --target=aarch64-linux-gnu"
           export PKG_CONFIG_LIBDIR=$deps/lib/pkgconfig:$deps/share/pkgconfig
           export CPPFLAGS="-I$deps/include"
           export CFLAGS="-I$deps/include -Wno-declaration-after-statement -Wno-implicit-function-declaration -Wno-int-conversion"
