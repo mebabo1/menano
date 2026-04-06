@@ -89,17 +89,23 @@ jobs:
           ./autogen.sh  
           mkdir wine-tools-build  
           cd wine-tools-build  
-          ../configure --without-x --without-gstreamer --without-vulkan --without-wayland --without-freetype  
+          # --enable-win64를 추가하여 32비트 필수 체크를 우회합니다.
+          ../configure \
+            --enable-win64 \
+            --disable-win16 \
+            --without-x \
+            --without-gstreamer \
+            --without-vulkan \
+            --without-wayland \
+            --without-freetype \
+            --without-fontconfig
           make -j$(nproc) __tooldeps__  
           cd ..  
           mkdir wine-tools  
-          cp -r wine-tools-build/* ./wine-tools/  
+          cp -r wine-tools-build/* ./wine-tools/
 
       - name: Compiling Wine for glibc (ARM64EC)  
         run: |  
-          sudo apt-get update
-          sudo apt-get install -y gcc-multilib g++-multilib
-
           export TOOLCHAIN="/usr/local/lib/android/sdk/ndk/28.2.13676358/toolchains/llvm/prebuilt/linux-x86_64/bin"
           export LLVM_MINGW_TOOLCHAIN="/opt/llvm-mingw/bin"
           export PATH="$LLVM_MINGW_TOOLCHAIN:$PATH"
