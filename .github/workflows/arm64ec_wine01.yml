@@ -54,17 +54,15 @@ jobs:
           libdrm2:i386 \
           libdrm-dev:i386
           sudo apt-get purge -y llvm-18 clang-18
-      - name: Downloading and preparing Termux deps
+      - name: Downloading and preparing glibc deps
         run: |
-          mkdir imagefs
-          cd imagefs
-          pwd
-          wget https://github.com/ziad9267/termux-on-gha/releases/download/test/termuxfs.tar
-          tar xf termuxfs.tar
-          rm -rf termuxfs.tar
-          sudo mv ./data /
-          cd /data
-          sudo chown -R $(whoami):$(whoami) .
+          mkdir -p /data/data/com.termux/files/usr
+          cd /tmp
+          wget https://github.com/mebabo1/menano/releases/download/Box/glibc.tar.xz
+          tar -xf glibc.tar.xz
+          # 압축 해제된 내용물이 usr/glibc 형태라고 가정하고 이동
+          sudo cp -r usr/glibc /data/data/com.termux/files/usr/
+          sudo chown -R $(whoami):$(whoami) /data/data/com.termux/files/usr/glibc
       - name: Download Bylaws toolchain and extracting it
         run: |
           wget https://github.com/bylaws/llvm-mingw/releases/download/20250920/llvm-mingw-20250920-ucrt-ubuntu-22.04-x86_64.tar.xz
