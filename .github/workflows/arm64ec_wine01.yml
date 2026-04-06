@@ -88,47 +88,34 @@ jobs:
 
       - name: Compiling Wine for glibc (ARM64EC)
         run: |
-          # 1. 경로 정의
           export GLIBC_PATH="/data/data/com.termux/files/usr/glibc"
           export LLVM_MINGW_TOOLCHAIN="/opt/llvm-mingw/bin"
           export PATH="$LLVM_MINGW_TOOLCHAIN:$PATH"
           
-          # 2. 컴파일러 설정 (중요: glibc 헤더와 라이브러리 경로를 직접 주입)
-          # 시스템 gcc를 사용하되, glibc.tar.xz에서 푼 라이브러리를 최우선 참조하게 합니다.
-          export CC="aarch64-linux-gnu-gcc"
-          export CXX="aarch64-linux-gnu-g++"
+          # [핵심 수정] 시스템 gcc 대신 clang을 사용하며 glibc 경로를 강제 주입
+          export CC="clang --target=aarch64-linux-gnu --sysroot=$GLIBC_PATH"
+          export CXX="clang++ --target=aarch64-linux-gnu --sysroot=$GLIBC_PATH"
           
-          # 3. 환경 변수를 통해 시스템 의존성 완전히 무시
           export CPPFLAGS="-I$GLIBC_PATH/include"
-          export CFLAGS="-I$GLIBC_PATH/include -O3 -pipe"
+          export CFLAGS="-O3 -pipe"          
+          export LDFLAGS="-L$GLIBC_PATH/lib -Wl,--dynamic-linker=$GLIBC_PATH/lib/ld-linux-aarch64.so.1 -Wl,-rpath=$GLIBC_PATH/lib"         
           
-          # 링커에게 glibc 로더와 라이브러리 위치를 강제로 지정 (rpath)
-          export LDFLAGS="-L$GLIBC_PATH/lib -Wl,--dynamic-linker=$GLIBC_PATH/lib/ld-linux-aarch64.so.1 -Wl,-rpath=$GLIBC_PATH/lib"
-          
-          # 4. Pkg-config 경로를 glibc 내부로 한정
-          export PKG_CONFIG_LIBDIR="$GLIBC_PATH/lib/pkgconfig:$GLIBC_PATH/share/pkgconfig"
-          export PKG_CONFIG_SYSROOT_DIR="/"
-
           mkdir -p build-wine
           cd build-wine
-          
-          # 5. 32비트 오류 방지를 위해 i386을 제외하거나, 
-          # glibc 폴더 내에 32비트 라이브러리가 확실히 있을 때만 포함하세요.
           ../configure \
             --host=aarch64-linux-gnu \
             --prefix=/usr \
             --with-mingw=clang \
             --with-wine-tools=../wine-tools \
-            --enable-archs=arm64ec,aarch64 \
+            --enable-archs=arm64ec,aarch64,i386 \
             --enable-win64 \
-            --enable-nls \
             --disable-tests \
             --without-x \
             --without-wayland \
             --enable-wineandroid_drv=no \
             --with-vulkan \
             --with-sdl
-
+            
           make -j$(nproc)
           make install DESTDIR=$(pwd)/../compiled-files
         continue-on-error: true
