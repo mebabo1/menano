@@ -444,6 +444,7 @@ jobs:
           
           export i386_CC="i686-w64-mingw32-clang"
           export i386_CXX="i686-w64-mingw32-clang++"
+          export CC="clang --target=aarch64-linux-gnu"
 
           export PULSE_CFLAGS="-I$deps/include/pulse"
           export PULSE_LIBS="-L$deps/lib/pulseaudio -lpulse"
