@@ -91,6 +91,7 @@ jobs:
             libltdl-dev \
             libxcb1-dev \
             libx11-dev \
+            libvulkan-dev \
             librsvg2-bin \
             git gettext make automake autoconf pkg-config libtool gtk-doc-tools clang \
             dpkg-dev \
@@ -465,7 +466,7 @@ jobs:
             --with-mingw=clang \
             --enable-archs=arm64ec,aarch64,i386 \
             --with-wine-tools=/opt/wine64-native \
-            --without-vulkan \
+            --with-vulkan \
             --enable-win64 \
             --enable-nls \
             --without-pulse \
