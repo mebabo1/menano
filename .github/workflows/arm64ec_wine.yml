@@ -596,8 +596,20 @@ jobs:
               fi
           done
 
-          
-
+          echo "=== 修复 ntdll.so 运行路径 (Symbolic Links) ==="          
+          # 1. 실제 ntdll.so 파일이 빌드 디렉토리에 있는지 확인 후 복사 (없을 경우를 대비)
+          if [ ! -f "$TARGET_PREFIX/lib/wine/aarch64-unix/ntdll.so" ]; then
+              NTDLL_PATH=$(find "$BUILD_DIR" -name "ntdll.so" -type f | grep "aarch64-unix" | head -1)
+              if [ -n "$NTDLL_PATH" ]; then
+                  cp -v "$NTDLL_PATH" "$TARGET_PREFIX/lib/wine/aarch64-unix/"
+              fi
+          fi
+          # 2. 에러 메시지 대응: bin 폴더에서 직접 ntdll.so를 찾을 수 있도록 링크
+          ln -sf ../lib/wine/aarch64-unix/ntdll.so "$TARGET_PREFIX/bin/ntdll.so"          
+          # 3. 표준 경로 대응: lib 폴더 바로 아래에도 링크
+          ln -sf wine/aarch64-unix/ntdll.so "$TARGET_PREFIX/lib/ntdll.so"          
+          echo "✓ ntdll.so 심볼릭 링크 생성 완료"
+         
           echo "=== 验证 bin 目录关键文件 ==="
           ls -la "$BIN_DIR"
           for required in wine wineserver wineboot; do
