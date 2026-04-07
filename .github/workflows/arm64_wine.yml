@@ -549,31 +549,7 @@ jobs:
           echo "Wine 版本: $WINE_VERSION_ACTUAL"
           echo "纯版本号: $PURE_VERSION"
           echo "主版本: $VERSION_MAJOR, 次版本: $VERSION_MINOR"
-          
-          # 判断版本是否 >= 9.10
-          if [ "$VERSION_MAJOR" -gt 9 ] || [ "$VERSION_MAJOR" -eq 9 -a "$VERSION_MINOR" -ge 10 ]; then
-            echo "使用 9.10+ 版本的修复方式 (wine_do_not_create_dxgi_manager2.patch)"
-            wget https://github.com/afeimod/linbox/raw/main/path/wine_do_not_create_dxgi_manager2.patch
-            if [ -f "dlls/mfplat/main.c" ]; then
-              echo "找到目标文件 dlls/mfplat/main.c，准备应用补丁..."
-              if patch -p1 < wine_do_not_create_dxgi_manager2.patch; then
-                echo "✅ 补丁应用成功"
-              else
-                echo "❌ 补丁应用失败"
-                exit 1
-              fi
-            else
-              echo "❌ 错误：目标文件 dlls/mfplat/main.c 不存在"
-              exit 1
-            fi
-          else
-            echo "使用 9.10 以下版本的修复方式 (fix_wine9.2_mfplat.sh)"
-            wget -O fix_wine9.2_mfplat.sh https://github.com/afeimod/linbox/raw/main/path/fix_wine9.2_mfplat.sh
-            chmod +x fix_wine9.2_mfplat.sh
-            ./fix_wine9.2_mfplat.sh
-            echo "✅ 9.10 以下版本修复完成"
-          fi
-          
+                   
           # 配置和构建真正的 WOW64 Wine
           mkdir -p build-wow64
           cd build-wow64
