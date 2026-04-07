@@ -481,7 +481,6 @@ jobs:
             --with-wine64=${{ env.WINE64_DIR }}/amd64 \
             --enable-tools \
             --with-vulkan \
-            --enable-win64 \
             --enable-nls \
             --without-pulse \
             --without-ffmpeg \
