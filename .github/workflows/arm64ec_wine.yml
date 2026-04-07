@@ -373,7 +373,9 @@ jobs:
             --enable-win64 \
             --enable-nls \
             --with-pulse \
+            --without-ffmpeg \
             --disable-win16 \
+            --without-gstreamer \
             --disable-opencl \
             --without-alsa \
             --disable-tests \
