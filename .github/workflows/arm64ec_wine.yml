@@ -574,25 +574,32 @@ jobs:
           mkdir -p "$BIN_DIR"
 
           # 需要的关键程序列表（包括 wineboot, winecfg, regedit, wineconsole 等）
+          echo "=== 补全关键程序文件 (Safe Version) ==="
+          BIN_DIR="$TARGET_PREFIX/bin"
+          mkdir -p "$BIN_DIR"
           PROGRAMS="wine wineserver wineboot winecfg regedit"
           for prog in $PROGRAMS; do
               if [ -f "$BIN_DIR/$prog" ]; then
                   echo "文件 $BIN_DIR/$prog 已存在"
                   continue
               fi
-              # 优先从 programs/ 子目录查找（用户态程序）
               found=""
-              if [[ "$prog" != "wine" && "$prog" != "wineserver" ]]; then
-                  found=$(find "$BUILD_DIR/programs" -type f -name "$prog" -executable 2>/dev/null | head -1)
+              if [ "$prog" = "wine" ] || [ "$prog" = "wineserver" ]; then
+                  found=$(find "$BUILD_DIR" -type f -name "$prog" | grep -E "loader/wine$|server/wineserver$" | head -1)
               fi
               if [ -z "$found" ]; then
-                  # 全目录搜索（包括 loader/ 等）
-                  found=$(find "$BUILD_DIR" -type f -name "$prog" -executable 2>/dev/null | head -1)
+                  found=$(find "$BUILD_DIR/programs" -type f -name "$prog" | head -1)
+              fi
+              if [ -z "$found" ]; then
+                  found=$(find "$BUILD_DIR" -type f -name "$prog" | head -1)
               fi
               if [ -n "$found" ]; then
+                  echo "Found $prog at $found, copying..."
                   cp -v "$found" "$BIN_DIR/"
+                  chmod +x "$BIN_DIR/$prog"
               else
-                  echo "错误: 完全未找到 $prog"
+                  echo "❌ 错误: 完全未找到 $prog""
+                  ls -R "$BUILD_DIR/programs" | grep "$prog" || echo "해당 파일 없음"
                   exit 1
               fi
           done
