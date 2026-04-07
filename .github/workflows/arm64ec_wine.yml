@@ -193,32 +193,21 @@ jobs:
               fi
               ;;
             staging)
-              echo "处理 Staging 分支"
+              echo "Staging"
               git clone https://github.com/afeimod/wine-arm.git source
               cd source
               git config advice.detachedHead false
               if [ "$WINE_VERSION" != "latest" ]; then
-                git checkout "$WINE_VERSION"
+                git checkout "wine-$WINE_VERSION"
               fi
               WINE_VERSION_ACTUAL=$(git describe --tags --abbrev=0 2>/dev/null || echo "$WINE_VERSION")
-              PURE_VERSION=$(echo "$WINE_VERSION_ACTUAL" | sed 's/^wine-//')
-              STAGING_VERSION="v${PURE_VERSION}"
-              wget -O "wine-staging-${PURE_VERSION}.tar.gz" "https://github.com/wine-staging/wine-staging/archive/refs/tags/${STAGING_VERSION}.tar.gz" || \
-              wget -O "wine-staging-${PURE_VERSION}.tar.gz" "https://github.com/wine-staging/wine-staging/archive/refs/tags/v${PURE_VERSION}.tar.gz"
-              if [ -f "wine-staging-${PURE_VERSION}.tar.gz" ]; then
-                tar -xzf "wine-staging-${PURE_VERSION}.tar.gz"
-                STAGING_DIR=$(find . -maxdepth 1 -type d -name "*staging*" | head -1)
-                if [ -n "$STAGING_DIR" ] && [ -d "$STAGING_DIR/staging" ]; then
-                  cd "$STAGING_DIR/staging"
-                  chmod +x patchinstall.py
-                  ./patchinstall.py --all --destdir=../../
-                  cd ../..
-                else
-                  echo "警告: 未找到 staging 补丁目录，跳过补丁应用"
-                fi
-              else
-                echo "警告: 无法下载 staging 补丁，继续构建无补丁版本"
+              ;;
+              cd source
+              git config advice.detachedHead false
+              if [ "$WINE_VERSION" != "latest" ]; then
+                git checkout "wine-$WINE_VERSION"
               fi
+              WINE_VERSION_ACTUAL=$(git describe --tags --abbrev=0 2>/dev/null || echo "$WINE_VERSION")
               ;;
             proton)
               echo "Processing Proton branch"
