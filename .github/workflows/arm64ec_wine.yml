@@ -467,6 +467,8 @@ jobs:
           export CXXFLAGS="-O3 -pipe"
           export CROSSCFLAGS="-O3 -pipe"
           export CROSSCXXFLAGS="-O3 -pipe"
+          export CROSSCC="arm64ec-w64-mingw32-clang"
+          export CROSSCXX="arm64ec-w64-mingw32-clang++
           
           export i386_CC="i686-w64-mingw32-clang"
           export i386_CXX="i686-w64-mingw32-clang++"
