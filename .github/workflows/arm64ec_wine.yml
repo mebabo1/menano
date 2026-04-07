@@ -479,6 +479,7 @@ jobs:
             --enable-archs=arm64ec,aarch64,i386 \
             --with-wine-tools=/opt/wine64-native \
             --with-wine64=${{ env.WINE64_DIR }}/amd64 \
+            --enable-tools \
             --with-vulkan \
             --enable-win64 \
             --enable-nls \
