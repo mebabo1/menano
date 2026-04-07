@@ -598,7 +598,7 @@ jobs:
                   cp -v "$found" "$BIN_DIR/"
                   chmod +x "$BIN_DIR/$prog"
               else
-                  echo "❌ 错误: 完全未找到 $prog""
+                  echo "❌ 错误: 完全未找到 $prog"
                   ls -R "$BUILD_DIR/programs" | grep "$prog" || echo "해당 파일 없음"
                   exit 1
               fi
