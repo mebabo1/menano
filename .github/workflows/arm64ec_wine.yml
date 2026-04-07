@@ -270,6 +270,12 @@ jobs:
             ./autogen.sh
           fi
 
+      - name: 1. 32비트 빌드 환경 준비 (wine-tools용)
+        run: |
+          sudo dpkg --add-architecture i386
+          sudo apt-get update
+          sudo apt-get install -y gcc-multilib g++-multilib libc6-dev-i386 build-essential
+
       # ------------------------------------------------------------
       # 9. 构建 native wine64（严格模仿成功示例，并备份完整 nls 目录）
       # ------------------------------------------------------------
@@ -281,8 +287,6 @@ jobs:
           cd ${{ env.WINE64_DIR }}
           mkdir -p amd64
           cd amd64
-          export ac_cv_prog_cc_c99=yes
-          export ac_cv_prog_cc_works=yes
           ../source/configure \
             --disable-tests \
             --without-x \
