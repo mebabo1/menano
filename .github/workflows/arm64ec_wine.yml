@@ -670,14 +670,6 @@ jobs:
             - **Host Architecture**: ARM64 (aarch64)
             - **Target Windows Architectures**: i386, x86_64, arm64ec (via WOW64 emulation)
 
-            ✓ Supports running 32-bit and 64-bit Windows applications
-            ✓ Vulkan rendering
-            ✓ GStreamer multimedia backend
-            ✓ Chinese locale support
-            ✓ Applied critical patches for improved compatibility
-            ✓ Includes complete runtime files: wine.inf, wineboot, wineserver, and all required components
-            After extraction, place the `${{ env.BUILD_NAME }}` directory in an appropriate location in Termux (recommended: `/data/data/com.termux/files/usr/glibc`) and configure the required environment variables.
-
             - Build Time: ${{ github.event.head_commit.timestamp }}
             - Commit: ${{ github.sha }}
             - Workflow: ${{ github.workflow }}
