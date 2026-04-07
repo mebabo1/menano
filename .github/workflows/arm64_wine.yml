@@ -498,12 +498,7 @@ jobs:
             WINE_VERSION_ACTUAL=$(git describe --tags --abbrev=0 2>/dev/null || echo "$WINE_VERSION")
             COMMIT_HASH=$(git rev-parse --short HEAD)
             BUILD_NAME="wine-${WINE_VERSION_ACTUAL}-${COMMIT_HASH}-vanilla-wow64"
-            
-          else
-            echo "未知的 Wine 分支: $WINE_BRANCH"
-            exit 1
-          fi
-            
+                        
           elif [ "$WINE_BRANCH" = "vanilla" ]; then
             # 原有的 vanilla 分支处理
             echo "处理 Vanilla 分支"
