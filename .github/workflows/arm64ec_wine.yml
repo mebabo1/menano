@@ -634,14 +634,12 @@ jobs:
       # ------------------------------------------------------------
       - name: 准备打包
         run: |
-          PACKAGE_NAME="${{ env.BUILD_NAME }}"
-          mkdir -p wine-package/$PACKAGE_NAME
-          cp -r /tmp/wine-install-wow64/* wine-package/$PACKAGE_NAME/
+          mkdir -p wine-package/wine 
+          cp -r /tmp/wine-install-wow64/* wine-package/wine/
 
       - name: 创建打包文件
         run: |
-          PACKAGE_NAME="${{ env.BUILD_NAME }}"
-          tar -cJf $PACKAGE_NAME.tar.xz -C wine-package $PACKAGE_NAME
+          tar -cJf ${{ env.BUILD_NAME }}.tar.xz -C wine-package wine
           ls -lh *.tar.xz
 
       - name: Generate checksums
