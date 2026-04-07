@@ -485,7 +485,7 @@ jobs:
           elif [ "$WINE_BRANCH" = "staging" ]; then
             # 原有的 staging 分支处理
             echo "处理 Staging 分支"
-            git clone https://github.com/afeimod/wine-arm.git wine
+            git clone https://github.com/wine-mirror/wine.git wine
             SOURCE_DIR="wine"
             cd "$SOURCE_DIR"
             
@@ -497,65 +497,12 @@ jobs:
             fi
             WINE_VERSION_ACTUAL=$(git describe --tags --abbrev=0 2>/dev/null || echo "$WINE_VERSION")
             COMMIT_HASH=$(git rev-parse --short HEAD)
-            BUILD_NAME="wine-${WINE_VERSION_ACTUAL}-${COMMIT_HASH}-staging-wow64"
+            BUILD_NAME="wine-${WINE_VERSION_ACTUAL}-${COMMIT_HASH}-vanilla-wow64"
             
-            # 修复：从 wine-X.Y 格式中提取纯版本号
-            PURE_VERSION=$(echo "$WINE_VERSION_ACTUAL" | sed 's/^wine-//')
-            echo "提取的纯版本号: $PURE_VERSION"
-            
-            # 使用正确的版本格式：vX.Y 而不是 wine-X.Y
-            STAGING_VERSION="v${PURE_VERSION}"
-            echo "尝试下载 staging 补丁版本: $STAGING_VERSION"
-            
-            # 下载并应用 staging 补丁 - 修复版本格式
-            wget -O "wine-staging-${PURE_VERSION}.tar.gz" "https://github.com/wine-staging/wine-staging/archive/refs/tags/${STAGING_VERSION}.tar.gz" || \
-            wget -O "wine-staging-${PURE_VERSION}.tar.gz" "https://github.com/wine-staging/wine-staging/archive/refs/tags/v${PURE_VERSION}.tar.gz"
-            
-            if [ -f "wine-staging-${PURE_VERSION}.tar.gz" ]; then
-              tar -xzf "wine-staging-${PURE_VERSION}.tar.gz"
-              
-              # 应用 staging 补丁 - 修复目录名检查逻辑
-              echo "查找解压后的 staging 目录..."
-              ls -la
-              
-              # 根据 build-wine-test.yml 的正确逻辑
-              if [ -d "wine-staging-${PURE_VERSION}" ]; then
-                echo "找到目录: wine-staging-${PURE_VERSION}"
-                cd "wine-staging-${PURE_VERSION}/staging"
-                chmod +x patchinstall.py
-                ./patchinstall.py --all --destdir=../../
-                cd "../.."
-              elif [ -d "wine-staging-v${PURE_VERSION}" ]; then
-                echo "找到目录: wine-staging-v${PURE_VERSION}"
-                cd "wine-staging-v${PURE_VERSION}/staging"
-                chmod +x patchinstall.py
-                ./patchinstall.py --all --destdir=../../
-                cd "../.."
-              elif [ -d "wine-staging-${STAGING_VERSION}" ]; then
-                echo "找到目录: wine-staging-${STAGING_VERSION}"
-                cd "wine-staging-${STAGING_VERSION}/staging"
-                chmod +x patchinstall.py
-                ./patchinstall.py --all --destdir=../../
-                cd "../.."
-              else
-                echo "警告: 未找到预期的 staging 目录结构，尝试自动查找..."
-                # 尝试查找任何包含 staging 的目录
-                STAGING_DIR=$(find . -maxdepth 1 -type d -name "*staging*" | head -1)
-                if [ -n "$STAGING_DIR" ] && [ -d "$STAGING_DIR/staging" ]; then
-                  echo "找到 staging 目录: $STAGING_DIR"
-                  cd "$STAGING_DIR/staging"
-                  chmod +x patchinstall.py
-                  ./patchinstall.py --all --destdir=../../
-                  cd "../.."
-                else
-                  echo "❌ 错误：无法找到 staging 补丁目录，跳过补丁应用"
-                  echo "当前目录内容:"
-                  ls -la
-                fi
-              fi
-            else
-              echo "警告: 无法下载 staging 补丁，继续构建无补丁版本"
-            fi
+          else
+            echo "未知的 Wine 分支: $WINE_BRANCH"
+            exit 1
+          fi
             
           elif [ "$WINE_BRANCH" = "vanilla" ]; then
             # 原有的 vanilla 分支处理
