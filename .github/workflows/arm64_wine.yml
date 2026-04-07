@@ -560,7 +560,7 @@ jobs:
           elif [ "$WINE_BRANCH" = "vanilla" ]; then
             # 原有的 vanilla 分支处理
             echo "处理 Vanilla 分支"
-            git clone https://github.com/afeimod/wine-arm.git wine
+            git clone https://github.com/wine-mirror/wine.git wine
             SOURCE_DIR="wine"
             cd "$SOURCE_DIR"
             
