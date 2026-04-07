@@ -493,7 +493,7 @@ jobs:
             git config advice.detachedHead false
             
             if [ "$WINE_VERSION" != "latest" ]; then
-              git checkout "wine-$WINE_VERSION"
+              git checkout "$WINE_VERSION"
             fi
             WINE_VERSION_ACTUAL=$(git describe --tags --abbrev=0 2>/dev/null || echo "$WINE_VERSION")
             COMMIT_HASH=$(git rev-parse --short HEAD)
@@ -515,7 +515,7 @@ jobs:
             git config advice.detachedHead false
             
             if [ "$WINE_VERSION" != "latest" ]; then
-              git checkout "wine-$WINE_VERSION"
+              git checkout "$WINE_VERSION"
             fi
             WINE_VERSION_ACTUAL=$(git describe --tags --abbrev=0 2>/dev/null || echo "$WINE_VERSION")
             COMMIT_HASH=$(git rev-parse --short HEAD)
