@@ -438,6 +438,7 @@ jobs:
           export deps="/data/data/com.termux/files/usr"
           export depsg="/data/data/com.termux/files/usr/glibc"
           export PKG_CONFIG_LIBDIR=/usr/lib/aarch64-linux-gnu/pkgconfig
+          export PKG_CONFIG_PATH=/usr/lib/aarch64-linux-gnu/pkgconfig
           export CFLAGS="-O3 -pipe -Wno-declaration-after-statement -Wno-implicit-function-declaration -Wno-int-conversion"
           export CXXFLAGS="-O3 -pipe"
           export CROSSCFLAGS="-O3 -pipe"
