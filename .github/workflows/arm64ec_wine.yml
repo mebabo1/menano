@@ -357,14 +357,14 @@ jobs:
       # ------------------------------------------------------------
       # 8. 生成 configure 脚本
       # ------------------------------------------------------------
-      - name: 生成 configure 脚本
+      - name: configure
         run: |
           cd ${{ env.WINE_SOURCE_DIR }}/source
           if [ ! -f "configure" ]; then
             ./autogen.sh
           fi
 
-      - name: 1. 32비트 빌드 환경 준비 (wine-tools용)
+      - name: wine-tools
         run: |
           sudo dpkg --add-architecture i386
           sudo apt-get update
