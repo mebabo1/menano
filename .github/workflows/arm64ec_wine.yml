@@ -516,7 +516,6 @@ jobs:
             --without-wayland \
             --without-xinerama \
             --without-xxf86vm \
-            i386_CC="clang -target i686-windows" \
             --enable-wineandroid_drv=no
             
           make -j$(nproc) > /dev/null
