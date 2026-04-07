@@ -444,10 +444,6 @@ jobs:
           
           export i386_CC="i686-w64-mingw32-clang"
           export i386_CXX="i686-w64-mingw32-clang++"
-          export arm64ec_CFLAGS="-D_ARM64EC_ -march=armv8-a"
-          export arm64ec_CROSSCFLAGS="-march=armv8-a"
-          export aarch64_CFLAGS="-march=armv8-a"
-          export aarch64_CROSSCFLAGS="-march=armv8-a"
 
           export PULSE_CFLAGS="-I$deps/include/pulse"
           export PULSE_LIBS="-L$deps/lib/pulseaudio -lpulse"
