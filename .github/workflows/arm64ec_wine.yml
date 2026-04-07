@@ -380,7 +380,7 @@ jobs:
             --with-vulkan \
             --enable-win64 \
             --enable-nls \
-            --with-pulse \
+            --without-pulse \
             --without-ffmpeg \
             --disable-win16 \
             --without-gstreamer \
