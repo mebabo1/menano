@@ -274,7 +274,7 @@ jobs:
         run: |
           sudo dpkg --add-architecture i386
           sudo apt-get update
-          sudo apt-get install -y gcc-multilib g++-multilib libc6-dev-i386 build-essential
+          sudo apt-get install -y gcc-multilib g++-multilib libc6-dev-i386 libfreetype6-dev:i386 build-essential
 
       # ------------------------------------------------------------
       # 9. 构建 native wine64（严格模仿成功示例，并备份完整 nls 目录）
