@@ -397,16 +397,7 @@ jobs:
             --without-wayland \
             --without-xinerama \
             --without-xxf86vm \
-            --enable-wineandroid_drv=no \
-            host_alias=aarch64-linux-gnu \
-            build_alias=x86_64-linux-gnu \
-            CC="aarch64-linux-gnu-gcc" \
-            CXX="aarch64-linux-gnu-g++" \
-            LD="aarch64-linux-gnu-ld" \
-            AR="aarch64-linux-gnu-ar" \
-            NM="aarch64-linux-gnu-nm" \
-            STRIP="aarch64-linux-gnu-strip" \
-            RANLIB="aarch64-linux-gnu-ranlib" 
+            --enable-wineandroid_drv=no
             
           make -j$(nproc) > /dev/null
           make install
