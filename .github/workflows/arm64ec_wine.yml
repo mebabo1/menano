@@ -198,7 +198,7 @@ jobs:
               cd source
               git config advice.detachedHead false
               if [ "$WINE_VERSION" != "latest" ]; then
-                git checkout "wine-$WINE_VERSION"
+                git checkout "$WINE_VERSION"
               fi
               WINE_VERSION_ACTUAL=$(git describe --tags --abbrev=0 2>/dev/null || echo "$WINE_VERSION")
               ;;
@@ -222,7 +222,7 @@ jobs:
               fi
 
               if [ "$WINE_VERSION" != "latest" ]; then
-                git checkout "wine-$WINE_VERSION" 2>/dev/null || echo "wine-$WINE_VERSION not found, staying on commit"
+                git checkout "$WINE_VERSION" 2>/dev/null || echo "wine-$WINE_VERSION not found, staying on commit"
               fi
 
               COMMIT_HASH=$(git rev-parse --short HEAD)
