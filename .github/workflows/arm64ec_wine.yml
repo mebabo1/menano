@@ -291,7 +291,6 @@ jobs:
             --disable-tests \
             --without-x \
             --without-gstreamer \
-            --without-vulkan \
             --without-wayland
           make __tooldeps__ -j$(nproc) > /dev/null
           echo "构建 NLS 目录..."
@@ -353,9 +352,9 @@ jobs:
           export deps="/data/data/com.termux/files/usr"
           export depsg="/data/data/com.termux/files/usr/glibc"
           export PKG_CONFIG_LIBDIR=/usr/lib/aarch64-linux-gnu/pkgconfig
-          export CFLAGS="-O3 -pipe"
+          export CFLAGS="-O3 -D_ARM64EC_ -Wno-implicit-function-declaration"
           export CXXFLAGS="-O3 -pipe"
-          export CROSSCFLAGS="-O3 -pipe"
+          export CROSSCFLAGS="-O3 -march=armv8-a"
           export CROSSCXXFLAGS="-O3 -pipe"
 
           export PULSE_CFLAGS="-I$deps/include/pulse"
@@ -377,7 +376,7 @@ jobs:
             --with-mingw=clang \
             --enable-archs=arm64ec,aarch64,i386 \
             --with-wine-tools=/opt/wine64-native \
-            --without-vulkan \
+            --with-vulkan \
             --enable-win64 \
             --enable-nls \
             --without-pulse \
