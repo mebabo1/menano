@@ -604,30 +604,23 @@ jobs:
 
       - name: 准备打包
         run: |
-          # 创建打包目录
-          PACKAGE_NAME="${{ env.BUILD_NAME }}"
-          mkdir -p wine-package/$PACKAGE_NAME
-          
-          # 复制 Wine 安装文件
-          echo "复制 Wine 文件到 $PACKAGE_NAME..."
-          cp -r /tmp/wine-install-wow64/* wine-package/$PACKAGE_NAME/
+          mkdir -p wine-package/wine
+          echo "复制 Wine 文件到 wine-package/wine..."
+          cp -r /tmp/wine-install-wow64/* wine-package/wine/
 
       - name: 创建打包文件
         run: |
           PACKAGE_NAME="${{ env.BUILD_NAME }}"
           
-          echo "最终文件结构:"
-          find wine-package -type f | sort | head -20
+          echo "最终文件结构"
+          ls -R wine-package | head -n 20
+          tar -cJf $PACKAGE_NAME.tar.xz -C wine-package wine
           
-          # 使用 tar.xz 格式打包
-          tar -cJf $PACKAGE_NAME.tar.xz -C wine-package $PACKAGE_NAME
-          
-          echo "打包完成:"
+          echo "打包完成: $PACKAGE_NAME.tar.xz"
           ls -lh *.tar.xz
 
       - name: Generate checksums
         run: |
-          cd $GITHUB_WORKSPACE
           sha256sum *.tar.xz > checksums.txt
           cat checksums.txt
 
