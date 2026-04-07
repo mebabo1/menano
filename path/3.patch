@@ -1,18 +1,45 @@
---- a/configure.ac
-+++ b/configure.ac
-@@ -3262,7 +3262,13 @@
- WINE_CONFIG_MAKEFILE(dlls/wbemdisp)
- WINE_CONFIG_MAKEFILE(dlls/wbemdisp/tests)
- WINE_CONFIG_MAKEFILE(dlls/wbemprox)
- WINE_CONFIG_MAKEFILE(dlls/wbemprox/tests)
--WINE_CONFIG_MAKEFILE(dlls/wdscore)
-+dnl ARM64EC linker cannot handle the C++ mangled stub symbols in wdscore
-+case " $cross_archs " in
-+  *\ arm64ec\ *)
-+    WINE_IGNORE_FILE(dlls/wdscore) ;;
-+  *)
-+    WINE_CONFIG_MAKEFILE(dlls/wdscore) ;;
-+esac
- WINE_CONFIG_MAKEFILE(dlls/webservices)
- WINE_CONFIG_MAKEFILE(dlls/webservices/tests)
- WINE_CONFIG_MAKEFILE(dlls/websocket)
+diff --git a/include/winnt.h b/include/winnt.h
+index e8a47fec963d..80329281ea4b 100644
+--- a/include/winnt.h
++++ b/include/winnt.h
+@@ -1473,6 +1473,10 @@ typedef struct _KNONVOLATILE_CONTEXT_POINTERS
+ #define XSTATE_MASK_LEGACY                  (XSTATE_MASK_LEGACY_FLOATING_POINT | XSTATE_MASK_LEGACY_SSE)
+ #define XSTATE_MASK_GSSE                    (1 << XSTATE_GSSE)
+
++#define XSTATE_ARM64_SVE 2
++
++#define XSTATE_MASK_ARM64_SVE (1 << XSTATE_ARM64_SVE)
++
+ typedef struct _XSTATE_FEATURE
+ {
+     ULONG Offset;
+@@ -1513,6 +1517,13 @@ typedef struct _XSAVE_AREA_HEADER
+ }
+ XSAVE_AREA_HEADER, *PXSAVE_AREA_HEADER;
+
++typedef struct _XSAVE_ARM64_SVE_HEADER {
++    ULONG VectorLength;
++    ULONG VectorRegisterOffset;
++    ULONG PredicateRegisterOffset;
++    ULONG Reserved[5];
++} XSAVE_ARM64_SVE_HEADER, *PXSAVE_ARM64_SVE_HEADER;
++
+ typedef struct _YMMCONTEXT
+ {
+     M128A Ymm0;
+@@ -1693,6 +1704,7 @@ typedef struct _KNONVOLATILE_CONTEXT_POINTERS
+ #define CONTEXT_ARM64_FLOATING_POINT  (CONTEXT_ARM64 | 0x00000004)
+ #define CONTEXT_ARM64_DEBUG_REGISTERS (CONTEXT_ARM64 | 0x00000008)
+ #define CONTEXT_ARM64_X18       (CONTEXT_ARM64 | 0x00000010)
++#define CONTEXT_ARM64_XSTATE    (CONTEXT_ARM64 | 0x00000020)
+ #define CONTEXT_ARM64_FULL (CONTEXT_ARM64_CONTROL | CONTEXT_ARM64_INTEGER | CONTEXT_ARM64_FLOATING_POINT)
+ #define CONTEXT_ARM64_ALL  (CONTEXT_ARM64_FULL | CONTEXT_ARM64_DEBUG_REGISTERS | CONTEXT_ARM64_X18)
+
+@@ -1972,6 +1984,7 @@ typedef struct DECLSPEC_ALIGN(16) _ARM64EC_NT_CONTEXT
+ #define CONTEXT_INTEGER CONTEXT_ARM64_INTEGER
+ #define CONTEXT_FLOATING_POINT CONTEXT_ARM64_FLOATING_POINT
+ #define CONTEXT_DEBUG_REGISTERS CONTEXT_ARM64_DEBUG_REGISTERS
++#define CONTEXT_XSTATE CONTEXT_ARM64_XSTATE
+ #define CONTEXT_FULL CONTEXT_ARM64_FULL
+ #define CONTEXT_ALL CONTEXT_ARM64_ALL
+ #define CONTEXT_RET_TO_GUEST CONTEXT_ARM64_RET_TO_GUEST
