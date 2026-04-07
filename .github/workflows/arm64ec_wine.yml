@@ -303,30 +303,6 @@ jobs:
             sed -i 's/xtajit\.dll/libwow64fex.dll/g' "$INF"
           fi
 
-          # 5. FEX YMM State 대응 (unwind.h)
-          FILE="dlls/ntdll/unwind.h"
-          if [ -f "$FILE" ] && ! grep -q 'CONTEXT_ARM64_FEX_YMMSTATE' "$FILE"; then
-            echo "Patching unwind flags for FEX YMM state..."
-            sed -i '/ctx_flags_x64_to_arm/,/}/ {
-              /CONTEXT_AMD64_FLOATING_POINT/ s/$/\n          if (flags \& CONTEXT_AMD64_XSTATE) ret |= CONTEXT_ARM64_FEX_YMMSTATE;/
-            }' "$FILE"
-            sed -i '/ctx_flags_arm_to_x64/,/}/ {
-              /CONTEXT_ARM64_FLOATING_POINT/ s/$/\n          if (flags \& CONTEXT_ARM64_FEX_YMMSTATE) ret |= CONTEXT_AMD64_XSTATE;/
-            }' "$FILE"
-          fi
-
-          # 6. winnt.h FEX 플래그 정의 추가
-          FILE="include/winnt.h"
-          if [ -f "$FILE" ] && ! grep -q 'CONTEXT_ARM64_FEX_YMMSTATE' "$FILE"; then
-            echo "Patching winnt.h to match FEX diff..."
-            sed -i 's|InterlockedOr(&dummy, 0)|_InterlockedOr((long volatile *)\&dummy, 0)|g' "$FILE"
-            sed -i 's/^#define CONTEXT_ARM64_X18.*/#define CONTEXT_ARM64_X18             (CONTEXT_ARM64 | 0x00000010)/' "$FILE"
-            if ! grep -q 'CONTEXT_ARM64_XSTATE' "$FILE"; then
-              sed -i '/CONTEXT_ARM64_X18/a #define CONTEXT_ARM64_XSTATE          (CONTEXT_ARM64 | 0x00000020)' "$FILE"
-            fi
-            sed -i '/CONTEXT_ARM64_XSTATE/a #define CONTEXT_ARM64_FEX_YMMSTATE   (CONTEXT_ARM64 | 0x00000040)' "$FILE"
-          fi
-
           # 8. Vulkan VRAM Faking 적용
           FILE="dlls/winevulkan/vulkan.c"
           if [ -f "$FILE" ] && ! grep -q 'WINE_VRAM_SIZE' "$FILE" ; then
