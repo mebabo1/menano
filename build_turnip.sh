@@ -60,6 +60,7 @@ meson setup builddir \
     -Dglvnd=enabled \
     -Dllvm=enabled \
     -Dshared-llvm=enabled \
+    -Dzstd=enabled \
     -Dvideo-codecs=all \
     -Dgallium-extra-hud=true \
     -Dc_args="-march=armv8-a+crc+crypto" \
