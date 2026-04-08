@@ -475,7 +475,6 @@ jobs:
             --enable-archs=i386,arm64ec \
             --with-wine-tools=/opt/wine64-native \
             --with-wine64=${{ env.WINE64_DIR }}/amd64 \
-            --enable-tools \
             --with-vulkan \
             --enable-nls \
             --without-pulse \
@@ -506,8 +505,6 @@ jobs:
             --without-xinerama \
             --without-xxf86vm
             
-          make dlls/stdole2.tlb -j$(nproc)
-          make dlls/stdole32.tlb -j$(nproc)
           make -j$(nproc) > /dev/null
           make install
 
