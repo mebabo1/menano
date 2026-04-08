@@ -329,12 +329,6 @@ jobs:
             fi
           fi
 
-          FILE="dlls/ntdll/unix/loader.c"
-          if ! grep -q '/aarch64-windows' "$FILE"; then
-            echo "Patching PE directory mapping..."
-            sed -i 's|/x86_64-windows|/aarch64-windows|g' "$FILE"
-          fi
-
           FILE="dlls/ntdll/loader.c"
           if grep -q 'xtajit64\.dll' "$FILE"; then
             echo "Replacing xtajit64.dll with libarm64ecfex.dll..."
