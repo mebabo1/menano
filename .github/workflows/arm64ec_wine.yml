@@ -244,6 +244,69 @@ jobs:
             fi
           fi
 
+          FILE3="dlls/wdscore/wdscore.spec"
+          if [ -f "$FILE3" ]; then
+            if grep -q '@ stub' "$FILE3"; then
+              echo "Cleaning wdscore.spec stubs..."
+              sed -i '/CDynamicArray/d' "$FILE3"
+              echo "✔ wdscore stubs cleaned"
+            else
+              echo "✔ wdscore already cleaned or not found"
+            fi
+          fi
+
+          # 2. ntdll virtual.c 미초기화 변수 방어 (컴파일러 경고 해결)
+          FILE="dlls/ntdll/unix/virtual.c"
+          if [ -f "$FILE" ]; then
+            if grep -q 'unsigned int vprot, sec_flags;' "$FILE"; then
+              echo "Fixing uninitialized vprot in virtual.c..."
+              sed -i 's/unsigned int vprot, sec_flags;/unsigned int vprot = 0, sec_flags = 0;/g' "$FILE"
+            fi
+          fi
+
+          FILE="dlls/ntdll/unix/loader.c"
+          if ! grep -q '/aarch64-windows' "$FILE"; then
+            echo "Patching PE directory mapping..."
+            sed -i 's|/x86_64-windows|/aarch64-windows|g' "$FILE"
+          fi
+
+          FILE="dlls/ntdll/loader.c"
+          if grep -q 'xtajit64\.dll' "$FILE"; then
+            echo "Replacing xtajit64.dll with libarm64ecfex.dll..."
+            sed -i 's|xtajit64\.dll|libarm64ecfex.dll|g' "$FILE"
+          fi
+
+          INF="loader/wine.inf.in"
+          if ! grep -q 'libarm64ecfex.dll' "$INF"; then
+            echo "Patching wine.inf..."
+            sed -i 's/xtajit64\.dll/libarm64ecfex.dll/g' "$INF"
+            sed -i 's/xtajit\.dll/libwow64fex.dll/g' "$INF"
+          fi
+
+          # 5. FEX YMM State 대응 (unwind.h)
+          FILE="dlls/ntdll/unwind.h"
+          if [ -f "$FILE" ] && ! grep -q 'CONTEXT_ARM64_FEX_YMMSTATE' "$FILE"; then
+            echo "Patching unwind flags for FEX YMM state..."
+            sed -i '/ctx_flags_x64_to_arm/,/}/ {
+              /CONTEXT_AMD64_FLOATING_POINT/ s/$/\n          if (flags \& CONTEXT_AMD64_XSTATE) ret |= CONTEXT_ARM64_FEX_YMMSTATE;/
+            }' "$FILE"
+            sed -i '/ctx_flags_arm_to_x64/,/}/ {
+              /CONTEXT_ARM64_FLOATING_POINT/ s/$/\n          if (flags \& CONTEXT_ARM64_FEX_YMMSTATE) ret |= CONTEXT_AMD64_XSTATE;/
+            }' "$FILE"
+          fi
+
+          # 6. winnt.h FEX 플래그 정의 추가
+          FILE="include/winnt.h"
+          if [ -f "$FILE" ] && ! grep -q 'CONTEXT_ARM64_FEX_YMMSTATE' "$FILE"; then
+            echo "Patching winnt.h to match FEX diff..."
+            sed -i 's|InterlockedOr(&dummy, 0)|_InterlockedOr((long volatile *)\&dummy, 0)|g' "$FILE"
+            sed -i 's/^#define CONTEXT_ARM64_X18.*/#define CONTEXT_ARM64_X18             (CONTEXT_ARM64 | 0x00000010)/' "$FILE"
+            if ! grep -q 'CONTEXT_ARM64_XSTATE' "$FILE"; then
+              sed -i '/CONTEXT_ARM64_X18/a #define CONTEXT_ARM64_XSTATE          (CONTEXT_ARM64 | 0x00000020)' "$FILE"
+            fi
+            sed -i '/CONTEXT_ARM64_XSTATE/a #define CONTEXT_ARM64_FEX_YMMSTATE   (CONTEXT_ARM64 | 0x00000040)' "$FILE"
+          fi
+
           # 8. Vulkan VRAM Faking 적용
           FILE="dlls/winevulkan/vulkan.c"
           if [ -f "$FILE" ] && ! grep -q 'WINE_VRAM_SIZE' "$FILE" ; then
@@ -259,8 +322,8 @@ jobs:
               }' "$FILE"
           fi
 
-          PATCH_LIST="https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/path/1.patch"
-                      
+          PATCH_LIST="https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/path/1.patch
+                      https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/path/2.patch"
 
           echo "Applying external patches..."
           for URL in $PATCH_LIST; do
@@ -282,6 +345,8 @@ jobs:
                 echo "⚠ Continuing to next patch despite failure..."
             fi
           done
+          echo "--------------------------------------------"
+          echo "✔ All patch processes completed"
 
       # ------------------------------------------------------------
       # 8. 生成 configure 脚本
