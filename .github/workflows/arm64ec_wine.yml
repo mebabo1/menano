@@ -372,6 +372,24 @@ jobs:
             sed -i '/CONTEXT_ARM64_XSTATE/a #define CONTEXT_ARM64_FEX_YMMSTATE   (CONTEXT_ARM64 | 0x00000040)' "$FILE"
           fi
 
+          FILE="dlls/kernel32/kernel32.spec"
+          if [ -f "$FILE" ]; then
+            echo "Injecting FEX-Emu dependencies into kernel32.spec..."
+            
+            # libarm64ecfex.dll 추가 (이미 있으면 스킵)
+            if ! grep -q "import libarm64ecfex.dll" "$FILE"; then
+              sed -i '1i import libarm64ecfex.dll' "$FILE"
+              echo "✔ libarm64ecfex.dll injected"
+            fi
+            
+            # libwow64fex.dll 추가 (이미 있으면 스킵)
+            if ! grep -q "import libwow64fex.dll" "$FILE"; then
+              # libarm64ecfex 뒤에 바로 추가되도록 1i를 다시 사용하거나 위치 지정
+              sed -i '1i import libwow64fex.dll' "$FILE"
+              echo "✔ libwow64fex.dll injected"
+            fi
+          fi
+
           # 8. Vulkan VRAM Faking 적용
           FILE="dlls/winevulkan/vulkan.c"
           if [ -f "$FILE" ] && ! grep -q 'WINE_VRAM_SIZE' "$FILE" ; then
