@@ -569,39 +569,44 @@ jobs:
               echo "警告: 未找到 wine.inf 文件"
           fi
 
-          echo "=== 补全关键程序文件 ==="
+          echo "=== 补全关键程序文件 (PE/WOW64 Support) ==="
           BIN_DIR="$TARGET_PREFIX/bin"
           mkdir -p "$BIN_DIR"
 
-          # 需要的关键程序列表（包括 wineboot, winecfg, regedit, wineconsole 等）
-          echo "=== 补全关键程序文件 (Safe Version) ==="
-          BIN_DIR="$TARGET_PREFIX/bin"
-          mkdir -p "$BIN_DIR"
           PROGRAMS="wine wineserver wineboot winecfg regedit"
           for prog in $PROGRAMS; do
               if [ -f "$BIN_DIR/$prog" ]; then
-                  echo "文件 $BIN_DIR/$prog 已存在"
+                  echo "파일 $BIN_DIR/$prog 가 이미 존재합니다."
                   continue
               fi
+
               found=""
+              # 1. wine과 wineserver 우선 탐색 (이들은 보통 확장자가 없음)
               if [ "$prog" = "wine" ] || [ "$prog" = "wineserver" ]; then
                   found=$(find "$BUILD_DIR" -type f -name "$prog" | grep -E "loader/wine$|server/wineserver$" | head -1)
               fi
+
+              # 2. 나머지 프로그램 탐색 (wineboot.exe 등 확장자 포함 검색)
               if [ -z "$found" ]; then
-                  found=$(find "$BUILD_DIR/programs" -type f -name "$prog" | head -1)
+                  # $prog 또는 $prog.exe 이름을 가진 파일을 programs 폴더 내에서 찾습니다.
+                  found=$(find "$BUILD_DIR/programs" -type f \( -name "$prog" -o -name "$prog.exe" \) | head -1)
               fi
+
+              # 3. 최후의 수단: 전체 빌드 폴더 검색
               if [ -z "$found" ]; then
-                  found=$(find "$BUILD_DIR" -type f -name "$prog" | head -1)
+                  found=$(find "$BUILD_DIR" -type f \( -name "$prog" -o -name "$prog.exe" \) | head -1)
               fi
+
               if [ -n "$found" ]; then
                   echo "Found $prog at $found, copying..."
-                  # 복사할 때 목적지 파일명을 원래 이름($prog)으로 통일 (exe 제거 방지 또는 유지)
-                  # 보통 Wine은 bin 폴더 안에 확장자 없는 이름을 기대합니다.
+                  # 중요: 원본이 .exe라도 목적지에서는 확장자를 떼고 저장하거나, 
+                  # 필요에 따라 이름을 맞춰줍니다. (여기서는 원래 요청한 $prog 이름으로 복사)
                   cp -v "$found" "$BIN_DIR/$prog"
                   chmod +x "$BIN_DIR/$prog"
               else
-                  echo "❌ 错误: 完全未找到 $prog"
-                  ls -R "$BUILD_DIR/programs" | grep "$prog" || echo "해당 파일 없음"
+                  echo "❌ 오류: $prog 를 찾을 수 없습니다."
+                  # 디버깅용 로그 출력
+                  find "$BUILD_DIR/programs" -name "$prog*" 2>/dev/null || echo "검색 결과 없음"
                   exit 1
               fi
           done
