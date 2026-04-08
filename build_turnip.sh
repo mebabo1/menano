@@ -19,14 +19,13 @@ fi
 
 cd $SOURCE_DIR
 
-# 3. Meson 설정 (여기에 있던 --destdir=$INSTALL_DIR 를 제거했습니다)
 echo "⚙️  Meson 구성 중..."
 meson setup builddir \
     --prefix=/data/data/com.termux/files/usr/glibc \
     --libdir=lib \
     -Dbuildtype=release \
     -Dplatforms=x11,wayland \
-    -Dgallium-drivers=freedreno,zink,swrast \
+    -Dgallium-drivers=freedreno,zink,llvmpipe \
     -Dvulkan-drivers=freedreno \
     -Dfreedreno-kmds=kgsl \
     -Degl=enabled \
