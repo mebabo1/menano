@@ -26,6 +26,10 @@ echo "🩹 성능 최적화 패치(MR 37802) 적용 중..."
 #curl -sL "https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/37802.patch" -o 37802.patch
 #patch -p1 --fuzz=4 < 37802.patch || echo "⚠️ 패치 적용 일부 실패 (이미 반영되었을 수 있음)"
 
+# 2-3. 가상 VRAM 보고 용량 상향 (게임 옵션 잠금 해제용)
+echo "💾 가상 VRAM 보고 용량 수정 중..."
+sed -i 's/availableMemory = .*/availableMemory = 4ULL << 30; /g' $SOURCE_DIR/src/freedreno/vulkan/tu_device.cc || true
+
 # 2-2. 의존성 서브프로젝트 다운로드 (Vulkan 최신 기능 보장)
 mkdir -p subprojects
 cd subprojects
