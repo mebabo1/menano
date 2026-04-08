@@ -42,7 +42,7 @@ meson setup builddir \
     -Dbuildtype=release \
     -Doptimization=3 \
     -Db_lto=true \
-    -Dplatforms=x11,wayland \
+    -Dplatforms=x11 \
     -Dgallium-drivers=freedreno,zink,llvmpipe \
     -Dvulkan-drivers=freedreno \
     -Dfreedreno-kmds=kgsl \
