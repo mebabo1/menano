@@ -209,8 +209,9 @@ jobs:
         cd $BUILD_DIR/proton
         
         # 克隆 Proton 源码
-        git clone https://github.com/Stredohori/proton-wine
-        cd wine
+        git -b "proton_10.0" clone https://github.com/Stredohori/proton-wine.git source
+        cd source
+        git config advice.detachedHead false
         
         # 切换到指定的 Proton 分支
         echo "切换到分支: $PROTON_BRANCH"
