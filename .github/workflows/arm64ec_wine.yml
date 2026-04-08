@@ -244,36 +244,6 @@ jobs:
             fi
           fi
 
-          FILE3="dlls/wdscore/wdscore.spec"
-          if [ -f "$FILE3" ]; then
-            if grep -q '@ stub' "$FILE3"; then
-              echo "Cleaning wdscore.spec stubs..."
-              sed -i '/CDynamicArray/d' "$FILE3"
-              echo "✔ wdscore stubs cleaned"
-            else
-              echo "✔ wdscore already cleaned or not found"
-            fi
-          fi
-
-          FILE="dlls/ntdll/unix/loader.c"
-          if ! grep -q '/aarch64-windows' "$FILE"; then
-            echo "Patching PE directory mapping..."
-            sed -i 's|/x86_64-windows|/aarch64-windows|g' "$FILE"
-          fi
-
-          FILE="dlls/ntdll/loader.c"
-          if grep -q 'xtajit64\.dll' "$FILE"; then
-            echo "Replacing xtajit64.dll with libarm64ecfex.dll..."
-            sed -i 's|xtajit64\.dll|libarm64ecfex.dll|g' "$FILE"
-          fi
-
-          INF="loader/wine.inf.in"
-          if ! grep -q 'libarm64ecfex.dll' "$INF"; then
-            echo "Patching wine.inf..."
-            sed -i 's/xtajit64\.dll/libarm64ecfex.dll/g' "$INF"
-            sed -i 's/xtajit\.dll/libwow64fex.dll/g' "$INF"
-          fi
-
           # 8. Vulkan VRAM Faking 적용
           FILE="dlls/winevulkan/vulkan.c"
           if [ -f "$FILE" ] && ! grep -q 'WINE_VRAM_SIZE' "$FILE" ; then
@@ -289,8 +259,8 @@ jobs:
               }' "$FILE"
           fi
 
-          PATCH_LIST="https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/path/1.patch
-                      https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/path/2.patch"
+          PATCH_LIST="https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/path/1.patch"
+                      
 
           echo "Applying external patches..."
           for URL in $PATCH_LIST; do
@@ -432,7 +402,7 @@ jobs:
           echo "使用 Wine64 构建目录（作为工具目录）: /opt/wine64-native"
           echo "WINE_NLS_DIR=$WINE_NLS_DIR"
 
-          # 关键修改：仅使用 --with-wine-tools，不使用 --with-wine64
+          # 关键修改：仅使用 --with-wine-tools，不使用 --with-wine64 arm64ec,aarch64
           ../configure \
             --host=aarch64-linux-gnu \
             --prefix=/tmp/wine-install-wow64 \
