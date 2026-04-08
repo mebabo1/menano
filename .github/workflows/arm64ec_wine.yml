@@ -358,12 +358,6 @@ jobs:
             ./autogen.sh
           fi
 
-      - name: wine-tools
-        run: |
-          sudo dpkg --add-architecture i386
-          sudo apt-get update
-          sudo apt-get install -y gcc-multilib g++-multilib libc6-dev-i386 libfreetype6-dev:i386 libvulkan-dev:i386 build-essential
-
       # ------------------------------------------------------------
       # 9. 构建 native wine64（严格模仿成功示例，并备份完整 nls 目录）
       # ------------------------------------------------------------
@@ -376,6 +370,7 @@ jobs:
           mkdir -p amd64
           cd amd64
           ../source/configure \
+            --enable-win64 \
             --disable-tests \
             --without-x \
             --without-vulkan \
