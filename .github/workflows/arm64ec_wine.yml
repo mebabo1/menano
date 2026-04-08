@@ -506,6 +506,7 @@ jobs:
             --without-xinerama \
             --without-xxf86vm
             
+          make dlls/stdole2.tlb/stdole2.tlb -j$(nproc)
           make -j$(nproc) > /dev/null
           make install
 
