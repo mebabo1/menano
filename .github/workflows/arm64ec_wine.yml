@@ -374,10 +374,14 @@ jobs:
 
           FILE="configure.ac"
           if [ -f "$FILE" ]; then
-            echo "Patching configure.ac for forced ARM64EC/WOW64 support..."
-            # \n 뒤에 정확히 스페이스 4칸을 입력합니다.
-            sed -i '/enable_xtajit64=${enable_xtajit64:-arm64ec}/a \    enable_wow64="aarch64,x86_64"\n    enable_wow64win="aarch64,x86_64"\n    enable_wow64cpu="x86_64"\n    enable_xtajit64="arm64ec"' "$FILE"
-            echo "✔ configure.ac patched to force arm64ec enablement"
+            echo "Patching configure.ac to force enable ARM64EC in else-block..."         
+            # 1. enable_xtajit64의 no를 arm64ec로 변경
+            sed -i 's/enable_xtajit64=${enable_xtajit64:-no}/enable_xtajit64=${enable_xtajit64:-arm64ec}/g' "$FILE"
+            sed -i 's/enable_wow64=${enable_wow64:-no}/enable_wow64=${enable_wow64:-aarch64,x86_64}/g' "$FILE"
+            sed -i 's/enable_wow64win=${enable_wow64win:-no}/enable_wow64win=${enable_wow64win:-aarch64,x86_64}/g' "$FILE"
+            sed -i 's/enable_wow64cpu=${enable_wow64cpu:-no}/enable_wow64cpu=${enable_wow64cpu:-x86_64}/g' "$FILE"
+            
+            echo "✔ configure.ac else-block patched successfully"
           fi
 
           # 8. Vulkan VRAM Faking 적용
