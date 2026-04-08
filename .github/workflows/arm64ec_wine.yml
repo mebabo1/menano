@@ -176,26 +176,26 @@ jobs:
 
           case "$WINE_BRANCH" in
             protoneg)
-              echo "Processing GE-Proton (GloriousEggroll) branch"
+              echo "Processing GE-Proton (GloriousEggroll) Wine Source"
 
-              # GE-Proton의 경우 보통 GE-Proton9-2, GE-Proton8-25 같은 태그 형식을 사용합니다.
-              # 입력값이 없으면 최신 릴리즈 태그를 사용하도록 설정할 수 있습니다.
-              GE_TAG="${{ github.event.inputs.wine_version }}"
+              # 1. GE-Proton 전용 Wine 소스 저장소를 직접 타겟팅합니다.
+              # GE는 'proton-wine'이라는 별도의 저장소에서 Wine 코드를 관리합니다.
+              WINE_VERSION="${{ github.event.inputs.wine_version || 'master' }}"
               
-              # GE-Proton의 Wine 소스 저장소로 변경
-              git clone https://github.com/GloriousEggroll/proton-ge-custom.git source_repo
-              cd source_repo
+              echo "Cloning GE-Proton Wine source..."
+              git clone https://github.com/GloriousEggroll/proton-wine.git source
               
-              # 서브모듈(Wine 소스) 업데이트 또는 특정 폴더 진입
-              # GE는 proton-wine이라는 이름으로 wine 소스를 관리합니다.
-              git submodule update --init --recursive proton-wine
-              
-              # 실제 빌드에 사용할 source 디렉토리로 이동/복사
-              mv proton-wine ${{ env.WINE_SOURCE_DIR }}/source
-              cd ${{ env.WINE_SOURCE_DIR }}/source
-              
+              cd source
               git config advice.detachedHead false
-              WINE_VERSION_ACTUAL=$(git describe --tags --abbrev=0 2>/dev/null || echo "GE-Proton")
+
+              # 2. 버전(태그) 선택 처리
+              if [ "$WINE_VERSION" != "latest" ] && [ "$WINE_VERSION" != "master" ]; then
+                # 입력된 버전이 태그로 존재하는지 확인 후 체크아웃
+                git checkout "$WINE_VERSION" 2>/dev/null || echo "Requested version $WINE_VERSION not found, using default branch."
+              fi
+
+              WINE_VERSION_ACTUAL=$(git describe --tags --abbrev=0 2>/dev/null || echo "GE-Proton-Custom")
+              echo "BUILD_NAME=wine-${WINE_VERSION_ACTUAL}-GE-arm64-wow64" >> $GITHUB_ENV
               ;;
             staging)
               echo " Staging "
