@@ -11,16 +11,15 @@ SOURCE_DIR=$WORK_DIR/mesa-src
 mkdir -p $WORK_DIR
 mkdir -p $INSTALL_DIR
 
-# 2. Mesa 소스 코드 클론 (업스트림 또는 특정 브랜치)
+# 2. Mesa 소스 코드 클론
 if [ ! -d "$SOURCE_DIR" ]; then
     echo "📥 Mesa 소스 클론 중..."
-    # 필요에 따라 https://github.com/lfdevs/mesa-for-android-container 로 변경 가능
     git clone --depth 1 https://gitlab.freedesktop.org/mesa/mesa.git $SOURCE_DIR
 fi
 
 cd $SOURCE_DIR
 
-# 3. Meson 설정 (glibc 환경 핵심 옵션)
+# 3. Meson 설정 (여기에 있던 --destdir=$INSTALL_DIR 를 제거했습니다)
 echo "⚙️  Meson 구성 중..."
 meson setup builddir \
     --prefix=/data/data/com.termux/files/usr/glibc \
@@ -40,14 +39,14 @@ meson setup builddir \
     -Dllvm=enabled \
     -Dshared-llvm=enabled \
     -Dvideo-codecs=all \
-    -Dgallium-extra-hud=true \
-    --destdir=$INSTALL_DIR
+    -Dgallium-extra-hud=true
 
 # 4. 컴파일 및 설치
 echo "🏗️  컴파일 시작 (nproc 사용)..."
 ninja -C builddir -j$(nproc)
 
 echo "📦 임시 디렉토리에 설치 중..."
-ninja -C builddir install
+# 설치 시점에 DESTDIR 환경 변수를 사용하여 빌드 결과물을 $INSTALL_DIR로 보냅니다.
+DESTDIR=$INSTALL_DIR ninja -C builddir install
 
 echo "✅ 빌드 완료!"
