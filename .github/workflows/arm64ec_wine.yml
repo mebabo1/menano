@@ -218,11 +218,18 @@ jobs:
           echo "WINE_VERSION_ACTUAL=$WINE_VERSION_ACTUAL" >> $GITHUB_ENV
           echo "源码准备完成，构建名称: $BUILD_NAME"
 
-      - name: native wine64 NLS
+      - name: configure
         run: |
           set -e
           mkdir -p ${{ env.WINE64_DIR }}
           cp -r ${{ env.WINE_SOURCE_DIR }}/source ${{ env.WINE64_DIR }}/source
+          cd ${{ env.WINE64_DIR }}
+          if [ ! -f "configure" ]; then
+            ./autogen.sh
+          fi
+
+      - name: native wine64 NLS
+        run: |
           cd ${{ env.WINE64_DIR }}
           mkdir -p amd64
           cd amd64
