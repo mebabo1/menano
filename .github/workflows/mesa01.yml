@@ -1,0 +1,65 @@
+name: Build Turnip (glibc aarch64)
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    # 1. 에뮬레이션 없는 네이티브 aarch64 환경 사용
+    runs-on: ubuntu-24.04-arm
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install glibc Dependencies
+        run: |
+          sudo apt-get update
+          # glibc 환경의 Mesa/Turnip 빌드에 필수적인 의존성들
+          sudo apt-get install -y \
+            ninja-build patchelf flex bison git perl python3-pip \
+            glslang-tools curl zip libdrm-dev libx11-dev \
+            libxcb-dri3-dev libwayland-dev libxshmfence-dev \
+            libxrandr-dev libxxf86vm-dev llvm-19
+          
+          # PEP 668 대비 안전한 설치
+          pip3 install mako meson --user
+          echo "$HOME/.local/bin" >> $GITHUB_PATH
+
+      - name: Build Drivers
+        run: |
+          # build_turnip.sh를 실행하기 전 환경 변수 주입
+          chmod +x build_turnip.sh
+          export BUILD_VERSION="${{ github.run_number }}"
+          
+          # 만약 스크립트가 없다면, 직접 빌드 명령어를 입력해도 됩니다.
+          # 이 단계에서 첫 번째 코드의 'meson setup' 옵션들이 적용되어야 합니다.
+          ./build_turnip.sh
+
+      - name: Package Artifacts
+        run: |
+          # glibc 환경은 경로 유지가 중요하므로 tar.gz 권장
+          mkdir -p output
+          # 빌드 결과물이 모이는 곳(예: install_dir)을 압축
+          # 아래 경로는 실제 빌드 스크립트의 결과물 위치에 맞춰 수정 필요
+          tar -czvf turnip-glibc-aarch64.tar.gz -C turnip_workdir/install .
+
+      - name: Upload Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: Turnip-Glibc-Drivers
+          path: "*.tar.gz"
+
+      - name: Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: glibc-v${{ github.run_number }}
+          name: Turnip Driver for glibc (v${{ github.run_number }})
+          files: "*.tar.gz"
+          body: |
+            Turnip (Freedreno Vulkan) driver built for glibc environment.
+            - Architecture: aarch64
+            - Runner: ubuntu-24.04-arm (Native)
