@@ -595,7 +595,9 @@ jobs:
               fi
               if [ -n "$found" ]; then
                   echo "Found $prog at $found, copying..."
-                  cp -v "$found" "$BIN_DIR/"
+                  # 복사할 때 목적지 파일명을 원래 이름($prog)으로 통일 (exe 제거 방지 또는 유지)
+                  # 보통 Wine은 bin 폴더 안에 확장자 없는 이름을 기대합니다.
+                  cp -v "$found" "$BIN_DIR/$prog"
                   chmod +x "$BIN_DIR/$prog"
               else
                   echo "❌ 错误: 完全未找到 $prog"
