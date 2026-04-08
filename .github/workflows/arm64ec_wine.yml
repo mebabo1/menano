@@ -13,8 +13,7 @@ on:
         options:
         - proton
         - staging
-        - staging-tkg
-        - staging-tkg-fsync
+        - protoneg
       wine_version:
         description: 'Wine 版本 (例如 9.22，或 latest)'
         required: false
@@ -176,21 +175,27 @@ jobs:
           cd ${{ env.WINE_SOURCE_DIR }}
 
           case "$WINE_BRANCH" in
-            staging-tkg|staging-tkg-fsync)
-              echo "处理 TKG 系列分支: $WINE_BRANCH"
-              git clone https://github.com/Kron4ek/wine-tkg.git source
-              cd source
-              if [ "$WINE_BRANCH" = "staging-tkg-fsync" ]; then
-                git checkout fsync
-              fi
-              if [ "$WINE_VERSION" != "latest" ]; then
-                git checkout "$WINE_VERSION" 2>/dev/null || git checkout "wine-$WINE_VERSION" 2>/dev/null || echo "使用默认分支"
-              fi
-              if [ -f "VERSION" ]; then
-                WINE_VERSION_ACTUAL="$(cat VERSION | tail -c +14)"
-              else
-                WINE_VERSION_ACTUAL=$(git describe --tags --abbrev=0 2>/dev/null || echo "$WINE_VERSION")
-              fi
+            protoneg)
+              echo "Processing GE-Proton (GloriousEggroll) branch"
+
+              # GE-Proton의 경우 보통 GE-Proton9-2, GE-Proton8-25 같은 태그 형식을 사용합니다.
+              # 입력값이 없으면 최신 릴리즈 태그를 사용하도록 설정할 수 있습니다.
+              GE_TAG="${{ github.event.inputs.wine_version }}"
+              
+              # GE-Proton의 Wine 소스 저장소로 변경
+              git clone https://github.com/GloriousEggroll/proton-ge-custom.git source_repo
+              cd source_repo
+              
+              # 서브모듈(Wine 소스) 업데이트 또는 특정 폴더 진입
+              # GE는 proton-wine이라는 이름으로 wine 소스를 관리합니다.
+              git submodule update --init --recursive proton-wine
+              
+              # 실제 빌드에 사용할 source 디렉토리로 이동/복사
+              mv proton-wine ${{ env.WINE_SOURCE_DIR }}/source
+              cd ${{ env.WINE_SOURCE_DIR }}/source
+              
+              git config advice.detachedHead false
+              WINE_VERSION_ACTUAL=$(git describe --tags --abbrev=0 2>/dev/null || echo "GE-Proton")
               ;;
             staging)
               echo " Staging "
