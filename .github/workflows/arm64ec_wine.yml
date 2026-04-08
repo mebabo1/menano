@@ -467,12 +467,12 @@ jobs:
           echo "使用 Wine64 构建目录（作为工具目录）: /opt/wine64-native"
           echo "WINE_NLS_DIR=$WINE_NLS_DIR"
 
-          # 关键修改：仅使用 --with-wine-tools，不使用 --with-wine64 ,aarch64
+          # 关键修改：仅使用 --with-wine-tools，不使用 --with-wine64 
           ../configure \
             --host=aarch64-linux-gnu \
             --prefix=/tmp/wine-install-wow64 \
             --with-mingw=clang \
-            --enable-archs=arm64ec,i386 \
+            --enable-archs=arm64ec,aarch64,i386 \
             --with-wine-tools=/opt/wine64-native \
             --with-wine64=${{ env.WINE64_DIR }}/amd64 \
             --with-vulkan \
