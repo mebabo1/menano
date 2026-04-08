@@ -41,7 +41,7 @@ meson setup builddir \
     --libdir=lib \
     -Dbuildtype=release \
     -Doptimization=3 \
-    -Db_lto=true \
+    -Db_lto=false \
     -Dplatforms=x11 \
     -Dgallium-drivers=freedreno,zink,llvmpipe \
     -Dvulkan-drivers=freedreno \
@@ -58,6 +58,8 @@ meson setup builddir \
     -Dshared-llvm=enabled \
     -Dvideo-codecs=all \
     -Dgallium-extra-hud=true \
+    -Dc_args="-march=armv8-a+crc+crypto" \
+    -Dcpp_args="-march=armv8-a+crc+crypto" \
     --force-fallback-for=spirv-tools,spirv-headers
 
 # 4. 컴파일 및 설치
