@@ -18,7 +18,6 @@ jobs:
       - name: Install glibc Dependencies
         run: |
           sudo apt-get update
-          # glibc 환경의 Mesa/Turnip 빌드에 필수적인 의존성들
           sudo apt-get install -y \
             ninja-build patchelf flex bison git perl python3-pip \
             glslang-tools curl zip libdrm-dev libx11-dev \
