@@ -13,7 +13,7 @@ on:
         options:
         - proton
         - staging
-        - protoneg
+        - protonarm64ec
       wine_version:
         description: 'Wine 版本 (例如 9.22，或 latest)'
         required: false
@@ -175,27 +175,16 @@ jobs:
           cd ${{ env.WINE_SOURCE_DIR }}
 
           case "$WINE_BRANCH" in
-            protoneg)
-              echo "Processing GE-Proton (GloriousEggroll) Wine Source"
+            protonarm64ec)
+              echo "Processing protonarm64ec branch"
 
-              # 1. GE-Proton 전용 Wine 소스 저장소를 직접 타겟팅합니다.
-              # GE는 'proton-wine'이라는 별도의 저장소에서 Wine 코드를 관리합니다.
-              WINE_VERSION="${{ github.event.inputs.wine_version || 'master' }}"
-              
-              echo "Cloning GE-Proton Wine source..."
-              git clone https://github.com/GloriousEggroll/proton-wine.git source
-              
+              git clone https://github.com/fathonix/wine-proton-arm64ec.git source
               cd source
               git config advice.detachedHead false
-
-              # 2. 버전(태그) 선택 처리
-              if [ "$WINE_VERSION" != "latest" ] && [ "$WINE_VERSION" != "master" ]; then
-                # 입력된 버전이 태그로 존재하는지 확인 후 체크아웃
-                git checkout "$WINE_VERSION" 2>/dev/null || echo "Requested version $WINE_VERSION not found, using default branch."
+              if [ "$WINE_VERSION" != "latest" ]; then
+                git checkout "$WINE_VERSION"
               fi
-
-              WINE_VERSION_ACTUAL=$(git describe --tags --abbrev=0 2>/dev/null || echo "GE-Proton-Custom")
-              echo "BUILD_NAME=wine-${WINE_VERSION_ACTUAL}-GE-arm64-wow64" >> $GITHUB_ENV
+              WINE_VERSION_ACTUAL=$(git describe --tags --abbrev=0 2>/dev/null || echo "$WINE_VERSION")
               ;;
             staging)
               echo " Staging "
@@ -266,15 +255,6 @@ jobs:
             fi
           fi
 
-          # 2. ntdll virtual.c 미초기화 변수 방어 (컴파일러 경고 해결)
-          FILE="dlls/ntdll/unix/virtual.c"
-          if [ -f "$FILE" ]; then
-            if grep -q 'unsigned int vprot, sec_flags;' "$FILE"; then
-              echo "Fixing uninitialized vprot in virtual.c..."
-              sed -i 's/unsigned int vprot, sec_flags;/unsigned int vprot = 0, sec_flags = 0;/g' "$FILE"
-            fi
-          fi
-
           FILE="dlls/ntdll/unix/loader.c"
           if ! grep -q '/aarch64-windows' "$FILE"; then
             echo "Patching PE directory mapping..."
@@ -294,30 +274,6 @@ jobs:
             sed -i 's/xtajit\.dll/libwow64fex.dll/g' "$INF"
           fi
 
-          # 5. FEX YMM State 대응 (unwind.h)
-          FILE="dlls/ntdll/unwind.h"
-          if [ -f "$FILE" ] && ! grep -q 'CONTEXT_ARM64_FEX_YMMSTATE' "$FILE"; then
-            echo "Patching unwind flags for FEX YMM state..."
-            sed -i '/ctx_flags_x64_to_arm/,/}/ {
-              /CONTEXT_AMD64_FLOATING_POINT/ s/$/\n          if (flags \& CONTEXT_AMD64_XSTATE) ret |= CONTEXT_ARM64_FEX_YMMSTATE;/
-            }' "$FILE"
-            sed -i '/ctx_flags_arm_to_x64/,/}/ {
-              /CONTEXT_ARM64_FLOATING_POINT/ s/$/\n          if (flags \& CONTEXT_ARM64_FEX_YMMSTATE) ret |= CONTEXT_AMD64_XSTATE;/
-            }' "$FILE"
-          fi
-
-          # 6. winnt.h FEX 플래그 정의 추가
-          FILE="include/winnt.h"
-          if [ -f "$FILE" ] && ! grep -q 'CONTEXT_ARM64_FEX_YMMSTATE' "$FILE"; then
-            echo "Patching winnt.h to match FEX diff..."
-            sed -i 's|InterlockedOr(&dummy, 0)|_InterlockedOr((long volatile *)\&dummy, 0)|g' "$FILE"
-            sed -i 's/^#define CONTEXT_ARM64_X18.*/#define CONTEXT_ARM64_X18             (CONTEXT_ARM64 | 0x00000010)/' "$FILE"
-            if ! grep -q 'CONTEXT_ARM64_XSTATE' "$FILE"; then
-              sed -i '/CONTEXT_ARM64_X18/a #define CONTEXT_ARM64_XSTATE          (CONTEXT_ARM64 | 0x00000020)' "$FILE"
-            fi
-            sed -i '/CONTEXT_ARM64_XSTATE/a #define CONTEXT_ARM64_FEX_YMMSTATE   (CONTEXT_ARM64 | 0x00000040)' "$FILE"
-          fi
-
           # 8. Vulkan VRAM Faking 적용
           FILE="dlls/winevulkan/vulkan.c"
           if [ -f "$FILE" ] && ! grep -q 'WINE_VRAM_SIZE' "$FILE" ; then
@@ -332,32 +288,6 @@ jobs:
                           object->memory_properties.memoryHeaps[k].size = s; \
               }' "$FILE"
           fi
-
-          PATCH_LIST="https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/path/1.patch
-                      https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/path/2.patch"
-
-          echo "Applying external patches..."
-          for URL in $PATCH_LIST; do
-            PATCH_FILE="${URL##*/}"            
-            echo "--------------------------------------------"
-            echo "Downloading $PATCH_FILE..."
-            wget -q -O "$PATCH_FILE" "$URL"
-            if git apply --check "$PATCH_FILE" > /dev/null 2>&1; then
-                echo "✔ $PATCH_FILE can be applied cleanly"
-                git apply --whitespace=fix "$PATCH_FILE"
-            elif git apply --3way --check "$PATCH_FILE" > /dev/null 2>&1; then
-                echo "⚠ Applying $PATCH_FILE with 3-way merge"
-                git apply --3way --whitespace=fix "$PATCH_FILE"
-            else
-                echo "❌ $PATCH_FILE failed, generating rejects"
-                git apply --reject --whitespace=fix "$PATCH_FILE" || true
-                echo "❌ $PATCH_FILE could not be fully applied"
-                find . -name "*.rej"
-                echo "⚠ Continuing to next patch despite failure..."
-            fi
-          done
-          echo "--------------------------------------------"
-          echo "✔ All patch processes completed"
 
       # ------------------------------------------------------------
       # 8. 生成 configure 脚本
