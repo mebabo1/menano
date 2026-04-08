@@ -23,8 +23,8 @@ cd $SOURCE_DIR
 # --- [성능 향상을 위한 추가 섹션] ---
 # 2-1. 최적화 패치 적용 (MR 37802: Adreno 성능 관련 최신 패치)
 echo "🩹 성능 최적화 패치(MR 37802) 적용 중..."
-curl -sL "https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/37802.patch" -o 37802.patch
-patch -p1 --fuzz=4 < 37802.patch || echo "⚠️ 패치 적용 일부 실패 (이미 반영되었을 수 있음)"
+#curl -sL "https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/37802.patch" -o 37802.patch
+#patch -p1 --fuzz=4 < 37802.patch || echo "⚠️ 패치 적용 일부 실패 (이미 반영되었을 수 있음)"
 
 # 2-2. 의존성 서브프로젝트 다운로드 (Vulkan 최신 기능 보장)
 mkdir -p subprojects
