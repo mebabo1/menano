@@ -335,6 +335,12 @@ jobs:
             sed -i 's|xtajit64\.dll|libarm64ecfex.dll|g' "$FILE"
           fi
 
+          FILE="dlls/ntdll/unix/loader.c"
+          if ! grep -q '/aarch64-windows' "$FILE"; then
+            echo "Patching PE directory mapping..."
+            sed -i 's|/x86_64-windows|/aarch64-windows|g' "$FILE"
+          fi
+
           INF="loader/wine.inf.in"
           if ! grep -q 'libarm64ecfex.dll' "$INF"; then
             echo "Patching wine.inf..."
