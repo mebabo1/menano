@@ -418,10 +418,10 @@ jobs:
 
           export CROSSCC="x86_64-w64-mingw32-gcc"
           export CROSSCXX="x86_64-w64-mingw32-g++"
-          export CFLAGS="-march=x86-64 -msse3 -mfpmath=sse -O3 -pipe"
-          export CXXFLAGS="-march=x86-64 -msse3 -mfpmath=sse -O3 -pipe"
-          export CROSSCFLAGS="-march=x86-64 -msse3 -mfpmath=sse -O3 -pipe"
-          export CROSSCXXFLAGS="-march=x86-64 -msse3 -mfpmath=sse -O3 -pipe"
+          export CFLAGS="-march=x86-64 -msse3 -mfpmath=sse -O2 -pipe"
+          export CXXFLAGS="-march=x86-64 -msse3 -mfpmath=sse -O2 -pipe"
+          export CROSSCFLAGS="-march=x86-64 -msse3 -mfpmath=sse -O2 -pipe"
+          export CROSSCXXFLAGS="-march=x86-64 -msse3 -mfpmath=sse -O2 -pipe"
           
           export PULSE_CFLAGS="-I$deps/include/pulse"
           export PULSE_LIBS="-L$deps/lib/pulseaudio -lpulse"
