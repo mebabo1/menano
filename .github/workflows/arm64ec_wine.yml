@@ -377,7 +377,7 @@ jobs:
           export FFMPEG_CFLAGS="-I$deps/include/libavutil -I$deps/include/libavcodec -I$deps/include/libavformat"
           export FFMPEG_LIBS="-L$deps/lib -lavutil -lavcodec -lavformat"
 
-          export LDFLAGS="-L$deps/lib -Wl,-rpath=$depsg/lib"
+          export LDFLAGS="-L$depsg/lib -Wl,-rpath=$depsg/lib"
           export WINE_NLS_DIR=/opt/wine64-native/nls
 
           echo "使用 Wine64 构建目录（作为工具目录）: /opt/wine64-native"
