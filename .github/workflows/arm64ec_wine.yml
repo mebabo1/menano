@@ -104,6 +104,7 @@ jobs:
             cmake \
             libstdc++6 \
             libgcc-s1 \
+            libstdc++-12-dev \
             libepoxy-dev:arm64 \
             libsdl2-dev:arm64 \
             ninja-build \
