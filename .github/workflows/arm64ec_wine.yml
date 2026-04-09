@@ -347,10 +347,10 @@ jobs:
           export deps="/data/data/com.termux/files/usr"
           export depsg="/data/data/com.termux/files/usr/glibc"
 
-          export CFLAGS="-O3 -pipe"
-          export CXXFLAGS="-O3 -pipe"
-          export CROSSCFLAGS="-O3 -pipe"
-          export CROSSCXXFLAGS="-O3 -pipe"
+          export CFLAGS="-march=x86-64 -msse3 -mfpmath=sse -O3 -ftree-vectorize -pipe"
+          export CXXFLAGS="-march=x86-64 -msse3 -mfpmath=sse -O3 -ftree-vectorize -pipe"
+          export CROSSCFLAGS="-march=x86-64 -msse3 -mfpmath=sse -O3 -ftree-vectorize -pipe"
+          export CROSSCXXFLAGS="-march=x86-64 -msse3 -mfpmath=sse -O3 -ftree-vectorize -pipe"
 
           export PULSE_CFLAGS="-I$deps/include/pulse"
           export PULSE_LIBS="-L$deps/lib/pulseaudio -lpulse"
