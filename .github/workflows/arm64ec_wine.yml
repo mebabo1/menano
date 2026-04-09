@@ -86,7 +86,8 @@ jobs:
             ca-certificates nano python3 python3-setuptools clang screen llvm lld wget curl \
             flex bison nasm \
             libfreetype6-dev libfreetype-dev \
-            libfreetype6-dev:arm64 libfreetype-dev:arm64 \
+            libfreetype6-dev:arm64 \
+            libfreetype-dev:arm64 \
             libglib2.0-dev \
             libltdl-dev \
             libxcb1-dev \
@@ -104,6 +105,7 @@ jobs:
             cmake \
             libstdc++6 \
             libgcc-s1 \
+            libstdc++-12-dev \
             libepoxy-dev:arm64 \
             libsdl2-dev:arm64 \
             ninja-build \
