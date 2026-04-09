@@ -412,7 +412,7 @@ jobs:
             --with-wine-tools=/opt/wine64-native \
             --with-mingw=clang \
             --without-freetype
-            --with-vulkan \
+            --without-vulkan \
             --enable-nls \
             --without-pulse \
             --without-ffmpeg \
