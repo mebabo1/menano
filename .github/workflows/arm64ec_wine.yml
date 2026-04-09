@@ -386,8 +386,6 @@ jobs:
           export PATH="/opt/${{ env.LLVMMINGW_NAME }}/bin:$PATH"
           export deps="/data/data/com.termux/files/usr"
           export depsg="/data/data/com.termux/files/usr/glibc"
-          export PKG_CONFIG_LIBDIR=/usr/lib/aarch64-linux-gnu/pkgconfig
-          export PKG_CONFIG_PATH=/usr/lib/aarch64-linux-gnu/pkgconfig
 
           export CFLAGS="-O3 -pipe"
           export CXXFLAGS="-O3 -pipe"
@@ -411,8 +409,6 @@ jobs:
             --host=x86_64-pc-linux-gnu \
             --prefix=/tmp/wine-install-wow64 \
             --enable-archs=i386,x86_64 \
-            --with-wine-tools=/opt/wine64-native \
-            --with-mingw=clang \
             --enable-win64 \
             --with-vulkan \
             --enable-nls \
