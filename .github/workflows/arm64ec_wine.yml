@@ -395,8 +395,6 @@ jobs:
           export PATH="/opt/${{ env.LLVMMINGW_NAME }}/bin:$PATH"
           export deps="/data/data/com.termux/files/usr"
           export depsg="/data/data/com.termux/files/usr/glibc"
-          export PKG_CONFIG_LIBDIR=/usr/lib/aarch64-linux-gnu/pkgconfig
-          export PKG_CONFIG_PATH=/usr/lib/aarch64-linux-gnu/pkgconfig
 
           export CROSSCC="x86_64-w64-mingw32-gcc"
           export CROSSCXX="x86_64-w64-mingw32-g++"
@@ -425,8 +423,8 @@ jobs:
           # 关键修改：仅使用 --with-wine-tools，不使用 --with-wine64 
           ../configure \
             --enable-win64 \
-            --enable-archs=i386,x86_64 \
             --host=x86_64-pc-linux-gnu \
+            --enable-archs=arm64ec,aarch64,i386 \
             --prefix=/tmp/wine-install-wow64 \
             --with-wine-tools=/opt/wine64-native \
             --with-mingw=clang \
