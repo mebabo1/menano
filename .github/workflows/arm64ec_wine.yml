@@ -411,34 +411,13 @@ jobs:
             --with-wine-tools=/opt/wine64-native \
             --with-mingw=clang \
             --without-freetype
-            --enable-nls \
             --without-pulse \
             --without-ffmpeg \
             --disable-win16 \
             --without-gstreamer \
             --disable-opencl \
             --without-alsa \
-            --disable-tests \
-            --without-capi \
-            --without-coreaudio \
-            --without-cups \
-            --without-dbus \
-            --without-gphoto \
-            --without-gssapi \
-            --without-krb5 \
-            --without-alsa \
-            --without-netapi \
-            --without-oss \
-            --without-pcap \
-            --without-pcsclite \
-            --without-sane \
-            --without-udev \
-            --without-unwind \
-            --without-usb \
-            --without-v4l2 \
-            --without-wayland \
-            --without-xinerama \
-            --without-xxf86vm
+            --disable-tests
             
           make -j$(nproc) > /dev/null
           make install
