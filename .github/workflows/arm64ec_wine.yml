@@ -409,6 +409,8 @@ jobs:
             --host=x86_64-pc-linux-gnu \
             --prefix=/tmp/wine-install-wow64 \
             --enable-archs=i386,x86_64 \
+            --with-wine-tools=/opt/wine64-native \
+            --with-mingw=clang \
             --enable-win64 \
             --with-vulkan \
             --enable-nls \
