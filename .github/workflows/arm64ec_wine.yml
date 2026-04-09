@@ -425,41 +425,42 @@ jobs:
           # 关键修改：仅使用 --with-wine-tools，不使用 --with-wine64 
           ../configure \
             --enable-win64 \
-            --host=x86_64-pc-linux-gnu \
-            --enable-archs=arm64ec,aarch64,i386 \
+            --build=x86_64-pc-linux-gnu \
+            --host=aarch64-linux-gnu \
             --prefix=/tmp/wine-install-wow64 \
-            --with-wine-tools=/opt/wine64-native \
             --with-mingw=clang \
-            --with-x \
+            --enable-archs=arm64ec,aarch64,i386 \
+            --with-wine-tools=/opt/wine64-native \
+            --with-wine64=${{ env.WINE64_DIR }}/amd64 \
+            --with-vulkan \
+            --enable-nls \
             --without-pulse \
             --without-ffmpeg \
+            --disable-win16 \
             --without-gstreamer \
             --disable-opencl \
-            --without-freetype \
-            --with-fontconfig \
-            --with-gettext \
-            --without-sdl \
-            --enable-nls \
-            --disable-winemenubuilder \
-            --disable-win16 \
+            --without-alsa \
             --disable-tests \
-            --without-ldap \
             --without-capi \
-            --without-oss \
+            --without-coreaudio \
             --without-cups \
             --without-dbus \
-            --without-coreaudio \
             --without-gphoto \
-            --without-osmesa \
-            --without-sane \
+            --without-gssapi \
+            --without-krb5 \
+            --without-alsa \
+            --without-netapi \
+            --without-oss \
             --without-pcap \
             --without-pcsclite \
+            --without-sane \
             --without-udev \
             --without-unwind \
             --without-usb \
             --without-v4l2 \
-            --with-xshm \
-            --without-wayland
+            --without-wayland \
+            --without-xinerama \
+            --without-xxf86vm
             
           make -j$(nproc) > /dev/null
           make install
