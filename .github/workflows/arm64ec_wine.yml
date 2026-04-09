@@ -455,7 +455,7 @@ jobs:
             --without-usb \
             --without-v4l2 \
             --with-xshm \
-            --without-wayland"
+            --without-wayland
             
           make -j$(nproc) > /dev/null
           make install
