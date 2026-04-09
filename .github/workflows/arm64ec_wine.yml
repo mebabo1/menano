@@ -58,6 +58,7 @@ jobs:
             autoconf \
             automake \
             libtool \
+            ocl-icd-opencl-dev \
             pkg-config \
             mingw-w64 \
             gcc-multilib \
