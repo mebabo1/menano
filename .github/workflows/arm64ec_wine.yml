@@ -87,7 +87,6 @@ jobs:
             flex bison nasm \
             libfreetype6-dev libfreetype-dev \
             libfreetype6-dev:arm64 \
-            libfreetype-dev:arm64 \
             libglib2.0-dev \
             libltdl-dev \
             libxcb1-dev \
@@ -128,7 +127,7 @@ jobs:
             libgstreamer-plugins-bad1.0-dev:arm64 \
             libudev-dev:arm64 \
             libunwind-dev:arm64 \
-            libsdl2-dev:arm64 \
+           libsdl2-dev:arm64 \
             libfontconfig1-dev:arm64 \
             libkrb5-dev:arm64 \
             libvulkan-dev:arm64 \
