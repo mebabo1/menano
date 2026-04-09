@@ -100,7 +100,7 @@ jobs:
             libxcb1-dev:arm64 \
             libx11-dev:arm64 \
             build-essential libc-dev less libc-devtools libidn2-0:arm64 \
-            libx11-dev libxinerama-dev libfreetype-dev libfontconfig-dev \
+            libx11-dev libxinerama-dev mingw-w64 libfontconfig-dev \
             cmake \
             libstdc++6 \
             libgcc-s1 \
