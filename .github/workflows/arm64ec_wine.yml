@@ -76,6 +76,14 @@ jobs:
           chmod -R 755 /data/data/com.termux/files/usr/glibc
           rm -rf temp_extracted glibc.tar.xz
 
+      - name: Download and extract termuxfs for ${{ matrix.arch }}
+        run: |
+          mkdir -p $HOME/termuxfs/${{ matrix.arch }}
+          cd $HOME/termuxfs/${{ matrix.arch }}
+          wget https://github.com/GameNative/termux-on-gha/releases/download/build-20260218/termuxfs-${{ matrix.arch }}.tar
+          tar -xf termuxfs-${{ matrix.arch }}.tar
+          ls -la $HOME/termuxfs/${{ matrix.arch }}/
+
       - name: llvm-mingw
         run: |
           mkdir -p /opt
