@@ -319,6 +319,17 @@ jobs:
             fi
           fi
 
+          FILE3="dlls/wdscore/wdscore.spec"
+          if [ -f "$FILE3" ]; then
+            if grep -q '@ stub' "$FILE3"; then
+              echo "Cleaning wdscore.spec stubs..."
+              sed -i '/CDynamicArray/d' "$FILE3"
+              echo "✔ wdscore stubs cleaned"
+            else
+              echo "✔ wdscore already cleaned or not found"
+            fi
+          fi
+
           FILE="dlls/ntdll/loader.c"
           if grep -q 'xtajit64\.dll' "$FILE"; then
             echo "Replacing xtajit64.dll with libarm64ecfex.dll..."
