@@ -327,9 +327,7 @@ jobs:
           export depsu="/data/data/com.termux/files/usr"
           export depsg="/data/data/com.termux/files/usr/glibc"
           export deps="$HOME/termuxfs/aarch64/data/data/com.termux/files/usr"
-          
-          export PKG_CONFIG_LIBDIR=/usr/lib/pkgconfig
-          export PKG_CONFIG_PATH=/usr/lib/pkgconfig
+          export PKG_CONFIG_LIBDIR=$deps/lib/pkgconfig:$deps/share/pkgconfig
 
           export CC="clang --target=aarch64-linux-gnu"
           export CXX="clang++ --target=aarch64-linux-gnu"
