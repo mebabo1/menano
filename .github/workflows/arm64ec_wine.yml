@@ -99,12 +99,12 @@ jobs:
             libltdl-dev:arm64 \
             libxcb1-dev:arm64 \
             libx11-dev:arm64 \
-            build-essential libc-dev-arm64-cross less libc-devtools libidn2-0:arm64 \
+            build-essential libc-dev less libc-devtools libidn2-0:arm64 \
             libx11-dev libxinerama-dev libfreetype-dev libfontconfig-dev \
             cmake \
-            libstdc++6-arm64-cross \
-            libgcc-s1-arm64-cross \
-            libstdc++-12-dev-arm64-cross \
+            libstdc++6 \
+            libgcc-s1 \
+            libstdc++-12 \
             libepoxy-dev:arm64 \
             libsdl2-dev:arm64 \
             ninja-build \
