@@ -358,7 +358,7 @@ jobs:
 
           export CC="clang --target=aarch64-linux-gnu"
           export CXX="clang++ --target=aarch64-linux-gnu"
-          export CFLAGS="-O3 -pipe"
+          export CFLAGS="--sysroot=$deps/lib"
           export CXXFLAGS="-O3 -pipe"
 
           export CROSSCC="arm64ec-w64-mingw32-clang"
