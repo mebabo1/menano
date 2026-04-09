@@ -45,7 +45,7 @@ jobs:
 
       - name: 安装构建依赖
         run: |
-          apt-get install -y \
+          apt-get install -y python3 python3-minimal \
             build-essential \
             git \
             wget \
