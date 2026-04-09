@@ -230,17 +230,6 @@ jobs:
             fi
           fi
 
-          FILE3="dlls/wdscore/wdscore.spec"
-          if [ -f "$FILE3" ]; then
-            if grep -q '@ stub' "$FILE3"; then
-              echo "Cleaning wdscore.spec stubs..."
-              sed -i '/CDynamicArray/d' "$FILE3"
-              echo "✔ wdscore stubs cleaned"
-            else
-              echo "✔ wdscore already cleaned or not found"
-            fi
-          fi
-
           # 2. ntdll virtual.c 미초기화 변수 방어 (컴파일러 경고 해결)
           FILE="dlls/ntdll/unix/virtual.c"
           if [ -f "$FILE" ]; then
@@ -284,8 +273,7 @@ jobs:
               }' "$FILE"
           fi
 
-          PATCH_LIST="https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/path/1.patch
-                      https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/path/2.patch"
+          PATCH_LIST="https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/path/1.patch"
 
           echo "Applying external patches..."
           for URL in $PATCH_LIST; do
@@ -310,9 +298,6 @@ jobs:
           echo "--------------------------------------------"
           echo "✔ All patch processes completed"
 
-      # ------------------------------------------------------------
-      # 8. 生成 configure 脚本
-      # ------------------------------------------------------------
       - name: configure
         run: |
           cd ${{ env.WINE_SOURCE_DIR }}/source
@@ -320,11 +305,7 @@ jobs:
             ./autogen.sh
           fi
 
-      # ------------------------------------------------------------
-      # 11. 交叉编译 ARM64 WOW64（使用复制后的目录作为工具目录）
-      #     修改：移除 --with-wine64，仅使用 --with-wine-tools 以强制重新编译 programs
-      # ------------------------------------------------------------
-      - name: 交叉编译 ARM64 WOW64
+      - name: ARM64 WOW64
         run: |
           cd ${{ env.WINE_SOURCE_DIR }}/source
           mkdir -p build-arm64
