@@ -416,8 +416,6 @@ jobs:
           export PKG_CONFIG_LIBDIR=/usr/lib/aarch64-linux-gnu/pkgconfig
           export PKG_CONFIG_PATH=/usr/lib/aarch64-linux-gnu/pkgconfig
 
-          export CROSSCC="x86_64-w64-mingw32-gcc"
-          export CROSSCXX="x86_64-w64-mingw32-g++"
           export CFLAGS="-O3 -pipe"
           export CXXFLAGS="-O3 -pipe"
           export CROSSCFLAGS="-O3 -pipe"
@@ -442,7 +440,6 @@ jobs:
             --with-mingw=clang \
             --enable-archs=arm64ec,aarch64,i386 \
             --with-wine-tools=/opt/wine64-native \
-            --with-wine64=${{ env.WINE64_DIR }}/amd64 \
             --with-vulkan \
             --enable-nls \
             --without-pulse \
