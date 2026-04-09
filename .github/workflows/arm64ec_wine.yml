@@ -42,104 +42,25 @@ jobs:
       - name: 安装基础工具
         run: |
           apt-get update
-          apt-get install -y --no-install-recommends \
-            ca-certificates wget git curl gnupg sudo xz-utils g++ file
 
-      - uses: actions/checkout@v4
-
-      # ------------------------------------------------------------
-      # 1. 配置 APT 源（支持 amd64 和 arm64）
-      # ------------------------------------------------------------
-      - name: APT
-        run: |
-          echo "🧹 Freeing disk space..."
-          sudo rm -rf /usr/share/dotnet
-          sudo rm -rf /opt/ghc
-          sudo rm -rf /usr/local/share/boost
-          sudo rm -rf "$AGENT_TOOLSDIRECTORY"
-          df -h
-
-          echo "📦 Configuring APT sources..."
-          if [ -f /etc/apt/sources.list ]; then
-            cp /etc/apt/sources.list /etc/apt/sources.list.bak
-          else
-            echo "deb http://deb.debian.org/debian bookworm main contrib non-free" > /etc/apt/sources.list
-            echo "deb http://deb.debian.org/debian bookworm-updates main contrib non-free" >> /etc/apt/sources.list
-            echo "deb http://security.debian.org/debian-security bookworm-security main contrib non-free" >> /etc/apt/sources.list
-          fi
-
-          grep -v '^#' /etc/apt/sources.list | sed 's/^deb /deb [arch=amd64] /g' > /tmp/amd64.list
-          sed -e 's/\[arch=amd64\]/[arch=arm64]/g' /tmp/amd64.list > /tmp/arm64.list
-          cat /tmp/amd64.list /tmp/arm64.list > /etc/apt/sources.list
-
-          dpkg --add-architecture arm64
-          apt-get update
-          apt-get install -y --no-install-recommends hello:arm64 || { echo "arm64 repo test failed"; exit 1; }
-
-      # ------------------------------------------------------------
-      # 2. 安装所有依赖（完全参照 Dockerfile 的包列表）
-      # ------------------------------------------------------------
       - name: 安装构建依赖
         run: |
-          apt-get install -y --no-install-recommends \
-            binutils-aarch64-linux-gnu gcc-aarch64-linux-gnu g++-aarch64-linux-gnu \
-            ca-certificates nano python3 python3-setuptools clang screen llvm lld wget curl \
-            flex bison nasm mingw-w64 \
-            libfreetype6-dev \
-            libglib2.0-dev \
-            libltdl-dev \
-            libxcb1-dev \
-            libx11-dev \
-            libvulkan-dev \
-            librsvg2-bin \
-            git gettext make automake autoconf pkg-config libtool gtk-doc-tools clang \
-            dpkg-dev \
-            libglib2.0-dev:arm64 \
-            libfreetype6-dev:arm64 \
-            libltdl-dev:arm64 \
-            libxcb1-dev:arm64 \
-            libx11-dev:arm64 \
-            build-essential libc-dev-arm64-cross less libc-devtools libidn2-0:arm64 \
-            libx11-dev libxinerama-dev libfreetype-dev libfontconfig-dev \
-            libfreetype-dev:arm64 \
-            cmake \
-            libstdc++6 \
-            libgcc-s1 \
-            libstdc++-dev \
-            libepoxy-dev:arm64 \
-            libsdl2-dev:arm64 \
-            ninja-build \
-            dpkg-dev fakeroot debhelper dh-make \
-            libxcursor-dev:arm64 \
-            libxi-dev:arm64 \
-            libxshmfence-dev:arm64 \
-            libxxf86vm-dev:arm64 \
-            libxrandr-dev:arm64 \
-            libxrender-dev:arm64 \
-            libxfixes-dev:arm64 \
-            libxcomposite-dev:arm64 \
-            libdbus-1-dev:arm64 \
-            libsane-dev:arm64 \
-            libusb-1.0-0-dev:arm64 \
-            libv4l-dev:arm64 \
-            libpulse-dev:arm64 \
-            libgstreamer1.0-dev:arm64 \
-            libgstreamer-plugins-base1.0-dev:arm64 \
-            libgstreamer-plugins-bad1.0-dev:arm64 \
-            libudev-dev:arm64 \
-            libunwind-dev:arm64 \
-            libsdl2-dev:arm64 \
-            libfontconfig1-dev:arm64 \
-            libkrb5-dev:arm64 \
-            libvulkan-dev:arm64 \
-            libgl-dev:arm64 \
-            libgnutls28-dev:arm64 \
-            libcups2-dev:arm64 \
-            libxkbcommon-dev:arm64 \
-            libxkbregistry-dev:arm64 \
-            ocl-icd-opencl-dev \
-            libwayland-dev:arm64
-
+          apt-get install -y \
+            build-essential \
+            git \
+            wget \
+            curl \
+            unzip \
+            flex \
+            bison \
+            gettext \
+            autoconf \
+            automake \
+            libtool \
+            pkg-config \
+            mingw-w64 \
+            gcc-multilib \
+            g++-multilib \
       # ------------------------------------------------------------
       # 3. 安装 llvm-mingw 交叉编译工具链
       # ------------------------------------------------------------
