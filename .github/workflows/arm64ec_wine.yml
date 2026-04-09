@@ -369,6 +369,8 @@ jobs:
             --enable-win64 \
             --enable-archs=i386,x86_64 \
             --prefix=/tmp/wine-install-wow64 \
+            --with-wine-tools=/opt/wine64-native \
+            --with-mingw=clang \
             --with-vulkan \
             --enable-nls \
             --without-pulse \
