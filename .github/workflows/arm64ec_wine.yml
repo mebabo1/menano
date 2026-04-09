@@ -445,18 +445,18 @@ jobs:
           export PKG_CONFIG_LIBDIR=/usr/lib/aarch64-linux-gnu/pkgconfig
           export PKG_CONFIG_PATH=/usr/lib/aarch64-linux-gnu/pkgconfig
 
-          export CC="clang --target=aarch64-linux-gnu"
-          export CXX="clang++ --target=aarch64-linux-gnu"
+          export CROSSCC="x86_64-w64-mingw32-gcc"
+          export CROSSCXX="x86_64-w64-mingw32-g++"
+          export CFLAGS="-march=x86-64 -msse3 -mfpmath=sse $OPT_FLAGS"
+          export CXXFLAGS="-march=x86-64 -msse3 -mfpmath=sse $OPT_FLAGS"
+          export CROSSCFLAGS="-march=x86-64 -msse3 -mfpmath=sse $OPT_FLAGS"
+          export CROSSCXXFLAGS="-march=x86-64 -msse3 -mfpmath=sse $OPT_FLAGS"
+
           export CFLAGS="-O3 -pipe"
           export CXXFLAGS="-O3 -pipe"
-
-          export CROSSCC="arm64ec-w64-mingw32-clang"
-          export CROSSCXX="arm64ec-w64-mingw32-clang++"
           export CROSSCFLAGS="-O3 -pipe"
           export CROSSCXXFLAGS="-O3 -pipe"
-          export i386_CC="i686-w64-mingw32-clang"
-          export i386_CXX="i686-w64-mingw32-clang++"
-
+          
           export PULSE_CFLAGS="-I$deps/include/pulse"
           export PULSE_LIBS="-L$deps/lib/pulseaudio -lpulse"
           export FFMPEG_CFLAGS="-I$depsg/include/libavutil"
@@ -471,41 +471,39 @@ jobs:
 
           # 关键修改：仅使用 --with-wine-tools，不使用 --with-wine64 
           ../configure \
-            --host=aarch64-linux-gnu \
+            --enable-win64 \
+            --enable-archs=i386,x86_64 \
             --prefix=/tmp/wine-install-wow64 \
-            --with-mingw=clang \
-            --enable-archs=arm64ec,aarch64,i386 \
             --with-wine-tools=/opt/wine64-native \
-            --with-wine64=${{ env.WINE64_DIR }}/amd64 \
-            --with-vulkan \
+            --with-mingw=clang \
+            --with-x \
+            --with-alsa \
+            --with-pulse \
+            --with-freetype \
+            --with-fontconfig \
+            --with-gettext \
+            --with-sdl \
             --enable-nls \
-            --without-pulse \
-            --without-ffmpeg \
+            --disable-winemenubuilder \
             --disable-win16 \
-            --without-gstreamer \
-            --disable-opencl \
-            --without-alsa \
             --disable-tests \
+            --without-ldap \
             --without-capi \
-            --without-coreaudio \
+            --without-oss \
             --without-cups \
             --without-dbus \
+            --without-coreaudio \
             --without-gphoto \
-            --without-gssapi \
-            --without-krb5 \
-            --without-alsa \
-            --without-netapi \
-            --without-oss \
+            --without-osmesa \
+            --without-sane \
             --without-pcap \
             --without-pcsclite \
-            --without-sane \
             --without-udev \
             --without-unwind \
             --without-usb \
             --without-v4l2 \
-            --without-wayland \
-            --without-xinerama \
-            --without-xxf86vm
+            --with-xshm \
+            --without-wayland"
             
           make -j$(nproc) > /dev/null
           make install
