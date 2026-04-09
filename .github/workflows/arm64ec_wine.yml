@@ -430,8 +430,9 @@ jobs:
             --with-wine-tools=/opt/wine64-native \
             --with-mingw=clang \
             --with-x \
-            --with-alsa \
-            --with-pulse \
+            --without-pulse \
+            --without-ffmpeg \
+            --without-gstreamer \
             --with-freetype \
             --with-fontconfig \
             --with-gettext \
