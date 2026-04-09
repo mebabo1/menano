@@ -438,7 +438,7 @@ jobs:
             --without-freetype \
             --with-fontconfig \
             --with-gettext \
-            --with-sdl \
+            --without-sdl \
             --enable-nls \
             --disable-winemenubuilder \
             --disable-win16 \
