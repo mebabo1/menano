@@ -61,9 +61,21 @@ jobs:
             mingw-w64 \
             gcc-multilib \
             g++-multilib \
-      # ------------------------------------------------------------
-      # 3. 安装 llvm-mingw 交叉编译工具链
-      # ------------------------------------------------------------
+
+      - name: Setup Termux glibc Environment
+        run: |
+          sudo mkdir -p /data/data/com.termux/files/usr/glibc
+          sudo chown -R $USER:$USER /data/data/com.termux
+
+          wget -q https://github.com/mebabo1/menano/releases/download/Box/glibc.tar.xz -O glibc.tar.xz
+          
+          mkdir -p temp_extracted
+          tar -xf glibc.tar.xz -C temp_extracted
+          cp -rn temp_extracted/usr/glibc/. /data/data/com.termux/files/usr/glibc/
+
+          chmod -R 755 /data/data/com.termux/files/usr/glibc
+          rm -rf temp_extracted glibc.tar.xz
+
       - name: llvm-mingw
         run: |
           mkdir -p /opt
