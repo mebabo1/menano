@@ -238,7 +238,6 @@ jobs:
             --enable-win64 \
             --disable-tests \
             --without-x \
-            --without-vulkan \
             --without-gstreamer \
             --without-wayland
           make __tooldeps__ -j$(nproc) > /dev/null
@@ -412,7 +411,6 @@ jobs:
             --with-wine-tools=/opt/wine64-native \
             --with-mingw=clang \
             --without-freetype
-            --without-vulkan \
             --enable-nls \
             --without-pulse \
             --without-ffmpeg \
