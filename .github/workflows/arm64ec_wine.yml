@@ -433,7 +433,7 @@ jobs:
             --without-ffmpeg \
             --without-gstreamer \
             --disable-opencl \
-            --with-freetype \
+            --without-freetype \
             --with-fontconfig \
             --with-gettext \
             --with-sdl \
