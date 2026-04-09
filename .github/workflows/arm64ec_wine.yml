@@ -324,8 +324,10 @@ jobs:
           cd build-arm64
 
           export PATH="/opt/${{ env.LLVMMINGW_NAME }}/bin:$PATH"
-          export deps="/data/data/com.termux/files/usr"
+          export depsu="/data/data/com.termux/files/usr"
           export depsg="/data/data/com.termux/files/usr/glibc"
+          export deps="$HOME/termuxfs/aarch64/data/data/com.termux/files/usr"
+          
           export PKG_CONFIG_LIBDIR=/usr/lib/aarch64-linux-gnu/pkgconfig
           export PKG_CONFIG_PATH=/usr/lib/aarch64-linux-gnu/pkgconfig
 
@@ -339,13 +341,18 @@ jobs:
           export CROSSCFLAGS="-O3 -pipe"
           export CROSSCXXFLAGS="-O3 -pipe"
 
+          export FREETYPE_CFLAGS="-I$deps/include/freetype2"
           export PULSE_CFLAGS="-I$deps/include/pulse"
           export PULSE_LIBS="-L$deps/lib/pulseaudio -lpulse"
-          export FFMPEG_CFLAGS="-I$depsg/include/libavutil"
-          export FFMPEG_LIBS="-L$depsg/lib -lavutil -lavcodec -lavformat"
-          export GSTREAMER_CFLAGS="-I$depsg/include/gstreamer-1.0 -I$deps/include/glib-2.0 -I$deps/lib/glib-2.0/include -I$deps/glib-2.0/include -I$deps/lib/gstreamer-1.0/include"
-          export GSTREAMER_LIBS="-L$depsg/lib -lgstgl-1.0 -lgstapp-1.0 -lgstvideo-1.0 -lgstaudio-1.0 -lglib-2.0 -lgobject-2.0 -lgio-2.0 -lgsttag-1.0 -lgstbase-1.0 -lgstreamer-1.0"
-          export LDFLAGS="-s -L/usr/lib/aarch64-linux-gnu -Wl,--dynamic-linker=/data/data/com.termux/files/usr/glibc/lib/ld-linux-aarch64.so.1 -Wl,-rpath=/data/data/com.termux/files/usr/glibc/lib"
+          export SDL2_CFLAGS="-I$deps/include/SDL2"
+          export SDL2_LIBS="-L$deps/lib -lSDL2"
+          export X_CFLAGS="-I$deps/include/X11"
+          export GSTREAMER_CFLAGS="-I$deps/include/gstreamer-1.0 -I$deps/include/glib-2.0 -I$deps/lib/glib-2.0/include -I$deps/glib-2.0/include -I$deps/lib/gstreamer-1.0/include"
+          export GSTREAMER_LIBS="-L$deps/lib -lgstgl-1.0 -lgstapp-1.0 -lgstvideo-1.0 -lgstaudio-1.0 -lglib-2.0 -lgobject-2.0 -lgio-2.0 -lgsttag-1.0 -lgstbase-1.0 -lgstreamer-1.0"
+          export FFMPEG_CFLAGS="-I$deps/include/libavutil -I$deps/include/libavcodec -I$deps/include/libavformat"
+          export FFMPEG_LIBS="-L$deps/lib -lavutil -lavcodec -lavformat"
+
+          export LDFLAGS="-L$deps/lib -Wl,-rpath=$depsg/lib"
           export WINE_NLS_DIR=/opt/wine64-native/nls
 
           echo "使用 Wine64 构建目录（作为工具目录）: /opt/wine64-native"
