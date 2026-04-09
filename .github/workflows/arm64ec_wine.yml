@@ -411,6 +411,7 @@ jobs:
             --enable-archs=i386,x86_64 \
             --with-wine-tools=/opt/wine64-native \
             --with-mingw=clang \
+            --without-freetype
             --enable-win64 \
             --with-vulkan \
             --enable-nls \
