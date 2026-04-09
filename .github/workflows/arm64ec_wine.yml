@@ -425,8 +425,10 @@ jobs:
           ../configure \
             --enable-win64 \
             --enable-archs=i386,x86_64 \
+            --host=aarch64-linux-gnu \
             --prefix=/tmp/wine-install-wow64 \
             --with-wine-tools=/opt/wine64-native \
+            --with-mingw=clang \
             --with-x \
             --with-alsa \
             --with-pulse \
