@@ -383,11 +383,11 @@ jobs:
 
           # 关键修改：仅使用 --with-wine-tools，不使用 --with-wine64 
           ../configure \
+            --enable-archs=arm64ec,aarch64,i386 \
             --build=x86_64-pc-linux-gnu \
             --host=aarch64-linux-gnu \
             --prefix=/tmp/wine-install-wow64 \
             --with-mingw=clang \
-            --enable-archs=arm64ec,aarch64,i386 \
             --with-wine-tools=/opt/wine64-native \
             --with-wine64=${{ env.WINE64_DIR }}/amd64 \
             --with-vulkan \
