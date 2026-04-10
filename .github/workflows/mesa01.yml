@@ -44,7 +44,6 @@ jobs:
 
       - name: Package Artifacts
         run: |
-          # glibc 환경은 경로 유지가 중요하므로 tar.gz 권장
           mkdir -p output
           cp -r turnip_workdir/install/* output
           TCMALLOC_PATH=$(ldconfig -p | grep libtcmalloc.so.4 | awk '{print $4}' | head -n 1)
