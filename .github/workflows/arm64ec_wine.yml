@@ -408,7 +408,7 @@ jobs:
           # export GSTREAMER_LIBS="-L$depsg/lib -lgstgl-1.0 -lgstapp-1.0 -lgstvideo-1.0 -lgstaudio-1.0 -lglib-2.0 -lgobject-2.0 -lgio-2.0 -lgsttag-1.0 -lgstbase-1.0 -lgstreamer-1.0"
 
           # export LDFLAGS="-L/usr/lib/x86_64-linux-gnu -L/lib/x86_64-linux-gnu"
-          export LDFLAGS="-L$depsg/lib -Wl,-rpath=depsg/lib"
+          export LDFLAGS="-L$depsg/lib -Wl,-rpath=$depsg/lib"
           
           ../configure \
             --host=aarch64-linux-gnu \
