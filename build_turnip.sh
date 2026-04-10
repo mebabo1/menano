@@ -57,7 +57,6 @@ meson setup builddir \
     -Dgallium-extra-hud=true \
     -Dc_args="-march=armv8-a+crc+crypto" \
     -Dcpp_args="-march=armv8-a+crc+crypto" \
-    -Dpower-symbolic-lookup=true \
     -Dfreedreno-virtio=true \
     --force-fallback-for=spirv-tools,spirv-headers
 # 4. 컴파일 및 설치
