@@ -464,41 +464,37 @@ jobs:
               echo "警告: 未找到 wine.inf 文件"
           fi
 
-      - name: Architecture Agnostic
+      - name: Architecture Agnostic & Complete Installation
         run: |
           set -e
           TARGET_PREFIX="/tmp/wine-install-wow64"
           BUILD_DIR="${{ env.WINE_SOURCE_DIR }}/source/build-arm64"
-          SOURCE_DIR="${{ env.WINE_SOURCE_DIR }}/source"
           
-          # 1. 아키텍처 자동 감지 (x86_64, aarch64 등)
-          # 빌드된 .so 파일이 들어있는 디렉토리 이름을 통해 실제 아키텍처를 파악합니다.
+          echo "=== 1. 아키텍처 자동 감지 ==="
+          # .so 파일 경로를 분석하여 x86_64-unix 또는 aarch64-unix 등을 찾아냅니다.
           DETECTED_ARCH=$(find "$BUILD_DIR" -name "*.so" -type f | grep -oP '(?<=dlls/).*(?=-unix/|/)' | head -1 | cut -d'/' -f1 || echo "")
           
-          # 만약 감지에 실패하면 시스템 아키텍처를 기본값으로 사용
           if [ -z "$DETECTED_ARCH" ]; then
               DETECTED_ARCH=$(uname -m)
-              [ "$DETECTED_ARCH" = "x86_64" ] && DETECTED_ARCH="x86_64"
-              [ "$DETECTED_ARCH" = "aarch64" ] && DETECTED_ARCH="aarch64"
+              echo "아키텍처 감지 실패, 기본값 사용: $DETECTED_ARCH"
           fi
           
           UNIX_LIB_DIR="$TARGET_PREFIX/lib/wine/${DETECTED_ARCH}-unix"
-          echo "=== Detected Architecture: $DETECTED_ARCH ==="
-          echo "=== Target Lib Directory: $UNIX_LIB_DIR ==="
+          echo "검색된 아키텍처: $DETECTED_ARCH"
+          echo "타겟 라이브러리 경로: $UNIX_LIB_DIR"
 
-          # 2. 필수 디렉토리 생성
+          # 필수 디렉토리 생성
           mkdir -p "$TARGET_PREFIX/bin"
           mkdir -p "$UNIX_LIB_DIR"
           mkdir -p "$TARGET_PREFIX/lib/wine"
 
-          # 3. 핵심 프로그램 보정 (wine, wineserver 등)
+          echo "=== 2. 핵심 프로그램 복사 (PE/WOW64) ==="
           PROGRAMS="wine wineserver wineboot winecfg regedit"
           for prog in $PROGRAMS; do
-              if [ -f "$TARGET_PREFIX/bin/$prog" ]; then continue; fi
+              # 이미 설치된 경우 스킵 (make install에서 들어온 경우)
+              [ -f "$TARGET_PREFIX/bin/$prog" ] && continue
               
-              # 빌드 디렉토리에서 해당 실행 파일 찾기
               found=$(find "$BUILD_DIR" -type f \( -name "$prog" -o -name "$prog.exe" \) | grep -E "loader/wine$|server/wineserver$|programs/" | head -1)
-              
               if [ -n "$found" ]; then
                   echo "Copying $prog from $found"
                   cp -v "$found" "$TARGET_PREFIX/bin/$prog"
@@ -506,62 +502,28 @@ jobs:
               fi
           done
 
-          # 4. Unix 라이브러리 (.so) 복사 및 심볼릭 링크
-          echo "=== Copying Unix Libraries (.so) ==="
-          # 모든 .so 파일을 찾아 타겟 디렉토리로 복사
+          echo "=== 3. Unix 라이브러리 (.so) 통합 및 링크 ==="
+          # 모든 .so 파일을 찾아 타겟 디렉토리로 이동
           find "$BUILD_DIR" -name "*.so" -type f -exec cp -v {} "$UNIX_LIB_DIR/" \;
 
-          echo "=== Creating Symbolic Links ==="
-          if [ -d "$UNIX_LIB_DIR" ]; then
-              cd "$UNIX_LIB_DIR"
-              for so_file in *.so; do
-                  [ -e "$so_file" ] || continue
-                  # lib 디렉토리 루트에 링크 생성 (일부 로더 호환성)
-                  ln -sf "wine/${DETECTED_ARCH}-unix/$so_file" "$TARGET_PREFIX/lib/$so_file"
-                  # bin 디렉토리에 링크 생성
-                  ln -sf "../lib/wine/${DETECTED_ARCH}-unix/$so_file" "$TARGET_PREFIX/bin/$so_file"
-              done
-          else
-              echo "❌ Error: Lib directory $UNIX_LIB_DIR not found!"
-              exit 1
-          fi
-
-          echo "=== Final Structure Check ==="
-          ls -F "$TARGET_PREFIX/bin/" | head -n 10
-          ls -F "$UNIX_LIB_DIR/" | head -n 10
-
-          UNIX_LIB_SRC=$(find "$BUILD_DIR" -type d -name "aarch64-unix" | head -1)         
-          if [ -d "$UNIX_LIB_SRC" ]; then
-              echo "Found Unix libraries at: $UNIX_LIB_SRC"
-              cp -vr "$UNIX_LIB_SRC"/*.so "$TARGET_PREFIX/lib/wine/aarch64-unix/" 2>/dev/null || true
-          else
-              echo "⚠️ Warning: aarch64-unix source directory not found, attempting fallback find..."
-              find "$BUILD_DIR" -name "*.so" -type f -exec cp -v {} "$TARGET_PREFIX/lib/wine/aarch64-unix/" \; 2>/dev/null || true
-          fi
-          echo "Creating bulk symbolic links for all .so files..."
-          
-          cd "$TARGET_PREFIX/lib/wine/aarch64-unix"
+          # 링크 생성 (상대 경로 사용으로 이식성 강화)
+          cd "$UNIX_LIB_DIR"
           for so_file in *.so; do
-              [ -e "$so_file" ] || continue # 파일이 없으면 스킵
-              
-              # bin 폴더로 링크 (실행 파일 바로 옆에서 찾는 경우 대비)
-              ln -sf "../lib/wine/aarch64-unix/$so_file" "$TARGET_PREFIX/bin/$so_file"
-              
-              # lib 폴더 루트로 링크 (표준 라이브러리 경로 대응)
-              ln -sf "wine/aarch64-unix/$so_file" "$TARGET_PREFIX/lib/$so_file"
-          done         
-          cd "$GITHUB_WORKSPACE"
-          
-          echo "=== 验证 bin 目录关键文件 ==="
-          ls -la "$BIN_DIR"
+              [ -e "$so_file" ] || continue
+              # /bin/ 폴더에서 라이브러리를 직접 참조할 수 있도록 링크
+              ln -sf "../lib/wine/${DETECTED_ARCH}-unix/$so_file" "$TARGET_PREFIX/bin/$so_file"
+              # /lib/ 루트에서도 참조 가능하게 링크
+              ln -sf "wine/${DETECTED_ARCH}-unix/$so_file" "$TARGET_PREFIX/lib/$so_file"
+          done
+
+          echo "=== 4. 검증 ==="
           for required in wine wineserver wineboot; do
-              if [ ! -f "$BIN_DIR/$required" ] && [ ! -L "$BIN_DIR/$required" ]; then
-                  echo "错误: 缺少关键文件 $required"
+              if [ ! -f "$TARGET_PREFIX/bin/$required" ]; then
+                  echo "❌ 오류: 필수 파일 $required 가 없습니다."
                   exit 1
-              else
-                  echo "✓ $required 存在"
               fi
           done
+          echo "✅ 모든 필수 파일 및 라이브러리 보정 완료"
 
           echo "=== 最终安装目录结构预览 ==="
           ls -la "$TARGET_PREFIX/share/wine/" || true
