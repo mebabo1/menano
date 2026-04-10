@@ -57,7 +57,6 @@ meson setup builddir \
     -Dgallium-extra-hud=true \
     -Dc_args="-march=armv8-a+crc+crypto" \
     -Dcpp_args="-march=armv8-a+crc+crypto" \
-    -Dfreedreno-virtio=true \
     --force-fallback-for=spirv-tools,spirv-headers
 # 4. 컴파일 및 설치
 echo "🏗️  컴파일 시작 (nproc 사용)..."
