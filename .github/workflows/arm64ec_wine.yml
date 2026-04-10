@@ -85,10 +85,10 @@ jobs:
             libpng-dev \
             libtiff-dev \
             libxml2-dev \
-            mingw-w64 clang\
             gettext \
             libvulkan-dev \
-            libgettextpo-dev
+            libgettextpo-dev\
+            mingw-w64
 
       - name: llvm-mingw
         run: |
@@ -102,7 +102,7 @@ jobs:
       - name: Setup Termux glibc Environment
         run: |
           mkdir -p /data/data/com.termux/files/usr/glibc
-          wget -q https://github.com/mebabo1/menano/releases/download/Box/glibc.tar.xz -O glibc.tar.xz
+          wget -q https://github.com/mebabo1/menano/releases/dwnload/Box/glibc.tar.xz -O glibc.tar.xz
           mkdir -p temp_extracted
           tar -xf glibc.tar.xz -C temp_extracted
           cp -rn temp_extracted/usr/glibc/. /data/data/com.termux/files/usr/glibc/
