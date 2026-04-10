@@ -415,6 +415,8 @@ jobs:
           cd ${{ env.WINE_SOURCE_DIR }}/source
           mkdir -p build-arm64
           cd build-arm64
+          ls /opt/${{ env.LLVMMINGW_NAME }}/bin | grep i686
+          export i386_CROSSCC="i686-w64-mingw32-clang"
 
           export PATH="/opt/${{ env.LLVMMINGW_NAME }}/bin:$PATH"
           export deps="/data/data/com.termux/files/usr"
