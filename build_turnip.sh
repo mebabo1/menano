@@ -31,7 +31,7 @@ git clone --depth=1 https://github.com/KhronosGroup/SPIRV-Headers.git spirv-head
 cd ..
 # --------------------------------
 
-echo "⚙️  Meson 구성 중 (최적화 옵션 포함)..."
+OPTIM_FLAGS="-march=armv9-a+crc+crypto+sve2"
 meson setup builddir \
     --prefix=/usr/glibc \
     --libdir=lib \
@@ -55,8 +55,8 @@ meson setup builddir \
     -Dzstd=enabled \
     -Dvideo-codecs=all \
     -Dgallium-extra-hud=true \
-    -Dc_args="-march=armv8-a+crc+crypto" \
-    -Dcpp_args="-march=armv8-a+crc+crypto" \
+    -Dc_args="$OPTIM_FLAGS" \
+    -Dcpp_args="$OPTIM_FLAGS" \
     --force-fallback-for=spirv-tools,spirv-headers
 # 4. 컴파일 및 설치
 echo "🏗️  컴파일 시작 (nproc 사용)..."
