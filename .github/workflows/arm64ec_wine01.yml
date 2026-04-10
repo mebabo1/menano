@@ -558,17 +558,22 @@ jobs:
           done
 
           echo "=== 3. Unix 라이브러리 (.so) 통합 및 링크 ==="
-          # 모든 .so 파일을 찾아 타겟 디렉토리로 이동
+          # 모든 .so 파일을 타겟 디렉토리로 이동 (이미 하신 부분)
           find "$BUILD_DIR" -name "*.so" -type f -exec cp -v {} "$UNIX_LIB_DIR/" \;
 
-          # 링크 생성 (상대 경로 사용으로 이식성 강화)
-          cd "$UNIX_LIB_DIR"
-          for so_file in *.so; do
-              [ -e "$so_file" ] || continue
-              # /bin/ 폴더에서 라이브러리를 직접 참조할 수 있도록 링크
-              ln -sf "../lib/wine/${DETECTED_ARCH}-unix/$so_file" "$TARGET_PREFIX/bin/$so_file"
-              # /lib/ 루트에서도 참조 가능하게 링크
-              ln -sf "wine/${DETECTED_ARCH}-unix/$so_file" "$TARGET_PREFIX/lib/$so_file"
+          # bin 디렉토리로 이동하여 lib를 상대 경로로 링크
+          cd "$TARGET_PREFIX/bin"
+          
+          # Wine 실행에 가장 중요한 'wine' 로더 링크 (가장 중요!)
+          # 보통 wine 실행 파일은 실제로는 로더를 호출하는 스크립트거나 바이너리입니다.
+          if [ -f "$UNIX_LIB_DIR/wine.so" ]; then
+              ln -sf "../lib/wine/${DETECTED_ARCH}-unix/wine.so" "wine"
+          fi
+
+          # 나머지 .so들에 대한 링크가 꼭 필요하다면 (Termux 특수성 대응)
+          for so_file in "$UNIX_LIB_DIR"/*.so; do
+              base_so=$(basename "$so_file")
+              ln -sf "../lib/wine/${DETECTED_ARCH}-unix/$base_so" "$base_so"
           done
 
           echo "=== 4. 검증 ==="
