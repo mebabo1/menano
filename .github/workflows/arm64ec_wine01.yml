@@ -430,7 +430,7 @@ jobs:
             --with-mingw=clang \
             --enable-archs=arm64ec,aarch64,i386 \
             --with-wine-tools=/opt/wine64-native \
-            --with-wine64=${{ env.WINE64_DIR }}/amd64 \
+            --enable-win64 \ \
             --with-vulkan \
             --enable-nls \
             --without-pulse \
