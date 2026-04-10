@@ -49,7 +49,7 @@ jobs:
           cp -r turnip_workdir/install/* output
           TCMALLOC_PATH=$(ldconfig -p | grep libtcmalloc.so.4 | awk '{print $4}' | head -n 1)
           if [ -f "$TCMALLOC_PATH" ]; then
-            cp "$TCMALLOC_PATH" output_dist/glibc/lib/
+            cp "$TCMALLOC_PATH" output
             echo "✅ libtcmalloc included: $TCMALLOC_PATH"
           else
             echo "⚠️ Warning: libtcmalloc not found in system paths"
