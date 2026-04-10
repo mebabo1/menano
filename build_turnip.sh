@@ -33,7 +33,6 @@ cd ..
 
 echo "⚙️  Meson 구성 중 (최적화 옵션 포함)..."
 meson setup builddir \
-meson setup builddir \
     --prefix=/data/data/com.termux/files/usr/glibc \
     --libdir=lib \
     -Dbuildtype=release \
