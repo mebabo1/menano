@@ -519,71 +519,33 @@ jobs:
               echo "警告: 未找到 wine.inf 文件"
           fi
 
-      - name: Architecture Agnostic & Complete Installation
-        run: |
-          set -e
-          TARGET_PREFIX="/tmp/wine-install-wow64"
-          BUILD_DIR="${{ env.WINE_SOURCE_DIR }}/source/build-arm64"
-          
-          echo "=== 1. 아키텍처 자동 감지 ==="
-          # .so 파일 경로를 분석하여 x86_64-unix 또는 aarch64-unix 등을 찾아냅니다.
-          DETECTED_ARCH=$(find "$BUILD_DIR" -name "*.so" -type f | grep -oP '(?<=dlls/).*(?=-unix/|/)' | head -1 | cut -d'/' -f1 || echo "")
-          
-          if [ -z "$DETECTED_ARCH" ]; then
-              DETECTED_ARCH=$(uname -m)
-              echo "아키텍처 감지 실패, 기본값 사용: $DETECTED_ARCH"
-          fi
-          
-          UNIX_LIB_DIR="$TARGET_PREFIX/lib/wine/${DETECTED_ARCH}-unix"
-          echo "검색된 아키텍처: $DETECTED_ARCH"
-          echo "타겟 라이브러리 경로: $UNIX_LIB_DIR"
+          echo "=== 补全关键程序文件 ==="
+          BIN_DIR="$TARGET_PREFIX/bin"
+          mkdir -p "$BIN_DIR"
 
-          # 필수 디렉토리 생성
-          mkdir -p "$TARGET_PREFIX/bin"
-          mkdir -p "$UNIX_LIB_DIR"
-          mkdir -p "$TARGET_PREFIX/lib/wine"
-
-          echo "=== 2. 핵심 프로그램 복사 (PE/WOW64) ==="
+          # 需要的关键程序列表（包括 wineboot, winecfg, regedit, wineconsole 等）
           PROGRAMS="wine wineserver wineboot winecfg regedit"
           for prog in $PROGRAMS; do
-              # 이미 설치된 경우 스킵 (make install에서 들어온 경우)
-              [ -f "$TARGET_PREFIX/bin/$prog" ] && continue
-              
-              found=$(find "$BUILD_DIR" -type f \( -name "$prog" -o -name "$prog.exe" \) | grep -E "loader/wine$|server/wineserver$|programs/" | head -1)
-              if [ -n "$found" ]; then
-                  echo "Copying $prog from $found"
-                  cp -v "$found" "$TARGET_PREFIX/bin/$prog"
-                  chmod +x "$TARGET_PREFIX/bin/$prog"
+              if [ -f "$BIN_DIR/$prog" ]; then
+                  echo "文件 $BIN_DIR/$prog 已存在"
+                  continue
               fi
-          done
-
-          echo "=== 3. Unix 라이브러리 (.so) 통합 및 링크 ==="
-          # 모든 .so 파일을 타겟 디렉토리로 이동 (이미 하신 부분)
-          find "$BUILD_DIR" -name "*.so" -type f -exec cp -v {} "$UNIX_LIB_DIR/" \;
-
-          # bin 디렉토리로 이동하여 lib를 상대 경로로 링크
-          cd "$TARGET_PREFIX/bin"
-          
-          # Wine 실행에 가장 중요한 'wine' 로더 링크 (가장 중요!)
-          # 보통 wine 실행 파일은 실제로는 로더를 호출하는 스크립트거나 바이너리입니다.
-          if [ -f "$UNIX_LIB_DIR/wine.so" ]; then
-              ln -sf "../lib/wine/${DETECTED_ARCH}-unix/wine.so" "wine"
-          fi
-
-          # 나머지 .so들에 대한 링크가 꼭 필요하다면 (Termux 특수성 대응)
-          for so_file in "$UNIX_LIB_DIR"/*.so; do
-              base_so=$(basename "$so_file")
-              ln -sf "../lib/wine/${DETECTED_ARCH}-unix/$base_so" "$base_so"
-          done
-
-          echo "=== 4. 검증 ==="
-          for required in wine wineserver wineboot; do
-              if [ ! -f "$TARGET_PREFIX/bin/$required" ]; then
-                  echo "❌ 오류: 필수 파일 $required 가 없습니다."
+              # 优先从 programs/ 子目录查找（用户态程序）
+              found=""
+              if [[ "$prog" != "wine" && "$prog" != "wineserver" ]]; then
+                  found=$(find "$BUILD_DIR/programs" -type f -name "$prog" -executable 2>/dev/null | head -1)
+              fi
+              if [ -z "$found" ]; then
+                  # 全目录搜索（包括 loader/ 等）
+                  found=$(find "$BUILD_DIR" -type f -name "$prog" -executable 2>/dev/null | head -1)
+              fi
+              if [ -n "$found" ]; then
+                  cp -v "$found" "$BIN_DIR/"
+              else
+                  echo "错误: 完全未找到 $prog"
                   exit 1
               fi
           done
-          echo "✅ 모든 필수 파일 및 라이브러리 보정 완료"
 
           echo "=== 最终安装目录结构预览 ==="
           ls -la "$TARGET_PREFIX/share/wine/" || true
