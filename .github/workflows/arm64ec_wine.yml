@@ -412,6 +412,7 @@ jobs:
           export LDFLAGS="-L$depsg/lib -Wl,-rpath=depsg/lib"
           
           ../configure \
+            --build=x86_64-pc-linux-gnu \
             --host=aarch64-linux-gnu \
             --enable-archs=arm64ec,aarch64,i386 \
             --prefix=/tmp/wine-install-wow64 \
