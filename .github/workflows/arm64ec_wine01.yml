@@ -76,68 +76,34 @@ jobs:
           apt-get update
           apt-get install -y --no-install-recommends hello:arm64 || { echo "arm64 repo test failed"; exit 1; }
 
-      # ------------------------------------------------------------
-      # 2. 安装所有依赖（完全参照 Dockerfile 的包列表）
-      # ------------------------------------------------------------
       - name: Dockerfile
         run: |
-          apt-get install -y --no-install-recommends \
-            binutils-aarch64-linux-gnu gcc-aarch64-linux-gnu g++-aarch64-linux-gnu \
-            ca-certificates nano python3 python3-setuptools clang screen llvm lld wget curl \
-            flex bison nasm mingw-w64 \
-            libfreetype6-dev \
-            libglib2.0-dev \
-            libltdl-dev \
-            libxcb1-dev \
-            libx11-dev \
-            libvulkan-dev \
-            librsvg2-bin \
-            git gettext make automake autoconf pkg-config libtool gtk-doc-tools clang \
-            dpkg-dev \
-            libglib2.0-dev:arm64 \
-            libfreetype6-dev:arm64 \
-            libltdl-dev:arm64 \
+          apt-get update && apt-get install -y --no-install-recommends \
+            build-essential \
+            git make cmake ninja-build autoconf automake \
+            libtool pkg-config gettext flex bison nasm \
+            python3 python3-setuptools ca-certificates wget \
+            curl xz-utils file \
+            clang llvm lld binutils-aarch64-linux-gnu \
+            gcc-aarch64-linux-gnu g++-aarch64-linux-gnu libc6-dev-arm64-cross \
+            mingw-w64 \
+            libglib2.0-dev libfreetype6-dev libltdl-dev libxcb1-dev \
+            libx11-dev libvulkan-dev librsvg2-bin \
+            libx11-dev:arm64 libxext-dev:arm64 libxcursor-dev:arm64 \
+            libxi-dev:arm64 libxrandr-dev:arm64 libxrender-dev:arm64 \
+            libxfixes-dev:arm64 libxcomposite-dev:arm64 libxinerama-dev:arm64 \
+            libxxf86vm-dev:arm64 libxshmfence-dev:arm64 libwayland-dev:arm64 \
+            libgl-dev:arm64 libvulkan-dev:arm64 libepoxy-dev:arm64 \
+            libsdl2-dev:arm64 libfontconfig1-dev:arm64 libfreetype6-dev:arm64 \
+            libpulse-dev:arm64 libgstreamer1.0-dev:arm64 libgstreamer-plugins-base1.0-dev:arm64 \
+            libgstreamer-plugins-bad1.0-dev:arm64 libudev-dev:arm64 libusb-1-0-0-dev:arm64 \
+            libv4l-dev:arm64 libsane-dev:arm64 libcups2-dev:arm64 \
+            libdbus-1-dev:arm64 libkrb5-dev:arm64 libgnutls28-dev:arm64 \
+            libunwind-dev:arm64 libxkbcommon-dev:arm64 libxkbregistry-dev:arm64 \
+            ocl-icd-opencl-dev:arm64 libglib2.0-dev:arm64 libltdl-dev:arm64 \
             libxcb1-dev:arm64 \
-            libx11-dev:arm64 \
-            build-essential libc-dev-arm64-cross less libc-devtools libidn2-0:arm64 \
-            libx11-dev libxinerama-dev libfreetype-dev libfontconfig-dev \
-            cmake \
-            libstdc++6 \
-            libgcc-s1 \
-            libstdc++-12-dev \
-            libepoxy-dev:arm64 \
-            libsdl2-dev:arm64 \
-            ninja-build \
-            dpkg-dev fakeroot debhelper dh-make \
-            libxcursor-dev:arm64 \
-            libxi-dev:arm64 \
-            libxshmfence-dev:arm64 \
-            libxxf86vm-dev:arm64 \
-            libxrandr-dev:arm64 \
-            libxrender-dev:arm64 \
-            libxfixes-dev:arm64 \
-            libxcomposite-dev:arm64 \
-            libdbus-1-dev:arm64 \
-            libsane-dev:arm64 \
-            libusb-1.0-0-dev:arm64 \
-            libv4l-dev:arm64 \
-            libpulse-dev:arm64 \
-            libgstreamer1.0-dev:arm64 \
-            libgstreamer-plugins-base1.0-dev:arm64 \
-            libgstreamer-plugins-bad1.0-dev:arm64 \
-            libudev-dev:arm64 \
-            libunwind-dev:arm64 \
-            libsdl2-dev:arm64 \
-            libfontconfig1-dev:arm64 \
-            libkrb5-dev:arm64 \
-            libvulkan-dev:arm64 \
-            libgl-dev:arm64 \
-            libgnutls28-dev:arm64 \
-            libcups2-dev:arm64 \
-            libxkbcommon-dev:arm64 \
-            libxkbregistry-dev:arm64 \
-            ocl-icd-opencl-dev:arm64 \
-            libwayland-dev:arm64
+            dpkg-dev fakeroot debhelper dh-make screen nano \
+            less
 
       # ------------------------------------------------------------
       # 3. 安装 llvm-mingw 交叉编译工具链
