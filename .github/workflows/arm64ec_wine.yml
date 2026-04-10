@@ -87,6 +87,7 @@ jobs:
             libxml2-dev \
             mingw-w64 \
             gettext \
+            libvulkan-dev \
             libgettextpo-dev
 
       - name: llvm-mingw
