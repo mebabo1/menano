@@ -85,7 +85,6 @@ jobs:
             libpng-dev \
             libtiff-dev \
             libxml2-dev \
-            mingw-w64 \
             gettext \
             libvulkan-dev \
             libgettextpo-dev
