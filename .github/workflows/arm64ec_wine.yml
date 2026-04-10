@@ -57,6 +57,7 @@ jobs:
             bison \
             gcc-multilib \
             g++-multilib \
+            mingw-w64-i686-dev g++-mingw-w64-i686 gcc-mingw-w64-i686 \
             libx11-dev \
             libxext-dev \
             libxi-dev \
