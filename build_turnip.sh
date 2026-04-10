@@ -33,6 +33,7 @@ cd ..
 
 echo "⚙️  Meson 구성 중 (최적화 옵션 포함)..."
 meson setup builddir \
+meson setup builddir \
     --prefix=/data/data/com.termux/files/usr/glibc \
     --libdir=lib \
     -Dbuildtype=release \
@@ -57,10 +58,9 @@ meson setup builddir \
     -Dgallium-extra-hud=true \
     -Dc_args="-march=armv8-a+crc+crypto" \
     -Dcpp_args="-march=armv8-a+crc+crypto" \
-    -Dpower-symbolic-lookup=true \ 
+    -Dpower-symbolic-lookup=true \
     -Dfreedreno-virtio=true \
     --force-fallback-for=spirv-tools,spirv-headers
-
 # 4. 컴파일 및 설치
 echo "🏗️  컴파일 시작 (nproc 사용)..."
 ninja -C builddir -j$(nproc)
