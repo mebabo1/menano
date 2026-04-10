@@ -44,7 +44,7 @@ jobs:
       - name: Package Artifacts
         run: |
           mkdir -p output          
-          # 4. 압축 (output 폴더 기준)
+          cp -r build/* output/
           tar -czvf turnip-glibc-aarch64.tar.gz -C output .
 
       - name: Upload Artifacts
