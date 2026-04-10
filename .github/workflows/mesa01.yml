@@ -41,19 +41,26 @@ jobs:
           # 만약 스크립트가 없다면, 직접 빌드 명령어를 입력해도 됩니다.
           # 이 단계에서 첫 번째 코드의 'meson setup' 옵션들이 적용되어야 합니다.
           ./build_turnip.sh
-
       - name: Package Artifacts
         run: |
           mkdir -p output
-          cp -r turnip_workdir/install/* output
-          TCMALLOC_PATH=$(ldconfig -p | grep libtcmalloc.so.4 | awk '{print $4}' | head -n 1)
-          if [ -f "$TCMALLOC_PATH" ]; then
-            cp "$TCMALLOC_PATH" output
-            echo "✅ libtcmalloc included: $TCMALLOC_PATH"
+          # 1. 빌드된 결과물 복사
+          cp -r turnip_workdir/install/* output/          
+          # 2. ldconfig 캐시 갱신 (설치된 라이브러리 인식 강화)
+          sudo ldconfig      
+          # 3. libtcmalloc 찾기 및 복사 (경로를 명시적으로 검색)
+          TCMALLOC_FILE=$(find /usr/lib/aarch64-linux-gnu -name "libtcmalloc.so.4*" | head -n 1)
+          
+          if [ -n "$TCMALLOC_FILE" ]; then
+            cp -L "$TCMALLOC_FILE" output/libtcmalloc.so.4
+            echo "✅ libtcmalloc included from: $TCMALLOC_FILE"
           else
-            echo "⚠️ Warning: libtcmalloc not found in system paths"
+            echo "❌ Error: libtcmalloc not found"
+            exit 1 # 파일이 없으면 빌드 실패 처리 (선택 사항)
           fi
-          tar -czvf turnip-glibc-aarch64.tar.gz -C turnip_workdir/install .
+          
+          # 4. 압축 (output 폴더 기준)
+          tar -czvf turnip-glibc-aarch64.tar.gz -C output .
 
       - name: Upload Artifacts
         uses: actions/upload-artifact@v4
