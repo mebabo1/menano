@@ -451,7 +451,7 @@ jobs:
           export CFLAGS="-march=armv8-a -O2 -pipe"
           export CXXFLAGS="-march=armv8-a -O2 -pipe"
           export CROSSCFLAGS="-march=armv8-a -O2 -pipe"
-          export CROSSCXXFLAGS="-march=armv8-a -O2 -pipe""
+          export CROSSCXXFLAGS="-march=armv8-a -O2 -pipe"
 
           export PULSE_CFLAGS="-I$deps/include/pulse"
           export PULSE_LIBS="-L$deps/lib/pulseaudio -lpulse"
@@ -475,7 +475,7 @@ jobs:
             --without-pulse \
             --without-ffmpeg \
             --disable-win16 \
-            --without-gstreamer \
+            --with-gstreamer \
             --disable-opencl \
             --without-alsa \
             --disable-tests \
