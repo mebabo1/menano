@@ -11,10 +11,8 @@ SOURCE_DIR=$WORK_DIR/mesa-src
 mkdir -p $WORK_DIR
 mkdir -p $INSTALL_DIR
 
-# 2. Mesa 소스 코드 클론
 if [ ! -d "$SOURCE_DIR" ]; then
     echo "📥 Mesa 소스 클론 중..."
-    # 최신 Adreno 지원을 위해 업스트림 메인 브랜치 사용
     git clone --depth 1 https://gitlab.freedesktop.org/mesa/mesa.git $SOURCE_DIR
 fi
 
@@ -26,11 +24,6 @@ echo "🩹 성능 최적화 패치(MR 37802) 적용 중..."
 #curl -sL "https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/37802.patch" -o 37802.patch
 #patch -p1 --fuzz=4 < 37802.patch || echo "⚠️ 패치 적용 일부 실패 (이미 반영되었을 수 있음)"
 
-# 2-3. 가상 VRAM 보고 용량 상향 (게임 옵션 잠금 해제용)
-echo "💾 가상 VRAM 보고 용량 수정 중..."
-sed -i 's/availableMemory = .*/availableMemory = 4ULL << 30; /g' $SOURCE_DIR/src/freedreno/vulkan/tu_device.cc || true
-
-# 2-2. 의존성 서브프로젝트 다운로드 (Vulkan 최신 기능 보장)
 mkdir -p subprojects
 cd subprojects
 git clone --depth=1 https://github.com/KhronosGroup/SPIRV-Tools.git spirv-tools || true
@@ -39,7 +32,6 @@ cd ..
 # --------------------------------
 
 echo "⚙️  Meson 구성 중 (최적화 옵션 포함)..."
-# 성능 향상을 위해 -Doptimization=3 및 -Db_lto=true 추가
 meson setup builddir \
     --prefix=/data/data/com.termux/files/usr/glibc \
     --libdir=lib \
