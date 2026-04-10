@@ -65,13 +65,3 @@ index 9f101a1..7a2b69f 100644
      InitializeObjectAttributes( &attr, &nameW, OBJ_CASE_INSENSITIVE, 0, NULL );
      if (!NtOpenKey( &key, KEY_READ | KEY_WOW64_64KEY, &attr ))
      {
-@@ -4280,6 +4313,7 @@ static void load_arm64ec_module(void)
-         }
-         NtClose( key );
-     }
-+}
- 
-     if ((status = load_dll( NULL, module, 0, &wm, FALSE )) ||
-         (status = arm64ec_process_init( wm->ldr.DllBase )))
--- 
-2.53.0
