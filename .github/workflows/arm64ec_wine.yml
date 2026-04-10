@@ -417,6 +417,14 @@ jobs:
           cd build-arm64
                     
           export PATH="/opt/${{ env.LLVMMINGW_NAME }}/bin:$PATH"
+          export LLVM_MINGW_PATH="/opt/${{ env.LLVMMINGW_NAME }}/bin"
+          export PATH="$LLVM_MINGW_PATH:$PATH"
+
+          export i386_CC="$LLVM_MINGW_PATH/i686-w64-mingw32-clang"
+          export x86_64_CC="$LLVM_MINGW_PATH/x86_64-w64-mingw32-clang"
+          export arm64ec_CC="$LLVM_MINGW_PATH/arm64ec-w64-mingw32-clang"
+          export aarch64_CC="$LLVM_MINGW_PATH/aarch64-w64-mingw32-clang"
+
           export deps="/data/data/com.termux/files/usr"
           export depsg="/data/data/com.termux/files/usr/glibc"
 
