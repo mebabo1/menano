@@ -1,0 +1,59 @@
+From c4249b90552a58fb5141350ffe50fd8451823619 Mon Sep 17 00:00:00 2001
+From: Billy Laws <blaws05@gmail.com>
+Date: Fri, 12 Apr 2024 20:54:16 +0000
+Subject: [PATCH 07/10] server: Ensure allocated space for mappings is in
+ accessible memory.
+
+---
+ server/mapping.c | 25 ++++++++++++++++++++++++-
+ 1 file changed, 24 insertions(+), 1 deletion(-)
+
+diff --git a/server/mapping.c b/server/mapping.c
+index 69cd0a7..5ecf43b 100644
+--- a/server/mapping.c
++++ b/server/mapping.c
+@@ -21,6 +21,7 @@
+ #include "config.h"
+ 
+ #include <assert.h>
++#include <errno.h>
+ #include <fcntl.h>
+ #include <stdarg.h>
+ #include <stdio.h>
+@@ -270,11 +271,33 @@ static inline mem_size_t round_size( mem_size_t size, mem_size_t mask )
+     return (size + mask) & ~mask;
+ }
+ 
++static void free_available_high_map_addr( client_ptr_t base, mem_size_t size )
++{
++    unsigned int flags = MAP_PRIVATE | MAP_ANON;
++
++#ifdef MAP_FIXED_NOREPLACE
++    flags |= MAP_FIXED_NOREPLACE;
++#endif
++
++    while (base >> 32)
++    {
++        void *ret = mmap( (void *)base, host_page_mask + 1, PROT_NONE, flags, -1, 0 );
++        if (ret != MAP_FAILED) munmap( ret, host_page_mask + 1 );
++        if ((ret != MAP_FAILED && ret >= (void *)base) || errno == EEXIST)
++        {
++            free_map_addr( base, size );
++            return;
++        }
++        base >>= 1;
++        size >>= 1;
++    }
++}
++
+ void init_memory(void)
+ {
+     host_page_mask = sysconf( _SC_PAGESIZE ) - 1;
+     free_map_addr( 0x60000000, 0x1c000000 );
+-    free_map_addr( 0x600000000000, 0x100000000000 );
++    free_available_high_map_addr( 0x600000000000, 0x100000000000 );
+ }
+ 
+ static void ranges_dump( struct object *obj, int verbose )
+-- 
+2.53.0
