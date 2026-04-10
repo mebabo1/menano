@@ -337,7 +337,6 @@ jobs:
             --without-pcsclite \
             --without-sane \
             --without-udev \
-            --without-unwind \
             --without-usb \
             --without-v4l2 \
             --without-wayland \
