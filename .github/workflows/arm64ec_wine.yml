@@ -412,11 +412,12 @@ jobs:
           export LDFLAGS="-L$depsg/lib -Wl,-rpath=depsg/lib"
           
           ../configure \
-            --enable-win64 \
+            --host=aarch64-linux-gnu \
             --enable-archs=arm64ec,aarch64,i386 \
             --prefix=/tmp/wine-install-wow64 \
             --with-wine-tools=/opt/wine64-native \
             --with-mingw=clang \
+            --enable-win64 \
             --with-vulkan \
             --enable-nls \
             --with-pulse \
