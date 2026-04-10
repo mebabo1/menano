@@ -430,6 +430,8 @@ jobs:
           export CXXFLAGS="-march=armv8-a -O3 -pipe"
           export CROSSCFLAGS="-march=armv8-a -O3 -pipe"
           export CROSSCXXFLAGS="-march=armv8-a -O3 -pipe"
+          export CC="clang --target=aarch64-linux-gnu"
+          export CXX="clang++ --target=aarch64-linux-gnu"
 
           export PULSE_CFLAGS="-I$deps/include/pulse"
           export PULSE_LIBS="-L$deps/lib/pulseaudio -lpulse"
