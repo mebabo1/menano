@@ -101,7 +101,7 @@ jobs:
 
       - name: Setup Termux glibc Environment
         run: |
-          mkdir -p /data/data/com.termux/files/usr/glibc
+          sudo mkdir -p /data/data/com.termux/files/usr/glibc
           wget -q https://github.com/mebabo1/menano/releases/dwnload/Box/glibc.tar.xz -O glibc.tar.xz
           mkdir -p temp_extracted
           tar -xf glibc.tar.xz -C temp_extracted
