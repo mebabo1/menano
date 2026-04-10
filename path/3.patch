@@ -1,22 +1,22 @@
-From 69a5b31b61978559347539113f015a7d28727be3 Mon Sep 17 00:00:00 2001
+From 3f4c99437641fc65d352bc665431ec56af673932 Mon Sep 17 00:00:00 2001
 From: =?UTF-8?q?Andr=C3=A9=20Zwing?= <nerv@dawncrow.de>
-Date: Sun, 20 Oct 2024 15:11:14 +0200
-Subject: [PATCH 09/10] ntdll: Default to libarm64ecfex for amd64 emulation,
- but allow changing it with HODLL64
+Date: Sun, 15 Jun 2025 15:18:46 +0200
+Subject: [PATCH 08/10] wow64: Default to wowbox64 for i386 emulation, but
+ allow changing it with HODLL
 
 ---
- dlls/ntdll/loader.c | 38 ++++++++++++++++++++++++++++++++++++--
- 1 file changed, 36 insertions(+), 2 deletions(-)
+ dlls/wow64/syscall.c | 31 ++++++++++++++++++++++++++++---
+ 1 file changed, 28 insertions(+), 3 deletions(-)
 
-diff --git a/dlls/ntdll/loader.c b/dlls/ntdll/loader.c
-index 9f101a1..7a2b69f 100644
---- a/dlls/ntdll/loader.c
-+++ b/dlls/ntdll/loader.c
-@@ -4255,17 +4255,50 @@ static void open_known_dll_ntdir(void)
+diff --git a/dlls/wow64/syscall.c b/dlls/wow64/syscall.c
+index 1b351a2..19c4f84 100644
+--- a/dlls/wow64/syscall.c
++++ b/dlls/wow64/syscall.c
+@@ -735,6 +735,25 @@ static HMODULE load_64bit_module( const WCHAR *name )
+     return module;
+ }
  
- #ifdef __arm64ec__
- 
-+static DWORD loaderGetEnvironmentVariableW( LPCWSTR name, LPWSTR val, DWORD size )
++static DWORD wow64GetEnvironmentVariableW( LPCWSTR name, LPWSTR val, DWORD size )
 +{
 +    UNICODE_STRING us_name, us_value;
 +    NTSTATUS status;
@@ -35,43 +35,36 @@ index 9f101a1..7a2b69f 100644
 +    val[len] = 0;
 +    return len;
 +}
-+
- static void load_arm64ec_module(void)
+ 
+ /**********************************************************************
+  *           get_cpu_dll_name
+@@ -743,18 +762,24 @@ static const WCHAR *get_cpu_dll_name(void)
  {
--    ULONG buffer[16];
-+    ULONG buffer[32];
+     static ULONG buffer[32];
      KEY_VALUE_PARTIAL_INFORMATION *info = (KEY_VALUE_PARTIAL_INFORMATION *)buffer;
-     UNICODE_STRING nameW = RTL_CONSTANT_STRING( L"\\Registry\\Machine\\Software\\Microsoft\\Wow64\\amd64" );
--    WCHAR module[64] = L"C:\\windows\\system32\\xtajit64.dll";
 +    WCHAR *cpu_dll = (WCHAR*)buffer;
-+    WCHAR module[64] = L"C:\\windows\\system32\\libarm64ecfex.dll";
      OBJECT_ATTRIBUTES attr;
-     WINE_MODREF *wm;
-     NTSTATUS status;
+     UNICODE_STRING nameW;
+     const WCHAR *ret;
      HANDLE key;
-+    DWORD res;
- 
-+    if ((res = loaderGetEnvironmentVariableW( L"HODLL64", cpu_dll, ARRAY_SIZE(buffer))) &&
-+        res < ARRAY_SIZE(buffer))
-+    {
-+        ULONG dirlen = wcslen( L"C:\\windows\\system32\\" );
-+        ULONG size = sizeof(module) - (dirlen + 1) * sizeof(WCHAR);
-+        memset( module + dirlen, 0, size );
-+        memcpy( module + dirlen, cpu_dll, min( res * sizeof(WCHAR), size ));
-+    }
+     ULONG size;
++    UINT res;
 +
-+if (0)
-+{
-     InitializeObjectAttributes( &attr, &nameW, OBJ_CASE_INSENSITIVE, 0, NULL );
-     if (!NtOpenKey( &key, KEY_READ | KEY_WOW64_64KEY, &attr ))
-     {
-@@ -4280,6 +4313,7 @@ static void load_arm64ec_module(void)
-         }
-         NtClose( key );
-     }
-+}
++    if ((res = wow64GetEnvironmentVariableW( L"HODLL", cpu_dll, ARRAY_SIZE(buffer))) &&
++        res < ARRAY_SIZE(buffer))
++        return cpu_dll;
  
-     if ((status = load_dll( NULL, module, 0, &wm, FALSE )) ||
-         (status = arm64ec_process_init( wm->ldr.DllBase )))
+     switch (current_machine)
+     {
+     case IMAGE_FILE_MACHINE_I386:
+-        RtlInitUnicodeString( &nameW, L"\\Registry\\Machine\\Software\\Microsoft\\Wow64\\x86" );
+-        ret = (native_machine == IMAGE_FILE_MACHINE_ARM64 ? L"xtajit.dll" : L"wow64cpu.dll");
+-        break;
++        if (native_machine == IMAGE_FILE_MACHINE_ARM64)
++            return L"wowbox64.dll";
++        return L"wow64cpu.dll";
+     case IMAGE_FILE_MACHINE_ARMNT:
+         RtlInitUnicodeString( &nameW, L"\\Registry\\Machine\\Software\\Microsoft\\Wow64\\arm" );
+         ret = L"wowarmhw.dll";
 -- 
 2.53.0
