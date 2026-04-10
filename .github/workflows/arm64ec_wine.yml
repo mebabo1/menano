@@ -380,6 +380,47 @@ jobs:
             ./autogen.sh
           fi
 
+      - name: apt-aarch64
+        run: |
+          dpkg --add-architecture arm64
+          apt-get update
+          apt-get install -y \
+            gcc-aarch64-linux-gnu \
+            g++-aarch64-linux-gnu \
+            binutils-aarch64-linux-gnu
+
+          apt-get install -y \
+            libx11-dev:arm64 \
+            libxext-dev:arm64 \
+            libxi-dev:arm64 \
+            libxrandr-dev:arm64 \
+            libxcursor-dev:arm64 \
+            libxcomposite-dev:arm64 \
+            libxdamage-dev:arm64 \
+            libxfixes-dev:arm64 \
+            libxxf86vm-dev:arm64 \
+            libxrender-dev:arm64 \
+            libxinerama-dev:arm64 \
+            libgl-dev:arm64 \
+            libsdl2-dev:arm64 \
+            libglu-dev:arm64 \
+            libosmesa6-dev:arm64 \
+            libfreetype6-dev:arm64 \
+            libfontconfig1-dev:arm64 \
+            libpcap-dev:arm64 \
+            libdbus-1-dev:arm64 \
+            libssl-dev:arm64 \
+            libasound2-dev:arm64 \
+            libpulse-dev:arm64 \
+            libudev-dev:arm64 \
+            libcups2-dev:arm64 \
+            libjpeg-dev:arm64 \
+            libpng-dev:arm64 \
+            libtiff-dev:arm64 \
+            libxml2-dev:arm64 \
+            libvulkan-dev:arm64 \
+            libgettextpo-dev:arm64
+
       - name: ARM64 WOW64
         run: |
           cd ${{ env.WINE_SOURCE_DIR }}/source
