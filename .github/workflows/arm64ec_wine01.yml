@@ -289,6 +289,12 @@ jobs:
       - name: Termux
         run: |
           cd ${{ env.WINE_SOURCE_DIR }}/source
+          find . -type f \( -name "*.c" -o -name "*.h" -o -name "*.in" -o -name "*.spec" \) -exec grep -l "/tmp" {} \; 2>/dev/null | xargs sed -i 's|/tmp/|/data/data/com.termux/files/usr/tmp/|g' 2>/dev/null || true
+          find server -type f \( -name "*.c" -o -name "*.h" \) -exec sed -i 's|"/tmp"|"/data/data/com.termux/files/usr/tmp"|g' {} + 2>/dev/null || true
+          find . -name "file.c" -exec sed -i 's|"/tmp"|"/data/data/com.termux/files/usr/tmp"|g' {} + 2>/dev/null || true
+          find . -name "loader.c" -exec sed -i 's|"/tmp"|"/data/data/com.termux/files/usr/tmp"|g' {} + 2>/dev/null || true
+          find . -name "server.c" -exec sed -i 's|"/tmp"|"/data/data/com.termux/files/usr/tmp"|g' {} + 2>/dev/null || true
+
           # 1. InterlockedOr 타입 캐스팅 수정 (atiadlxx)
           FILE="dlls/atiadlxx/atiadlxx_main.c"
           if [ -f "$FILE" ]; then
