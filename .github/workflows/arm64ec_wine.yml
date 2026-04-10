@@ -46,7 +46,7 @@ jobs:
       - name: apt-amd64
         run: |
           apt-get install -y python3 python3-minimal \
-            debootstrap clang \
+            debootstrap \
             perl \
             git \
             wget \
@@ -57,9 +57,6 @@ jobs:
             bison \
             gcc-multilib \
             g++-multilib \
-            libstdc++6 \
-            libgcc-s1 \
-            libstdc++-12-dev \
             libx11-dev \
             libxext-dev \
             libxi-dev \
@@ -372,29 +369,16 @@ jobs:
             ./autogen.sh
           fi
 
-      - name: apt-aarch64 (Source Separation & Optimized Install)
+      - name: apt-aarch64
         run: |
-          set -e
-          echo "📦 Configuring Multi-arch APT sources..."
-          
-          # 1. 기존 리스트 백업 및 아키텍처별 분리 설정
-          # 기존 소스에서 주석을 제외하고 모든 'deb' 앞에 [arch=amd64] 추가
-          grep -v '^#' /etc/apt/sources.list | sed 's/^deb /deb [arch=amd64] /g' > /tmp/amd64.list
-          # amd64 리스트를 기반으로 arm64용 리스트 생성
-          sed -e 's/\[arch=amd64\]/[arch=arm64]/g' /tmp/amd64.list > /tmp/arm64.list
-          # 두 리스트를 합쳐서 적용
-          cat /tmp/amd64.list /tmp/arm64.list > /etc/apt/sources.list
-
-          # 2. 아키텍처 추가 및 업데이트
           dpkg --add-architecture arm64
           apt-get update
-
-          # 3. 크로스 빌드 도구 및 arm64 라이브러리 설치
-          # --no-install-recommends를 사용하여 불필요한 용량 차지 방지
-          apt-get install -y --no-install-recommends \
+          apt-get install -y \
             gcc-aarch64-linux-gnu \
             g++-aarch64-linux-gnu \
-            binutils-aarch64-linux-gnu \
+            binutils-aarch64-linux-gnu
+
+          apt-get install -y \
             libx11-dev:arm64 \
             libxext-dev:arm64 \
             libxi-dev:arm64 \
@@ -466,11 +450,10 @@ jobs:
           
           ../configure \
             --host=aarch64-linux-gnu \
-            --enable-archs=arm64ec,aarch64,i386 \
+            --enable-archs=arm64ec,aarch64 \
             --prefix=/tmp/wine-install-wow64 \
             --with-wine-tools=/opt/wine64-native \
             --with-mingw=clang \
-            --with-i386-windows-target=i686-w64-mingw32 \
             --enable-win64 \
             --with-vulkan \
             --enable-nls \
