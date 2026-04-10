@@ -117,20 +117,15 @@ jobs:
           rm ${{ env.LLVMMINGW_NAME }}.tar.xz
           echo "/opt/${{ env.LLVMMINGW_NAME }}/bin" >> $GITHUB_PATH
 
-      # ------------------------------------------------------------
-      # 4. 设置中文语言环境
-      # ------------------------------------------------------------
       - name: locales
         run: |
           apt-get install -y locales
-          sed -i '/zh_CN.UTF-8/s/^# //g' /etc/locale.gen
+          sed -i '/ko_KR.UTF-8/s/^# //g' /etc/locale.gen
           locale-gen
-          echo "LANG=zh_CN.UTF-8" >> $GITHUB_ENV
-          echo "LC_ALL=zh_CN.UTF-8" >> $GITHUB_ENV
-
-      # ------------------------------------------------------------
-      # 5. 获取 Wine 源码（分支处理与原工作流一致）
-      # ------------------------------------------------------------
+          echo "LANG=ko_KR.UTF-8" >> $GITHUB_ENV
+          echo "LC_ALL=ko_KR.UTF-8" >> $GITHUB_ENV
+          echo "LANGUAGE=ko_KR:ko" >> $GITHUB_ENV
+ 
       - name: Wine
         run: |
           set -e
