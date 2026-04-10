@@ -1,78 +1,77 @@
-diff --git a/dlls/ntdll/unix/virtual.c b/dlls/ntdll/unix/virtual.c
-index 4b4d9d6cd7f6..e43b50180fc2 100644
---- a/dlls/ntdll/unix/virtual.c
-+++ b/dlls/ntdll/unix/virtual.c
-@@ -241,6 +241,9 @@ static void *preload_reserve_end;
- static BOOL force_exec_prot;  /* whether to force PROT_EXEC on all PROT_READ mmaps */
- static BOOL enable_write_exceptions;  /* raise exception on writes to executable memory */
+From 69a5b31b61978559347539113f015a7d28727be3 Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Andr=C3=A9=20Zwing?= <nerv@dawncrow.de>
+Date: Sun, 20 Oct 2024 15:11:14 +0200
+Subject: [PATCH 09/10] ntdll: Default to libarm64ecfex for amd64 emulation,
+ but allow changing it with HODLL64
 
-+#define FEX_STATS_SHM_MAX_SIZE 0x400000
-+static void *fex_stats_shm;
-+
- struct range_entry
- {
-     void *base;
-@@ -6297,6 +6300,49 @@ static unsigned int get_memory_image_info( HANDLE process, LPCVOID addr, MEMORY_
-     return status;
- }
+---
+ dlls/ntdll/loader.c | 38 ++++++++++++++++++++++++++++++++++++--
+ 1 file changed, 36 insertions(+), 2 deletions(-)
 
-+#if defined(linux) && defined(__aarch64__)
-+NTSTATUS get_memory_fex_stats_shm( HANDLE process, LPCVOID addr, MEMORY_FEX_STATS_SHM_INFORMATION *info,
-+                                   SIZE_T len, SIZE_T *res_len)
+diff --git a/dlls/ntdll/loader.c b/dlls/ntdll/loader.c
+index 9f101a1..7a2b69f 100644
+--- a/dlls/ntdll/loader.c
++++ b/dlls/ntdll/loader.c
+@@ -4255,17 +4255,50 @@ static void open_known_dll_ntdir(void)
+ 
+ #ifdef __arm64ec__
+ 
++static DWORD loaderGetEnvironmentVariableW( LPCWSTR name, LPWSTR val, DWORD size )
 +{
-+    char buf[0x20];
-+    int fd;
-+    int oflag = O_RDWR;
++    UNICODE_STRING us_name, us_value;
++    NTSTATUS status;
++    DWORD len;
 +
-+    if (len != sizeof(*info)) return STATUS_INFO_LENGTH_MISMATCH;
-+    if (process != GetCurrentProcess()) return STATUS_INVALID_HANDLE;
++    RtlInitUnicodeString( &us_name, name );
++    us_value.Length = 0;
++    us_value.MaximumLength = (size ? size - 1 : 0) * sizeof(WCHAR);
++    us_value.Buffer = val;
 +
-+    sprintf( buf, "fex-%d-stats", getpid() );
++    status = RtlQueryEnvironmentVariable_U( NULL, &us_name, &us_value );
++    len = us_value.Length / sizeof(WCHAR);
++    if (status == STATUS_BUFFER_TOO_SMALL) return len + 1;
++    if (status) return 0;
++    if (!size) return len + 1;
++    val[len] = 0;
++    return len;
++}
 +
-+    if (!fex_stats_shm) {
-+        fex_stats_shm = mmap( NULL, FEX_STATS_SHM_MAX_SIZE, PROT_NONE, MAP_PRIVATE | MAP_ANONYMOUS |
-+                              MAP_NORESERVE, -1, 0 );
-+        if (fex_stats_shm == MAP_FAILED) {
-+            fex_stats_shm = NULL;
-+            return STATUS_INTERNAL_ERROR;
-+        }
-+
-+        oflag |= O_CREAT | O_TRUNC;
+ static void load_arm64ec_module(void)
+ {
+-    ULONG buffer[16];
++    ULONG buffer[32];
+     KEY_VALUE_PARTIAL_INFORMATION *info = (KEY_VALUE_PARTIAL_INFORMATION *)buffer;
+     UNICODE_STRING nameW = RTL_CONSTANT_STRING( L"\\Registry\\Machine\\Software\\Microsoft\\Wow64\\amd64" );
+-    WCHAR module[64] = L"C:\\windows\\system32\\xtajit64.dll";
++    WCHAR *cpu_dll = (WCHAR*)buffer;
++    WCHAR module[64] = L"C:\\windows\\system32\\libarm64ecfex.dll";
+     OBJECT_ATTRIBUTES attr;
+     WINE_MODREF *wm;
+     NTSTATUS status;
+     HANDLE key;
++    DWORD res;
+ 
++    if ((res = loaderGetEnvironmentVariableW( L"HODLL64", cpu_dll, ARRAY_SIZE(buffer))) &&
++        res < ARRAY_SIZE(buffer))
++    {
++        ULONG dirlen = wcslen( L"C:\\windows\\system32\\" );
++        ULONG size = sizeof(module) - (dirlen + 1) * sizeof(WCHAR);
++        memset( module + dirlen, 0, size );
++        memcpy( module + dirlen, cpu_dll, min( res * sizeof(WCHAR), size ));
 +    }
 +
-+    fd = shm_open( buf, oflag, S_IRWXU | S_IRWXG | S_IRWXO );
-+    if (fd == -1) return STATUS_INTERNAL_ERROR;
-+
-+    if (ftruncate( fd, info->map_size )) goto err;
-+
-+    if (mmap( fex_stats_shm, info->map_size, PROT_READ | PROT_WRITE, MAP_SHARED | MAP_FIXED, fd,
-+              0 ) == MAP_FAILED) goto err;
-+
-+    close( fd );
-+
-+    info->shm_base = fex_stats_shm;
-+    *res_len = len;
-+    return STATUS_SUCCESS;
-+
-+err:
-+    close( fd );
-+    return STATUS_INTERNAL_ERROR;
++if (0)
++{
+     InitializeObjectAttributes( &attr, &nameW, OBJ_CASE_INSENSITIVE, 0, NULL );
+     if (!NtOpenKey( &key, KEY_READ | KEY_WOW64_64KEY, &attr ))
+     {
+@@ -4280,6 +4313,7 @@ static void load_arm64ec_module(void)
+         }
+         NtClose( key );
+     }
 +}
-+#endif
-
- /***********************************************************************
-  *             NtQueryVirtualMemory   (NTDLL.@)
-@@ -6376,6 +6379,14 @@            }
-             return STATUS_INVALID_HANDLE;
  
-+        case MemoryFexStatsShm:
-+#if defined(linux) && (defined(__aarch64__) || defined(__arm64ec__))
-+            return get_memory_fex_stats_shm( process, addr, buffer, len, res_len );
-+#else
-+            FIXME("MemoryFexStatsShm unsupported on this platform\n");
-+            return STATUS_INVALID_PARAMETER;
-+#endif
-+
-         default:
-             FIXME("(%p,%p,info_class=%d,%p,%ld,%p) Unknown information class\n",
-                   process, addr, info_class, buffer, len, res_len);
+     if ((status = load_dll( NULL, module, 0, &wm, FALSE )) ||
+         (status = arm64ec_process_init( wm->ldr.DllBase )))
+-- 
+2.53.0
