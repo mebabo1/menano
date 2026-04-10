@@ -99,16 +99,6 @@ jobs:
           rm ${{ env.LLVMMINGW_NAME }}.tar.xz
           echo "/opt/${{ env.LLVMMINGW_NAME }}/bin" >> $GITHUB_PATH
 
-      - name: Setup Termux glibc Environment
-        run: |
-          sudo mkdir -p /data/data/com.termux/files/usr/glibc
-          wget -q https://github.com/mebabo1/menano/releases/dwnload/Box/glibc.tar.xz -O glibc.tar.xz
-          mkdir -p temp_extracted
-          tar -xf glibc.tar.xz -C temp_extracted
-          cp -rn temp_extracted/usr/glibc/. /data/data/com.termux/files/usr/glibc/
-          chmod -R 755 /data/data/com.termux/files/usr/glibc
-          rm -rf temp_extracted glibc.tar.xz
-
       - name: locales
         run: |
           apt-get install -y locales
