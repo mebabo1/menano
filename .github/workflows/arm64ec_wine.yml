@@ -325,7 +325,7 @@ jobs:
             --with-pulse \
             --disable-win16 \
             --with-gstreamer \
-            --with-ffmpeg \
+            --without-ffmpeg \
             --disable-opencl \
             --without-alsa \
             --disable-tests \
