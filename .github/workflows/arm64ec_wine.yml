@@ -464,47 +464,71 @@ jobs:
               echo "警告: 未找到 wine.inf 文件"
           fi
 
-          echo "=== 补全关键程序文件 (PE/WOW64 Support) ==="
-          BIN_DIR="$TARGET_PREFIX/bin"
-          mkdir -p "$BIN_DIR"
+      - name: Architecture Agnostic
+        run: |
+          set -e
+          TARGET_PREFIX="/tmp/wine-install-wow64"
+          BUILD_DIR="${{ env.WINE_SOURCE_DIR }}/source/build-arm64"
+          SOURCE_DIR="${{ env.WINE_SOURCE_DIR }}/source"
+          
+          # 1. 아키텍처 자동 감지 (x86_64, aarch64 등)
+          # 빌드된 .so 파일이 들어있는 디렉토리 이름을 통해 실제 아키텍처를 파악합니다.
+          DETECTED_ARCH=$(find "$BUILD_DIR" -name "*.so" -type f | grep -oP '(?<=dlls/).*(?=-unix/|/)' | head -1 | cut -d'/' -f1 || echo "")
+          
+          # 만약 감지에 실패하면 시스템 아키텍처를 기본값으로 사용
+          if [ -z "$DETECTED_ARCH" ]; then
+              DETECTED_ARCH=$(uname -m)
+              [ "$DETECTED_ARCH" = "x86_64" ] && DETECTED_ARCH="x86_64"
+              [ "$DETECTED_ARCH" = "aarch64" ] && DETECTED_ARCH="aarch64"
+          fi
+          
+          UNIX_LIB_DIR="$TARGET_PREFIX/lib/wine/${DETECTED_ARCH}-unix"
+          echo "=== Detected Architecture: $DETECTED_ARCH ==="
+          echo "=== Target Lib Directory: $UNIX_LIB_DIR ==="
 
+          # 2. 필수 디렉토리 생성
+          mkdir -p "$TARGET_PREFIX/bin"
+          mkdir -p "$UNIX_LIB_DIR"
+          mkdir -p "$TARGET_PREFIX/lib/wine"
+
+          # 3. 핵심 프로그램 보정 (wine, wineserver 등)
           PROGRAMS="wine wineserver wineboot winecfg regedit"
           for prog in $PROGRAMS; do
-              if [ -f "$BIN_DIR/$prog" ]; then
-                  echo "파일 $BIN_DIR/$prog 가 이미 존재합니다."
-                  continue
-              fi
-
-              found=""
-              # 1. wine과 wineserver 우선 탐색 (이들은 보통 확장자가 없음)
-              if [ "$prog" = "wine" ] || [ "$prog" = "wineserver" ]; then
-                  found=$(find "$BUILD_DIR" -type f -name "$prog" | grep -E "loader/wine$|server/wineserver$" | head -1)
-              fi
-
-              # 2. 나머지 프로그램 탐색 (wineboot.exe 등 확장자 포함 검색)
-              if [ -z "$found" ]; then
-                  # $prog 또는 $prog.exe 이름을 가진 파일을 programs 폴더 내에서 찾습니다.
-                  found=$(find "$BUILD_DIR/programs" -type f \( -name "$prog" -o -name "$prog.exe" \) | head -1)
-              fi
-
-              # 3. 최후의 수단: 전체 빌드 폴더 검색
-              if [ -z "$found" ]; then
-                  found=$(find "$BUILD_DIR" -type f \( -name "$prog" -o -name "$prog.exe" \) | head -1)
-              fi
-
+              if [ -f "$TARGET_PREFIX/bin/$prog" ]; then continue; fi
+              
+              # 빌드 디렉토리에서 해당 실행 파일 찾기
+              found=$(find "$BUILD_DIR" -type f \( -name "$prog" -o -name "$prog.exe" \) | grep -E "loader/wine$|server/wineserver$|programs/" | head -1)
+              
               if [ -n "$found" ]; then
-                  echo "Found $prog at $found, copying..."
-                  # 중요: 원본이 .exe라도 목적지에서는 확장자를 떼고 저장하거나, 
-                  # 필요에 따라 이름을 맞춰줍니다. (여기서는 원래 요청한 $prog 이름으로 복사)
-                  cp -v "$found" "$BIN_DIR/$prog"
-                  chmod +x "$BIN_DIR/$prog"
-              else
-                  echo "❌ 오류: $prog 를 찾을 수 없습니다."
-                  # 디버깅용 로그 출력
-                  find "$BUILD_DIR/programs" -name "$prog*" 2>/dev/null || echo "검색 결과 없음"
-                  exit 1
+                  echo "Copying $prog from $found"
+                  cp -v "$found" "$TARGET_PREFIX/bin/$prog"
+                  chmod +x "$TARGET_PREFIX/bin/$prog"
               fi
           done
+
+          # 4. Unix 라이브러리 (.so) 복사 및 심볼릭 링크
+          echo "=== Copying Unix Libraries (.so) ==="
+          # 모든 .so 파일을 찾아 타겟 디렉토리로 복사
+          find "$BUILD_DIR" -name "*.so" -type f -exec cp -v {} "$UNIX_LIB_DIR/" \;
+
+          echo "=== Creating Symbolic Links ==="
+          if [ -d "$UNIX_LIB_DIR" ]; then
+              cd "$UNIX_LIB_DIR"
+              for so_file in *.so; do
+                  [ -e "$so_file" ] || continue
+                  # lib 디렉토리 루트에 링크 생성 (일부 로더 호환성)
+                  ln -sf "wine/${DETECTED_ARCH}-unix/$so_file" "$TARGET_PREFIX/lib/$so_file"
+                  # bin 디렉토리에 링크 생성
+                  ln -sf "../lib/wine/${DETECTED_ARCH}-unix/$so_file" "$TARGET_PREFIX/bin/$so_file"
+              done
+          else
+              echo "❌ Error: Lib directory $UNIX_LIB_DIR not found!"
+              exit 1
+          fi
+
+          echo "=== Final Structure Check ==="
+          ls -F "$TARGET_PREFIX/bin/" | head -n 10
+          ls -F "$UNIX_LIB_DIR/" | head -n 10
 
           UNIX_LIB_SRC=$(find "$BUILD_DIR" -type d -name "aarch64-unix" | head -1)         
           if [ -d "$UNIX_LIB_SRC" ]; then
