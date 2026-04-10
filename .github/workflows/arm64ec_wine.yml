@@ -298,16 +298,21 @@ jobs:
           export deps="/data/data/com.termux/files/usr"
           export depsg="/data/data/com.termux/files/usr/glibc"
 
-          export CFLAGS="-march=x86-64 -msse3 -mfpmath=sse -O3 -ftree-vectorize -pipe"
-          export CXXFLAGS="-march=x86-64 -msse3 -mfpmath=sse -O3 -ftree-vectorize -pipe"
-          export CROSSCFLAGS="-march=x86-64 -msse3 -mfpmath=sse -O3 -ftree-vectorize -pipe"
-          export CROSSCXXFLAGS="-march=x86-64 -msse3 -mfpmath=sse -O3 -ftree-vectorize -pipe"
+          # export CFLAGS="-march=x86-64 -msse3 -mfpmath=sse -O3 -ftree-vectorize -pipe"
+          # export CXXFLAGS="-march=x86-64 -msse3 -mfpmath=sse -O3 -ftree-vectorize -pipe"
+          # export CROSSCFLAGS="-march=x86-64 -msse3 -mfpmath=sse -O3 -ftree-vectorize -pipe"
+          # export CROSSCXXFLAGS="-march=x86-64 -msse3 -mfpmath=sse -O3 -ftree-vectorize -pipe"
+
+          export CFLAGS="-march=x86-64-v3 -O3 -flto -pipe -fno-semantic-interposition"
+          export CXXFLAGS="-march=x86-64-v3 -O3 -flto -pipe -fno-semantic-interposition"
+          export CROSSCFLAGS="-O3 -march=x86-64-v3 -flto"
+          export CROSSCXXFLAGS="-O3 -march=x86-64-v3 -flto"
 
           export PULSE_CFLAGS="-I$deps/include/pulse"
           export PULSE_LIBS="-L$deps/lib/pulseaudio -lpulse"
 
-          export LDFLAGS="-L/usr/lib/x86_64-linux-gnu -L/lib/x86_64-linux-gnu"
-          # export LDFLAGS="-s -L/usr/lib/aarch64-linux-gnu -Wl,--dynamic-linker=$depsg/lib/ld-linux-aarch64.so.1 -Wl,-rpath=$depsg/lib"
+          # export LDFLAGS="-L/usr/lib/x86_64-linux-gnu -L/lib/x86_64-linux-gnu"
+          export LDFLAGS="-Wl,-O3 -Wl,--as-needed -Wl,--strip-all -flto"
           
           ../configure \
             --enable-archs=i386,x86_64 \
