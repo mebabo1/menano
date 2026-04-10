@@ -263,6 +263,17 @@ jobs:
             fi
           fi
 
+          FILE3="dlls/wdscore/wdscore.spec"
+          if [ -f "$FILE3" ]; then
+            if grep -q '@ stub' "$FILE3"; then
+              echo "Cleaning wdscore.spec stubs..."
+              sed -i '/CDynamicArray/d' "$FILE3"
+              echo "✔ wdscore stubs cleaned"
+            else
+              echo "✔ wdscore already cleaned or not found"
+            fi
+          fi
+
           # 2. ntdll virtual.c 미초기화 변수 방어 (컴파일러 경고 해결)
           FILE="dlls/ntdll/unix/virtual.c"
           if [ -f "$FILE" ]; then
@@ -279,9 +290,15 @@ jobs:
           fi
 
           FILE="dlls/ntdll/loader.c"
-          if grep -q 'xtajit64\.dll' "$FILE"; then
-            echo "Replacing xtajit64.dll with libarm64ecfex.dll..."
-            sed -i 's|xtajit64\.dll|libarm64ecfex.dll|g' "$FILE"
+          if [ -f "$FILE" ]; then
+            if grep -q 'xtajit64\.dll' "$FILE"; then
+              echo "Replacing xtajit64.dll with libarm64ecfex.dll..."
+              sed -i 's|xtajit64\.dll|libarm64ecfex.dll|g' "$FILE"
+            fi
+            if grep -q 'ULONG buffer\[16\];' "$FILE"; then
+              echo "Increasing loader buffer size from 16 to 32..."
+              sed -i 's/ULONG buffer\[16\];/ULONG buffer\[32\];/g' "$FILE"
+            fi
           fi
 
           INF="loader/wine.inf.in"
@@ -289,6 +306,30 @@ jobs:
             echo "Patching wine.inf..."
             sed -i 's/xtajit64\.dll/libarm64ecfex.dll/g' "$INF"
             sed -i 's/xtajit\.dll/libwow64fex.dll/g' "$INF"
+          fi
+
+          # 5. FEX YMM State 대응 (unwind.h)
+          FILE="dlls/ntdll/unwind.h"
+          if [ -f "$FILE" ] && ! grep -q 'CONTEXT_ARM64_FEX_YMMSTATE' "$FILE"; then
+            echo "Patching unwind flags for FEX YMM state..."
+            sed -i '/ctx_flags_x64_to_arm/,/}/ {
+              /CONTEXT_AMD64_FLOATING_POINT/ s/$/\n          if (flags \& CONTEXT_AMD64_XSTATE) ret |= CONTEXT_ARM64_FEX_YMMSTATE;/
+            }' "$FILE"
+            sed -i '/ctx_flags_arm_to_x64/,/}/ {
+              /CONTEXT_ARM64_FLOATING_POINT/ s/$/\n          if (flags \& CONTEXT_ARM64_FEX_YMMSTATE) ret |= CONTEXT_AMD64_XSTATE;/
+            }' "$FILE"
+          fi
+
+          # 6. winnt.h FEX 플래그 정의 추가
+          FILE="include/winnt.h"
+          if [ -f "$FILE" ] && ! grep -q 'CONTEXT_ARM64_FEX_YMMSTATE' "$FILE"; then
+            echo "Patching winnt.h to match FEX diff..."
+            sed -i 's|InterlockedOr(&dummy, 0)|_InterlockedOr((long volatile *)\&dummy, 0)|g' "$FILE"
+            sed -i 's/^#define CONTEXT_ARM64_X18.*/#define CONTEXT_ARM64_X18             (CONTEXT_ARM64 | 0x00000010)/' "$FILE"
+            if ! grep -q 'CONTEXT_ARM64_XSTATE' "$FILE"; then
+              sed -i '/CONTEXT_ARM64_X18/a #define CONTEXT_ARM64_XSTATE          (CONTEXT_ARM64 | 0x00000020)' "$FILE"
+            fi
+            sed -i '/CONTEXT_ARM64_XSTATE/a #define CONTEXT_ARM64_FEX_YMMSTATE   (CONTEXT_ARM64 | 0x00000040)' "$FILE"
           fi
 
           # 8. Vulkan VRAM Faking 적용
@@ -306,14 +347,17 @@ jobs:
               }' "$FILE"
           fi
 
-          PATCH_LIST="https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/path/1.patch"
+          export PATCH_BASE="https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/path"
 
-          echo "Applying external patches..."
-          for URL in $PATCH_LIST; do
-            PATCH_FILE="${URL##*/}"            
+          PATCH_FILES="1.patch 2.patch"
+          echo "Applying external patches from $PATCH_BASE..."
+          for FILE in $PATCH_FILES; do
+            URL="${PATCH_BASE}/${FILE}"
+            PATCH_FILE="$FILE"           
             echo "--------------------------------------------"
             echo "Downloading $PATCH_FILE..."
             wget -q -O "$PATCH_FILE" "$URL"
+            
             if git apply --check "$PATCH_FILE" > /dev/null 2>&1; then
                 echo "✔ $PATCH_FILE can be applied cleanly"
                 git apply --whitespace=fix "$PATCH_FILE"
@@ -323,9 +367,7 @@ jobs:
             else
                 echo "❌ $PATCH_FILE failed, generating rejects"
                 git apply --reject --whitespace=fix "$PATCH_FILE" || true
-                echo "❌ $PATCH_FILE could not be fully applied"
                 find . -name "*.rej"
-                echo "⚠ Continuing to next patch despite failure..."
             fi
           done
           echo "--------------------------------------------"
@@ -371,7 +413,7 @@ jobs:
           
           ../configure \
             --enable-win64 \
-            --enable-archs=i386,x86_64 \
+            --enable-archs=arm64ec,aarch64,i386 \
             --prefix=/tmp/wine-install-wow64 \
             --with-wine-tools=/opt/wine64-native \
             --with-mingw=clang \
