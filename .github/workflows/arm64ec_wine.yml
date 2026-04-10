@@ -316,9 +316,9 @@ jobs:
             --with-vulkan \
             --enable-nls \
             --with-pulse \
-            --without-ffmpeg \
             --disable-win16 \
-            --without-gstreamer \
+            --with-gstreamer \
+            --with-ffmpeg \
             --disable-opencl \
             --without-alsa \
             --disable-tests \
