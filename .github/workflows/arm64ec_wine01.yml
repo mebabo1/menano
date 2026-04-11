@@ -246,6 +246,7 @@ jobs:
 
       - name: Termux
         run: |
+          cd ${{ env.WINE_SOURCE_DIR }}/source
           export PATH="/opt/${{ env.LLVMMINGW_NAME }}/bin:$PATH"
           export deps="/data/data/com.termux/files/usr"
           export depsg="/data/data/com.termux/files/usr/glibc"
@@ -266,7 +267,6 @@ jobs:
           export PULSE_LIBS="-L$deps/lib/pulseaudio -lpulse"
           export LDFLAGS="-s -L/usr/lib/aarch64-linux-gnu -Wl,--dynamic-linker=/data/data/com.termux/files/usr/glibc/lib/ld-linux-aarch64.so.1 -Wl,-rpath=/data/data/com.termux/files/usr/glibc/lib"
 
-          cd ${{ env.WINE_SOURCE_DIR }}/source
           find . -type f \( -name "*.c" -o -name "*.h" -o -name "*.in" -o -name "*.spec" \) -exec grep -l "/tmp" {} \; 2>/dev/null | xargs sed -i 's|/tmp/|/data/data/com.termux/files/usr/tmp/|g' 2>/dev/null || true
           find server -type f \( -name "*.c" -o -name "*.h" \) -exec sed -i 's|"/tmp"|"/data/data/com.termux/files/usr/tmp"|g' {} + 2>/dev/null || true
           find . -name "file.c" -exec sed -i 's|"/tmp"|"/data/data/com.termux/files/usr/tmp"|g' {} + 2>/dev/null || true
@@ -401,6 +401,26 @@ jobs:
       - name: configure
         run: |
           cd ${{ env.WINE_SOURCE_DIR }}/source
+          export PATH="/opt/${{ env.LLVMMINGW_NAME }}/bin:$PATH"
+          export deps="/data/data/com.termux/files/usr"
+          export depsg="/data/data/com.termux/files/usr/glibc"
+          export PKG_CONFIG_LIBDIR=/usr/lib/aarch64-linux-gnu/pkgconfig
+          export PKG_CONFIG_PATH=/usr/lib/aarch64-linux-gnu/pkgconfig
+
+          export CC="clang --target=aarch64-linux-gnu"
+          export CXX="clang++ --target=aarch64-linux-gnu"
+          export CROSSCC="arm64ec-w64-mingw32-clang"
+          export CROSSCXX="arm64ec-w64-mingw32-clang++"
+
+          export CFLAGS="-O2 -pipe"
+          export CXXFLAGS="-O2 -pipe"
+          export CROSSCFLAGS="-O2 -pipe"
+          export CROSSCXXFLAGS="-O2 -pipe"
+
+          export PULSE_CFLAGS="-I$deps/include/pulse"
+          export PULSE_LIBS="-L$deps/lib/pulseaudio -lpulse"
+          export LDFLAGS="-s -L/usr/lib/aarch64-linux-gnu -Wl,--dynamic-linker=/data/data/com.termux/files/usr/glibc/lib/ld-linux-aarch64.so.1 -Wl,-rpath=/data/data/com.termux/files/usr/glibc/lib"
+
           if [ ! -f "configure" ]; then
             ./autogen.sh
           fi
