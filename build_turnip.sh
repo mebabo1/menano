@@ -12,8 +12,8 @@ mkdir -p $WORK_DIR
 mkdir -p $INSTALL_DIR
 
 if [ ! -d "$SOURCE_DIR" ]; then
-    echo "📥 Mesa 소스 클론 중..."
-    git clone --depth 1 https://gitlab.freedesktop.org/mesa/mesa.git $SOURCE_DIR
+    echo "📥 whitebelyash Mesa (gen8) 소스 클론 중..."
+    git clone --depth 1 --branch gen8 https://github.com/whitebelyash/mesa-tu8.git $SOURCE_DIR
 fi
 
 cd $SOURCE_DIR
