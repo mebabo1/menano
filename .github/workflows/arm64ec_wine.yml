@@ -359,6 +359,7 @@ jobs:
           TARGET_PREFIX="/tmp/wine-install-wow64"
           BUILD_DIR="${{ env.WINE_SOURCE_DIR }}/source/build-arm64"
           SOURCE_DIR="${{ env.WINE_SOURCE_DIR }}/source"
+          NATIVE_NLS_DIR="/opt/wine64-native/nls"
           ARCH=$(uname -m)
           if [ "$ARCH" = "x86_64" ]; then
               WINE_ARCH="x86_64"
@@ -369,6 +370,14 @@ jobs:
           mkdir -p "$TARGET_PREFIX/bin"
           mkdir -p "$TARGET_PREFIX/lib/wine/$WINE_ARCH-unix"
           mkdir -p "$TARGET_PREFIX/share/wine/nls"
+          mkdir -p "$TARGET_PREFIX/share/wine/fonts"
+          # NATIVE NLS 복사
+          if [ -d "$NATIVE_NLS_DIR" ]; then
+              cp -v "$NATIVE_NLS_DIR"/*.nls "$TARGET_PREFIX/share/wine/nls/" 2>/dev/null || true
+          fi
+          if [ -d "$SOURCE_DIR/fonts" ]; then
+              cp -v "$SOURCE_DIR/fonts"/*.ttf "$SOURCE_DIR/fonts"/*.fon "$TARGET_PREFIX/share/wine/fonts/" 2>/dev/null || true
+          fi
           echo "=== 2. 유닉스 라이브러리(.so) 및 ntdll.so 강제 배치 ==="
           find "$BUILD_DIR" -name "ntdll.so" -exec cp -vL {} "$TARGET_PREFIX/lib/wine/$WINE_ARCH-unix/" \;
           find "$BUILD_DIR/dlls" -name "*.so" -exec cp -vL {} "$TARGET_PREFIX/lib/wine/$WINE_ARCH-unix/" \;
