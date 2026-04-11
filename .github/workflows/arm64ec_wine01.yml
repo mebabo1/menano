@@ -83,7 +83,7 @@ jobs:
             git make cmake ninja-build autoconf automake \
             libtool pkg-config gettext flex bison nasm \
             python3 python3-setuptools ca-certificates wget \
-            curl xz-utils file libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev \
+            curl xz-utils file \
             clang llvm lld binutils-aarch64-linux-gnu \
             gcc-aarch64-linux-gnu g++-aarch64-linux-gnu libc6-dev-arm64-cross \
             mingw-w64 \
