@@ -75,6 +75,6 @@ jobs:
             - Architecture: aarch64
             - Runner: ubuntu-24.04-arm (Native)
             - Download the full tar.gz package  
-             ```bash  
-             tar xf /sdcard/Download/glibcmesa-26.1.0-devel-aarch64-full.tar.gz -C $PREFIX/
-             ```  
+              ```bash  
+              tar xf /sdcard/Download/glibcmesa-26.1.0-devel-aarch64-full.tar.gz -C $PREFIX/
+              ```  
