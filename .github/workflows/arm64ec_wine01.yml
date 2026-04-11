@@ -499,7 +499,10 @@ jobs:
           mkdir -p "$TARGET_PREFIX/lib/wine/$WINE_ARCH-unix"
           mkdir -p "$TARGET_PREFIX/share/wine/nls"
           mkdir -p "$TARGET_PREFIX/share/wine/fonts"
-          # NATIVE NLS 복사
+          if [ -d "$BUILD_DIR/dlls/ntdll/aarch64-windows" ] || [ -d "$TARGET_PREFIX/lib/wine/aarch64-windows" ]; then
+              echo "✔ aarch64-windows 폴더 감지됨. 불필요한 x86_64-unix 폴더를 제거합니다."
+              rm -rf "$TARGET_PREFIX/lib/wine/x86_64-unix"
+          fi
           if [ -d "$NATIVE_NLS_DIR" ]; then
               cp -v "$NATIVE_NLS_DIR"/*.nls "$TARGET_PREFIX/share/wine/nls/" 2>/dev/null || true
           fi
