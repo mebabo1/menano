@@ -528,6 +528,7 @@ jobs:
           done
           echo "=== 5. 환경 변수 및 공백 에러 방지 처리 ==="
           echo "=== 최종 구조 검증 ==="
+          ls -l "$TARGET_PREFIX/lib/wine/x86_64-unix/ntdll.so" || true
           ls -l "$TARGET_PREFIX/bin/wine"
           ls -l "$TARGET_PREFIX/lib/wine/$WINE_ARCH-unix/ntdll.so"
 
