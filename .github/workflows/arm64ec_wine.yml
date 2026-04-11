@@ -402,12 +402,12 @@ jobs:
           else
               echo "警告: 未找到 wine.inf 文件"
           fi
-          echo "=== 补全关键程序文件 ==="
-      - name: 全面补全安装目录 (Shared Library Path Fix)
+
+      - name: Shared Library Path Fix
         run: |
           set -e
           TARGET_PREFIX="/tmp/wine-install-wow64"
-          BUILD_DIR="${{ env.WINE_SOURCE_DIR }}/source/build-arm64" # x86_64 빌드라면 해당 경로로 수정 필요
+          BUILD_DIR="${{ env.WINE_SOURCE_DIR }}/source/build-arm64"
           SOURCE_DIR="${{ env.WINE_SOURCE_DIR }}/source"
           ARCH=$(uname -m)
           if [ "$ARCH" = "x86_64" ]; then
