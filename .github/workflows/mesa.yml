@@ -257,11 +257,8 @@ jobs:
         
           Installation Instructions:  
           1. Download the full tar.gz package  
-          2. Extract to the root directory in a glibc environment: `tar -xzf package.tar.gz -C /`  
-          3. Or extract to a custom directory and set environment variables:  
              ```bash  
-             export LD_LIBRARY_PATH=/path/to/mesa/lib:$LD_LIBRARY_PATH  
-             export LIBGL_DRIVERS_PATH=/path/to/mesa/lib/dri  
+             tar xf /sdcard/Download/glibcmesa-26.1.0-devel-aarch64-full.tar.gz -C $PREFIX/
              ```  
         
           Notes:  
