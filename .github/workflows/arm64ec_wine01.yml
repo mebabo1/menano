@@ -468,59 +468,8 @@ jobs:
             echo "错误: /tmp/wine-install-wow64/bin 目录不存在，安装可能不完整"
             exit 1
           fi
-      # ------------------------------------------------------------
-      # 12. 全面补全安装目录的运行时文件（增强版：优先从 programs/ 查找）
-      # ------------------------------------------------------------
-      - name: 全面补全安装目录的运行时文件（增强版）
-        run: |
-          set -e
-          TARGET_PREFIX="/tmp/wine-install-wow64"
-          BUILD_DIR="${{ env.WINE_SOURCE_DIR }}/source/build-arm64"
-          SOURCE_DIR="${{ env.WINE_SOURCE_DIR }}/source"
-          NATIVE_NLS_DIR="/opt/wine64-native/nls"
-          SOURCE_FONTS_DIR="$SOURCE_DIR/fonts"
 
-          echo "=== 补全 share/wine/nls ==="
-          mkdir -p "$TARGET_PREFIX/share/wine/nls"
-          if [ -d "$NATIVE_NLS_DIR" ]; then
-              cp -v "$NATIVE_NLS_DIR"/*.nls "$TARGET_PREFIX/share/wine/nls/" 2>/dev/null || echo "没有找到 .nls 文件，可能已存在"
-          fi
-          if [ ! -f "$TARGET_PREFIX/share/wine/nls/locale.nls" ] && [ -f "/opt/nls-backup/locale.nls" ]; then
-              cp -v "/opt/nls-backup/locale.nls" "$TARGET_PREFIX/share/wine/nls/"
-          fi
-
-          echo "=== 补全 share/wine/fonts ==="
-          if [ -d "$SOURCE_FONTS_DIR" ]; then
-              mkdir -p "$TARGET_PREFIX/share/wine/fonts"
-              cp -v "$SOURCE_FONTS_DIR"/*.ttf "$SOURCE_FONTS_DIR"/*.fon "$TARGET_PREFIX/share/wine/fonts/" 2>/dev/null || echo "字体复制完成或无字体文件"
-          else
-              echo "警告: 源码 fonts 目录不存在，跳过字体复制"
-          fi
-
-          echo "=== 补全 wine.inf ==="
-          # 查找构建生成的 wine.inf（优先）
-          WINE_INF_SRC=$(find "$BUILD_DIR" -name "wine.inf" -type f 2>/dev/null | head -1)
-          if [ -z "$WINE_INF_SRC" ]; then
-              # 如果未生成，尝试从源码目录复制原始文件
-              if [ -f "$SOURCE_DIR/dlls/wine.inf/wine.inf" ]; then
-                  WINE_INF_SRC="$SOURCE_DIR/dlls/wine.inf/wine.inf"
-              elif [ -f "$SOURCE_DIR/dlls/wine.inf/wine.inf.in" ]; then
-                  WINE_INF_SRC="$SOURCE_DIR/dlls/wine.inf/wine.inf.in"
-              fi
-          fi
-          if [ -n "$WINE_INF_SRC" ]; then
-              mkdir -p "$TARGET_PREFIX/share/wine"
-              TARGET_INF="$TARGET_PREFIX/share/wine/wine.inf"
-              cp -v "$WINE_INF_SRC" "$TARGET_INF"
-              sed -i 's/xtajit64\.dll/libarm64ecfex.dll/g' "$TARGET_INF"
-              sed -i 's/xtajit\.dll/libwow64fex.dll/g' "$TARGET_INF"
-              grep -E 'arm64ecfex|wow64fex|xtajit' "$TARGET_INF" || true
-          else
-              echo "警告: 未找到 wine.inf 文件"
-          fi
-
-          echo "=== 补全关键程序文件 ==="
-      - name: 全面补全安装目录 (Shared Library Path Fix)
+      - name: Shared Library Path Fix
         run: |
           set -e
           TARGET_PREFIX="/tmp/wine-install-wow64"
