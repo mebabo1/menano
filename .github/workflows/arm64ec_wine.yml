@@ -396,13 +396,6 @@ jobs:
               fi
           done
           echo "=== 5. 환경 변수 및 공백 에러 방지 처리 ==="
-
-          WINE_INF_SRC=$(find "$BUILD_DIR" -name "wine.inf" -type f | head -1)
-          if [ -n "$WINE_INF_SRC" ]; then
-              mkdir -p "$TARGET_PREFIX/share/wine"
-              cp -v "$WINE_INF_SRC" "$TARGET_PREFIX/share/wine/wine.inf"
-              sed -i 's|xtajit|libarm64ecfex|g' "$TARGET_PREFIX/share/wine/wine.inf"
-          fi
           echo "=== 최종 구조 검증 ==="
           ls -l "$TARGET_PREFIX/bin/wine"
           ls -l "$TARGET_PREFIX/lib/wine/$WINE_ARCH-unix/ntdll.so"
