@@ -470,6 +470,7 @@ jobs:
             --without-v4l2 \
             --without-wayland \
             --without-xinerama \
+            --with-xshm \
             --without-xxf86vm
             
           make -j$(nproc) > /dev/null
