@@ -76,5 +76,5 @@ jobs:
             - Runner: ubuntu-24.04-arm (Native)
             - Download the full tar.gz package  
               ```bash  
-              tar xf /sdcard/Download/glibcmesa-26.1.0-devel-aarch64-full.tar.gz -C $PREFIX/
+              tar xf /sdcard/Download/turnip-glibc-aarch64.tar.gz -C $PREFIX/
               ```  
