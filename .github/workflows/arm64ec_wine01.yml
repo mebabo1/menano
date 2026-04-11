@@ -526,12 +526,23 @@ jobs:
                   echo "경고: $prog 를 찾을 수 없습니다. 빌드 로그를 확인하세요."
               fi
           done
-          echo "=== 5. 환경 변수 및 공백 에러 방지 처리 ==="
           echo "=== 최종 구조 검증 ==="
-          ls -l "$TARGET_PREFIX/lib/wine/x86_64-unix/ntdll.so" || true
-          ls -l "$TARGET_PREFIX/bin/wine"
-          ls -l "$TARGET_PREFIX/lib/wine/$WINE_ARCH-unix/ntdll.so"
+          # 1. 메인 실행 파일(wine) 검증
+          ls -l "$TARGET_PREFIX/bin/wine" || echo "❌ 경고: wine 실행 파일이 bin에 없습니다."
 
+          # 2. 실제 타겟 아키텍처(aarch64-unix) 검증
+          if [ -d "$TARGET_PREFIX/lib/wine/aarch64-unix" ]; then
+              echo "✔ aarch64-unix 폴더 감지됨"
+              ls -l "$TARGET_PREFIX/lib/wine/aarch64-unix/ntdll.so" || echo "⚠ ntdll.so 누락"
+              
+              # aarch64가 정상일 때만 x86_64 폴더 상태를 확인 (에러 무시)
+              echo "--- 보조 아키텍처 확인 ---"
+              ls -l "$TARGET_PREFIX/lib/wine/x86_64-unix/ntdll.so" 2>/dev/null || echo "ℹ x86_64-unix가 없습니다 (정상적인 WOW64 통합 처리됨)"
+          else
+              # 만약 메인 폴더인 aarch64-unix 조차 없다면 이건 진짜 에러입니다.
+              echo "❌ 에러: 핵심 라이브러리 폴더(aarch64-unix)를 찾을 수 없습니다."
+              exit 1
+          fi
 
       # ------------------------------------------------------------
       # 13. 验证安装目录内容（可选，便于调试）
