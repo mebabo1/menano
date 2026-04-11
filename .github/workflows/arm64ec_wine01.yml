@@ -448,7 +448,7 @@ jobs:
             --without-pulse \
             --without-ffmpeg \
             --disable-win16 \
-            --with-gstreamer \
+            --without-gstreamer \
             --disable-opencl \
             --without-alsa \
             --disable-tests \
