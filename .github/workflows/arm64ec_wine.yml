@@ -500,7 +500,7 @@ jobs:
           body: |
             - **Wine Branch**: ${{ github.event.inputs.wine_branch || 'staging' }}
             - **Wine Version**: ${{ github.event.inputs.wine_version || 'latest' }}
-            - **Host Architecture**: Amd64 (aarch64)
+            - **Host Architecture**: Amd64
             - **Target Windows Architectures**: i386, x86_64 (via WOW64 emulation)
 
             - Build Time: ${{ github.event.head_commit.timestamp }}
