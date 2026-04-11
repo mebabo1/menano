@@ -474,7 +474,7 @@ jobs:
           set -e
           TARGET_PREFIX="/tmp/wine-install-wow64"
           BUILD_DIR="${{ env.WINE_SOURCE_DIR }}/source/build-arm64" # x86_64 빌드라면 해당 경로로 수정 필요
-          SOURCE_DIR="${{ env.WINE_SOURCE_DIR }}/source"
+          SOURCE_DIR="${{ env.WINE64_DIR }}/source"
           ARCH=$(uname -m)
           if [ "$ARCH" = "x86_64" ]; then
               WINE_ARCH="x86_64"
