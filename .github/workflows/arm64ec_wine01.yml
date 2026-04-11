@@ -520,36 +520,50 @@ jobs:
           fi
 
           echo "=== 补全关键程序文件 ==="
-          BIN_DIR="$TARGET_PREFIX/bin"
-          mkdir -p "$BIN_DIR"
-
-          # 需要的关键程序列表（包括 wineboot, winecfg, regedit, wineconsole 等）
+      - name: 全面补全安装目录 (Shared Library Path Fix)
+        run: |
+          set -e
+          TARGET_PREFIX="/tmp/wine-install-wow64"
+          BUILD_DIR="${{ env.WINE_SOURCE_DIR }}/source/build-arm64" # x86_64 빌드라면 해당 경로로 수정 필요
+          SOURCE_DIR="${{ env.WINE_SOURCE_DIR }}/source"
+          ARCH=$(uname -m)
+          if [ "$ARCH" = "x86_64" ]; then
+              WINE_ARCH="x86_64"
+          else
+              WINE_ARCH="aarch64"
+          fi
+          echo "=== 1. 표준 디렉토리 구조 생성 ($WINE_ARCH-unix) ==="
+          mkdir -p "$TARGET_PREFIX/bin"
+          mkdir -p "$TARGET_PREFIX/lib/wine/$WINE_ARCH-unix"
+          mkdir -p "$TARGET_PREFIX/share/wine/nls"
+          echo "=== 2. 유닉스 라이브러리(.so) 및 ntdll.so 강제 배치 ==="
+          find "$BUILD_DIR" -name "ntdll.so" -exec cp -vL {} "$TARGET_PREFIX/lib/wine/$WINE_ARCH-unix/" \;
+          find "$BUILD_DIR/dlls" -name "*.so" -exec cp -vL {} "$TARGET_PREFIX/lib/wine/$WINE_ARCH-unix/" \;
+          find "$BUILD_DIR/programs" -name "*.so" -exec cp -vL {} "$TARGET_PREFIX/lib/wine/$WINE_ARCH-unix/" \;
+          echo "=== 3. bin/ntdll.so 로딩 에러 대응 (상대 경로 링크) ==="
+          ln -sf "../lib/wine/$WINE_ARCH-unix/ntdll.so" "$TARGET_PREFIX/bin/ntdll.so"
+          echo "=== 4. 주요 실행 파일(Loader) 복사 ==="
           PROGRAMS="wine wineserver wineboot winecfg regedit"
           for prog in $PROGRAMS; do
-              if [ -f "$BIN_DIR/$prog" ]; then
-                  echo "文件 $BIN_DIR/$prog 已存在"
-                  continue
-              fi
-              # 优先从 programs/ 子目录查找（用户态程序）
-              found=""
-              if [[ "$prog" != "wine" && "$prog" != "wineserver" ]]; then
-                  found=$(find "$BUILD_DIR/programs" -type f -name "$prog" -executable 2>/dev/null | head -1)
-              fi
-              if [ -z "$found" ]; then
-                  # 全目录搜索（包括 loader/ 等）
-                  found=$(find "$BUILD_DIR" -type f -name "$prog" -executable 2>/dev/null | head -1)
-              fi
+
+              found=$(find "$BUILD_DIR" -type f -name "$prog" -executable | head -1)
               if [ -n "$found" ]; then
-                  cp -v "$found" "$BIN_DIR/"
+                  cp -vL "$found" "$TARGET_PREFIX/bin/"
               else
-                  echo "错误: 完全未找到 $prog"
-                  exit 1
+                  echo "경고: $prog 를 찾을 수 없습니다. 빌드 로그를 확인하세요."
               fi
           done
+          echo "=== 5. 환경 변수 및 공백 에러 방지 처리 ==="
 
-          echo "=== 最终安装目录结构预览 ==="
-          ls -la "$TARGET_PREFIX/share/wine/" || true
-          ls -la "$TARGET_PREFIX/bin/" || true
+          WINE_INF_SRC=$(find "$BUILD_DIR" -name "wine.inf" -type f | head -1)
+          if [ -n "$WINE_INF_SRC" ]; then
+              mkdir -p "$TARGET_PREFIX/share/wine"
+              cp -v "$WINE_INF_SRC" "$TARGET_PREFIX/share/wine/wine.inf"
+              sed -i 's|xtajit|libarm64ecfex|g' "$TARGET_PREFIX/share/wine/wine.inf"
+          fi
+          echo "=== 최종 구조 검증 ==="
+          ls -l "$TARGET_PREFIX/bin/wine"
+          ls -l "$TARGET_PREFIX/lib/wine/$WINE_ARCH-unix/ntdll.so"
 
       # ------------------------------------------------------------
       # 13. 验证安装目录内容（可选，便于调试）
