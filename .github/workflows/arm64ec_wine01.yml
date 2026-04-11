@@ -512,10 +512,6 @@ jobs:
           find "$BUILD_DIR/programs" -name "*.so" -exec cp -vL {} "$TARGET_PREFIX/lib/wine/$WINE_ARCH-unix/" \;
           echo "=== 3. bin/ntdll.so 로딩 에러 대응 (상대 경로 링크) ==="
           ln -sf "../lib/wine/$WINE_ARCH-unix/ntdll.so" "$TARGET_PREFIX/bin/ntdll.so"
-          for so_file in "$TARGET_PREFIX/lib/wine/$WINE_ARCH-unix/"*.so; do
-              filename=$(basename "$so_file")
-              ln -sf "../lib/wine/$WINE_ARCH-unix/$filename" "$TARGET_PREFIX/bin/$filename"
-          done
           echo "=== 4. 주요 실행 파일(Loader) 복사 ==="
           PROGRAMS="wine wineserver wineboot winecfg regedit"
           for prog in $PROGRAMS; do
