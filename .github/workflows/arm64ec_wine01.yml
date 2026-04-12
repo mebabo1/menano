@@ -353,6 +353,18 @@ jobs:
           find . -type f \( -name "*.c" -o -name "*.h" -o -name "*.spec" -o -name "*.in" \) \
             -exec sed -i 's/xtajit\.dll/libwow64fex.dll/g' {} +
 
+          if [ -d "dlls/xtajit64" ]; then
+              echo "Renaming xtajit64 directory and files..."
+              mv dlls/xtajit64/xtajit64.spec dlls/xtajit64/libarm64ecfex.spec 2>/dev/null || true
+              mv dlls/xtajit64 dlls/libarm64ecfex 2>/dev/null || true
+          fi
+          if [ -d "dlls/xtajit" ]; then
+              mv dlls/xtajit/xtajit.spec dlls/xtajit/libwow64fex.spec 2>/dev/null || true
+              mv dlls/xtajit dlls/libwow64fex 2>/dev/null || true
+          fi
+          find . -name "Makefile.in" -exec sed -i 's/xtajit64/libarm64ecfex/g' {} +
+          find . -name "Makefile.in" -exec sed -i 's/xtajit/libwow64fex/g' {} +
+
           export PATCH_BASE="https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/path"
 
           PATCH_FILES="1.patch 2.patch"
