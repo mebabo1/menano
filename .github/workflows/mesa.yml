@@ -256,7 +256,7 @@ jobs:
           - `checksums.txt` - Checksum file  
         
           Installation Instructions:  
-          1. Download the full tar.gz package  
+          1. use glibc gpu
              ```bash  
              tar xf /sdcard/Download/glibcmesa-26.1.0-devel-aarch64-full.tar.gz -C $PREFIX/
              ```  
