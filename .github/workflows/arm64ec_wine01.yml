@@ -348,6 +348,10 @@ jobs:
               }' "$FILE"
           fi
 
+          if [ -d "dlls/xtajit64" ]; then
+              mv dlls/xtajit64/xtajit64.spec dlls/xtajit64/libarm64ecfex.spec 2>/dev/null || true
+              mv dlls/xtajit64 dlls/libarm64ecfex 2>/dev/null || true
+          fi
 
           find . -type f \( -name "*.c" -o -name "*.h" -o -name "*.in" \) \
             -exec sed -i 's/xtajit64\.dll/libarm64ecfex.dll/g' {} +
