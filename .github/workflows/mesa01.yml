@@ -74,7 +74,7 @@ jobs:
             Turnip (Freedreno Vulkan) driver built for glibc environment.
             - Architecture: aarch64
             - Runner: ubuntu-24.04-arm (Native)
-            - Download the full tar.gz package  
+            - use glubc gpu  
               ```bash  
               tar xf /sdcard/Download/turnip-glibc-aarch64.tar.gz -C $PREFIX/
               ```  
