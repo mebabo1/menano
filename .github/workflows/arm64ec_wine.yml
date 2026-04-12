@@ -382,19 +382,28 @@ jobs:
           find "$BUILD_DIR" -name "ntdll.so" -exec cp -vL {} "$TARGET_PREFIX/lib/wine/$WINE_ARCH-unix/" \;
           find "$BUILD_DIR/dlls" -name "*.so" -exec cp -vL {} "$TARGET_PREFIX/lib/wine/$WINE_ARCH-unix/" \;
           find "$BUILD_DIR/programs" -name "*.so" -exec cp -vL {} "$TARGET_PREFIX/lib/wine/$WINE_ARCH-unix/" \;
-          echo "=== 3. bin/ntdll.so 로딩 에러 대응 (상대 경로 링크) ==="
-          ln -sf "../lib/wine/$WINE_ARCH-unix/ntdll.so" "$TARGET_PREFIX/bin/ntdll.so"
-          echo "=== 4. 주요 실행 파일(Loader) 복사 ==="
+
+          echo "=== 3. 로더 및 실행 파일 복사 ==="
           PROGRAMS="wine wineserver wineboot winecfg regedit"
           for prog in $PROGRAMS; do
-
               found=$(find "$BUILD_DIR" -type f -name "$prog" -executable | head -1)
-              if [ -n "$found" ]; then
-                  cp -vL "$found" "$TARGET_PREFIX/bin/"
-              else
-                  echo "경고: $prog 를 찾을 수 없습니다. 빌드 로그를 확인하세요."
-              fi
+              [ -n "$found" ] && cp -vL "$found" "$TARGET_PREFIX/bin/" || echo "⚠ $prog 찾지 못함"
           done
+
+          echo "=== 4. 심볼릭 링크 재생성 (절대 경로 에러 방어) ==="
+          # ntdll.so 링크가 실제로 존재하는지 확인 후 생성
+          if [ -f "$TARGET_PREFIX/lib/wine/$WINE_ARCH-unix/ntdll.so" ]; then
+              cd "$TARGET_PREFIX/bin"
+              # 상대 경로가 확실히 맞도록 해당 디렉토리로 이동 후 링크 생성
+              ln -sf "../lib/wine/$WINE_ARCH-unix/ntdll.so" "ntdll.so"
+              echo "✔ ntdll.so 심볼릭 링크 생성 완료"
+          else
+              echo "❌ 치명적 오류: ntdll.so 원본 파일이 없습니다!"
+              exit 1
+          fi         
+          if [ -f "wine" ]; then
+              ln -sf wine wine64
+          fi
           echo "=== 5. 환경 변수 및 공백 에러 방지 처리 ==="
           echo "=== 최종 구조 검증 ==="
           ls -l "$TARGET_PREFIX/bin/wine"
