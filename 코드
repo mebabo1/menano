@@ -57,10 +57,12 @@
           fi
 
           INF="loader/wine.inf.in"
-          if ! grep -q 'libarm64ecfex.dll' "$INF"; then
-            echo "Patching wine.inf..."
-            sed -i 's/xtajit64\.dll/libarm64ecfex.dll/g' "$INF"
-            sed -i 's/xtajit\.dll/libwow64fex.dll/g' "$INF"
+          if [ -f "$INF" ] && ! grep -q 'libarm64ecfex.dll' "$INF"; then
+              echo "Patching wine.inf for FEX libraries..."
+              sed -i 's/xtajit64\.dll/libarm64ecfex.dll/g' "$INF"
+              sed -i 's/xtajit\.dll/libwow64fex.dll/g' "$INF"
+              sed -i '/^;;KnownDLLs$/a HKLM,%Control%\\Session Manager\\KnownDLLs,"libarm64ecfex",,"libarm64ecfex.dll"\nHKLM,%Control%\\Session Manager\\KnownDLLs,"libwow64fex",,"libwow64fex.dll"' "$INF"    
+              echo "✔ wine.inf integrated patch applied."
           fi
 
           # 5. FEX YMM State 대응 (unwind.h)
