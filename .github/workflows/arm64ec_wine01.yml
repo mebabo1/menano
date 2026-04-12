@@ -433,7 +433,6 @@ jobs:
             --with-mingw=clang \
             --enable-archs=arm64ec,aarch64,i386 \
             --with-wine-tools=/opt/wine64-native \
-            --enable-win64 \
             --with-vulkan \
             --enable-nls \
             --without-pulse \
