@@ -17,27 +17,3 @@ index 963ebd2..android_fixed 100644
  #else
  static void *address_space_limit = (void *)0xc0000000;
  static void *user_space_limit    = (void *)0x7fff0000;
-@@ -405,6 +405,13 @@ static void kernel_writewatch_init(void)
- {
--    struct uffdio_api uffdio_api;
--
--    uffd_fd = syscall( __NR_userfaultfd, O_CLOEXEC | O_NONBLOCK | UFFD_USER_MODE_ONLY );
--
--    if (uffd_fd == -1) return;
--
--    uffdio_api.api = UFFD_API;
--    uffdio_api.features = 0;
--
--    if (ioctl( uffd_fd, UFFDIO_API, &uffdio_api ) == -1)
--    {
--        close( uffd_fd );
--        return;
--    }
--
--    use_kernel_writewatch = 1;
-+    /* Android environment: disable kernel writewatch completely */
-+    TRACE("Kernel writewatches are disabled (Android environment)\n");
-+    use_kernel_writewatch = 0;
- }
- 
- static void kernel_writewatch_reset( void *start, SIZE_T len )
