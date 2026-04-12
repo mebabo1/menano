@@ -139,7 +139,7 @@ jobs:
             winearm64ec)
               echo "Processing protonarm64ec branch"
 
-              git clone -b "upstream-arm64ec" https://github.com/ziad9267/wine.git source
+              git clone -b "bleeding-edge" https://github.com/ziad9267/wine.git source
               cd source
               git config advice.detachedHead false
               if [ "$WINE_VERSION" != "latest" ]; then
