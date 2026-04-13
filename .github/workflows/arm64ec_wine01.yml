@@ -442,6 +442,7 @@ jobs:
             --enable-nls \
             --without-pulse \
             --without-ffmpeg \
+            --without-gstreamer \
             --disable-win16 \
             --disable-opencl \
             --without-alsa \
