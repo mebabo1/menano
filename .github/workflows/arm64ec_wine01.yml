@@ -520,7 +520,9 @@ jobs:
               echo "❌ 치명적 오류: ntdll.so 원본 파일이 없습니다!"
               exit 1
           fi         
-
+          if [ -f "wine" ]; then
+              cp -r wine wine64
+          fi
           echo "=== 최종 검증 ==="
           ls -l "$TARGET_PREFIX/bin/ntdll.so"
           # 링크가 가리키는 실제 파일의 존재 여부를 한 번 더 확인
