@@ -281,7 +281,7 @@ jobs:
             fi
             if grep -q '0x7fffffff0000' "$FILE"; then
               echo "Patching address_space_limit in virtual.c for Android/FEX..."
-              sed -i 's/0x7fffffff0000/0x7fffff0000/g' "$FILE"
+              sed -i 's/\(_limit.*\)0x7fffffff0000/\10x7fffff0000/g' "$FILE"
             fi
           fi
 
