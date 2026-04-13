@@ -194,6 +194,8 @@ jobs:
           cd ${{ env.WINE64_DIR }}
           mkdir -p amd64
           cd amd64
+          export PATH="/opt/${{ env.LLVMMINGW_NAME }}/bin:$PATH"
+          
           ../source/configure \
             --disable-tests \
             --without-x \
@@ -439,7 +441,6 @@ jobs:
             --without-wayland \
             --without-xinerama \
             --with-xshm \
-            i386_CROSSCFLAGS="-march=pentium4" \
             --without-xxf86vm
             
           make -j$(nproc) > /dev/null
