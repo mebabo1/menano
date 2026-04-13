@@ -439,6 +439,7 @@ jobs:
             --without-wayland \
             --without-xinerama \
             --with-xshm \
+            i386_CROSSCFLAGS="-march=pentium4" \
             --without-xxf86vm
             
           make -j$(nproc) > /dev/null
