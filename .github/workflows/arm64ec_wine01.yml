@@ -281,8 +281,12 @@ jobs:
               sed -i 's/unsigned int vprot, sec_flags;/unsigned int vprot = 0, sec_flags = 0;/g' "$FILE"
             fi
             if grep -q '0x7fffffff0000' "$FILE"; then
-              echo "Patching address_space_limit in virtual.c for Android/FEX..."
+              echo "Patching address_space_limit in virtual.c..."
               sed -i 's/\(_limit.*\)0x7fffffff0000/\10x7fffff0000/g' "$FILE"
+            fi
+            if grep -q 'use_kernel_writewatch = 1;' "$FILE"; then
+              echo "Disabling kernel writewatch for Android compatibility..."
+              sed -i 's/use_kernel_writewatch = 1;/use_kernel_writewatch = 0;/g' "$FILE"
             fi
           fi
 
