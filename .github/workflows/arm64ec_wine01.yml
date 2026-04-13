@@ -296,7 +296,7 @@ jobs:
             fi
             if grep -q 'ULONG buffer\[16\];' "$FILE"; then
               echo "Increasing loader buffer size from 16 to 32..."
-              sed -i 's/ULONG[[:space:]]\+buffer\[[[:space:]]*16[[:space:]]*\];/ULONG buffer[32];/g' "$FILE"
+              sed -i 's/ULONG buffer\[16\];/ULONG buffer\[32\];/g' "$FILE"
             fi
           fi
 
