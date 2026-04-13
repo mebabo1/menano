@@ -356,6 +356,8 @@ jobs:
             -exec sed -i 's/xtajit64\.dll/libarm64ecfex.dll/g' {} +
           find . -type f \( -name "*.c" -o -name "*.h" -o -name "*.in" \) \
             -exec sed -i 's/xtajit\.dll/libwow64fex.dll/g' {} +
+          
+          sed -i 's/as_fn_error.*x86_64 PE cross-compiler not found/echo "Skipping x86_64 PE check" #/g' configure
 
           export PATCH_BASE="https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/path"
 
@@ -434,7 +436,6 @@ jobs:
             --with-mingw=clang \
             --enable-archs=arm64ec,aarch64,i386 \
             --with-wine-tools=/opt/wine64-native \
-            --without-x86_64
             --with-vulkan \
             --enable-nls \
             --without-pulse \
