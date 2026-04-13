@@ -372,7 +372,7 @@ jobs:
               exit 1
           fi         
           if [ -f "wine" ]; then
-              ln -sf wine wine64
+              cp -r wine wine64
           fi
           echo "=== 5. 환경 변수 및 공백 에러 방지 처리 ==="
           echo "=== 최종 구조 검증 ==="
