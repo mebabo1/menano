@@ -386,7 +386,6 @@ jobs:
           if [ ! -f "configure" ]; then
             ./autogen.sh
           fi
-          sed -i 's/as_fn_error.*x86_64 PE cross-compiler not found/echo "Skipping x86_64 PE check" #/g' configure
 
       # ------------------------------------------------------------
       # 11. 交叉编译 ARM64 WOW64（使用复制后的目录作为工具目录）
@@ -414,6 +413,8 @@ jobs:
           export CROSSCFLAGS="-march=armv8-a -O2 -pipe"
           export CROSSCXXFLAGS="-march=armv8-a -O2 -pipe"
           export i386_CFLAGS="-march=pentium4 -O2"
+          export x86_64_CC="false" 
+          export x86_64_CLANG="false"
 
           export GSTREAMER_CFLAGS="-I$depsg/include/gstreamer-1.0 -I$depsg/include/glib-2.0 -I$depsg/lib/glib-2.0/include -I$depsg/glib-2.0/include -I$depsg/lib/gstreamer-1.0/include"
           export GSTREAMER_LIBS="-L$depsg/lib -lgstgl-1.0 -lgstapp-1.0 -lgstvideo-1.0 -lgstaudio-1.0 -lglib-2.0 -lgobject-2.0 -lgio-2.0 -lgsttag-1.0 -lgstbase-1.0 -lgstreamer-1.0"
