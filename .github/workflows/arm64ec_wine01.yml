@@ -460,7 +460,11 @@ jobs:
             --without-wayland \
             --without-xinerama \
             --with-xshm \
-            --without-xxf86vm
+            --without-xxf86vm \
+            aarch64_CFLAGS="-march=armv8-a" \
+            aarch64_CROSSCFLAGS="-march=armv8-a" \
+            arm64ec_CROSSCFLAGS="-march=armv8-a" \
+            i386_CROSSCFLAGS="-march=pentium4"
             
           make -j$(nproc) > /dev/null
           make install
