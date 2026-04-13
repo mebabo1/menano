@@ -357,8 +357,6 @@ jobs:
           find . -type f \( -name "*.c" -o -name "*.h" -o -name "*.in" \) \
             -exec sed -i 's/xtajit\.dll/libwow64fex.dll/g' {} +
           
-          sed -i 's/as_fn_error.*x86_64 PE cross-compiler not found/echo "Skipping x86_64 PE check" #/g' configure
-
           export PATCH_BASE="https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/path"
 
           PATCH_FILES="1.patch 2.patch"
@@ -388,6 +386,7 @@ jobs:
           if [ ! -f "configure" ]; then
             ./autogen.sh
           fi
+          sed -i 's/as_fn_error.*x86_64 PE cross-compiler not found/echo "Skipping x86_64 PE check" #/g' configure
 
       # ------------------------------------------------------------
       # 11. 交叉编译 ARM64 WOW64（使用复制后的目录作为工具目录）
