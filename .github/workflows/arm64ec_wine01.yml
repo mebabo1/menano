@@ -408,10 +408,10 @@ jobs:
           export CROSSCC="arm64ec-w64-mingw32-clang"
           export CROSSCXX="arm64ec-w64-mingw32-clang++"
 
-          export CFLAGS="-march=armv8.2-a -O2 -pipe"
-          export CXXFLAGS="-march=armv8.2-a -O2 -pipe"
-          export CROSSCFLAGS="-O2 -pipe"
-          export CROSSCXXFLAGS="-O2 -pipe"
+          export CFLAGS="-march=armv8-a -O2 -pipe"
+          export CXXFLAGS="-march=armv8-a -O2 -pipe"
+          export CROSSCFLAGS="-march=armv8-a -O2 -pipe"
+          export CROSSCXXFLAGS="-march=armv8-a -O2 -pipe"
           export i386_CFLAGS="-march=pentium4 -O2"
 
           export GSTREAMER_CFLAGS="-I$depsg/include/gstreamer-1.0 -I$depsg/include/glib-2.0 -I$depsg/lib/glib-2.0/include -I$depsg/glib-2.0/include -I$depsg/lib/gstreamer-1.0/include"
