@@ -347,15 +347,6 @@ jobs:
                           object->memory_properties.memoryHeaps[k].size = s; \
               }' "$FILE"
           fi
-
-          if [ -d "dlls/xtajit64" ]; then
-              mv dlls/xtajit64/xtajit64.spec dlls/xtajit64/libarm64ecfex.spec 2>/dev/null || true
-          fi
-
-          find . -type f \( -name "*.c" -o -name "*.h" -o -name "*.in" \) \
-            -exec sed -i 's/xtajit64\.dll/libarm64ecfex.dll/g' {} +
-          find . -type f \( -name "*.c" -o -name "*.h" -o -name "*.in" \) \
-            -exec sed -i 's/xtajit\.dll/libwow64fex.dll/g' {} +
           
           export PATCH_BASE="https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/path"
 
@@ -433,6 +424,7 @@ jobs:
             --with-mingw=clang \
             --enable-archs=arm64ec,aarch64,i386 \
             --with-wine-tools=/opt/wine64-native \
+            --enable-win64 \
             --with-vulkan \
             --enable-nls \
             --without-pulse \
@@ -460,11 +452,7 @@ jobs:
             --without-wayland \
             --without-xinerama \
             --with-xshm \
-            --without-xxf86vm \
-            aarch64_CFLAGS="-march=armv8-a" \
-            aarch64_CROSSCFLAGS="-march=armv8-a" \
-            arm64ec_CROSSCFLAGS="-march=armv8-a" \
-            i386_CROSSCFLAGS="-march=pentium4"
+            --without-xxf86vm
             
           make -j$(nproc) > /dev/null
           make install
