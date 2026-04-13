@@ -250,32 +250,6 @@ jobs:
             fi
           fi
 
-          export PATCH_BASE="https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/path"
-
-          PATCH_FILES="1.patch"
-          echo "Applying external patches from $PATCH_BASE..."
-          for FILE in $PATCH_FILES; do
-            URL="${PATCH_BASE}/${FILE}"
-            PATCH_FILE="$FILE"           
-            echo "--------------------------------------------"
-            echo "Downloading $PATCH_FILE..."
-            wget -q -O "$PATCH_FILE" "$URL"
-            
-            if git apply --check "$PATCH_FILE" > /dev/null 2>&1; then
-                echo "✔ $PATCH_FILE can be applied cleanly"
-                git apply --whitespace=fix "$PATCH_FILE"
-            elif git apply --3way --check "$PATCH_FILE" > /dev/null 2>&1; then
-                echo "⚠ Applying $PATCH_FILE with 3-way merge"
-                git apply --3way --whitespace=fix "$PATCH_FILE"
-            else
-                echo "❌ $PATCH_FILE failed, generating rejects"
-                git apply --reject --whitespace=fix "$PATCH_FILE" || true
-                find . -name "*.rej"
-            fi
-          done
-          echo "--------------------------------------------"
-          echo "✔ All patch processes completed"
-
       - name: configure
         run: |
           cd ${{ env.WINE_SOURCE_DIR }}/source
