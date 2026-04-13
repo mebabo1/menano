@@ -409,7 +409,6 @@ jobs:
           ../configure \
             --build=x86_64-pc-linux-gnu \
             --host=aarch64-linux-gnu \
-            --enable-win64 \
             --prefix=/tmp/wine-install-wow64 \
             --with-mingw=clang \
             --enable-archs=arm64ec,aarch64,i386 \
