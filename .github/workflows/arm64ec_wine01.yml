@@ -296,16 +296,22 @@ jobs:
             sed -i 's|/x86_64-windows|/aarch64-windows|g' "$FILE"
           fi
 
-          FILE="dlls/ntdll/loader.c"
-          if [ -f "$FILE" ]; then
-            if grep -q 'xtajit64\.dll' "$FILE"; then
-              echo "Replacing xtajit64.dll with libarm64ecfex.dll..."
-              sed -i 's|xtajit64\.dll|libarm64ecfex.dll|g' "$FILE"
+          FILE_LOADER="dlls/ntdll/loader.c"
+          if [ -f "$FILE_LOADER" ]; then
+            echo "Applying combined patches to loader.c..."
+            if grep -q 'xtajit64\.dll' "$FILE_LOADER"; then
+              echo "  - Replacing xtajit64.dll with libarm64ecfex.dll"
+              sed -i 's|xtajit64\.dll|libarm64ecfex.dll|g' "$FILE_LOADER"
             fi
-            if grep -q 'ULONG buffer\[16\];' "$FILE"; then
-              echo "Increasing loader buffer size from 16 to 32..."
-              sed -i 's/ULONG buffer\[16\];/ULONG buffer\[32\];/g' "$FILE"
+            if grep -q 'ULONG buffer\[16\];' "$FILE_LOADER"; then
+              echo "  - Increasing loader buffer size to 32"
+              sed -i 's/ULONG buffer\[16\];/ULONG buffer\[32\];/g' "$FILE_LOADER"
             fi
+            if grep -q 'base = (char \*)nt->OptionalHeader.ImageBase;' "$FILE_LOADER"; then
+              echo "  - Patching ImageBase logic for WOW64"
+              sed -i 's/base = (char \*)nt->OptionalHeader.ImageBase;/if (nt->OptionalHeader.Magic == IMAGE_NT_OPTIONAL_HDR64_MAGIC) base = (char *)((const IMAGE_NT_HEADERS64 *)nt)->OptionalHeader.ImageBase; else base = (char *)((const IMAGE_NT_HEADERS32 *)nt)->OptionalHeader.ImageBase;/g' "$FILE_LOADER"
+            fi           
+            echo "✔ All loader.c patches applied."
           fi
 
           INF="loader/wine.inf.in"
