@@ -195,7 +195,6 @@ jobs:
           mkdir -p amd64
           cd amd64
           ../source/configure \
-            --enable-win64 \
             --disable-tests \
             --without-x \
             --without-vulkan \
