@@ -308,9 +308,9 @@ jobs:
               sed -i 's/ULONG buffer\[16\];/ULONG buffer\[32\];/g' "$FILE_LOADER"
             fi
             if grep -q 'base = (char \*)nt->OptionalHeader.ImageBase;' "$FILE_LOADER"; then
-              echo "  - Patching ImageBase logic for WOW64"
-              sed -i 's/base = (char \*)nt->OptionalHeader.ImageBase;/if (nt->OptionalHeader.Magic == IMAGE_NT_OPTIONAL_HDR64_MAGIC) base = (char *)((const IMAGE_NT_HEADERS64 *)nt)->OptionalHeader.ImageBase; else base = (char *)((const IMAGE_NT_HEADERS32 *)nt)->OptionalHeader.ImageBase;/g' "$FILE_LOADER"
-            fi           
+              echo "  - Patching ImageBase logic for WOW64 (with UINT_PTR cast)"
+              sed -i 's/base = (char \*)nt->OptionalHeader.ImageBase;/if (nt->OptionalHeader.Magic == IMAGE_NT_OPTIONAL_HDR64_MAGIC) base = (char *)((const IMAGE_NT_HEADERS64 *)nt)->OptionalHeader.ImageBase; else base = (char *)(UINT_PTR)((const IMAGE_NT_HEADERS32 *)nt)->OptionalHeader.ImageBase;/g' "$FILE_LOADER"
+            fi                      
             echo "✔ All loader.c patches applied."
           fi
 
