@@ -197,6 +197,7 @@ jobs:
           export PATH="/opt/${{ env.LLVMMINGW_NAME }}/bin:$PATH"
           
           ../source/configure \
+            --enable-win64 \
             --disable-tests \
             --without-x \
             --without-vulkan \
