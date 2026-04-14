@@ -401,7 +401,7 @@ jobs:
           # 关键修改：仅使用 --with-wine-tools，不使用 --with-wine64 
           ../configure \
             --enable-win64 \
-            --host=aarch64-linux-gnu \
+            --host=$TARGET \
             --prefix=/tmp/wine-install-wow64 \
             --with-mingw=clang \
             --enable-archs=arm64ec,aarch64,i386 \
