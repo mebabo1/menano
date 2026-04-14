@@ -87,7 +87,6 @@ jobs:
             librsvg2-bin \
             git gettext make automake autoconf pkg-config libtool gtk-doc-tools clang \
             dpkg-dev \
-            libglib2.0-dev:arm64 \
             libfreetype6-dev:arm64 \
             libltdl-dev:arm64 \
             libxcb1-dev:arm64 \
@@ -95,8 +94,8 @@ jobs:
             build-essential libc-dev-arm64-cross less libc-devtools libidn2-0:arm64 \
             libx11-dev libxinerama-dev libfreetype-dev libfontconfig-dev \
             cmake \
-            libstdc++6-arm64-cross \
-            libstdc++-12-dev-arm64-cross \
+            libstdc++6 \
+            libstdc++-12-dev \
             libepoxy-dev:arm64 \
             libsdl2-dev:arm64 \
             ninja-build \
