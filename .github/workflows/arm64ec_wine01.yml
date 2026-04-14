@@ -385,6 +385,7 @@ jobs:
 
           # 关键修改：仅使用 --with-wine-tools，不使用 --with-wine64 
           ../configure \
+            --enable-win64 \
             --host=aarch64-linux-gnu \
             --prefix=/tmp/wine-install-wow64 \
             --with-mingw=clang \
@@ -416,6 +417,7 @@ jobs:
             --without-v4l2 \
             --without-wayland \
             --without-xinerama \
+            --with-xshm \
             --without-xxf86vm
             
           make -j$(nproc) > /dev/null
