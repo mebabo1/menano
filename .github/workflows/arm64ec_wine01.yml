@@ -57,47 +57,19 @@ jobs:
           sudo rm -rf /opt/ghc
           sudo rm -rf /usr/local/share/boost
           sudo rm -rf "$AGENT_TOOLSDIRECTORY"
-          df -h
 
-          echo "📦 Configuring APT sources..."
-          if [ -f /etc/apt/sources.list ]; then
-            cp /etc/apt/sources.list /etc/apt/sources.list.bak
-          else
-            echo "deb http://deb.debian.org/debian bookworm main contrib non-free" > /etc/apt/sources.list
-            echo "deb http://deb.debian.org/debian bookworm-updates main contrib non-free" >> /etc/apt/sources.list
-            echo "deb http://security.debian.org/debian-security bookworm-security main contrib non-free" >> /etc/apt/sources.list
-          fi
-
-          grep -v '^#' /etc/apt/sources.list | sed 's/^deb /deb [arch=amd64] /g' > /tmp/amd64.list
-          sed -e 's/\[arch=amd64\]/[arch=arm64]/g' /tmp/amd64.list > /tmp/arm64.list
-          cat /tmp/amd64.list /tmp/arm64.list > /etc/apt/sources.list
-
-          dpkg --add-architecture arm64
-          apt-get update
-          apt-get install -y --no-install-recommends hello:arm64 || { echo "arm64 repo test failed"; exit 1; }
-
-      - name: Dockerfile
+      - name: Dockerfile (Optimized for Sysroot)
         run: |
           apt-get update && apt-get install -y --no-install-recommends \
-            build-essential \
-            git make cmake ninja-build autoconf automake \
+            build-essential git make cmake ninja-build autoconf automake \
             libtool pkg-config gettext flex bison nasm \
             python3 python3-setuptools ca-certificates wget \
             curl xz-utils file \
-            clang llvm lld binutils-aarch64-linux-gnu \
-            gcc-aarch64-linux-gnu g++-aarch64-linux-gnu libc6-dev-arm64-cross \
+            clang llvm lld \
             mingw-w64 \
-            libglib2.0-dev libfreetype6-dev libltdl-dev libxcb1-dev \
-            libx11-dev libvulkan-dev librsvg2-bin \
-            libglib2.0-dev:arm64 libunwind-dev:arm64 libdbus-1-dev:arm64 libudev-dev:arm64 \
-            libvulkan-dev:arm64 libgl-dev:arm64 libepoxy-dev:arm64 libxcb1-dev:arm64 \
-            libx11-dev:arm64 libxext-dev:arm64 libxcursor-dev:arm64 libxi-dev:arm64 \
-            libxrandr-dev:arm64 libxrender-dev:arm64 libxfixes-dev:arm64 \
-            libxcomposite-dev:arm64 libxinerama-dev:arm64 libxxf86vm-dev:arm64 \
-            libwayland-dev:arm64 libxkbcommon-dev:arm64 \
-            libfontconfig1-dev:arm64 libfreetype6-dev:arm64 libsdl2-dev:arm64 \
-            libpulse-dev:arm64 libgstreamer1.0-dev:arm64 libgstreamer-plugins-base1.0-dev:arm64 \
-            dpkg-dev fakeroot debhelper dh-make screen nano \
+            librsvg2-bin \
+            dpkg-dev \
+            fakeroot \
             less
 
       # ------------------------------------------------------------
