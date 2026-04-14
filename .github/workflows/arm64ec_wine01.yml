@@ -334,7 +334,7 @@ jobs:
           mkdir -p /opt/arm64ec-sysroot
           wget https://github.com/Waim908/BCC/releases/download/wine-arm64ec-ubuntu2404-bcc-latest/wine-ubuntu2404-bcc-arm64ec.tar.xz
           tar -xf wine-ubuntu2404-bcc-arm64ec.tar.xz -C /opt/arm64ec-sysroot
-          echo "Sysroot 준비 완료: /opt/arm64ec-sysroot"
+          find /opt/arm64ec-sysroot -type l | xargs -I{} python3 -c "import os, sys; f='{}'; l=os.readlink(f); os.remove(f); os.symlink(os.path.join('/opt/arm64ec-sysroot', l.lstrip('/')), f)" || true
 
       - name: ARM64 WOW64
         run: |
