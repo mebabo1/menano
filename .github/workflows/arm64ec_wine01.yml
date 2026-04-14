@@ -239,6 +239,17 @@ jobs:
           find . -name "loader.c" -exec sed -i 's|"/tmp"|"/data/data/com.termux/files/usr/tmp"|g' {} + 2>/dev/null || true
           find . -name "server.c" -exec sed -i 's|"/tmp"|"/data/data/com.termux/files/usr/tmp"|g' {} + 2>/dev/null || true
 
+          FILE="dlls/atiadlxx/atiadlxx_main.c"
+          if [ -f "$FILE" ]; then
+            if grep -q 'InterlockedOr(&dummy, 0)' "$FILE"; then
+              sed -i 's/LONG dummy/long dummy/g' "$FILE"
+              sed -i 's|InterlockedOr(&dummy, 0)|_InterlockedOr((long volatile *)\&dummy, 0)|g' "$FILE"
+              echo "✔ InterlockedOr patched with explicit casting"
+            else
+              echo "✔ InterlockedOr already patched or not found"
+            fi
+          fi
+
           FILE3="dlls/wdscore/wdscore.spec"
           if [ -f "$FILE3" ]; then
             if grep -q '@ stub' "$FILE3"; then
