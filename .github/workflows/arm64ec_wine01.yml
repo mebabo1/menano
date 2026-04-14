@@ -391,12 +391,12 @@ jobs:
             --with-mingw=clang \
             --enable-archs=arm64ec,aarch64,i386 \
             --with-wine-tools=/opt/wine64-native \
+            --disable-win16 \
             --with-vulkan \
             --enable-nls \
             --without-pulse \
             --without-ffmpeg \
             --with-gstreamer \
-            --disable-win16 \
             --disable-opencl \
             --without-alsa \
             --disable-tests \
