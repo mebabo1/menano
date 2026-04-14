@@ -428,6 +428,7 @@ jobs:
             --enable-archs=arm64ec,aarch64,i386 \
             --with-wine-tools=/opt/wine64-native \
             --disable-win16 \
+            --disable-tests \
             --with-vulkan \
             --enable-nls \
             --without-pulse \
@@ -435,7 +436,6 @@ jobs:
             --with-gstreamer \
             --disable-opencl \
             --without-alsa \
-            --disable-tests \
             --without-capi \
             --without-coreaudio \
             --without-cups \
