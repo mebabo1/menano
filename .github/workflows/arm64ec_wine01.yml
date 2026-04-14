@@ -88,6 +88,7 @@ jobs:
             libwayland-dev:arm64 libxkbcommon-dev:arm64 \
             libfontconfig1-dev:arm64 libfreetype6-dev:arm64 libsdl2-dev:arm64 \
             libpulse-dev:arm64 libgstreamer1.0-dev:arm64 libgstreamer-plugins-base1.0-dev:arm64 \
+            libavcodec-dev:arm64 libavformat-dev:arm64 libavutil-dev:arm64 libswresample-dev:arm64 \
             dpkg-dev fakeroot less
 
       - name: llvm-mingw
