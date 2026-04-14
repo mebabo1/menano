@@ -97,7 +97,7 @@ jobs:
             libv4l-dev:arm64 libsane-dev:arm64 libcups2-dev:arm64 \
             libdbus-1-dev:arm64 libkrb5-dev:arm64 libgnutls28-dev:arm64 \
             libunwind-dev:arm64 libxkbcommon-dev:arm64 libxkbregistry-dev:arm64 \
-            ocl-icd-opencl-dev:arm64 libglib2.0-dev:arm64 libltdl-dev:arm64 \
+            ocl-icd-opencl-dev:arm64 libltdl-dev:arm64 \
             libxcb1-dev:arm64 \
             dpkg-dev fakeroot debhelper dh-make screen nano \
             less
