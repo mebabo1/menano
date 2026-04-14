@@ -352,11 +352,14 @@ jobs:
             ./autogen.sh
           fi
 
-      # ------------------------------------------------------------
-      # 11. 交叉编译 ARM64 WOW64（使用复制后的目录作为工具目录）
-      #     修改：移除 --with-wine64，仅使用 --with-wine-tools 以强制重新编译 programs
-      # ------------------------------------------------------------
-      - name: 交叉编译 ARM64 WOW64
+      - name: ARM64EC Sysroot
+        run: |
+          mkdir -p /opt/arm64ec-sysroot
+          wget https://github.com/Waim908/BCC/releases/download/wine-arm64ec-ubuntu2404-bcc-latest/wine-ubuntu2404-bcc-arm64ec.tar.xz
+          tar -xf wine-ubuntu2404-bcc-arm64ec.tar.xz -C /opt/arm64ec-sysroot
+          echo "Sysroot 준비 완료: /opt/arm64ec-sysroot"
+
+      - name: ARM64 WOW64
         run: |
           cd ${{ env.WINE_SOURCE_DIR }}/source
           mkdir -p build-arm64
