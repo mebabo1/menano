@@ -251,15 +251,6 @@ jobs:
           # find . -name "loader.c" -exec sed -i 's|"/tmp"|"/data/data/com.termux/files/usr/tmp"|g' {} + 2>/dev/null || true
           # find . -name "server.c" -exec sed -i 's|"/tmp"|"/data/data/com.termux/files/usr/tmp"|g' {} + 2>/dev/null || true
 
-          FILE="dlls/atiadlxx/atiadlxx_main.c"
-          if [ -f "$FILE" ]; then
-            if grep -q 'InterlockedOr(&dummy, 0)' "$FILE"; then
-              sed -i 's/LONG dummy/long dummy/g' "$FILE"
-              sed -i 's|InterlockedOr(&dummy, 0)|_InterlockedOr((long volatile *)\&dummy, 0)|g' "$FILE"
-              echo "✔ InterlockedOr patched with explicit casting"
-            fi
-          fi
-
           FILE3="dlls/wdscore/wdscore.spec"
           if [ -f "$FILE3" ]; then
             if grep -q '@ stub' "$FILE3"; then
@@ -398,11 +389,9 @@ jobs:
 
           # 关键修改：仅使用 --with-wine-tools，不使用 --with-wine64 
           ../configure \
-            --host=aarch64-w64-mingw32 \
-            --target=arm64ec-w64-mingw32 \
+            --host=aarch64-linux-gnu \
             --prefix=/tmp/wine-install-wow64 \
             --with-mingw=clang \
-            --enable-win64 \
             --enable-archs=arm64ec,aarch64,i386 \
             --with-wine-tools=/opt/wine64-native \
             --with-vulkan \
