@@ -402,6 +402,7 @@ jobs:
             --target=arm64ec-w64-mingw32 \
             --prefix=/tmp/wine-install-wow64 \
             --with-mingw=clang \
+            --enable-win64 \
             --enable-archs=arm64ec,aarch64,i386 \
             --with-wine-tools=/opt/wine64-native \
             --with-vulkan \
