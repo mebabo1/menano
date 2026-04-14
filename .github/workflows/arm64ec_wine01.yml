@@ -292,19 +292,9 @@ jobs:
             fi
           fi
 
-          FILE="dlls/ntdll/unix/loader.c"
-          if ! grep -q '/aarch64-windows' "$FILE"; then
-            echo "Patching PE directory mapping..."
-            sed -i 's|/x86_64-windows|/aarch64-windows|g' "$FILE"
-          fi
-
           FILE_LOADER="dlls/ntdll/loader.c"
           if [ -f "$FILE_LOADER" ]; then
             echo "Applying combined patches to loader.c..."
-            if grep -q 'xtajit64\.dll' "$FILE_LOADER"; then
-              echo "  - Replacing xtajit64.dll with libarm64ecfex.dll"
-              sed -i 's|xtajit64\.dll|libarm64ecfex.dll|g' "$FILE_LOADER"
-            fi
             if grep -q 'ULONG buffer\[16\];' "$FILE_LOADER"; then
               echo "  - Increasing loader buffer size to 32"
               sed -i 's/ULONG buffer\[16\];/ULONG buffer\[32\];/g' "$FILE_LOADER"
@@ -338,7 +328,14 @@ jobs:
                           object->memory_properties.memoryHeaps[k].size = s; \
               }' "$FILE"
           fi
-          
+
+          find . -type f \( -name "*.c" -o -name "*.h" \) \
+            -exec sed -i 's/xtajit64\.dll/libarm64ecfex.dll/g' {} +
+          find . -type f \( -name "*.c" -o -name "*.h" \) \
+            -exec sed -i 's/xtajit\.dll/libwow64fex.dll/g' {} +
+          find dlls/ntdll -type f \( -name "*.c" -o -name "*.h" \) \
+            -exec sed -i 's|x86_64-windows|aarch64-windows|g' {} +          
+
           export PATCH_BASE="https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/path"
 
           PATCH_FILES="2.patch"
