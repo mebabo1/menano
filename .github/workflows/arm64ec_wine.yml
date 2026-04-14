@@ -250,6 +250,20 @@ jobs:
             fi
           fi
 
+          FILE="dlls/winevulkan/vulkan.c"
+          if [ -f "$FILE" ] && ! grep -q 'WINE_VRAM_SIZE' "$FILE" ; then
+            echo "Applying VRAM faking to winevulkan..."
+            sed -i '/p_vkGetPhysicalDeviceMemoryProperties(host_physical_device, \&object->memory_properties);/a \
+              { \
+                  const char *v = getenv("WINE_VRAM_SIZE"); \
+                  uint64_t s = v ? (uint64_t)atoll(v)*1024*1024 : (uint64_t)2048*1024*1024; \
+                  uint32_t k; \
+                  for (k=0; k<object->memory_properties.memoryHeapCount; k++) \
+                      if (object->memory_properties.memoryHeaps[k].flags \& VK_MEMORY_HEAP_DEVICE_LOCAL_BIT) \
+                          object->memory_properties.memoryHeaps[k].size = s; \
+              }' "$FILE"
+          fi
+
       - name: configure
         run: |
           cd ${{ env.WINE_SOURCE_DIR }}/source
