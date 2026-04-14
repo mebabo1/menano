@@ -412,10 +412,10 @@ jobs:
             --disable-win16 \
             --disable-tests \
             --with-vulkan \
+            --with-gstreamer \
             --enable-nls \
             --without-pulse \
             --without-ffmpeg \
-            --without-gstreamer \
             --disable-opencl \
             --without-alsa \
             --without-capi \
