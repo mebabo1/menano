@@ -66,6 +66,11 @@ jobs:
             python3 python3-setuptools ca-certificates wget \
             curl xz-utils file libfreetype6-dev \
             clang llvm lld \
+            binutils-aarch64-linux-gnu \
+            gcc-aarch64-linux-gnu \
+            g++-aarch64-linux-gnu \
+            libc6-dev-arm64-cross \
+            clang llvm lld \
             mingw-w64 \
             librsvg2-bin \
             dpkg-dev \
