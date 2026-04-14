@@ -77,6 +77,7 @@ jobs:
         run: |
           apt-get install -y --no-install-recommends \
             build-essential git make cmake ninja-build autoconf automake \
+            libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev \
             libtool pkg-config gettext flex bison nasm python3 python3-setuptools \
             ca-certificates wget curl xz-utils file clang llvm lld libfreetype6-dev \
             gcc-aarch64-linux-gnu g++-aarch64-linux-gnu libc6-dev-arm64-cross mingw-w64 \
