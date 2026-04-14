@@ -78,7 +78,7 @@ jobs:
           apt-get install -y --no-install-recommends \
             build-essential git make cmake ninja-build autoconf automake \
             libtool pkg-config gettext flex bison nasm python3 python3-setuptools \
-            ca-certificates wget curl xz-utils file clang llvm lld \
+            ca-certificates wget curl xz-utils file clang llvm lld libfreetype6-dev \
             gcc-aarch64-linux-gnu g++-aarch64-linux-gnu libc6-dev-arm64-cross mingw-w64 \
             libglib2.0-dev:arm64 libunwind-dev:arm64 libdbus-1-dev:arm64 libudev-dev:arm64 \
             libvulkan-dev:arm64 libgl-dev:arm64 libepoxy-dev:arm64 libxcb1-dev:arm64 \
