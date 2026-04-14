@@ -1,4 +1,4 @@
-name: Build Wine ARM64 WOW64
+name: Build Wine ARM64 termux
 
 on:
   schedule:
