@@ -378,10 +378,10 @@ jobs:
           export CROSSCFLAGS="-O2 -pipe"
           export CROSSCXXFLAGS="-O2 -pipe"
 
-          export GSTREAMER_CFLAGS="-I$depsg/include/gstreamer-1.0 -I$depsg/include/glib-2.0 -I$depsg/lib/glib-2.0/include -I$depsg/glib-2.0/include -I$depsg/lib/gstreamer-1.0/include"
-          export GSTREAMER_LIBS="-L$depsg/lib -lgstgl-1.0 -lgstapp-1.0 -lgstvideo-1.0 -lgstaudio-1.0 -lglib-2.0 -lgobject-2.0 -lgio-2.0 -lgsttag-1.0 -lgstbase-1.0 -lgstreamer-1.0"
-          export FFMPEG_CFLAGS="-I$depsg/include/libavutil -I$depsg/include/libavcodec -I$depsg/include/libavformat"
-          export FFMPEG_LIBS="-L$depsg/lib -lavutil -lavcodec -lavformat"
+          # export GSTREAMER_CFLAGS="-I$depsg/include/gstreamer-1.0 -I$depsg/include/glib-2.0 -I$depsg/lib/glib-2.0/include -I$depsg/glib-2.0/include -I$depsg/lib/gstreamer-1.0/include"
+          # export GSTREAMER_LIBS="-L$depsg/lib -lgstgl-1.0 -lgstapp-1.0 -lgstvideo-1.0 -lgstaudio-1.0 -lglib-2.0 -lgobject-2.0 -lgio-2.0 -lgsttag-1.0 -lgstbase-1.0 -lgstreamer-1.0"
+          # export FFMPEG_CFLAGS="-I$depsg/include/libavutil -I$depsg/include/libavcodec -I$depsg/include/libavformat"
+          # export FFMPEG_LIBS="-L$depsg/lib -lavutil -lavcodec -lavformat"
           export PULSE_CFLAGS="-I$deps/include/pulse"
           export PULSE_LIBS="-L$deps/lib/pulseaudio -lpulse"
           export WINE_NLS_DIR=/opt/wine64-native/nls
