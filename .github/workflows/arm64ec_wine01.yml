@@ -117,6 +117,7 @@ jobs:
             libgstreamer1.0-dev:arm64 \
             libgstreamer-plugins-base1.0-dev:arm64 \
             libgstreamer-plugins-bad1.0-dev:arm64 \
+            libglib2.0-dev:arm64 \
             libudev-dev:arm64 \
             libunwind-dev:arm64 \
             libsdl2-dev:arm64 \
