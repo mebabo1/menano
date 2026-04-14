@@ -366,8 +366,8 @@ jobs:
           export PATH="/opt/${{ env.LLVMMINGW_NAME }}/bin:$PATH"
           export deps="/data/data/com.termux/files/usr"
           export depsg="/data/data/com.termux/files/usr/glibc"
-          export PKG_CONFIG_LIBDIR=/usr/lib/aarch64-linux-gnu/pkgconfig
-          export PKG_CONFIG_PATH=/usr/lib/aarch64-linux-gnu/pkgconfig
+          # export PKG_CONFIG_LIBDIR=/usr/lib/aarch64-linux-gnu/pkgconfig
+          # export PKG_CONFIG_PATH=/usr/lib/aarch64-linux-gnu/pkgconfig
 
           export CC="clang --target=aarch64-linux-gnu"
           export CXX="clang++ --target=aarch64-linux-gnu"
