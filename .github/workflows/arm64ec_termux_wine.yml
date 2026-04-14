@@ -369,23 +369,31 @@ jobs:
           export PATH="/opt/${{ env.LLVMMINGW_NAME }}/bin:$PATH"
           export deps="$HOME/termuxfs/aarch64/data/data/com.termux/files/usr"
           export RUNTIME_PATH="/data/data/com.termux/files/usr"
-
           export TOOLCHAIN="$HOME/Android/Sdk/ndk/27.3.13750724/toolchains/llvm/prebuilt/linux-x86_64/bin"
           export TARGET=aarch64-linux-android28
+          export CC=$TOOLCHAIN/$TARGET-clang
+          export AS=$CC
+          export CXX=$TOOLCHAIN/$TARGET-clang++
 
           export CFLAGS="-O2 -pipe"
           export CXXFLAGS="-O2 -pipe"
           export CROSSCFLAGS="-O2 -pipe"
           export CROSSCXXFLAGS="-O2 -pipe"
 
-          # export GSTREAMER_CFLAGS="-I$depsg/include/gstreamer-1.0 -I$depsg/include/glib-2.0 -I$depsg/lib/glib-2.0/include -I$depsg/glib-2.0/include -I$depsg/lib/gstreamer-1.0/include"
-          # export GSTREAMER_LIBS="-L$depsg/lib -lgstgl-1.0 -lgstapp-1.0 -lgstvideo-1.0 -lgstaudio-1.0 -lglib-2.0 -lgobject-2.0 -lgio-2.0 -lgsttag-1.0 -lgstbase-1.0 -lgstreamer-1.0"
-          # export FFMPEG_CFLAGS="-I$depsg/include/libavutil -I$depsg/include/libavcodec -I$depsg/include/libavformat"
-          # export FFMPEG_LIBS="-L$depsg/lib -lavutil -lavcodec -lavformat"
+          export FREETYPE_CFLAGS="-I$deps/include/freetype2"
           export PULSE_CFLAGS="-I$deps/include/pulse"
           export PULSE_LIBS="-L$deps/lib/pulseaudio -lpulse"
+          export SDL2_CFLAGS="-I$deps/include/SDL2"
+          export SDL2_LIBS="-L$deps/lib -lSDL2"
+          export X_CFLAGS="-I$deps/include/X11"
+          export X_LIBS="-landroid-sysvshm"
+          export GSTREAMER_CFLAGS="-I$deps/include/gstreamer-1.0 -I$deps/include/glib-2.0 -I$deps/lib/glib-2.0/include -I$deps/glib-2.0/include -I$deps/lib/gstreamer-1.0/include"
+          export GSTREAMER_LIBS="-L$deps/lib -lgstgl-1.0 -lgstapp-1.0 -lgstvideo-1.0 -lgstaudio-1.0 -lglib-2.0 -lgobject-2.0 -lgio-2.0 -lgsttag-1.0 -lgstbase-1.0 -lgstreamer-1.0"
+          export FFMPEG_CFLAGS="-I$deps/include/libavutil -I$deps/include/libavcodec -I$deps/include/libavformat"
+          export FFMPEG_LIBS="-L$deps/lib -lavutil -lavcodec -lavformat"
+
           export WINE_NLS_DIR=/opt/wine64-native/nls
-          export LDFLAGS="-s -L/usr/lib/aarch64-linux-gnu -Wl,--dynamic-linker=$depsg/lib/ld-linux-aarch64.so.1 -Wl,-rpath=$depsg/lib"
+          export LDFLAGS="-L$deps/lib -Wl,-rpath=$RUNTIME_PATH/lib"
 
           echo "使用 Wine64 构建目录（作为工具目录）: /opt/wine64-native"
           echo "WINE_NLS_DIR=$WINE_NLS_DIR"
