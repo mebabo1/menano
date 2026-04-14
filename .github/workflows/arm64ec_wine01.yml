@@ -403,8 +403,8 @@ jobs:
 
           # 关键修改：仅使用 --with-wine-tools，不使用 --with-wine64 
           ../configure \
-            --build=x86_64-pc-linux-gnu \
-            --host=aarch64-linux-gnu \
+            --host=aarch64-w64-mingw32 \
+            --target=arm64ec-w64-mingw32 \
             --prefix=/tmp/wine-install-wow64 \
             --with-mingw=clang \
             --enable-archs=arm64ec,aarch64,i386 \
