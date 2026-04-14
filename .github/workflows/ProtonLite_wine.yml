@@ -1,5 +1,5 @@
 # build-wine-all.yml
-name: Build ProtonLite WOW64 for Termux
+name: Build ProtonLite WOW64
 
 on:
   workflow_dispatch:  # 只保留手动触发
