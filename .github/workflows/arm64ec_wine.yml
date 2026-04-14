@@ -294,11 +294,9 @@ jobs:
           export LDFLAGS="-L/usr/lib/x86_64-linux-gnu -L/lib/x86_64-linux-gnu"
 
           ../configure \
+            --enable-win64 \
             --enable-archs=i386,x86_64 \
             --prefix=/tmp/wine-install-wow64 \
-            --with-wine-tools=/opt/wine64-native \
-            --with-mingw=clang \
-            --enable-win64 \
             --with-vulkan \
             --enable-nls \
             --with-pulse \
@@ -326,6 +324,7 @@ jobs:
             --without-v4l2 \
             --without-wayland \
             --without-xinerama \
+            --with-xshm \
             --without-xxf86vm
             
           make -j$(nproc) > /dev/null
