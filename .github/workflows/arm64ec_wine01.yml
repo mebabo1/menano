@@ -412,7 +412,7 @@ jobs:
             --enable-nls \
             --without-pulse \
             --without-ffmpeg \
-            --with-gstreamer \
+            --without-gstreamer \
             --disable-opencl \
             --without-alsa \
             --without-capi \
