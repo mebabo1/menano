@@ -388,8 +388,8 @@ jobs:
           export LDFLAGS="-L$deps/lib -Wl,-rpath=$RUNTIME_PATH/lib"
 
           export FREETYPE_CFLAGS="-I$deps/include/freetype2"
-          export PULSE_CFLAGS="-I$RUNTIME_PATH/include/pulse"
-          export PULSE_LIBS="-L$RUNTIME_PATH/lib/pulseaudio -lpulse"
+          export PULSE_CFLAGS="-I$deps/include/pulse"
+          export PULSE_LIBS="-L$deps/lib/pulseaudio -lpulse"
           export SDL2_CFLAGS="-I$deps/include/SDL2"
           export SDL2_LIBS="-L$deps/lib -lSDL2"
           export X_CFLAGS="-I$deps/include"
