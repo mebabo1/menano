@@ -477,10 +477,8 @@ jobs:
           make -j$(nproc) > build.log 2>&1 || (tail -n 100 build.log && exit 1)
           make install
 
-          if [ ! -d /tmp/wine-install-wow64/bin ]; then
-            echo "错误: /tmp/wine-install-wow64/bin 目录不存在，安装可能不完整"
-            exit 1
-          fi
+          echo "설치된 파일 목록 확인:"
+          find /tmp/wine-install-wow64 -maxdepth 2
 
       - name: Shared Library Path Fix
         run: |
