@@ -12,8 +12,8 @@ mkdir -p $WORK_DIR
 mkdir -p $INSTALL_DIR
 
 if [ ! -d "$SOURCE_DIR" ]; then
-    echo "📥 whitebelyash Mesa (gen8) 소스 클론 중..."
-    git clone --depth 1 --branch gen8 https://github.com/whitebelyash/mesa-tu8.git $SOURCE_DIR
+    echo "📥 whitebelyash Mesa 소스 클론 중..."
+    git clone --depth 1 https://github.com/lfdevs/mesa-for-android-container.git $SOURCE_DIR
 fi
 
 cd $SOURCE_DIR
@@ -31,7 +31,6 @@ git clone --depth=1 https://github.com/KhronosGroup/SPIRV-Headers.git spirv-head
 cd ..
 # --------------------------------
 
-OPTIM_FLAGS="-march=armv9-a+crc+crypto+sve2"
 meson setup builddir \
     --prefix=/usr/glibc \
     --libdir=lib \
@@ -55,8 +54,6 @@ meson setup builddir \
     -Dzstd=enabled \
     -Dvideo-codecs=all \
     -Dgallium-extra-hud=true \
-    -Dc_args="$OPTIM_FLAGS" \
-    -Dcpp_args="$OPTIM_FLAGS" \
     --force-fallback-for=spirv-tools,spirv-headers
 # 4. 컴파일 및 설치
 echo "🏗️  컴파일 시작 (nproc 사용)..."
