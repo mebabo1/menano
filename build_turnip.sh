@@ -32,7 +32,7 @@ cd ..
 # --------------------------------
 
 meson setup builddir \
-    --prefix=/usr/glibc \
+    --prefix=/usr \
     --libdir=lib \
     -Dbuildtype=release \
     -Doptimization=3 \
