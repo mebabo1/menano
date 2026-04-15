@@ -325,7 +325,8 @@ jobs:
           find . -type f \( -name "*.c" -o -name "*.h" \) \
             -exec sed -i 's/xtajit\.dll/libwow64fex.dll/g' {} +
           find dlls/ntdll -type f \( -name "*.c" -o -name "*.h" \) \
-            -exec sed -i 's|x86_64-windows|aarch64-windows|g' {} +          
+            -exec sed -i 's|x86_64-windows|aarch64-windows|g' {} +
+          sed -i 's/pthread_mutexattr_setrobust/ \/\/pthread_mutexattr_setrobust/g' dlls/winepulse.drv/pulse.c
 
           export PATCH_BASE="https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/path"
 
