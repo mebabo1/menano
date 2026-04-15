@@ -81,22 +81,16 @@ jobs:
           tar -xf termuxfs.tar
           ls -la $HOME/termuxfs/aarch64/
 
-      - name: Cache Android NDK
-        id: cache-ndk
-        uses: actions/cache@v4
-        with:
-          path: ~/Android/Sdk/ndk/27.3.13750724
-          key: android-ndk-r27d
-      
-      - name: Set up Android NDK
-        if: steps.cache-ndk.outputs.cache-hit != 'true'
-        run: |
-          mkdir -p $HOME/Android/Sdk/ndk
-          cd $HOME/Android/Sdk/ndk
-          wget https://dl.google.com/android/repository/android-ndk-r27d-linux.zip
-          unzip -q android-ndk-r27d-linux.zip
-          mv android-ndk-r27d 27.3.13750724
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
 
+      - name: Setup NDK
+        uses: nttld/setup-ndk@v1
+        id: ndk
+        with:
+         ndk-version: r28c
+         add-to-path: false
+         link-to-sdk: true
 
       - name: llvm-mingw
         run: |
@@ -401,7 +395,7 @@ jobs:
           export PATH="/opt/${{ env.LLVMMINGW_NAME }}/bin:$PATH"
           export deps="$HOME/termuxfs/aarch64/data/data/com.termux/files/usr"
           export RUNTIME_PATH="/data/data/com.termux/files/usr"
-          export TOOLCHAIN="$HOME/Android/Sdk/ndk/27.3.13750724/toolchains/llvm/prebuilt/linux-x86_64/bin"
+          export TOOLCHAIN="/usr/local/lib/android/sdk/ndk/28.2.13676358/toolchains/llvm/prebuilt/linux-x86_64/bin"
           export TARGET=aarch64--linux-android
           export CC=$TOOLCHAIN/$TARGET-clang
           export AS=$CC
