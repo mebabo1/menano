@@ -371,6 +371,11 @@ jobs:
           export CC=$TOOLCHAIN/$TARGET-clang
           export AS=$CC
           export CXX=$TOOLCHAIN/$TARGET-clang++
+          export AR=$TOOLCHAIN/llvm-ar
+          export LD=$TOOLCHAIN/ld
+          export RANLIB=$TOOLCHAIN/llvm-ranlib
+          export STRIP=$TOOLCHAIN/llvm-strip
+          export DLLTOOL=$LLVM_MINGW_TOOLCHAIN/llvm-dlltool
           
           export PKG_CONFIG_LIBDIR=$deps/lib/pkgconfig:$deps/share/pkgconfig
           export ACLOCAL_PATH=$deps/lib/aclocal:$deps/share/aclocal
