@@ -491,9 +491,14 @@ jobs:
           # Termux는 무조건 aarch64 환경임
           WINE_ARCH="aarch64"
 
+          if [ -d "$TARGET_PREFIX/arm64-v8a" ]; then
+              echo "✔ arm64-v8a 폴더 감지. 파일 이동 중..."
+              # 폴더 내의 모든 것을 상위로 이동 (bin, lib, share 등)
+              mv "$TARGET_PREFIX/arm64-v8a/"* "$TARGET_PREFIX/"
+              rm -rf "$TARGET_PREFIX/arm64-v8a"
+          fi
+
           echo "=== 1. 구조 생성 및 모든 라이브러리 수집 ==="
-          mkdir -p "$TARGET_PREFIX/bin"
-          mkdir -p "$TARGET_PREFIX/lib/wine/$WINE_ARCH-unix"
           mkdir -p "$TARGET_PREFIX/share/wine/nls"
           mkdir -p "$TARGET_PREFIX/share/wine/fonts"
 
