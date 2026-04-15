@@ -1,67 +1,23 @@
-From 69a5b31b61978559347539113f015a7d28727be3 Mon Sep 17 00:00:00 2001
-From: =?UTF-8?q?Andr=C3=A9=20Zwing?= <nerv@dawncrow.de>
-Date: Sun, 20 Oct 2024 15:11:14 +0200
-Subject: [PATCH 09/10] ntdll: Default to libarm64ecfex for amd64 emulation,
- but allow changing it with HODLL64
-
----
- dlls/ntdll/loader.c | 38 ++++++++++++++++++++++++++++++++++++--
- 1 file changed, 36 insertions(+), 2 deletions(-)
-
-diff --git a/dlls/ntdll/loader.c b/dlls/ntdll/loader.c
-index 9f101a1..7a2b69f 100644
---- a/dlls/ntdll/loader.c
-+++ b/dlls/ntdll/loader.c
-@@ -4255,17 +4255,50 @@ static void open_known_dll_ntdir(void)
+diff --git a/dlls/ntdll/unix/fsync.c b/dlls/ntdll/unix/fsync.c
+index 4d9f5cd..b3c738e 100644
+--- a/dlls/ntdll/unix/fsync.c
++++ b/dlls/ntdll/unix/fsync.c
+@@ -53,6 +53,9 @@
  
- #ifdef __arm64ec__
+ #include "unix_private.h"
+ #include "fsync.h"
++#ifdef __ANDROID__
++#include "../../../android/shm_utils/shm_utils.h"
++#endif
  
-+static DWORD loaderGetEnvironmentVariableW( LPCWSTR name, LPWSTR val, DWORD size )
-+{
-+    UNICODE_STRING us_name, us_value;
-+    NTSTATUS status;
-+    DWORD len;
-+
-+    RtlInitUnicodeString( &us_name, name );
-+    us_value.Length = 0;
-+    us_value.MaximumLength = (size ? size - 1 : 0) * sizeof(WCHAR);
-+    us_value.Buffer = val;
-+
-+    status = RtlQueryEnvironmentVariable_U( NULL, &us_name, &us_value );
-+    len = us_value.Length / sizeof(WCHAR);
-+    if (status == STATUS_BUFFER_TOO_SMALL) return len + 1;
-+    if (status) return 0;
-+    if (!size) return len + 1;
-+    val[len] = 0;
-+    return len;
-+}
-+
- static void load_arm64ec_module(void)
+ WINE_DEFAULT_DEBUG_CHANNEL(fsync);
+ 
+@@ -165,7 +168,7 @@ static inline int futex_wake( int *addr, int val )
+ 
+ int do_fsync(void)
  {
--    ULONG buffer[16];
-+    ULONG buffer[32];
-     KEY_VALUE_PARTIAL_INFORMATION *info = (KEY_VALUE_PARTIAL_INFORMATION *)buffer;
-     UNICODE_STRING nameW = RTL_CONSTANT_STRING( L"\\Registry\\Machine\\Software\\Microsoft\\Wow64\\amd64" );
--    WCHAR module[64] = L"C:\\windows\\system32\\xtajit64.dll";
-+    WCHAR *cpu_dll = (WCHAR*)buffer;
-+    WCHAR module[64] = L"C:\\windows\\system32\\libarm64ecfex.dll";
-     OBJECT_ATTRIBUTES attr;
-     WINE_MODREF *wm;
-     NTSTATUS status;
-     HANDLE key;
-+    DWORD res;
+-#ifdef __linux__
++#if defined(__linux__) && !defined(__ANDROID__)
+     static int do_fsync_cached = -1;
  
-+    if ((res = loaderGetEnvironmentVariableW( L"HODLL64", cpu_dll, ARRAY_SIZE(buffer))) &&
-+        res < ARRAY_SIZE(buffer))
-+    {
-+        ULONG dirlen = wcslen( L"C:\\windows\\system32\\" );
-+        ULONG size = sizeof(module) - (dirlen + 1) * sizeof(WCHAR);
-+        memset( module + dirlen, 0, size );
-+        memcpy( module + dirlen, cpu_dll, min( res * sizeof(WCHAR), size ));
-+    }
-+
-+if (0)
-+{
-     InitializeObjectAttributes( &attr, &nameW, OBJ_CASE_INSENSITIVE, 0, NULL );
-     if (!NtOpenKey( &key, KEY_READ | KEY_WOW64_64KEY, &attr ))
-     {
+     if (do_fsync_cached == -1)
