@@ -407,6 +407,7 @@ jobs:
             --with-wine-tools=/opt/wine64-native \
             --disable-win16 \
             --disable-tests \
+            --enable-wineandroid_drv=no \
             --with-vulkan \
             --with-gstreamer \
             --enable-nls \
