@@ -67,7 +67,7 @@ jobs:
             curl xz-utils file libfreetype6-dev \
             clang llvm lld unzip \
             binutils-aarch64-linux-gnu \
-            mingw-w64 \
+            mingw-w64 gradle \
             librsvg2-bin \
             dpkg-dev \
             fakeroot \
@@ -374,9 +374,10 @@ jobs:
           export PKG_CONFIG_LIBDIR=$deps/lib/pkgconfig:$deps/share/pkgconfig
           export ACLOCAL_PATH=$deps/lib/aclocal:$deps/share/aclocal
           
-          export C_OPTS="-Wno-declaration-after-statement -Wno-implicit-function-declaration -Wno-int-conversion"
-          export CFLAGS=$C_OPTS
-          export CXXFLAGS=$C_OPTS
+          export CFLAGS="-O2 -pipe"
+          export CXXFLAGS="-O2 -pipe"
+          export CROSSCFLAGS="-O2 -pipe"
+          export CROSSCXXFLAGS="-O2 -pipe"
 
           export FREETYPE_CFLAGS="-I$deps/include/freetype2"
           export PULSE_CFLAGS="-I$deps/include/pulse"
@@ -404,6 +405,7 @@ jobs:
             --with-mingw=clang \
             --enable-archs=arm64ec,aarch64,i386 \
             --with-wine-tools=/opt/wine64-native \
+            --enable-wineandroid_drv=no \
             --disable-win16 \
             --disable-tests \
             --with-vulkan \
