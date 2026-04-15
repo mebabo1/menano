@@ -34,7 +34,7 @@ static inline int shm_open(const char *name, int oflag, mode_t mode) {
     tmpdir = getenv("TMPDIR");
 
     if (!tmpdir) {
-        tmpdir = "/tmp";
+        tmpdir = "/data/data/com.termux/files/usr/tmp";
     }
 
     asprintf(&fname, "%s/%s", tmpdir, name);
@@ -48,7 +48,7 @@ static inline int shm_unlink(const char *name) {
     tmpdir = getenv("TMPDIR");
 
     if (!tmpdir) {
-        tmpdir = "/tmp";
+        tmpdir = "/data/data/com.termux/files/usr/tmp";
     }
 
     asprintf(&fname, "%s/%s", tmpdir, name);
