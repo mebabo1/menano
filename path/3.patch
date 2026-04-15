@@ -11,3 +11,4 @@ index 3074f7c..275d099 100644
 +#endif
  
  WINE_DEFAULT_DEBUG_CHANNEL(esync);
+ 
