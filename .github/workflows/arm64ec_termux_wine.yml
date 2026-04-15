@@ -413,6 +413,7 @@ jobs:
             --enable-nls \
             --without-pulse \
             --without-ffmpeg \
+            --disable-amd_ags_x64 \
             --disable-opencl \
             --without-alsa \
             --without-capi \
