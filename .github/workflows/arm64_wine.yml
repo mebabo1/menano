@@ -1,11 +1,6 @@
 name: Build Wine Proton&Wine bootBuilder
 
 on:
-  schedule:
-    # Proton 构建 - 每月1号和15号
-    - cron: '0 0 1,15 * *'
-    # Wine 构建 - 每月5号和20号
-    - cron: '0 2 5,20 * *'
   workflow_dispatch:
     inputs:
       build_type:
