@@ -475,6 +475,7 @@ jobs:
             --without-xxf86vm
             
           make -j$(nproc) > build.log 2>&1 || (tail -n 100 build.log && exit 1)
+          mkdir -p /tmp/wine-install-wow64
           make install
 
           echo "설치된 파일 목록 확인:"
