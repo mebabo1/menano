@@ -402,7 +402,7 @@ jobs:
           export deps="$HOME/termuxfs/aarch64/data/data/com.termux/files/usr"
           export RUNTIME_PATH="/data/data/com.termux/files/usr"
           export TOOLCHAIN="$HOME/Android/Sdk/ndk/27.3.13750724/toolchains/llvm/prebuilt/linux-x86_64/bin"
-          export TARGET=aarch64-linux-android28
+          export TARGET=aarch64--linux-android
           export CC=$TOOLCHAIN/$TARGET-clang
           export AS=$CC
           export CXX=$TOOLCHAIN/$TARGET-clang++
@@ -437,13 +437,13 @@ jobs:
           echo "WINE_NLS_DIR=$WINE_NLS_DIR"
 
           ../configure \
-            --enable-win64 \
             --host=$TARGET \
             --prefix=/tmp/wine-install-wow64 \
             --with-mingw=clang \
             --enable-archs=arm64ec,aarch64,i386 \
             --with-wine-tools=/opt/wine64-native \
             --enable-wineandroid_drv=no \
+            --enable-win64 \
             --disable-win16 \
             --disable-tests \
             --with-vulkan \
