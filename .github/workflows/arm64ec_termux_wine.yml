@@ -115,6 +115,41 @@ jobs:
           echo "LANG=ko_KR.UTF-8" >> $GITHUB_ENV
           echo "LC_ALL=ko_KR.UTF-8" >> $GITHUB_ENV
           echo "LANGUAGE=ko_KR:ko" >> $GITHUB_ENV
+
+      - name: Create Android SHM Compatibility Header
+        run: |
+          export deps="$HOME/termuxfs/aarch64/data/data/com.termux/files/usr"
+          cat <<EOF > $deps/include/shm_utils.h
+          #ifndef __WINE_SERVER_SHM_UTILS_H
+          #define __WINE_SERVER_SHM_UTILS_H
+
+          #ifdef __ANDROID__
+          #include <fcntl.h>
+          #include <stdio.h>
+          #include <stdlib.h>
+          #include <unistd.h>
+          #include <sys/stat.h>
+
+          static inline int shm_open(const char *name, int oflag, mode_t mode) {
+              char *tmpdir = getenv("TMPDIR") ? getenv("TMPDIR") : "/tmp";
+              char *fname;
+              if (asprintf(&fname, "%s/%s", tmpdir, name) == -1) return -1;
+              int fd = open(fname, oflag, mode);
+              free(fname);
+              return fd;
+          }
+
+          static inline int shm_unlink(const char *name) {
+              char *tmpdir = getenv("TMPDIR") ? getenv("TMPDIR") : "/tmp";
+              char *fname;
+              if (asprintf(&fname, "%s/%s", tmpdir, name) == -1) return -1;
+              int ret = unlink(fname);
+              free(fname);
+              return ret;
+          }
+          #endif /* __ANDROID__ */
+          #endif /* __WINE_SERVER_SHM_UTILS_H */
+          EOF
  
       - name: Wine
         run: |
