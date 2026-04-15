@@ -409,7 +409,7 @@ jobs:
           
           export PKG_CONFIG_LIBDIR=$deps/lib/pkgconfig:$deps/share/pkgconfig
           export ACLOCAL_PATH=$deps/lib/aclocal:$deps/share/aclocal
-          export CPPFLAGS="-I$deps/include -I$deps/include/shm_utils --sysroot=$TOOLCHAIN/../sysroot"
+          export CPPFLAGS="-I$deps/include --sysroot=$TOOLCHAIN/../sysroot"
           
           export LDFLAGS="-L$deps/lib -Wl,-rpath=$RUNTIME_PATH/lib"
           export LIBRARY_PATH="$deps/lib${LIBRARY_PATH:+:$LIBRARY_PATH}"
