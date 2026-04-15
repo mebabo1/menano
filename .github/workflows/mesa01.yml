@@ -47,7 +47,7 @@ jobs:
           # 스크립트에서 INSTALL_DIR=$WORK_DIR/install 로 설정했으므로 해당 경로를 참조합니다.
           # WORK_DIR=$(pwd)/turnip_workdir 였으므로 경로는 아래와 같습니다.
           
-          SOURCE_PATH="turnip_workdir/install/usr"
+          SOURCE_PATH="turnip_workdir/install"
           
           if [ -d "$SOURCE_PATH" ]; then
             echo "✅ 빌드 결과물 확인 완료. 압축을 시작합니다."
