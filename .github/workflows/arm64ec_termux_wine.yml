@@ -400,13 +400,11 @@ jobs:
           export PATH="/opt/${{ env.LLVMMINGW_NAME }}/bin:$PATH"
           export deps="$HOME/termuxfs/aarch64/data/data/com.termux/files/usr"
           export RUNTIME_PATH="/data/data/com.termux/files/usr"
-          export TOOLCHAIN="$WORKDIR/android-ndk/android-ndk-r29/toolchains/llvm/prebuilt/linux-x86_64/bin"
-          export ARCH="aarch64"
-          export SDKVER="28"
-          export TARGET="$ARCH-linux-android"
-          export CC="$TOOLCHAIN/$TARGET$SDKVER-clang -v"
+          export TOOLCHAIN="$HOME/Android/Sdk/ndk/27.3.13750724/toolchains/llvm/prebuilt/linux-x86_64/bin"
+          export TARGET=aarch64-linux-android28
+          export CC=$TOOLCHAIN/$TARGET-clang
           export AS=$CC
-          export CXX="$TOOLCHAIN/$TARGET$SDKVER-clang++ -v"
+          export CXX=$TOOLCHAIN/$TARGET-clang++
           
           export PKG_CONFIG_LIBDIR=$deps/lib/pkgconfig:$deps/share/pkgconfig
           export ACLOCAL_PATH=$deps/lib/aclocal:$deps/share/aclocal
