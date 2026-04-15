@@ -382,7 +382,6 @@ jobs:
           export CROSSCXXFLAGS="-O2 -pipe"
           export LDFLAGS="-L$deps/lib -Wl,-rpath=$RUNTIME_PATH/lib"
 
-          export LIBRARY_PATH="$deps/lib${LIBRARY_PATH:+:$LIBRARY_PATH}"
           export FREETYPE_CFLAGS="-I$deps/include/freetype2"
           export PULSE_CFLAGS="-I$RUNTIME_PATH/include/pulse"
           export PULSE_LIBS="-L$RUNTIME_PATH/lib/pulseaudio -lpulse"
