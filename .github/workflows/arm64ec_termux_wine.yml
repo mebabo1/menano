@@ -383,10 +383,8 @@ jobs:
           
           export C_OPTS="-Wno-declaration-after-statement -Wno-implicit-function-declaration -Wno-int-conversion"
           export CFLAGS=$C_OPTS
-          export CXXFLAGS="-O2 -pipe"
-          export CROSSCFLAGS="-O2 -pipe"
-          export CROSSCXXFLAGS="-O2 -pipe"
-          export LDFLAGS="-L$deps/lib -Wl,-rpath=$RUNTIME_PATH/lib"
+          # export LDFLAGS="-L$deps/lib -Wl,-rpath=$RUNTIME_PATH/lib"
+          export LDFLAGS="-L$deps/lib -Wl,-O1 -Wl,--as-needed -Wl,-rpath=$RUNTIME_PATH/lib"
 
           export FREETYPE_CFLAGS="-I$deps/include/freetype2"
           export PULSE_CFLAGS="-I$deps/include/pulse"
