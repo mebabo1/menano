@@ -412,7 +412,7 @@ jobs:
             --with-vulkan \
             --with-gstreamer \
             --enable-nls \
-            --without-pulse \
+            --with-pulse \
             --without-ffmpeg \
             --disable-opencl \
             --without-alsa \
