@@ -380,7 +380,9 @@ jobs:
           export CXXFLAGS="-O2 -pipe"
           export CROSSCFLAGS="-O2 -pipe"
           export CROSSCXXFLAGS="-O2 -pipe"
+          export LDFLAGS="-L$deps/lib -Wl,-rpath=$RUNTIME_PATH/lib"
 
+          export LIBRARY_PATH="$deps/lib${LIBRARY_PATH:+:$LIBRARY_PATH}"
           export FREETYPE_CFLAGS="-I$deps/include/freetype2"
           export PULSE_CFLAGS="-I$RUNTIME_PATH/include/pulse"
           export PULSE_LIBS="-L$RUNTIME_PATH/lib/pulseaudio -lpulse"
@@ -394,7 +396,6 @@ jobs:
           export FFMPEG_LIBS="-L$deps/lib -lavutil -lavcodec -lavformat"
 
           export WINE_NLS_DIR=/opt/wine64-native/nls
-          export LDFLAGS="-L$deps/lib -Wl,-rpath=$RUNTIME_PATH/lib"
 
           echo "使用 Wine64 构建目录（作为工具目录）: /opt/wine64-native"
           echo "WINE_NLS_DIR=$WINE_NLS_DIR"
