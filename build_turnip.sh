@@ -6,8 +6,11 @@ echo "🚀 Turnip (Mesa) Termux/Android 최적화 빌드 시작..."
 WORK_DIR=$(pwd)/turnip_workdir
 INSTALL_DIR=$WORK_DIR/install
 SOURCE_DIR=$WORK_DIR/mesa-src
-# NDK는 자동으로 받거나 경로를 지정해야 합니다 (앞선 스크립트 방식 권장)
-NDK_PATH="$WORK_DIR/android-ndk-r29" 
+if [ -z "$ANDROID_NDK_HOME" ]; then
+    NDK_PATH="$WORK_DIR/android-ndk-r29"
+else
+    NDK_PATH="$ANDROID_NDK_HOME"
+fi
 
 mkdir -p "$WORK_DIR"
 
