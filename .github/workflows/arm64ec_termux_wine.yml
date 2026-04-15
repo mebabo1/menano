@@ -371,11 +371,6 @@ jobs:
           export CC=$TOOLCHAIN/$TARGET-clang
           export AS=$CC
           export CXX=$TOOLCHAIN/$TARGET-clang++
-          export AR=$TOOLCHAIN/llvm-ar
-          export LD=$TOOLCHAIN/ld
-          export RANLIB=$TOOLCHAIN/llvm-ranlib
-          export STRIP=$TOOLCHAIN/llvm-strip
-          export DLLTOOL=$LLVM_MINGW_TOOLCHAIN/llvm-dlltool
           
           export PKG_CONFIG_LIBDIR=$deps/lib/pkgconfig:$deps/share/pkgconfig
           export ACLOCAL_PATH=$deps/lib/aclocal:$deps/share/aclocal
@@ -383,9 +378,8 @@ jobs:
           
           export C_OPTS="-Wno-declaration-after-statement -Wno-implicit-function-declaration -Wno-int-conversion"
           export CFLAGS=$C_OPTS
-          # export LDFLAGS="-L$deps/lib -Wl,-rpath=$RUNTIME_PATH/lib"
-          export LDFLAGS="-L$deps/lib -Wl,-O1 -Wl,--as-needed -Wl,-rpath=$RUNTIME_PATH/lib"
-
+          export LDFLAGS="-L$deps/lib -Wl,-rpath=$RUNTIME_PATH/lib"
+          
           export FREETYPE_CFLAGS="-I$deps/include/freetype2"
           export PULSE_CFLAGS="-I$deps/include/pulse"
           export PULSE_LIBS="-L$deps/lib/pulseaudio -lpulse"
@@ -441,7 +435,7 @@ jobs:
             --without-xinerama \
             --without-xxf86vm
             
-          make -j$(nproc) > /dev/null
+          make -j$(nproc)
           make install
 
           # 验证安装是否生成 bin 目录（若缺失则报错）
