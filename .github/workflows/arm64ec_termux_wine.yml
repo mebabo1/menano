@@ -436,7 +436,7 @@ jobs:
             --without-xinerama \
             --without-xxf86vm
             
-          make -j$(nproc)
+          make -j$(nproc) > /dev/null
           make install
 
           # 验证安装是否生成 bin 目录（若缺失则报错）
