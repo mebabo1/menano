@@ -474,10 +474,9 @@ jobs:
             --without-xinerama \
             --without-xxf86vm
             
-          make -j$(nproc) > /dev/null
+          make -j$(nproc) > build.log 2>&1 || (tail -n 100 build.log && exit 1)
           make install
 
-          # 验证安装是否生成 bin 目录（若缺失则报错）
           if [ ! -d /tmp/wine-install-wow64/bin ]; then
             echo "错误: /tmp/wine-install-wow64/bin 目录不存在，安装可能不完整"
             exit 1
