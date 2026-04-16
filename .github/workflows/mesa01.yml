@@ -1,4 +1,4 @@
-name: Build Mesa Turnip (glibc aarch64)
+name: Build Mesa Turnip (termux)
 
 on:
   workflow_dispatch:
