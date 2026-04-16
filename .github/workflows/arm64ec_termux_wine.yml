@@ -560,8 +560,8 @@ jobs:
       # ------------------------------------------------------------
       - name: 准备打包
         run: |
-          mkdir -p wine-package/
-          cp -r /tmp/wine-install-wow64/* wine-package/
+          mkdir -p wine-package/wine 
+          cp -r /tmp/wine-install-wow64/* wine-package/wine/
 
       - name: 创建打包文件
         run: |
