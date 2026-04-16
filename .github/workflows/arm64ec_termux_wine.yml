@@ -511,6 +511,7 @@ jobs:
           if [ -d "$BUILD_DIR/dlls/ntdll/aarch64-windows" ]; then
               echo "✔ aarch64-windows 감지됨. x86_64-unix 찌꺼기 정리."
               rm -rf "$TARGET_PREFIX/lib/wine/x86_64-unix"
+              ls -la "$TARGET_PREFIX/"
           fi
 
           echo "=== 2. 리소스 복사 (NLS, Fonts) ==="
@@ -542,6 +543,7 @@ jobs:
           ls -l "$TARGET_PREFIX/bin/ntdll.so"
           # 링크가 가리키는 실제 파일의 존재 여부를 한 번 더 확인
           ls -L "$TARGET_PREFIX/bin/ntdll.so" || { echo "❌ 링크가 깨졌습니다!"; exit 1; }
+          ls -R "$TARGET_PREFIX/"
 
       # ------------------------------------------------------------
       # 13. 验证安装目录内容（可选，便于调试）
