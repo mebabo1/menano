@@ -1,3 +1,5 @@
+-Wl,--dynamic-linker=$depsg/lib/ld-linux-aarch64.so.1
+
           FILE_PULSE="dlls/winepulse.drv/pulse.c"
           if [ -f "$FILE_PULSE" ]; then
             if ! grep -q '#ifndef __ANDROID__' "$FILE_PULSE"; then
