@@ -479,6 +479,14 @@ jobs:
             fi
           fi
 
+          FILE_SPEC="dlls/ntdll/ntdll.spec"
+          if [ -f "$FILE_SPEC" ]; then
+            echo "Patching $FILE_SPEC for RtlWow64SuspendThread..."
+            if ! grep -q "RtlWow64SuspendThread" "$FILE_SPEC"; then
+              sed -i '/RtlWow64SetThreadContext/a @ stdcall -arch=win64 RtlWow64SuspendThread(long ptr)' "$FILE_SPEC"
+            fi
+          fi
+
           # 8. Vulkan VRAM Faking 적용
           FILE="dlls/winevulkan/vulkan.c"
           if [ -f "$FILE" ] && ! grep -q 'WINE_VRAM_SIZE' "$FILE" ; then
