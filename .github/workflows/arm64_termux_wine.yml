@@ -450,8 +450,7 @@ jobs:
           SOURCE_DIR="${{ env.WINE64_DIR }}/source"
           NATIVE_NLS_DIR="/opt/wine64-native/nls"
           
-          # Termux는 무조건 aarch64 환경임
-          WINE_ARCH="aarch64"
+          WINE_ARCH="x86_64"
 
           echo "=== 1. 구조 생성 및 모든 라이브러리 수집 ==="
           mkdir -p "$TARGET_PREFIX/share/wine/nls"
@@ -461,12 +460,6 @@ jobs:
           find "$BUILD_DIR" -name "ntdll.so" -exec cp -vL {} "$TARGET_PREFIX/arm64-v8a/lib/wine/$WINE_ARCH-unix/" \;
           find "$BUILD_DIR/dlls" -name "*.so" -exec cp -vL {} "$TARGET_PREFIX/arm64-v8a/lib/wine/$WINE_ARCH-unix/" \;
           find "$BUILD_DIR/programs" -name "*.so" -exec cp -vL {} "$TARGET_PREFIX/arm64-v8a/lib/wine/$WINE_ARCH-unix/" \;
-
-          # 수집 완료 후 불필요한 폴더 제거 (이미 복사본이 있으므로 안전)
-          if [ -d "$BUILD_DIR/dlls/ntdll/aarch64-windows" ]; then
-              echo "✔ aarch64-windows 감지됨. x86_64-unix 찌꺼기 정리."
-              rm -rf "$TARGET_PREFIX/lib/wine/x86_64-unix"
-          fi
 
           echo "=== 2. 리소스 복사 (NLS, Fonts) ==="
           [ -d "$NATIVE_NLS_DIR" ] && cp -v "$NATIVE_NLS_DIR"/*.nls "$TARGET_PREFIX/share/wine/nls/" 2>/dev/null || true
