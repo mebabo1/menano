@@ -47,6 +47,7 @@ fi
 cd "$SOURCE_DIR"
 echo "🩹 메모리 핸들러 패치 적용 중..."
 # mesa 소스 내부의 stub 파일 수정
+sed -i "s/dep_libdrm = dependency('libdrm'/dep_libdrm = dependency('libdrm', fallback : ['libdrm', 'libdrm_dep'] /g" meson.build
 sed -i 's/typedef const native_handle_t\* buffer_handle_t;/typedef void\* buffer_handle_t;/g' include/android_stub/cutils/native_handle.h || true
 sed -i 's/, hnd->handle/, (void \*)hnd->handle/g' src/util/u_gralloc/u_gralloc_fallback.c || true
 
