@@ -33,9 +33,19 @@ fi
 
 cd "$SOURCE_DIR"
 
+echo "📦 의존성 소스 가져오는 중..."
+mkdir -p "$SOURCE_DIR/subprojects"
+cd "$SOURCE_DIR/subprojects"
+
+# libdrm 추가 (Mesa 빌드에 필수)
+if [ ! -d "libdrm" ]; then
+    echo "📥 libdrm 소스 클론 중..."
+    git clone --depth 1 https://gitlab.freedesktop.org/mesa/drm.git libdrm
+fi
+
 sed -i 's/typedef const native_handle_t\* buffer_handle_t;/typedef void\* buffer_handle_t;/g' include/android_stub/cutils/native_handle.h || true
 sed -i 's/, hnd->handle/, (void \*)hnd->handle/g' src/util/u_gralloc/u_gralloc_fallback.c || true
-mkdir -p subprojects && cd subprojects
+
 git clone --depth=1 https://github.com/KhronosGroup/SPIRV-Tools.git spirv-tools || true
 git clone --depth=1 https://github.com/KhronosGroup/SPIRV-Headers.git spirv-headers || true
 cd ..
