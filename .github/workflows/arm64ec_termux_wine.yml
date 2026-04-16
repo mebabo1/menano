@@ -446,6 +446,7 @@ jobs:
             --enable-archs=arm64ec,aarch64,i386 \
             --with-wine-tools=/opt/wine64-native \
             --enable-wineandroid_drv=no \
+            --without-android-display \
             --enable-win64 \
             --disable-win16 \
             --disable-tests \
