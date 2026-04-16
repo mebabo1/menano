@@ -55,12 +55,12 @@ jobs:
       - name: Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: glibc-v${{ github.run_number }}
-          name: Turnip Driver for glibc (v${{ github.run_number }})
+          tag_name: driver-v${{ github.run_number }}
+          name: Turnip Driver (v${{ github.run_number }})
           files: "*.tar.gz"
           body: |
             Turnip (Freedreno Vulkan) driver built for termux environment.
-            - use glubc gpu  
+            - use termux gpu  
               ```bash  
-              tar xf /sdcard/Download/turnip-glibc-aarch64.tar.gz -C $PREFIX/
+              tar xf /sdcard/Download/turnip-driver-aarch64.tar.gz -C $PREFIX/
               ```  
