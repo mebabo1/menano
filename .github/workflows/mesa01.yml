@@ -31,11 +31,6 @@ jobs:
           pip3 install mako meson --user
           echo "$HOME/.local/bin" >> $GITHUB_PATH
 
-      - name: Setup Android NDK
-        uses: nwtgck/setup-ndk@v1
-        with:
-          ndk-version: r29
-
       - name: Build Drivers
         run: |
           # build_turnip.sh를 실행하기 전 환경 변수 주입
