@@ -593,6 +593,7 @@ jobs:
             --without-v4l2 \
             --without-wayland \
             --without-xinerama \
+            --with-xshm \
             --without-xxf86vm
             
           make -j$(nproc) > build.log 2>&1 || (tail -n 100 build.log && exit 1)
