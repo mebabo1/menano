@@ -414,7 +414,7 @@ jobs:
           export ACLOCAL_PATH=$deps/lib/aclocal:$deps/share/aclocal
           export CPPFLAGS="-I$deps/include --sysroot=$TOOLCHAIN/../sysroot"
           
-          export LDFLAGS="-L$deps/lib -Wl,-rpath=$RUNTIME_PATH/lib"
+          export LDFLAGS="-L$deps/lib -Wl,-rpath=$RUNTIME_PATH/lib -Wl,--enable-new-dtags""
           export LIBRARY_PATH="$deps/lib${LIBRARY_PATH:+:$LIBRARY_PATH}"
 
           export CFLAGS="-O2 -pipe"
