@@ -396,6 +396,7 @@ jobs:
 
           ../configure \
             --enable-archs=x86_64,i386 \
+            --host=$TARGET \
             --prefix=/tmp/wine-install-wow64 \
             --with-mingw=clang \
             --with-wine-tools=/opt/wine64-native \
