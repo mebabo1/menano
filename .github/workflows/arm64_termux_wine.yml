@@ -306,9 +306,6 @@ jobs:
             fi
           fi
 
-          FILE_LOADER="dlls/ntdll/loader.c"
-          if [ -f "$FILE_LOADER" ]; then
-
           FILE="dlls/winevulkan/vulkan.c"
           if [ -f "$FILE" ] && ! grep -q 'WINE_VRAM_SIZE' "$FILE" ; then
             echo "Applying VRAM faking to winevulkan..."
