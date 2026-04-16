@@ -11,50 +11,49 @@ NDK_VER="android-ndk-r29"
 mkdir -p "$WORK_DIR"
 cd "$WORK_DIR"
 
-# 1. NDK 다운로드 및 경로 설정
+# 1. NDK 다운로드 및 설정
 if [ -z "$ANDROID_NDK_HOME" ] && [ ! -d "$NDK_VER" ]; then
     echo "📥 NDK ($NDK_VER) 다운로드 중..."
     curl -sL "https://dl.google.com/android/repository/${NDK_VER}-linux.zip" -o "${NDK_VER}.zip"
-    echo "📦 압축 해제 중..."
     unzip -q "${NDK_VER}.zip"
     rm "${NDK_VER}.zip"
-    export ANDROID_NDK_HOME="$WORK_DIR/$NDK_VER"
-elif [ -d "$NDK_VER" ]; then
-    export ANDROID_NDK_HOME="$WORK_DIR/$NDK_VER"
 fi
-
+export ANDROID_NDK_HOME="${ANDROID_NDK_HOME:-$WORK_DIR/$NDK_VER}"
 echo "📂 NDK 경로: $ANDROID_NDK_HOME"
 
-# 2. 소스 코드 가져오기
+# 2. Mesa 소스 클론
 if [ ! -d "$SOURCE_DIR" ]; then
     echo "📥 Mesa 소스 클론 중..."
     git clone --depth 1 https://github.com/lfdevs/mesa-for-android-container.git "$SOURCE_DIR"
 fi
 
-cd "$SOURCE_DIR"
+# 3. 의존성 (libdrm, SPIRV) 준비 - subprojects 폴더 내부에 위치해야 함
+echo "📦 의존성 소스 정리 중..."
+SUB_DIR="$SOURCE_DIR/subprojects"
+mkdir -p "$SUB_DIR"
 
-echo "📦 의존성 소스 가져오는 중..."
-mkdir -p "$SOURCE_DIR/subprojects"
-cd "$SOURCE_DIR/subprojects"
-
-# libdrm 추가 (Mesa 빌드에 필수)
-if [ ! -d "libdrm" ]; then
-    echo "📥 libdrm 소스 클론 중..."
-    git clone --depth 1 https://gitlab.freedesktop.org/mesa/drm.git libdrm
+# libdrm 클론 (이름은 반드시 'libdrm'이어야 함)
+if [ ! -d "$SUB_DIR/libdrm" ]; then
+    git clone --depth 1 https://gitlab.freedesktop.org/mesa/drm.git "$SUB_DIR/libdrm"
 fi
 
+# SPIRV 도구들 클론
+if [ ! -d "$SUB_DIR/spirv-tools" ]; then
+    git clone --depth=1 https://github.com/KhronosGroup/SPIRV-Tools.git "$SUB_DIR/spirv-tools"
+    git clone --depth=1 https://github.com/KhronosGroup/SPIRV-Headers.git "$SUB_DIR/spirv-headers"
+fi
+
+# 4. 소스 코드 패치 (경로 주의)
+cd "$SOURCE_DIR"
+echo "🩹 메모리 핸들러 패치 적용 중..."
+# mesa 소스 내부의 stub 파일 수정
 sed -i 's/typedef const native_handle_t\* buffer_handle_t;/typedef void\* buffer_handle_t;/g' include/android_stub/cutils/native_handle.h || true
 sed -i 's/, hnd->handle/, (void \*)hnd->handle/g' src/util/u_gralloc/u_gralloc_fallback.c || true
 
-git clone --depth=1 https://github.com/KhronosGroup/SPIRV-Tools.git spirv-tools || true
-git clone --depth=1 https://github.com/KhronosGroup/SPIRV-Headers.git spirv-headers || true
-cd ..
-
-# 3. [중요] Meson 크로스 컴파일 설정 파일 생성
-# Meson이 NDK의 컴파일러를 인식하게 만드는 핵심 단계입니다.
+# 5. 크로스 파일 생성 (pkgconfig 차단 강화)
 NDK_BIN="$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin"
 NDK_SYS="$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/sysroot"
-API=34  # Android API Level
+API=34
 
 cat <<EOF > android-cross.txt
 [binaries]
@@ -64,7 +63,8 @@ cpp = ['$NDK_BIN/aarch64-linux-android$API-clang++', '--sysroot=$NDK_SYS']
 c_ld = 'lld'
 cpp_ld = 'lld'
 strip = '$NDK_BIN/llvm-strip'
-pkg-config = 'false'
+# pkgconfig를 아예 찾지 못하도록 설정
+pkgconfig = 'false'
 
 [host_machine]
 system = 'android'
@@ -73,22 +73,12 @@ cpu = 'armv8'
 endian = 'little'
 EOF
 
-# 4. 소스 코드 패치
-echo "🩹 메모리 핸들러 패치 적용 중..."
-sed -i 's/typedef const native_handle_t\* buffer_handle_t;/typedef void\* buffer_handle_t;/g' include/android_stub/cutils/native_handle.h || true
-sed -i 's/, hnd->handle/, (void \*)hnd->handle/g' src/util/u_gralloc/u_gralloc_fallback.c || true
-
-# 5. 의존성 (SPIRV) 준비
-mkdir -p subprojects && cd subprojects
-git clone --depth=1 https://github.com/KhronosGroup/SPIRV-Tools.git spirv-tools || true
-git clone --depth=1 https://github.com/KhronosGroup/SPIRV-Headers.git spirv-headers || true
-cd ..
-
-# 6. Meson 설정 (크로스 파일 적용)
+# 6. Meson 설정 및 빌드
 OPTIM_FLAGS="-march=armv8-a"
 
-echo "⚙️ Meson 설정 시작 (Cross-file 사용)..."
-rm -rf builddir # 이전 실패한 설정이 있으면 삭제
+echo "⚙️ Meson 설정 시작..."
+rm -rf builddir
+# wrap-mode=nodownload를 사용하여 이미 준비된 subprojects를 강제로 사용하게 함
 meson setup builddir \
     --cross-file android-cross.txt \
     --prefix=/usr \
@@ -106,16 +96,15 @@ meson setup builddir \
     -Dgbm=disabled \
     -Dcpp_args="$OPTIM_FLAGS" \
     -Dc_args="$OPTIM_FLAGS" \
-    --wrap-mode=forcefallback \
+    --wrap-mode=nodownload \
     --force-fallback-for=spirv-tools,spirv-headers,libdrm
 
-# 7. 컴파일 및 설치
 echo "🏗️ 컴파일 시작..."
 ninja -C builddir -j$(nproc)
 
-echo "📦 결과물 정리 중..."
+echo "📦 결과물 정리..."
+mkdir -p "$INSTALL_DIR"
 DESTDIR="$INSTALL_DIR" ninja -C builddir install
 cp builddir/src/freedreno/vulkan/libvulkan_freedreno.so "$INSTALL_DIR/vulkan.adreno.so"
 
-echo "✅ 모든 빌드 작업이 완료되었습니다!"
-echo "📍 결과물 위치: $INSTALL_DIR/vulkan.adreno.so"
+echo "✅ 빌드 완료! 결과물: $INSTALL_DIR/vulkan.adreno.so"
