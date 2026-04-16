@@ -25,22 +25,6 @@ fi
 
 echo "📂 NDK 경로: $ANDROID_NDK_HOME"
 
-echo "📦 의존성 소스 가져오는 중..."
-mkdir -p "$SOURCE_DIR/subprojects"
-cd "$SOURCE_DIR/subprojects"
-
-# libdrm 추가 (Mesa 빌드에 필수)
-if [ ! -d "libdrm" ]; then
-    echo "📥 libdrm 소스 클론 중..."
-    git clone --depth 1 https://gitlab.freedesktop.org/mesa/drm.git libdrm
-fi
-
-# SPIRV 도구들
-git clone --depth=1 https://github.com/KhronosGroup/SPIRV-Tools.git spirv-tools || true
-git clone --depth=1 https://github.com/KhronosGroup/SPIRV-Headers.git spirv-headers || true
-
-cd ..
-
 # 2. 소스 코드 가져오기
 if [ ! -d "$SOURCE_DIR" ]; then
     echo "📥 Mesa 소스 클론 중..."
@@ -48,6 +32,13 @@ if [ ! -d "$SOURCE_DIR" ]; then
 fi
 
 cd "$SOURCE_DIR"
+
+sed -i 's/typedef const native_handle_t\* buffer_handle_t;/typedef void\* buffer_handle_t;/g' include/android_stub/cutils/native_handle.h || true
+sed -i 's/, hnd->handle/, (void \*)hnd->handle/g' src/util/u_gralloc/u_gralloc_fallback.c || true
+mkdir -p subprojects && cd subprojects
+git clone --depth=1 https://github.com/KhronosGroup/SPIRV-Tools.git spirv-tools || true
+git clone --depth=1 https://github.com/KhronosGroup/SPIRV-Headers.git spirv-headers || true
+cd ..
 
 # 3. [중요] Meson 크로스 컴파일 설정 파일 생성
 # Meson이 NDK의 컴파일러를 인식하게 만드는 핵심 단계입니다.
