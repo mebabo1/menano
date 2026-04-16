@@ -360,10 +360,10 @@ jobs:
           cd build-arm64
 
           export PATH="/opt/${{ env.LLVMMINGW_NAME }}/bin:$PATH"
-          export deps="$HOME/termuxfs/aarch64/data/data/com.termux/files/usr"
+          export deps="$HOME/termuxfs/x86_64/data/data/com.termux/files/usr"
           export RUNTIME_PATH="/data/data/com.termux/files/usr"
           export TOOLCHAIN="$HOME/Android/Sdk/ndk/27.3.13750724/toolchains/llvm/prebuilt/linux-x86_64/bin"
-          export TARGET=aarch64-linux-android28
+          export TARGET=x86_64-linux-android28
           export CC=$TOOLCHAIN/$TARGET-clang
           export AS=$CC
           export CXX=$TOOLCHAIN/$TARGET-clang++
