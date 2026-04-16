@@ -544,15 +544,14 @@ jobs:
       - name: 验证安装目录内容
         run: |
           echo "安装目录 /tmp/wine-install-wow64 的内容："
-          TARGET_PREFIX="/tmp/wine-install-wow64/arm64-v8a"
-          ls -la $TARGET_PREFIX/
-          if [ -d $TARGET_PREFIX/bin ]; then
+          ls -la /tmp/wine-install-wow64/
+          if [ -d /tmp/wine-install-wow64/bin ]; then
             echo "bin 目录内容："
-            ls -la $TARGET_PREFIX/bin/
+            ls -la /tmp/wine-install-wow64/bin/
           fi
-          if [ -d $TARGET_PREFIX/share ]; then
+          if [ -d /tmp/wine-install-wow64/share ]; then
             echo "share 目录内容："
-            ls -la $TARGET_PREFIX/share/
+            ls -la /tmp/wine-install-wow64/share/
           fi
 
       # ------------------------------------------------------------
