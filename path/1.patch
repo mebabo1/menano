@@ -2,7 +2,7 @@ diff --git a/dlls/winepulse.drv/pulse.c b/dlls/winepulse.drv/pulse.c
 index 85062ea..5380f3c 100644
 --- a/dlls/winepulse.drv/pulse.c
 +++ b/dlls/winepulse.drv/pulse.c
-@@ -267,10 +267,17 @@ static NTSTATUS pulse_process_attach(void *args)
+@@ -267,11 +267,14 @@ static NTSTATUS pulse_process_attach(void *args)
  {
      pthread_mutexattr_t attr;
  
@@ -11,16 +11,14 @@ index 85062ea..5380f3c 100644
      pthread_mutexattr_setprotocol(&attr, PTHREAD_PRIO_INHERIT);
      pthread_mutexattr_setrobust(&attr, PTHREAD_MUTEX_ROBUST);
 -
-+    if (pthread_mutex_init(&pulse_mutex, &attr) != 0)
-+        pthread_mutex_init(&pulse_mutex, NULL);
-+#else
-+    pthread_mutex_init(&pulse_mutex, NULL);
+     if (pthread_mutex_init(&pulse_mutex, &attr) != 0)
 +#endif
-+    
++        pthread_mutex_init(&pulse_mutex, NULL);
++
      if (pthread_mutex_init(&pulse_mutex, &attr) != 0)
          pthread_mutex_init(&pulse_mutex, NULL);
  
-@@ -317,9 +324,14 @@ static NTSTATUS pulse_main_loop(void *args)
+@@ -317,9 +320,13 @@ static NTSTATUS pulse_main_loop(void *args)
      pulse_ml = pa_mainloop_new();
      pa_mainloop_set_poll_func(pulse_ml, pulse_poll_func, NULL);
      NtSetEvent(params->event, NULL);
@@ -34,7 +32,7 @@ index 85062ea..5380f3c 100644
      pa_mainloop_free(pulse_ml);
      pulse_unlock();
      return STATUS_SUCCESS;
-@@ -1732,6 +1744,17 @@ static void pulse_add_stream_to_period(struct pulse_stream *stream)
+@@ -1732,6 +1739,16 @@ static void pulse_add_stream_to_period(struct pulse_stream *stream)
      period->timer_last_time = pa_rtclock_now();
      period->time_event = pa_context_rttime_new(pulse_ctx, period->timer_last_time + period->period,
              pa_streams_timer_cb, period);
