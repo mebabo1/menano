@@ -456,6 +456,15 @@ jobs:
               echo "✔ wine.inf integrated patch applied."
           fi
 
+          FILE_PRE="loader/preloader.c"
+          if [ -f "$FILE_PRE" ]; then
+            echo "Patching $FILE_PRE for Android memory layout..."
+            if ! grep -q "# elif __ANDROID__" "$FILE_PRE"; then
+              sed -i 's/#ifdef __aarch64__/#if defined(__aarch64__) || defined(__ANDROID__)/' "$FILE_PRE"
+            fi
+            echo "✔ preloader.c patched"
+          fi
+
           # 8. Vulkan VRAM Faking 적용
           FILE="dlls/winevulkan/vulkan.c"
           if [ -f "$FILE" ] && ! grep -q 'WINE_VRAM_SIZE' "$FILE" ; then
