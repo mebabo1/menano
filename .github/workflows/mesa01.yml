@@ -17,19 +17,8 @@ jobs:
       - name: Install glibc Dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y \
-            ninja-build patchelf flex bison git perl python3-pip \
-            glslang-tools curl zip libdrm-dev libx11-dev \
-            libxcb-dri3-dev libwayland-dev libxshmfence-dev \
-            libxrandr-dev libxxf86vm-dev llvm-19 libgoogle-perftools-dev \
-            libglvnd-dev libx11-xcb-dev libxcb-glx0-dev \
-            libxcb-shm0-dev libxcb-present-dev libxcb-randr0-dev \
-            libxcb-sync-dev libxcb-xfixes0-dev libxcb-dri3-dev \
-            libxcb-dri2-0-dev libxkbcommon-dev libzstd-dev
-          
-          # 안전한 설치
-          pip3 install mako meson --user
-          echo "$HOME/.local/bin" >> $GITHUB_PATH
+          sudo apt-get install -y ninja-build patchelf unzip flex bison git perl python3-pip glslang-tools curl zip
+          pip3 install --break-system-packages meson mako
 
       - name: Build Drivers
         run: |
