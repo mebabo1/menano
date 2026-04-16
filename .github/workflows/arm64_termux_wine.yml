@@ -398,6 +398,7 @@ jobs:
           echo "WINE_NLS_DIR=$WINE_NLS_DIR"
 
           ../configure \
+            --host=$TARGET \
             --prefix=/tmp/wine-install-wow64 \
             --with-mingw=clang \
             --enable-archs=x86_64,i386 \
