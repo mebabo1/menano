@@ -483,7 +483,7 @@ jobs:
       - name: Shared Library Path Fix
         run: |
           set -e
-          TARGET_PREFIX="/tmp/wine-install-wow64"
+          TARGET_PREFIX="/tmp/wine-install-wow64/arm64-v8a"
           BUILD_DIR="${{ env.WINE_SOURCE_DIR }}/source/build-arm64"
           SOURCE_DIR="${{ env.WINE64_DIR }}/source"
           NATIVE_NLS_DIR="/opt/wine64-native/nls"
@@ -544,14 +544,15 @@ jobs:
       - name: 验证安装目录内容
         run: |
           echo "安装目录 /tmp/wine-install-wow64 的内容："
-          ls -la /tmp/wine-install-wow64/
-          if [ -d /tmp/wine-install-wow64/bin ]; then
+          TARGET_PREFIX="/tmp/wine-install-wow64/arm64-v8a"
+          ls -la $TARGET_PREFIX/
+          if [ -d $TARGET_PREFIX/bin ]; then
             echo "bin 目录内容："
-            ls -la /tmp/wine-install-wow64/bin/
+            ls -la $TARGET_PREFIX/bin/
           fi
-          if [ -d /tmp/wine-install-wow64/share ]; then
+          if [ -d $TARGET_PREFIX/share ]; then
             echo "share 目录内容："
-            ls -la /tmp/wine-install-wow64/share/
+            ls -la $TARGET_PREFIX/share/
           fi
 
       # ------------------------------------------------------------
@@ -559,12 +560,12 @@ jobs:
       # ------------------------------------------------------------
       - name: 准备打包
         run: |
-          mkdir -p wine-package/wine 
-          cp -r /tmp/wine-install-wow64/* wine-package/wine/
+          mkdir -p wine-package/
+          cp -r /tmp/wine-install-wow64/* wine-package/
 
       - name: 创建打包文件
         run: |
-          tar -cJf ${{ env.BUILD_NAME }}.tar.xz -C wine-package wine
+          tar -cJf ${{ env.BUILD_NAME }}.tar.xz -C wine-package
           ls -lh *.tar.xz
 
       - name: Generate checksums
