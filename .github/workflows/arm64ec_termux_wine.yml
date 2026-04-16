@@ -483,7 +483,7 @@ jobs:
       - name: Shared Library Path Fix
         run: |
           set -e
-          TARGET_PREFIX="/tmp/wine-install-wow64/arm64-v8a"
+          TARGET_PREFIX="/tmp/wine-install-wow64"
           BUILD_DIR="${{ env.WINE_SOURCE_DIR }}/source/build-arm64"
           SOURCE_DIR="${{ env.WINE64_DIR }}/source"
           NATIVE_NLS_DIR="/opt/wine64-native/nls"
@@ -492,6 +492,8 @@ jobs:
           WINE_ARCH="aarch64"
 
           echo "=== 1. 구조 생성 및 모든 라이브러리 수집 ==="
+          mkdir -p "$TARGET_PREFIX/bin"
+          mkdir -p "$TARGET_PREFIX/lib/wine/$WINE_ARCH-unix"
           mkdir -p "$TARGET_PREFIX/share/wine/nls"
           mkdir -p "$TARGET_PREFIX/share/wine/fonts"
 
@@ -504,7 +506,6 @@ jobs:
           if [ -d "$BUILD_DIR/dlls/ntdll/aarch64-windows" ]; then
               echo "✔ aarch64-windows 감지됨. x86_64-unix 찌꺼기 정리."
               rm -rf "$TARGET_PREFIX/lib/wine/x86_64-unix"
-              ls -la "$TARGET_PREFIX/"
           fi
 
           echo "=== 2. 리소스 복사 (NLS, Fonts) ==="
@@ -520,8 +521,8 @@ jobs:
 
           echo "=== 4. 심볼릭 링크 재생성 (절대 경로 에러 방어) ==="
           # ntdll.so 링크가 실제로 존재하는지 확인 후 생성
-          if [ -f "$TARGET_PREFIX/lib/wine/$WINE_ARCH-unix/ntdll.so" ]; then
-              cd "$TARGET_PREFIX/bin"
+          if [ -f "$TARGET_PREFIX/arm64-v8a/lib/wine/$WINE_ARCH-unix/ntdll.so" ]; then
+              cd "$TARGET_PREFIX/arm64-v8a/bin"
               # 상대 경로가 확실히 맞도록 해당 디렉토리로 이동 후 링크 생성
               ln -sf "../lib/wine/$WINE_ARCH-unix/ntdll.so" "ntdll.so"
               echo "✔ ntdll.so 심볼릭 링크 생성 완료"
@@ -533,10 +534,9 @@ jobs:
               cp -r wine wine64
           fi
           echo "=== 최종 검증 ==="
-          ls -l "$TARGET_PREFIX/bin/ntdll.so"
+          ls -l "$TARGET_PREFIX/arm64-v8a/bin/ntdll.so"
           # 링크가 가리키는 실제 파일의 존재 여부를 한 번 더 확인
-          ls -L "$TARGET_PREFIX/bin/ntdll.so" || { echo "❌ 링크가 깨졌습니다!"; exit 1; }
-          ls -R "$TARGET_PREFIX/"
+          ls -L "$TARGET_PREFIX/arm64-v8a/bin/ntdll.so" || { echo "❌ 링크가 깨졌습니다!"; exit 1; }
 
       # ------------------------------------------------------------
       # 13. 验证安装目录内容（可选，便于调试）
