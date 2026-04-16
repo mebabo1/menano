@@ -74,7 +74,7 @@ endian = 'little'
 EOF
 
 # 6. Meson 설정 및 빌드
-OPTIM_FLAGS="-march=armv8-a"
+COMMON_FLAGS="-march=armv8-a -Wno-error -Wno-incompatible-pointer-types -Wno-pointer-sign -Wno-implicit-function-declaration"
 
 echo "⚙️ Meson 설정 시작..."
 rm -rf builddir
@@ -94,8 +94,8 @@ meson setup builddir \
     -Dglx=disabled \
     -Degl=disabled \
     -Dgbm=disabled \
-    -Dcpp_args="$OPTIM_FLAGS" \
-    -Dc_args="$OPTIM_FLAGS" \
+    -Dcpp_args="$COMMON_FLAGS" \
+    -Dc_args="$COMMON_FLAGS" \
     --wrap-mode=nodownload \
     --force-fallback-for=spirv-tools,spirv-headers,libdrm
 
