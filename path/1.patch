@@ -14,8 +14,6 @@ index 85062ea..5380f3c 100644
 +    if (pthread_mutex_init(&pulse_mutex, &attr) != 0)
 +        pthread_mutex_init(&pulse_mutex, NULL);
 +#else
-+    /* 안드로이드 Bionic은 PRIO_INHERIT 등을 완벽히 지원하지 않아 
-+       특정 상황에서 크래시를 유발하므로 기본 뮤텍스를 사용합니다. */
 +    pthread_mutex_init(&pulse_mutex, NULL);
 +#endif
 +    
