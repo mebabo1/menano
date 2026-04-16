@@ -372,10 +372,11 @@ jobs:
           export LDFLAGS="-L$deps/lib -Wl,-rpath=$RUNTIME_PATH/lib"
           export LIBRARY_PATH="$deps/lib${LIBRARY_PATH:+:$LIBRARY_PATH}"
 
-          export CFLAGS="-march=x86-64 -mtune=generic"
-          export CXXFLAGS="-march=x86-64 -mtune=generic"
-          export CROSSCFLAGS="-march=x86-64 -mtune=generic"
-          export CROSSCXXFLAGS="-march=x86-64 -mtune=generic"
+          export C_OPTS="-march=x86-64 -mtune=generic -Wno-declaration-after-statement -Wno-implicit-function-declaration -Wno-int-conversion"
+          export CFLAGS=$C_OPTS
+          export CXXFLAGS=$C_OPTS
+          export CROSSCFLAGS=$C_OPTS
+          export CROSSCXXFLAGS=$C_OPTS
           
           export FREETYPE_CFLAGS="-I$deps/include/freetype2"
           export PULSE_CFLAGS="-I$deps/include/pulse"
