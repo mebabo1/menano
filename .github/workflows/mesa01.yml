@@ -8,8 +8,7 @@ permissions:
 
 jobs:
   build:
-    # 1. 에뮬레이션 없는 네이티브 aarch64 환경 사용
-    runs-on: ubuntu-24.04-arm
+    runs-on: ubuntu-latest
     
     steps:
       - name: Checkout
