@@ -2,7 +2,7 @@ diff --git a/dlls/winepulse.drv/pulse.c b/dlls/winepulse.drv/pulse.c
 index 85062ea..5380f3c 100644
 --- a/dlls/winepulse.drv/pulse.c
 +++ b/dlls/winepulse.drv/pulse.c
-@@ -267,11 +267,14 @@ static NTSTATUS pulse_process_attach(void *args)
+@@ -267,11 +267,13 @@ static NTSTATUS pulse_process_attach(void *args)
  {
      pthread_mutexattr_t attr;
  
