@@ -89,6 +89,7 @@ meson setup builddir \
     -Dgbm=disabled \
     -Dcpp_args="$OPTIM_FLAGS" \
     -Dc_args="$OPTIM_FLAGS" \
+    --wrap-mode=forcefallback \
     --force-fallback-for=spirv-tools,spirv-headers
 
 # 7. 컴파일 및 설치
