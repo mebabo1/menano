@@ -90,7 +90,7 @@ meson setup builddir \
     -Dcpp_args="$OPTIM_FLAGS" \
     -Dc_args="$OPTIM_FLAGS" \
     --wrap-mode=forcefallback \
-    --force-fallback-for=spirv-tools,spirv-headers
+    --force-fallback-for=spirv-tools,spirv-headers,libdrm
 
 # 7. 컴파일 및 설치
 echo "🏗️ 컴파일 시작..."
