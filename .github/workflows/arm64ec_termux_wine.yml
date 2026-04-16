@@ -414,7 +414,7 @@ jobs:
           export ACLOCAL_PATH=$deps/lib/aclocal:$deps/share/aclocal
           export CPPFLAGS="-I$deps/include --sysroot=$TOOLCHAIN/../sysroot"
           
-          export LDFLAGS="-L$deps/lib -Wl,-rpath=$RUNTIME_PATH/lib -Wl,--enable-new-dtags""
+          export LDFLAGS="-L$deps/lib -Wl,-rpath=$RUNTIME_PATH/lib -Wl,--enable-new-dtags"
           export LIBRARY_PATH="$deps/lib${LIBRARY_PATH:+:$LIBRARY_PATH}"
 
           export CFLAGS="-O2 -pipe"
@@ -446,7 +446,6 @@ jobs:
             --enable-archs=arm64ec,aarch64,i386 \
             --with-wine-tools=/opt/wine64-native \
             --enable-wineandroid_drv=no \
-            --without-android-display \
             --enable-win64 \
             --disable-win16 \
             --disable-tests \
