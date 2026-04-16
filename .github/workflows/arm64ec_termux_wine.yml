@@ -459,10 +459,24 @@ jobs:
           FILE_PRE="loader/preloader.c"
           if [ -f "$FILE_PRE" ]; then
             echo "Patching $FILE_PRE for Android memory layout..."
-            if ! grep -q "# elif __ANDROID__" "$FILE_PRE"; then
-              sed -i 's/#ifdef __aarch64__/#if defined(__aarch64__) || defined(__ANDROID__)/' "$FILE_PRE"
+            # 1. 이미 패치되었는지 확인
+            if ! grep -q "defined(__ANDROID__)" "$FILE_PRE"; then
+              # 2. #ifdef __aarch64__ 또는 #if defined(__aarch64__) 모두 대응하는 패턴
+              sed -i 's/#if\(def\)\? __aarch64__/#if defined(__aarch64__) || defined(__ANDROID__)/' "$FILE_PRE"
+              
+              # 3. 만약 위 명령어로도 안 변했다면 (확인 사살)
+              if ! grep -q "defined(__ANDROID__)" "$FILE_PRE"; then
+                 # 주소 제한 수치(0x7fffffffff)가 있는 줄을 찾아 강제로 조건을 추가
+                 sed -i '/0x7fffffffff/s/#ifdef __aarch64__/#if defined(__aarch64__) || defined(__ANDROID__)/' "$FILE_PRE"
+              fi
             fi
-            echo "✔ preloader.c patched"
+            
+            # 패치 결과 확인 로그 추가
+            if grep -q "defined(__ANDROID__)" "$FILE_PRE"; then
+              echo "✔ preloader.c patched successfully"
+            else
+              echo "❌ preloader.c patch FAILED (pattern not found)"
+            fi
           fi
 
           # 8. Vulkan VRAM Faking 적용
