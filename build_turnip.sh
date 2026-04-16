@@ -6,10 +6,15 @@ echo "🚀 Turnip (Mesa) Termux/Android 최적화 빌드 시작..."
 WORK_DIR=$(pwd)/turnip_workdir
 INSTALL_DIR=$WORK_DIR/install
 SOURCE_DIR=$WORK_DIR/mesa-src
-if [ -z "$ANDROID_NDK_HOME" ]; then
-    NDK_PATH="$WORK_DIR/android-ndk-r29"
-else
-    NDK_PATH="$ANDROID_NDK_HOME"
+if [ -z "$ANDROID_NDK_HOME" ] && [ ! -d "$NDK_VER" ]; then
+    echo "📥 NDK ($NDK_VER) 다운로드 중..."
+    curl -sL "https://dl.google.com/android/repository/${NDK_VER}-linux.zip" -o "${NDK_VER}.zip"
+    echo "📦 압축 해제 중..."
+    unzip -q "${NDK_VER}.zip"
+    rm "${NDK_VER}.zip"
+    export ANDROID_NDK_HOME="$WORK_DIR/$NDK_VER"
+elif [ -d "$NDK_VER" ]; then
+    export ANDROID_NDK_HOME="$WORK_DIR/$NDK_VER"
 fi
 
 mkdir -p "$WORK_DIR"
