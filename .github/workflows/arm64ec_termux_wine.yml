@@ -458,11 +458,17 @@ jobs:
 
           FILE_PRE="loader/preloader.c"
           if [ -f "$FILE_PRE" ]; then
-            echo "Patching $FILE_PRE for Android compatibility..."
+            echo "Patching $FILE_PRE for Android memory symbols..."
+            
+            # 1. 안드로이드 조건부 매크로 수정 (기존에 하셨던 것)
             sed -i '/__aarch64__/ { /__ANDROID__/! s/__aarch64__/defined(__aarch64__) || defined(__ANDROID__)/ }' "$FILE_PRE"
             sed -i 's/#ifdef defined/#if defined/g' "$FILE_PRE"
-            if ! grep -q "extern char _end" "$FILE_PRE"; then
-              sed -i '/static struct preloader_state/i extern char _end[];' "$FILE_PRE"
+            
+            # 2. _start 및 _end 심볼 강제 선언 (핵심 수정)
+            # 만약 이미 선언되어 있지 않다면, 외부 참조(extern)를 추가합니다.
+            if ! grep -q "extern char _start" "$FILE_PRE"; then
+              # static struct preloader_state 문구를 찾아 그 위에 두 줄을 삽입합니다.
+              sed -i '/static struct preloader_state/i \extern char _start[];\nextern char _end[];' "$FILE_PRE"
             fi
           fi
 
