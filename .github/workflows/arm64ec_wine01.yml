@@ -383,10 +383,6 @@ jobs:
           export WINE_NLS_DIR=/opt/wine64-native/nls
           export LDFLAGS="-s -L/usr/lib/aarch64-linux-gnu -Wl,--dynamic-linker=$depsg/lib/ld-linux-aarch64.so.1 -Wl,-rpath=$depsg/lib"
 
-          echo "使用 Wine64 构建目录（作为工具目录）: /opt/wine64-native"
-          echo "WINE_NLS_DIR=$WINE_NLS_DIR"
-
-          # 关键修改：仅使用 --with-wine-tools，不使用 --with-wine64 
           ../configure \
             --enable-win64 \
             --host=aarch64-linux-gnu \
@@ -400,7 +396,6 @@ jobs:
             --with-gstreamer \
             --enable-nls \
             --disable-winemenubuilder \
-            --disable-amd_ags_x64 \
             --without-pulse \
             --without-ffmpeg \
             --disable-opencl \
@@ -442,8 +437,7 @@ jobs:
           BUILD_DIR="${{ env.WINE_SOURCE_DIR }}/source/build-arm64"
           SOURCE_DIR="${{ env.WINE64_DIR }}/source"
           NATIVE_NLS_DIR="/opt/wine64-native/nls"
-          
-          # Termux는 무조건 aarch64 환경임
+
           WINE_ARCH="aarch64"
 
           echo "=== 1. 구조 생성 및 모든 라이브러리 수집 ==="
