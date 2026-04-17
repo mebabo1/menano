@@ -501,8 +501,8 @@ jobs:
 
             # 2. RtlWow64SuspendThread 구현 추가 (printf 방식 사용)
             if [ -f "$FILE_SIG" ] && ! grep -q "RtlWow64SuspendThread" "$FILE_SIG"; then
-            PATCH_CODE="NTSTATUS WINAPI RtlWow64SuspendThread( HANDLE thread, ULONG *count )\n{\n    return NtSuspendThread( thread, count );\n}\n"
-            sed -i "/RtlWalkFrameChain/i $PATCH_CODE" "$FILE_SIG"
+              PATCH_CODE="NTSTATUS WINAPI RtlWow64SuspendThread( HANDLE thread, ULONG *count )\n{\n    return NtSuspendThread( thread, count );\n}\n"
+              sed -i "/RtlWalkFrameChain/i $PATCH_CODE" "$FILE_SIG"
             fi
           fi
 
