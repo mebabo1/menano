@@ -1,0 +1,21 @@
+--- a/dlls/ntdll/env.c
++++ b/dlls/ntdll/env.c
+@@ -620,6 +620,19 @@
+     set_wow64_environment( &new_params->Environment );
+     new_params->EnvironmentSize = RtlSizeHeap( GetProcessHeap(), 0, new_params->Environment );
++
++    /* Android/Termux locale-archive support */
++    {
++        char buf[MAX_PATH];
++        if (__wine_get_unix_env("LOCALE_ARCHIVE", buf, sizeof(buf)) == STATUS_SUCCESS)
++        {
++            UNICODE_STRING nameW = RTL_CONSTANT_STRING( L"LOCALE_ARCHIVE" );
++            UNICODE_STRING valW;
++            WCHAR *valW_buf = RtlAllocateHeap( GetProcessHeap(), 0, MAX_PATH * sizeof(WCHAR) );
++            RtlMultiByteToUnicodeN( valW_buf, MAX_PATH * sizeof(WCHAR), NULL, buf, strlen(buf) + 1 );
++            RtlInitUnicodeString( &valW, valW_buf );
++            RtlSetEnvironmentVariable( &new_params->Environment, &nameW, &valW );
++            RtlFreeHeap( GetProcessHeap(), 0, valW_buf );
++        }
++    }
+ }
