@@ -458,18 +458,21 @@ jobs:
 
           FILE_PRE="loader/preloader.c"
           if [ -f "$FILE_PRE" ]; then
-            echo "Patching $FILE_PRE for Android memory symbols..."
+            echo "Applying emergency fix for _start and _end in $FILE_PRE..."
             
-            # 1. 안드로이드 조건부 매크로 수정 (기존에 하셨던 것)
+            # 1. 안드로이드/A64 매크로 수정
             sed -i '/__aarch64__/ { /__ANDROID__/! s/__aarch64__/defined(__aarch64__) || defined(__ANDROID__)/ }' "$FILE_PRE"
             sed -i 's/#ifdef defined/#if defined/g' "$FILE_PRE"
             
-            # 2. _start 및 _end 심볼 강제 선언 (핵심 수정)
-            # 만약 이미 선언되어 있지 않다면, 외부 참조(extern)를 추가합니다.
+            # 2. 파일 최상단(정확히는 10번째 줄)에 심볼 선언 강제 삽입
+            # grep으로 중복 삽입 방지 확인 후 삽입
             if ! grep -q "extern char _start" "$FILE_PRE"; then
-              # static struct preloader_state 문구를 찾아 그 위에 두 줄을 삽입합니다.
-              sed -i '/static struct preloader_state/i \extern char _start[];\nextern char _end[];' "$FILE_PRE"
+              sed -i '10i extern char _start[];\nextern char _end[];' "$FILE_PRE"
             fi
+
+            # 3. (추가 보험) _start 대신 __executable_start를 쓰는 환경 대응
+            # 일부 링커 에러를 방지하기 위해 코드 내의 _start를 매크로로 연결할 수도 있습니다.
+            # sed -i '11i #define _start __executable_start' "$FILE_PRE"
           fi
 
           FILE_SPEC="dlls/ntdll/ntdll.spec"
