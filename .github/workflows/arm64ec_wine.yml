@@ -267,17 +267,30 @@ jobs:
 
           FILE_VULKAN_H="include/wine/vulkan_driver.h"
           if [ -f "$FILE_VULKAN_H" ] && ! grep -q "low_latency_enabled" "$FILE_VULKAN_H"; then
-            echo "Patching $FILE_VULKAN_H..."
-            sed -i '/keyed_mutexes_enabled;/a \    BOOL low_latency_enabled;' "$FILE_VULKAN_H"
-            sed -i '/PFN_vkQueuePresentKHR p_vkQueuePresentKHR;/a \    PFN_vkSetLatencySleepModeNV p_vkSetLatencySleepModeNV;' "$FILE_VULKAN_H"
+            echo "Patching $FILE_VULKAN_H for Universal Latency Control..."
+            # 기존 플래그 옆에 범용 플래그와 표준 함수 포인터 추가
+            sed -i '/keyed_mutexes_enabled;/a \    BOOL low_latency_enabled;\n    BOOL use_standard_latency;' "$FILE_VULKAN_H"
+            sed -i '/PFN_vkQueuePresentKHR p_vkQueuePresentKHR;/a \    PFN_vkSetLatencySleepModeNV p_vkSetLatencySleepModeNV;\n    PFN_vkWaitForPresentKHR p_vkWaitForPresentKHR;' "$FILE_VULKAN_H"
           fi
 
           FILE_VULKAN_C="dlls/win32u/vulkan.c"
           if [ -f "$FILE_VULKAN_C" ] && ! grep -q "win32u_vkSetLatencySleepModeNV" "$FILE_VULKAN_C"; then
-            echo "Patching $FILE_VULKAN_C..."
-            printf '\nstatic VkResult win32u_vkSetLatencySleepModeNV(VkDevice device, VkSwapchainKHR swapchain, const VkLatencySleepModeInfoNV *pSleepModeInfo)\n{\n    VkLatencySleepModeInfoNV sleep_mode_info_host;\n    struct vulkan_device *vk_device = vulkan_device_from_handle(device);\n    struct swapchain *vk_swapchain = swapchain_from_handle(swapchain);\n    vk_device->low_latency_enabled = pSleepModeInfo->lowLatencyMode;\n    sleep_mode_info_host.sType = VK_STRUCTURE_TYPE_LATENCY_SLEEP_MODE_INFO_NV;\n    sleep_mode_info_host.pNext = NULL;\n    sleep_mode_info_host.lowLatencyMode = pSleepModeInfo->lowLatencyMode;\n    sleep_mode_info_host.lowLatencyBoost = pSleepModeInfo->lowLatencyBoost;\n    sleep_mode_info_host.minimumIntervalUs = pSleepModeInfo->minimumIntervalUs;\n    return vk_device->p_vkSetLatencySleepModeNV(vk_device->host.device, vk_swapchain->obj.host.swapchain, &sleep_mode_info_host);\n}\n' | sed -i '/static VkResult win32u_vkCreateSwapchainKHR/i \\' "$FILE_VULKAN_C"
-            sed -i '/static VkResult win32u_vkQueuePresentKHR/i #define win32u_vk_find_struct(s, t) win32u_vk_find_struct_((void *)s, VK_STRUCTURE_TYPE_##t)\nstatic void *win32u_vk_find_struct_(void *s, VkStructureType t)\n{\n    VkBaseOutStructure *header;\n    for (header = s; header; header = header->pNext)\n    {\n        if (header->sType == t) return header;\n    }\n    return NULL;\n}\n' "$FILE_VULKAN_C"
-            sed -i '/submitInfo.pSignalSemaphores = &blit_sema;/a \        if ((queue->device->low_latency_enabled) && (present_id = win32u_vk_find_struct(&present_info_host, PRESENT_ID_KHR)))\n        {\n            latencySubmitInfo.sType = VK_STRUCTURE_TYPE_LATENCY_SUBMISSION_PRESENT_ID_NV;\n            latencySubmitInfo.pNext = NULL;\n            latencySubmitInfo.presentID = *present_id->pPresentIds;\n            submitInfo.pNext = &latencySubmitInfo;\n        }' "$FILE_VULKAN_C"
+            echo "Applying Universal Vulkan Latency patch (NVIDIA + Turnip/Standard)..."
+
+            # 1. 함수 정의 및 표준 대기 헬퍼 함수 삽입
+            # win32u_apply_standard_latency: 표준 확장을 사용하여 프레임 동기화
+            FUNC_DEF="static VkResult win32u_vkSetLatencySleepModeNV(VkDevice device, VkSwapchainKHR swapchain, const VkLatencySleepModeInfoNV *pSleepModeInfo) { VkLatencySleepModeInfoNV host; struct vulkan_device *vk_dev = vulkan_device_from_handle(device); struct swapchain *vk_sw = swapchain_from_handle(swapchain); vk_dev->low_latency_enabled = pSleepModeInfo->lowLatencyMode; vk_dev->use_standard_latency = pSleepModeInfo->lowLatencyMode; host.sType = VK_STRUCTURE_TYPE_LATENCY_SLEEP_MODE_INFO_NV; host.pNext = NULL; host.lowLatencyMode = pSleepModeInfo->lowLatencyMode; host.lowLatencyBoost = pSleepModeInfo->lowLatencyBoost; host.minimumIntervalUs = pSleepModeInfo->minimumIntervalUs; return vk_dev->p_vkSetLatencySleepModeNV(vk_dev->host.device, vk_sw->obj.host.swapchain, &host); }\\n\\nstatic void win32u_apply_standard_latency(struct vulkan_device *dev, VkSwapchainKHR sw, uint64_t id) { if (dev->p_vkWaitForPresentKHR) dev->p_vkWaitForPresentKHR(dev->host.device, sw, id, 1000000000); }\\n\\n#define win32u_vk_find_struct(s, t) win32u_vk_find_struct_((void *)s, VK_STRUCTURE_TYPE_##t)\\nstatic void *win32u_vk_find_struct_(void *s, VkStructureType t) { VkBaseOutStructure *h; for (h = s; h; h = h->pNext) { if (h->sType == t) return h; } return NULL; }\\n"
+            sed -i "/static VkResult win32u_vkCreateSwapchainKHR/i $FUNC_DEF" "$FILE_VULKAN_C"
+
+            # 2. 변수 선언부 삽입
+            sed -i '/VkPipelineStageFlags waitStage/a \        VkLatencySubmissionPresentIdNV latencySubmitInfo;\n        VkPresentIdKHR *present_id;' "$FILE_VULKAN_C"
+
+            # 3. 로직 삽입 (NVIDIA 전용 + Turnip/표준 공용)
+            # NVIDIA Reflex와 표준 KHR 대기 방식을 동시에 처리합니다.
+            QUEUE_LOGIC="        if ((present_id = win32u_vk_find_struct(&present_info_host, PRESENT_ID_KHR))) { if (queue->device->low_latency_enabled) { latencySubmitInfo.sType = VK_STRUCTURE_TYPE_LATENCY_SUBMISSION_PRESENT_ID_NV; latencySubmitInfo.pNext = NULL; latencySubmitInfo.presentID = *present_id->pPresentIds; submitInfo.pNext = &latencySubmitInfo; } if (queue->device->use_standard_latency) win32u_apply_standard_latency(queue->device, present_info->pSwapchains[0], *present_id->pPresentIds); }"
+            sed -i "/submitInfo.pSignalSemaphores = &blit_sema;/a $QUEUE_LOGIC" "$FILE_VULKAN_C"
+
+            # 4. 구조체 함수 등록
             sed -i '/.p_get_host_surface_extension = win32u_get_host_surface_extension,/a \    .p_vkSetLatencySleepModeNV = win32u_vkSetLatencySleepModeNV,' "$FILE_VULKAN_C"
           fi
 
