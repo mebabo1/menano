@@ -499,29 +499,18 @@ jobs:
           if [ -f "$FILE_SIG" ]; then
             echo "Applying integrated patches to $FILE_SIG..."
 
-            # 1. Syscall/Memory 호환성 패치 (Android 전용)
+            # 1. Syscall/Memory 호환성 패치
             if ! grep -q "__ANDROID__" "$FILE_SIG"; then
               echo "  -> Applying Syscall/Memory compatibility logic"
-              # 시스콜 주소 체크 범위에 #ifndef __ANDROID__ 삽입
               sed -i '/if ((ULONG_PTR)sc_seccomp < NATIVE_SYSCALL_ADDRESS_START/i #ifndef __ANDROID__' "$FILE_SIG"
               sed -i '/ERR_(seh)("The known reasons are/a #endif' "$FILE_SIG"
-              # mmap 고정 주소를 NULL로 변경
               sed -i 's/mmap((void \*)0x600000000000/mmap(NULL/g' "$FILE_SIG"
             fi
 
-            # 2. RtlWow64SuspendThread 구현 추가
+            # 2. RtlWow64SuspendThread 구현 추가 (printf 방식 사용)
             if ! grep -q "RtlWow64SuspendThread" "$FILE_SIG"; then
               echo "  -> Adding RtlWow64SuspendThread implementation"
-              cat >> "$FILE_SIG" <<EOF
-
-              /***********************************************************************
-               * RtlWow64SuspendThread (NTDLL.@)
-               */
-              NTSTATUS WINAPI RtlWow64SuspendThread( HANDLE thread, ULONG *count )
-              {
-                  return NtSuspendThread( thread, count );
-              }
-              EOF
+              printf '\n/***********************************************************************\n * RtlWow64SuspendThread (NTDLL.@)\n */\nNTSTATUS WINAPI RtlWow64SuspendThread( HANDLE thread, ULONG *count )\n{\n    return NtSuspendThread( thread, count );\n}\n' >> "$FILE_SIG"
             fi
           fi
 
