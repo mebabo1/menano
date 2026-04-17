@@ -610,6 +610,7 @@ jobs:
             --without-pulse \
             --without-ffmpeg \
             --disable-winemenubuilder \
+            --disable-amd_ags_x64 \
             --disable-opencl \
             --without-capi \
             --without-coreaudio \
