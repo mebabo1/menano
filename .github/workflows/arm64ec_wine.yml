@@ -333,8 +333,8 @@ jobs:
             --with-gstreamer \
             --without-ffmpeg \
             --disable-opencl \
-            --without-alsa \
             --disable-tests \
+            --disable-winemenubuilder \
             --without-capi \
             --without-coreaudio \
             --without-cups \
