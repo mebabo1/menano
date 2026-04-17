@@ -418,6 +418,23 @@ jobs:
             fi
           fi
 
+          FILE_RTL="dlls/ntdll/rtl.c"
+          if [ -f "$FILE_RTL" ]; then
+            echo "Adding stub for RtlWow64SuspendThread in $FILE_RTL..."
+            if ! grep -q "RtlWow64SuspendThread" "$FILE_RTL"; then
+              cat >> "$FILE_RTL" <<EOF
+              /***********************************************************************
+               * RtlWow64SuspendThread (NTDLL.@)
+               */
+              NTSTATUS WINAPI RtlWow64SuspendThread(HANDLE thread, ULONG *count)
+              {
+                FIXME("(%p, %p): stub\n", thread, count);
+                return STATUS_NOT_IMPLEMENTED;
+            }
+            EOF
+            fi
+          fi
+
           FILE="dlls/ntdll/unix/virtual.c"
           if [ -f "$FILE" ]; then
             if grep -q 'unsigned int vprot, sec_flags;' "$FILE"; then
