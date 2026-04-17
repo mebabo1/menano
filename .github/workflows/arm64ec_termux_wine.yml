@@ -487,6 +487,14 @@ jobs:
             fi
           fi
 
+          FILE_SIG="dlls/ntdll/unix/signal_x86_64.c"
+          if [ -f "$FILE_SIG" ]; then
+            echo "Patching $FILE_SIG for Android Syscall/Memory compatibility..."
+            sed -i '/if ((ULONG_PTR)sc_seccomp < NATIVE_SYSCALL_ADDRESS_START/,/}/ { /if/i #ifndef __ANDROID__' "$FILE_SIG"
+            sed -i '/ERR_(seh)("The known reasons are/a #endif' "$FILE_SIG"
+            sed -i 's/mmap((void \*)0x600000000000/mmap(NULL/' "$FILE_SIG"
+          fi
+
           # 8. Vulkan VRAM Faking 적용
           FILE="dlls/winevulkan/vulkan.c"
           if [ -f "$FILE" ] && ! grep -q 'WINE_VRAM_SIZE' "$FILE" ; then
