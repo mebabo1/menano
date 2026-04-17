@@ -458,27 +458,28 @@ jobs:
 
           FILE_PRE="loader/preloader.c"
           if [ -f "$FILE_PRE" ]; then
-            echo "Patching $FILE_PRE for wld_mprotect and mmap comparison..."
+            echo "Fixing conflicting types for wld_mprotect in $FILE_PRE..."
 
-            # 1. wld_mprotect 함수 선언 강제 추가 (함수 정의들 모여있는 곳에 삽입)
-            # wld_mmap 선언 뒤에 wld_mprotect 선언을 붙여줍니다.
-            if ! grep -q "void wld_mprotect" "$FILE_PRE"; then
-              sed -i '/void \*wld_mmap/a void wld_mprotect( void *addr, size_t len, int prot );' "$FILE_PRE"
+            # 1. 기존에 잘못 삽입했을 수 있는 선언문 제거 (청소)
+            sed -i '/void wld_mprotect/d' "$FILE_PRE"
+
+            # 2. 올바른 형식의 wld_mprotect 선언 추가 (int 반환형으로 일치)
+            # wld_mmap 선언 뒤에 삽입하여 컴파일러가 미리 알게 합니다.
+            if ! grep -q "int wld_mprotect" "$FILE_PRE"; then
+              sed -i '/int wld_mmap/a int wld_mprotect( const void *addr, size_t len, int prot );' "$FILE_PRE"
             fi
 
-            # 2. (void *)-1 비교 구문 에러 방지
-            # 비교 대상을 (void *)(long)-1 형태로 더 확실하게 캐스팅하여 경고를 제거합니다.
+            # 3. (void *)-1 비교 구문 안전하게 캐스팅 (경고 제거)
             sed -i 's/== (void \*)-1/== (void *)(long)-1/g' "$FILE_PRE"
 
-            # 3. 이전에 발생한 _start, _end 선언 위치 재보정 (진입점 함수 바로 위)
+            # 4. _start, _end 메모리 심볼 선언 (wld_start 직전)
             if ! grep -q "extern char _start" "$FILE_PRE"; then
-              sed -i '/void\* wld_start/i extern char _start[], _end[];' "$FILE_PRE"
+              sed -i '/void\* wld_start/i #ifndef _start\n#define _start __executable_start\n#endif\n#ifndef _end\n#define _end end\n#endif\nextern char _start[], _end[];' "$FILE_PRE"
             fi
-            
-            # 4. _start 관련 매크로 (안드로이드 링커 대응)
-            if ! grep -q "#define _start __executable_start" "$FILE_PRE"; then
-              sed -i '/extern char _start/i #ifndef _start\n#define _start __executable_start\n#endif\n#ifndef _end\n#define _end end\n#endif' "$FILE_PRE"
-            fi
+
+            # 5. 매크로 조건문 수정 (Android 대응)
+            sed -i '/__aarch64__/ { /__ANDROID__/! s/__aarch64__/defined(__aarch64__) || defined(__ANDROID__)/ }' "$FILE_PRE"
+            sed -i 's/#ifdef defined/#if defined/g' "$FILE_PRE"
           fi
 
           FILE_SPEC="dlls/ntdll/ntdll.spec"
