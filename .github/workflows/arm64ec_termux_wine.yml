@@ -480,22 +480,9 @@ jobs:
           fi
 
           FILE_RTL="dlls/ntdll/rtl.c"
-          if [ -f "$FILE_RTL" ]; then
-            echo "Adding stub for RtlWow64SuspendThread in $FILE_RTL..."
-            if ! grep -q "RtlWow64SuspendThread" "$FILE_RTL"; then
-              # EOF 앞뒤 공백을 제거하여 쉘 에러 방지
-              cat >> "$FILE_RTL" <<EOF
-
-            /***********************************************************************
-             * RtlWow64SuspendThread (NTDLL.@)
-             */
-            NTSTATUS WINAPI RtlWow64SuspendThread(HANDLE thread, ULONG *count)
-            {
-                FIXME("(%p, %p): stub\n", thread, count);
-                return STATUS_NOT_IMPLEMENTED;
-            }
-            EOF
-            fi
+          if [ -f "$FILE_RTL" ] && ! grep -q "RtlWow64SuspendThread" "$FILE_RTL"; then
+            echo "Adding stub to $FILE_RTL"
+            printf '\nNTSTATUS WINAPI RtlWow64SuspendThread(HANDLE thread, ULONG *count)\n{\n    FIXME("(%%p, %%p): stub\\n", thread, count);\n    return 0xC0000002; /* STATUS_NOT_IMPLEMENTED */\n}\n' >> "$FILE_RTL"
           fi
 
           FILE_SIG="dlls/ntdll/unix/signal_x86_64.c"
