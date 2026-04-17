@@ -477,22 +477,8 @@ jobs:
 
           FILE_S64="dlls/ntdll/unix/signal_arm64.c"
           if [ -f "$FILE_S64" ] && ! grep -q "RtlWow64SuspendThread" "$FILE_S64"; then
-            echo "Patching $FILE_S64..."
-            cat >> "$FILE_S64" <<EOF
-
-            /***********************************************************************
-             * RtlWow64SuspendThread (NTDLL.@)
-             */
-            NTSTATUS WINAPI RtlWow64SuspendThread( HANDLE thread, ULONG *count )
-            {
-                THREAD_BASIC_INFORMATION tbi;
-                NTSTATUS ret = NtQueryInformationThread( thread, ThreadBasicInformation, &tbi, sizeof(tbi), NULL);
-                if (ret) return ret;
-
-                if (tbi.ClientId.UniqueProcess != NtCurrentTeb()->ClientId.UniqueProcess) return STATUS_SUCCESS;
-                return pWow64SuspendLocalThread ? pWow64SuspendLocalThread( thread, count ) : NtSuspendThread( thread, count );
-            }
-            EOF
+            echo "Patching $FILE_S64 with actual implementation..."
+            printf '\n/***********************************************************************\n * RtlWow64SuspendThread (NTDLL.@)\n */\nNTSTATUS WINAPI RtlWow64SuspendThread( HANDLE thread, ULONG *count )\n{\n    THREAD_BASIC_INFORMATION tbi;\n    NTSTATUS ret = NtQueryInformationThread( thread, ThreadBasicInformation, &tbi, sizeof(tbi), NULL);\n    if (ret) return ret;\n\n    if (tbi.ClientId.UniqueProcess != NtCurrentTeb()->ClientId.UniqueProcess) return 0; /* STATUS_SUCCESS */\n    return pWow64SuspendLocalThread ? pWow64SuspendLocalThread( thread, count ) : NtSuspendThread( thread, count );\n}\n' >> "$FILE_S64"
           fi
 
           FILE_SIG="dlls/ntdll/unix/signal_x86_64.c"
