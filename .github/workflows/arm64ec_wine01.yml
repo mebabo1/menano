@@ -396,6 +396,7 @@ jobs:
             --with-gstreamer \
             --enable-nls \
             --disable-winemenubuilder \
+            --without-osmesa \
             --without-pulse \
             --without-ffmpeg \
             --disable-opencl \
