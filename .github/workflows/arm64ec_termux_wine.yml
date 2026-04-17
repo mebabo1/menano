@@ -458,9 +458,12 @@ jobs:
 
           FILE_PRE="loader/preloader.c"
           if [ -f "$FILE_PRE" ]; then
-            echo "Patching $FILE_PRE..."
+            echo "Patching $FILE_PRE for Android compatibility..."
             sed -i '/__aarch64__/ { /__ANDROID__/! s/__aarch64__/defined(__aarch64__) || defined(__ANDROID__)/ }' "$FILE_PRE"
             sed -i 's/#ifdef defined/#if defined/g' "$FILE_PRE"
+            if ! grep -q "extern char _end" "$FILE_PRE"; then
+              sed -i '/static struct preloader_state/i extern char _end[];' "$FILE_PRE"
+            fi
           fi
 
           FILE_SPEC="dlls/ntdll/ntdll.spec"
