@@ -481,9 +481,10 @@ jobs:
             sed -i '/pWow64PrepareForException/a extern NTSTATUS (WINAPI *pWow64SuspendLocalThread)( HANDLE thread, ULONG *count );' "$FILE_MISC"
           fi
 
-          if [ -f "$FILE_SIG" ] && ! grep -q "RtlWow64SuspendThread" "$FILE_SIG"; then
-            PATCH_CODE="NTSTATUS WINAPI RtlWow64SuspendThread( HANDLE thread, ULONG *count )\n{\n    return NtSuspendThread( thread, count );\n}\n"
-            sed -i "/RtlWalkFrameChain/i $PATCH_CODE" "$FILE_SIG"
+          FILE_S64="dlls/ntdll/unix/signal_arm64.c"
+          if [ -f "$FILE_S64" ] && ! grep -q "RtlWow64SuspendThread" "$FILE_S64"; then
+            echo "Patching $FILE_S64 with complete definitions..."
+            printf '\n/* Android/ARM64 thread suspension support */\nextern NTSTATUS (WINAPI *pWow64SuspendLocalThread)( HANDLE thread, ULONG *count );\n\nNTSTATUS WINAPI RtlWow64SuspendThread( HANDLE thread, ULONG *count )\n{\n    THREAD_BASIC_INFORMATION tbi;\n    NTSTATUS ret = NtQueryInformationThread( thread, ThreadBasicInformation, &tbi, sizeof(tbi), NULL);\n    if (ret) return ret;\n\n    if (tbi.ClientId.UniqueProcess != NtCurrentTeb()->ClientId.UniqueProcess) return 0; /* STATUS_SUCCESS */\n    if (pWow64SuspendLocalThread) return pWow64SuspendLocalThread( thread, count );\n    return NtSuspendThread( thread, count );\n}\n' >> "$FILE_S64"
           fi
 
           FILE_SIG="dlls/ntdll/unix/signal_x86_64.c"
@@ -499,9 +500,9 @@ jobs:
             fi
 
             # 2. RtlWow64SuspendThread 구현 추가 (printf 방식 사용)
-            if ! grep -q "RtlWow64SuspendThread" "$FILE_SIG"; then
-              echo "  -> Adding RtlWow64SuspendThread implementation"
-              printf '\n/***********************************************************************\n * RtlWow64SuspendThread (NTDLL.@)\n */\nNTSTATUS WINAPI RtlWow64SuspendThread( HANDLE thread, ULONG *count )\n{\n    return NtSuspendThread( thread, count );\n}\n' >> "$FILE_SIG"
+            if [ -f "$FILE_SIG" ] && ! grep -q "RtlWow64SuspendThread" "$FILE_SIG"; then
+            PATCH_CODE="NTSTATUS WINAPI RtlWow64SuspendThread( HANDLE thread, ULONG *count )\n{\n    return NtSuspendThread( thread, count );\n}\n"
+            sed -i "/RtlWalkFrameChain/i $PATCH_CODE" "$FILE_SIG"
             fi
           fi
 
