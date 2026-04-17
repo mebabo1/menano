@@ -611,6 +611,7 @@ jobs:
             --without-ffmpeg \
             --disable-winemenubuilder \
             --disable-amd_ags_x64 \
+            --without-osmesa \
             --disable-opencl \
             --without-capi \
             --without-coreaudio \
