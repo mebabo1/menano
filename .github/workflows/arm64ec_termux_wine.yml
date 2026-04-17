@@ -458,21 +458,23 @@ jobs:
 
           FILE_PRE="loader/preloader.c"
           if [ -f "$FILE_PRE" ]; then
-            echo "Applying emergency fix for _start and _end in $FILE_PRE..."
+            echo "Applying terminal fix for memory symbols in $FILE_PRE..."
             
-            # 1. 안드로이드/A64 매크로 수정
+            # 1. 안드로이드/A64 조건부 매크로 수정 (기존 로직 유지)
             sed -i '/__aarch64__/ { /__ANDROID__/! s/__aarch64__/defined(__aarch64__) || defined(__ANDROID__)/ }' "$FILE_PRE"
             sed -i 's/#ifdef defined/#if defined/g' "$FILE_PRE"
             
-            # 2. 파일 최상단(정확히는 10번째 줄)에 심볼 선언 강제 삽입
-            # grep으로 중복 삽입 방지 확인 후 삽입
+            # 2. _start, _end 선언을 wld_start 함수 정의 직전에 삽입
+            # 기존 삽입 시도가 실패했을 경우를 대비해 중복 확인 후 삽입합니다.
             if ! grep -q "extern char _start" "$FILE_PRE"; then
-              sed -i '10i extern char _start[];\nextern char _end[];' "$FILE_PRE"
+              sed -i '/void\* wld_start/i extern char _start[], _end[];' "$FILE_PRE"
             fi
-
-            # 3. (추가 보험) _start 대신 __executable_start를 쓰는 환경 대응
-            # 일부 링커 에러를 방지하기 위해 코드 내의 _start를 매크로로 연결할 수도 있습니다.
-            # sed -i '11i #define _start __executable_start' "$FILE_PRE"
+            
+            # 3. 만약 링커 에러가 날 경우를 대비한 매크로 처리 (선택 사항)
+            # 안드로이드 링커 표준 이름인 __executable_start와 연결해줍니다.
+            if ! grep -q "#define _start __executable_start" "$FILE_PRE"; then
+              sed -i '/extern char _start/i #ifndef _start\n#define _start __executable_start\n#endif\n#ifndef _end\n#define _end end\n#endif' "$FILE_PRE"
+            fi
           fi
 
           FILE_SPEC="dlls/ntdll/ntdll.spec"
