@@ -418,23 +418,6 @@ jobs:
             fi
           fi
 
-          FILE_RTL="dlls/ntdll/rtl.c"
-          if [ -f "$FILE_RTL" ]; then
-            echo "Adding stub for RtlWow64SuspendThread in $FILE_RTL..."
-            if ! grep -q "RtlWow64SuspendThread" "$FILE_RTL"; then
-              cat >> "$FILE_RTL" <<EOF
-              /***********************************************************************
-               * RtlWow64SuspendThread (NTDLL.@)
-               */
-              NTSTATUS WINAPI RtlWow64SuspendThread(HANDLE thread, ULONG *count)
-              {
-                FIXME("(%p, %p): stub\n", thread, count);
-                return STATUS_NOT_IMPLEMENTED;
-            }
-            EOF
-            fi
-          fi
-
           FILE="dlls/ntdll/unix/virtual.c"
           if [ -f "$FILE" ]; then
             if grep -q 'unsigned int vprot, sec_flags;' "$FILE"; then
@@ -487,20 +470,31 @@ jobs:
                  sed -i '/0x7fffffffff/s/#ifdef __aarch64__/#if defined(__aarch64__) || defined(__ANDROID__)/' "$FILE_PRE"
               fi
             fi
-            
-            # 패치 결과 확인 로그 추가
-            if grep -q "defined(__ANDROID__)" "$FILE_PRE"; then
-              echo "✔ preloader.c patched successfully"
-            else
-              echo "❌ preloader.c patch FAILED (pattern not found)"
-            fi
-          fi
 
           FILE_SPEC="dlls/ntdll/ntdll.spec"
           if [ -f "$FILE_SPEC" ]; then
             echo "Patching $FILE_SPEC for RtlWow64SuspendThread..."
             if ! grep -q "RtlWow64SuspendThread" "$FILE_SPEC"; then
               sed -i '/RtlWow64SetThreadContext/a @ stdcall -arch=win64 RtlWow64SuspendThread(long ptr)' "$FILE_SPEC"
+            fi
+          fi
+
+          FILE_RTL="dlls/ntdll/rtl.c"
+          if [ -f "$FILE_RTL" ]; then
+            echo "Adding stub for RtlWow64SuspendThread in $FILE_RTL..."
+            if ! grep -q "RtlWow64SuspendThread" "$FILE_RTL"; then
+              # EOF 앞뒤 공백을 제거하여 쉘 에러 방지
+              cat >> "$FILE_RTL" <<EOF
+
+            /***********************************************************************
+             * RtlWow64SuspendThread (NTDLL.@)
+             */
+            NTSTATUS WINAPI RtlWow64SuspendThread(HANDLE thread, ULONG *count)
+            {
+                FIXME("(%p, %p): stub\n", thread, count);
+                return STATUS_NOT_IMPLEMENTED;
+            }
+            EOF
             fi
           fi
 
