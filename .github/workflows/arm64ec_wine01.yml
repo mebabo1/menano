@@ -400,6 +400,7 @@ jobs:
             --with-gstreamer \
             --enable-nls \
             --disable-winemenubuilder \
+            --disable-amd_ags_x64 \
             --without-pulse \
             --without-ffmpeg \
             --disable-opencl \
