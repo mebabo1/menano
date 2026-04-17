@@ -458,28 +458,27 @@ jobs:
 
           FILE_PRE="loader/preloader.c"
           if [ -f "$FILE_PRE" ]; then
-            echo "Fixing conflicting types for wld_mprotect in $FILE_PRE..."
+            echo "Applying final consolidated fix for $FILE_PRE..."
 
-            # 1. 기존에 잘못 삽입했을 수 있는 선언문 제거 (청소)
-            sed -i '/void wld_mprotect/d' "$FILE_PRE"
+            # 1. 중복 및 충돌 방지를 위한 기존 선언 제거
+            sed -i '/wld_mprotect/d' "$FILE_PRE"
+            sed -i '/extern char _start/d' "$FILE_PRE"
+            sed -i '/#define _start/d' "$FILE_PRE"
 
-            # 2. 올바른 형식의 wld_mprotect 선언 추가 (int 반환형으로 일치)
-            # wld_mmap 선언 뒤에 삽입하여 컴파일러가 미리 알게 합니다.
-            if ! grep -q "int wld_mprotect" "$FILE_PRE"; then
-              sed -i '/int wld_mmap/a int wld_mprotect( const void *addr, size_t len, int prot );' "$FILE_PRE"
-            fi
+            # 2. 모든 함수 호출보다 앞선 위치에 통합 선언 주입
+            # static struct 문구는 파일 앞부분에 위치하므로 여기가 명당입니다.
+            NEW_HEADERS="int wld_mprotect( const void *addr, size_t len, int prot );\nextern char _start[], _end[];\n#ifndef _start\n#define _start __executable_start\n#endif\n#ifndef _end\n#define _end end\n#endif"
+            sed -i "/static struct/i $NEW_HEADERS" "$FILE_PRE"
 
-            # 3. (void *)-1 비교 구문 안전하게 캐스팅 (경고 제거)
+            # 3. (void *)-1 비교 구문 에러 방지 (캐스팅 보강)
             sed -i 's/== (void \*)-1/== (void *)(long)-1/g' "$FILE_PRE"
 
-            # 4. _start, _end 메모리 심볼 선언 (wld_start 직전)
-            if ! grep -q "extern char _start" "$FILE_PRE"; then
-              sed -i '/void\* wld_start/i #ifndef _start\n#define _start __executable_start\n#endif\n#ifndef _end\n#define _end end\n#endif\nextern char _start[], _end[];' "$FILE_PRE"
-            fi
-
-            # 5. 매크로 조건문 수정 (Android 대응)
+            # 4. 안드로이드 매크로 조건문 수정
             sed -i '/__aarch64__/ { /__ANDROID__/! s/__aarch64__/defined(__aarch64__) || defined(__ANDROID__)/ }' "$FILE_PRE"
             sed -i 's/#ifdef defined/#if defined/g' "$FILE_PRE"
+            
+            # 5. 함수의 실제 구현부(Body)를 안드로이드 빌드에 포함
+            sed -i 's/#ifdef __linux__/#if defined(__linux__) || defined(__ANDROID__)/g' "$FILE_PRE"
           fi
 
           FILE_SPEC="dlls/ntdll/ntdll.spec"
