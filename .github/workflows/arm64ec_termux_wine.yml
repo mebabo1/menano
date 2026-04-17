@@ -566,9 +566,10 @@ jobs:
             FUNC_DEF="static VkResult win32u_vkSetLatencySleepModeNV(VkDevice device, VkSwapchainKHR swapchain, const VkLatencySleepModeInfoNV *pSleepModeInfo) { VkLatencySleepModeInfoNV host; struct vulkan_device *vk_dev = vulkan_device_from_handle(device); struct swapchain *vk_sw = swapchain_from_handle(swapchain); vk_dev->low_latency_enabled = pSleepModeInfo->lowLatencyMode; host.sType = VK_STRUCTURE_TYPE_LATENCY_SLEEP_MODE_INFO_NV; host.pNext = NULL; host.lowLatencyMode = pSleepModeInfo->lowLatencyMode; host.lowLatencyBoost = pSleepModeInfo->lowLatencyBoost; host.minimumIntervalUs = pSleepModeInfo->minimumIntervalUs; return vk_dev->p_vkSetLatencySleepModeNV(vk_dev->host.device, vk_sw->obj.host.swapchain, &host); }\\n\\n#define win32u_vk_find_struct(s, t) win32u_vk_find_struct_((void *)s, VK_STRUCTURE_TYPE_##t)\\nstatic void *win32u_vk_find_struct_(void *s, VkStructureType t) { VkBaseOutStructure *h; for (h = s; h; h = h->pNext) { if (h->sType == t) return h; } return NULL; }\\n"
             sed -i "/static VkResult win32u_vkCreateSwapchainKHR/i $FUNC_DEF" "$FILE_VULKAN_C"
 
-            # 2. vkQueuePresentKHR 내부에 조건부 로직 삽입 (한 줄로 압축)
+            sed -i '/VkPipelineStageFlags waitStage/a \        VkLatencySubmissionPresentIdNV latencySubmitInfo;\n        VkPresentIdKHR *present_id;' "$FILE_VULKAN_C"
+            # (B) 실제 실행 로직 삽입 (이전과 동일)
             QUEUE_LOGIC="        if ((queue->device->low_latency_enabled) && (present_id = win32u_vk_find_struct(&present_info_host, PRESENT_ID_KHR))) { latencySubmitInfo.sType = VK_STRUCTURE_TYPE_LATENCY_SUBMISSION_PRESENT_ID_NV; latencySubmitInfo.pNext = NULL; latencySubmitInfo.presentID = *present_id->pPresentIds; submitInfo.pNext = &latencySubmitInfo; }"
-            sed -i "/submitInfo.pSignalSemaphores = &blit_sema;/a $QUEUE_LOGIC" "$FILE_VULKAN_C"
+            sed -i "/submitInfo.pSignalSemaphores = &blit_sema;/a $QUEUE_LOGIC" "$FILE_VULKAN_C".pSignalSemaphores = &blit_sema;/a $QUEUE_LOGIC" "$FILE_VULKAN_C"
 
             # 3. vulkan_funcs 구조체에 함수 포인터 등록
             sed -i '/.p_get_host_surface_extension = win32u_get_host_surface_extension,/a \    .p_vkSetLatencySleepModeNV = win32u_vkSetLatencySleepModeNV,' "$FILE_VULKAN_C"
