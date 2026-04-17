@@ -564,21 +564,16 @@ jobs:
           export TARGET=aarch64-linux-android28
           export CC=$TOOLCHAIN/$TARGET-clang
           export AS=$CC
-          export CXX=$TOOLCHAIN/$TARGET-clang++
-          export AR=$TOOLCHAIN/llvm-ar
-          export LD=$TOOLCHAIN/ld
-          export RANLIB=$TOOLCHAIN/llvm-ranlib
-          export STRIP=$TOOLCHAIN/llvm-strip
+          export CXX=$TOOLCHAIN/$TARGET-clang++      
           
           export PKG_CONFIG_LIBDIR=$deps/lib/pkgconfig:$deps/share/pkgconfig
           export ACLOCAL_PATH=$deps/lib/aclocal:$deps/share/aclocal
           export CPPFLAGS="-I$deps/include --sysroot=$TOOLCHAIN/../sysroot"
           
-          export LDFLAGS="-L$deps/lib -Wl,-rpath=$RUNTIME_PATH/lib -Wl,--enable-new-dtags"
+          export LDFLAGS="-L$deps/lib -Wl,-rpath=$RUNTIME_PATH/lib"
 
-          COMMON_FLAGS="-O2 -pipe -Wno-error -Wno-nullability-completeness -Wno-strict-prototypes"
-          export CFLAGS="$COMMON_FLAGS -D_NO_CRT_STDIO_INLINE"
-          export CXXFLAGS="$COMMON_FLAGS"
+          export CFLAGS="-O2 -pipe"
+          export CXXFLAGS="-O2 -pipe"
           export CROSSCFLAGS="-O2 -pipe"
           export CROSSCXXFLAGS="-O2 -pipe"
           
@@ -606,7 +601,6 @@ jobs:
             --enable-archs=arm64ec,aarch64,i386 \
             --with-wine-tools=/opt/wine64-native \
             --enable-wineandroid_drv=no \
-            --without-android-display \
             --enable-win64 \
             --disable-win16 \
             --disable-tests \
