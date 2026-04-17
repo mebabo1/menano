@@ -563,7 +563,7 @@ jobs:
           export TOOLCHAIN="$HOME/Android/Sdk/ndk/27.3.13750724/toolchains/llvm/prebuilt/linux-x86_64/bin"
           export TARGET=aarch64-linux-android28
           export CC=$TOOLCHAIN/$TARGET-clang
-          export AS=$CC
+          # export AS=$CC
           export CXX=$TOOLCHAIN/$TARGET-clang++      
           
           export PKG_CONFIG_LIBDIR=$deps/lib/pkgconfig:$deps/share/pkgconfig
