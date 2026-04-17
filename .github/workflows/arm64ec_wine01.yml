@@ -399,6 +399,7 @@ jobs:
             --with-vulkan \
             --with-gstreamer \
             --enable-nls \
+            --disable-winemenubuilder \
             --without-pulse \
             --without-ffmpeg \
             --disable-opencl \
