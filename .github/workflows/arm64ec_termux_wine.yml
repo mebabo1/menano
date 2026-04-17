@@ -458,31 +458,41 @@ jobs:
 
           FILE_PRE="loader/preloader.c"
           if [ -f "$FILE_PRE" ]; then
-            echo "Patching $FILE_PRE for Android memory layout..."
-            # 1. 이미 패치되었는지 확인
-            if ! grep -q "defined(__ANDROID__)" "$FILE_PRE"; then
-              # 2. #ifdef __aarch64__ 또는 #if defined(__aarch64__) 모두 대응하는 패턴
-              sed -i 's/#if\(def\)\? __aarch64__/#if defined(__aarch64__) || defined(__ANDROID__)/' "$FILE_PRE"
-            fi
-            # 3. 만약 위 명령어로도 안 변했다면 (확인 사살)
-            if ! grep -q "defined(__ANDROID__)" "$FILE_PRE"; then
-              # 주소 제한 수치(0x7fffffffff)가 있는 줄을 찾아 강제로 조건을 추가
-              sed -i '/0x7fffffffff/s/#ifdef __aarch64__/#if defined(__aarch64__) || defined(__ANDROID__)/' "$FILE_PRE"
-            fi
+            echo "Patching $FILE_PRE..."
+            sed -i '/__aarch64__/ { /__ANDROID__/! s/__aarch64__/defined(__aarch64__) || defined(__ANDROID__)/ }' "$FILE_PRE"
+            sed -i 's/#ifdef defined/#if defined/g' "$FILE_PRE"
           fi
 
           FILE_SPEC="dlls/ntdll/ntdll.spec"
-          if [ -f "$FILE_SPEC" ]; then
-            echo "Patching $FILE_SPEC for RtlWow64SuspendThread..."
-            if ! grep -q "RtlWow64SuspendThread" "$FILE_SPEC"; then
-              sed -i '/RtlWow64SetThreadContext/a @ stdcall -arch=win64 RtlWow64SuspendThread(long ptr)' "$FILE_SPEC"
-            fi
+          if [ -f "$FILE_SPEC" ] && ! grep -q "RtlWow64SuspendThread" "$FILE_SPEC"; then
+            echo "Patching $FILE_SPEC..."
+            sed -i '/RtlWow64SetThreadContext/a @ stdcall -arch=win64 RtlWow64SuspendThread(long ptr)' "$FILE_SPEC"
           fi
 
-          FILE_RTL="dlls/ntdll/rtl.c"
-          if [ -f "$FILE_RTL" ] && ! grep -q "RtlWow64SuspendThread" "$FILE_RTL"; then
-            echo "Adding stub to $FILE_RTL"
-            printf '\nNTSTATUS WINAPI RtlWow64SuspendThread(HANDLE thread, ULONG *count)\n{\n    FIXME("(%%p, %%p): stub\\n", thread, count);\n    return 0xC0000002; /* STATUS_NOT_IMPLEMENTED */\n}\n' >> "$FILE_RTL"
+          FILE_H="include/winternl.h"
+          if [ -f "$FILE_H" ] && ! grep -q "RtlWow64SuspendThread" "$FILE_H"; then
+            echo "Patching $FILE_H..."
+            sed -i '/RtlWow64IsWowGuestMachineSupported/a NTSYSAPI NTSTATUS  WINAPI RtlWow64SuspendThread(HANDLE,ULONG*);' "$FILE_H"
+          fi
+
+          FILE_S64="dlls/ntdll/unix/signal_arm64.c"
+          if [ -f "$FILE_S64" ] && ! grep -q "RtlWow64SuspendThread" "$FILE_S64"; then
+            echo "Patching $FILE_S64..."
+            cat >> "$FILE_S64" <<EOF
+
+            /***********************************************************************
+             * RtlWow64SuspendThread (NTDLL.@)
+             */
+            NTSTATUS WINAPI RtlWow64SuspendThread( HANDLE thread, ULONG *count )
+            {
+                THREAD_BASIC_INFORMATION tbi;
+                NTSTATUS ret = NtQueryInformationThread( thread, ThreadBasicInformation, &tbi, sizeof(tbi), NULL);
+                if (ret) return ret;
+
+                if (tbi.ClientId.UniqueProcess != NtCurrentTeb()->ClientId.UniqueProcess) return STATUS_SUCCESS;
+                return pWow64SuspendLocalThread ? pWow64SuspendLocalThread( thread, count ) : NtSuspendThread( thread, count );
+            }
+            EOF
           fi
 
           FILE_SIG="dlls/ntdll/unix/signal_x86_64.c"
