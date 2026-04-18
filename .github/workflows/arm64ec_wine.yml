@@ -228,19 +228,6 @@ jobs:
           fi
           echo "复制后 locale.nls 存在，大小: $(wc -c < /opt/wine64-native/nls/locale.nls) 字节"
 
-      - name: Add Esync Source Files
-        run: |
-          cd ${{ env.WINE_SOURCE_DIR }}/source
-          RAW_URL="https://raw.githubusercontent.com/mebabo1/menano/main"
-
-          echo "Downloading Esync files to existing source tree..."
-          curl -L "${RAW_URL}/dlls/ntdll/unix/esync.h" -o dlls/ntdll/unix/esync.h
-          curl -L "${RAW_URL}/dlls/ntdll/unix/esync.c" -o dlls/ntdll/unix/esync.c
-          curl -L "${RAW_URL}/server/esync.h" -o server/esync.h
-          curl -L "${RAW_URL}/server/esync.c" -o server/esync.c
-
-          echo "Esync files successfully added."
-
       - name: Termux
         run: |
           cd ${{ env.WINE_SOURCE_DIR }}/source
