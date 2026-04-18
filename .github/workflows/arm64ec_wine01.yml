@@ -397,6 +397,7 @@ jobs:
             --enable-nls \
             --disable-winemenubuilder \
             --without-osmesa \
+            --disable-amd_ags_x64 \
             --without-pulse \
             --without-ffmpeg \
             --disable-opencl \
