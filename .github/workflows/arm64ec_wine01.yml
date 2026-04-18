@@ -343,10 +343,17 @@ jobs:
 
           FILE_NTDLL_FSYNC="dlls/ntdll/unix/fsync.c"
           if [ -f "$FILE_NTDLL_FSYNC" ]; then
-            echo "Patching $FILE_NTDLL_FSYNC: Disabling fsync execution..."
-            # fsync_enabled를 0으로 강제하고 syscall 호출부를 주석 처리
+            echo "Patching $FILE_NTDLL_FSYNC with safe syntax..."
+            
+            # 1. fsync_enabled 비활성화
             sed -i 's/fsync_enabled = 1;/fsync_enabled = 0;/g' "$FILE_NTDLL_FSYNC"
-            sed -i 's/syscall( __NR_futex_waitv/\/\/ syscall( __NR_futex_waitv/g' "$FILE_NTDLL_FSYNC"
+            
+            # 2. syscall 호출부를 안전한 실패 코드(return -1)로 치환
+            # 단순히 주석 처리하는 게 아니라 실제 코드를 넣어 if/else 구조를 유지합니다.
+            sed -i 's/return syscall( __NR_futex_waitv, .*/{ errno = ENOSYS; return -1; }/g' "$FILE_NTDLL_FSYNC"
+            
+            # 3. 단독으로 쓰인 syscall 호출부도 처리
+            sed -i 's/syscall( __NR_futex_waitv, .*/{ errno = ENOSYS; }/g' "$FILE_NTDLL_FSYNC"
           fi
 
           find . -type f \( -name "*.c" -o -name "*.h" \) \
