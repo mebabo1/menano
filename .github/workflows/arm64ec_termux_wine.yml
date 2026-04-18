@@ -448,6 +448,13 @@ jobs:
             echo "✔ All loader.c patches applied."
           fi
 
+          FILE_LOADER="dlls/ntdll/unix/loader.c"
+          if [ -f "$FILE_LOADER" ]; then
+            echo "Removing M_PERTURB calls from $FILE_LOADER..."
+            # mallopt( M_PERTURB, ... ) 로 시작하는 모든 줄을 주석 처리 (// 추가)
+            sed -i 's/^[[:space:]]*mallopt( M_PERTURB,/\/\/ mallopt( M_PERTURB,/g' "$FILE_LOADER"
+          fi
+
           INF="loader/wine.inf.in"
           if [ -f "$INF" ] && ! grep -q 'libarm64ecfex.dll' "$INF"; then
               echo "Patching wine.inf for FEX libraries..."
