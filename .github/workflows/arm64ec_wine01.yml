@@ -269,13 +269,22 @@ jobs:
 
           FILE_LOADER="dlls/ntdll/loader.c"
           if [ -f "$FILE_LOADER" ]; then
-            echo "  - Increasing loader buffer size to 32"
-            sed -i 's/ULONG buffer\[16\];/ULONG buffer\[32\];/g' "$FILE_LOADER"
+            echo "Applying combined patches to loader.c..."
+            if grep -q 'ULONG buffer\[16\];' "$FILE_LOADER"; then
+              echo "  - Increasing loader buffer size to 32"
+              sed -i 's/ULONG buffer\[16\];/ULONG buffer\[32\];/g' "$FILE_LOADER"
+            fi
+            if grep -q 'base = (char \*)nt->OptionalHeader.ImageBase;' "$FILE_LOADER"; then
+              echo "  - Patching ImageBase logic for WOW64 (with UINT_PTR cast)"
+              sed -i 's/base = (char \*)nt->OptionalHeader.ImageBase;/if (nt->OptionalHeader.Magic == IMAGE_NT_OPTIONAL_HDR64_MAGIC) base = (char *)((const IMAGE_NT_HEADERS64 *)nt)->OptionalHeader.ImageBase; else base = (char *)(UINT_PTR)((const IMAGE_NT_HEADERS32 *)nt)->OptionalHeader.ImageBase;/g' "$FILE_LOADER"
+            fi                      
+            echo "✔ All loader.c patches applied."
           fi
 
           FILE_LOADER="dlls/ntdll/unix/loader.c"
           if [ -f "$FILE_LOADER" ]; then
             echo "Removing M_PERTURB calls from $FILE_LOADER..."
+            # mallopt( M_PERTURB, ... ) 로 시작하는 모든 줄을 주석 처리 (// 추가)
             sed -i 's/^[[:space:]]*mallopt( M_PERTURB,/\/\/ mallopt( M_PERTURB,/g' "$FILE_LOADER"
           fi
 
@@ -293,6 +302,12 @@ jobs:
               echo "Disabling kernel writewatch for Android compatibility..."
               sed -i 's/use_kernel_writewatch = 1;/use_kernel_writewatch = 0;/g' "$FILE"
             fi
+          fi
+
+          FILE_VIRTUAL="dlls/ntdll/unix/virtual.c"
+          if [ -f "$FILE_VIRTUAL" ]; then
+            echo "Patching shm_open for Termux with safe delimiters..."
+            sed -i "s@fd = shm_open( buf, oflag, S_IRWXU | S_IRWXG | S_IRWXO );@char shm_p[256]; snprintf(shm_p, 256, \"/data/data/com.termux/files/usr/tmp/wine_shm_%s\", buf); fd = open(shm_p, oflag, S_IRWXU | S_IRWXG | S_IRWXO);@g" "$FILE_VIRTUAL"
           fi
 
           INF="loader/wine.inf.in"
