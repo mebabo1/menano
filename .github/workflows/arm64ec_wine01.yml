@@ -267,6 +267,18 @@ jobs:
             fi
           fi
 
+          FILE_LOADER="dlls/ntdll/loader.c"
+          if [ -f "$FILE_LOADER" ]; then
+            echo "  - Increasing loader buffer size to 32"
+            sed -i 's/ULONG buffer\[16\];/ULONG buffer\[32\];/g' "$FILE_LOADER"
+          fi
+
+          FILE_LOADER="dlls/ntdll/unix/loader.c"
+          if [ -f "$FILE_LOADER" ]; then
+            echo "Removing M_PERTURB calls from $FILE_LOADER..."
+            sed -i 's/^[[:space:]]*mallopt( M_PERTURB,/\/\/ mallopt( M_PERTURB,/g' "$FILE_LOADER"
+          fi
+
           FILE="dlls/ntdll/unix/virtual.c"
           if [ -f "$FILE" ]; then
             if grep -q 'unsigned int vprot, sec_flags;' "$FILE"; then
