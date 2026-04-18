@@ -333,26 +333,6 @@ jobs:
               }' "$FILE"
           fi
 
-          FILE_SERVER_FSYNC="server/fsync.c"
-          if [ -f "$FILE_SERVER_FSYNC" ]; then
-            echo "Patching $FILE_SERVER_FSYNC: Disabling fsync support check..."
-            # 1. syscall 부분을 주석 처리
-            sed -i '/int fsync_check_support(void)/,/}/ s/syscall/\/\/ syscall/' "$FILE_SERVER_FSYNC"
-            # 2. return 부분을 return 0; 으로 치환 (중괄호 제거)
-            sed -i '/int fsync_check_support(void)/,/}/ s/return .*/return 0;/' "$FILE_SERVER_FSYNC"
-          fi
-
-          FILE_NTDLL_FSYNC="dlls/ntdll/unix/fsync.c"
-          if [ -f "$FILE_NTDLL_FSYNC" ]; then
-            echo "Patching $FILE_NTDLL_FSYNC with safe syntax..."
-            # 1. fsync_enabled 비활성화
-            sed -i 's/fsync_enabled = 1;/fsync_enabled = 0;/g' "$FILE_NTDLL_FSYNC"
-            # 2. syscall 호출부를 안전한 실패 코드로 치환
-            sed -i 's/return syscall( __NR_futex_waitv, .*/{ errno = ENOSYS; return -1; }/g' "$FILE_NTDLL_FSYNC"
-            # 3. 단독으로 쓰인 syscall 호출부 처리
-            sed -i 's/syscall( __NR_futex_waitv, .*/{ errno = ENOSYS; }/g' "$FILE_NTDLL_FSYNC"
-          fi
-
           find . -type f \( -name "*.c" -o -name "*.h" \) \
             -exec sed -i 's/xtajit64\.dll/libarm64ecfex.dll/g' {} +
           find . -type f \( -name "*.c" -o -name "*.h" \) \
