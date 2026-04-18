@@ -85,7 +85,7 @@ jobs:
             libpng-dev \
             libtiff-dev \
             libxml2-dev \
-            gettext \
+            gettext curl \
             libvulkan-dev \
             libgstreamer1.0-dev \
             libgstreamer-plugins-base1.0-dev \
