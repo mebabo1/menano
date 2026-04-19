@@ -395,9 +395,22 @@ jobs:
           fi
 
           if [ -f "dlls/ntdll/unix/fsync.c" ]; then
+            echo "Patching dlls/ntdll/unix/fsync.c for 8 Gen 5 compatibility..."
+            
+            # 1. 지원 여부 체크 무조건 통과
             sed -i '/int fsync_check_support(void)/,/}/ s/return .*/return 1;/' dlls/ntdll/unix/fsync.c
+            
+            # 2. STATUS_NOT_IMPLEMENTED(0xc0000002) 에러 우회 (서버-클라이언트 연결 보장)
             sed -i 's/if (status) return status;/if (status == 0xc0000002) return 0; if (status) return status;/g' dlls/ntdll/unix/fsync.c
-            sed -i 's/MAP_SHARED/MAP_SHARED | MAP_ANONYMOUS/g' dlls/ntdll/unix/fsync.c
+            
+            # 3. [핵심] futex_waitv 부재로 인한 강제 종료(exit) 제거
+            # 로그의 "Server is running with WINEFSYNC but..." 에러 후 종료되는 것을 막습니다.
+            sed -i 's/exit(1);/\/* exit disabled *\//g' dlls/ntdll/unix/fsync.c
+            
+            # 4. [주의] MAP_ANONYMOUS 제거
+            # 파일 기반 SHM을 사용해야 하므로 기존 mmap 설정을 건드리지 않거나, 
+            # 확실하게 MAP_SHARED만 사용하도록 고정합니다.
+            sed -i 's/MAP_SHARED | MAP_ANONYMOUS/MAP_SHARED/g' dlls/ntdll/unix/fsync.c
           fi
 
           if [ -f "dlls/ntdll/unix/sync.c" ]; then
