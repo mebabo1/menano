@@ -305,50 +305,42 @@ jobs:
             sed -i 's/^[[:space:]]*mallopt( M_PERTURB,/\/\/ mallopt( M_PERTURB,/g' "$FILE_LOADER"
           fi
 
-          # 1. fsync 안드로이드 제한 해제 및 체크 로직 우회 (사전 패치)
-          echo "Bypassing Android fsync restrictions..."
-          
-          # server/fsync.c: 안드로이드에서 fsync 사용 금지 해제
           if [ -f "server/fsync.c" ]; then
             sed -i 's/defined(__linux__) && !defined(__ANDROID__)/defined(__linux__)/g' server/fsync.c
           fi
-
-          # dlls/ntdll/unix/fsync.c: 보안 정책(EPERM)으로 인한 체크 실패 우회
           if [ -f "dlls/ntdll/unix/fsync.c" ]; then
             sed -i 's/errno != ENOSYS && errno != EPERM/errno != ENOSYS/g' dlls/ntdll/unix/fsync.c
           fi
 
-          # 1. 대상 파일 리스트 업데이트 (서버 파일 2개 추가)
-          TARGET_FILES="dlls/ntdll/unix/virtual.c dlls/ntdll/unix/fsync.c server/fsync.c dlls/winex11.drv/bitblt.c server/fd.c server/mapping.c"
+          TOTAL_TARGETS="
+            dlls/ntdll/unix/virtual.c 
+            dlls/ntdll/unix/fsync.c 
+            dlls/ntdll/unix/sync.c 
+            dlls/ntdll/unix/server.c 
+            dlls/ntdll/unix/loader.c
+            server/fsync.c 
+            server/fd.c 
+            server/mapping.c 
+            server/thread.c
+            server/inproc_sync.c
+            dlls/winex11.drv/bitblt.c
+          "
 
-          for FILE in $TARGET_FILES; do
+          for FILE in $TOTAL_TARGETS; do
             if [ -f "$FILE" ]; then
-              echo "Applying SHM Hook to $FILE..."
-              
+              echo "Checking SHM Hook for $FILE..."
               case "$FILE" in
-                server/*)
-                  # server 폴더 내부 파일들은 1단계 상위인 android 폴더로 접근
-                  HEADER_PATH="../android/shm_utils/shm_utils.h"
-                  ;;
-                dlls/winex11.drv/*)
-                  HEADER_PATH="../../android/shm_utils/shm_utils.h"
-                  ;;
-                dlls/ntdll/unix/*)
-                  HEADER_PATH="../../../android/shm_utils/shm_utils.h"
-                  ;;
-                *)
-                  HEADER_PATH="../../android/shm_utils/shm_utils.h"
-                  ;;
+                server/*)           HEADER_PATH="../android/shm_utils/shm_utils.h" ;;
+                dlls/winex11.drv/*) HEADER_PATH="../../android/shm_utils/shm_utils.h" ;;
+                dlls/ntdll/unix/*)  HEADER_PATH="../../../android/shm_utils/shm_utils.h" ;;
+                *)                  HEADER_PATH="../../android/shm_utils/shm_utils.h" ;;
               esac
-
               if ! grep -q "shm_utils.h" "$FILE"; then
-                echo "Inserting header path: $HEADER_PATH into $FILE"
-                # 서버 파일들은 WINE_DEFAULT_DEBUG_CHANNEL이 없을 수도 있으므로 
-                # 가장 안전하게 #include <config.h> 바로 아래에 삽입합니다.
+                echo ">>> Injecting Hook into $FILE"
+                # config.h 바로 아래에 넣는 것이 가장 안전 (표준 include들이 가로채기 당하기 전)
                 if grep -q "#include \"config.h\"" "$FILE"; then
                   sed -i "/#include \"config.h\"/a #include \"$HEADER_PATH\"" "$FILE"
                 else
-                  # config.h가 없으면 파일 맨 처음에 삽입
                   sed -i "1i #include \"$HEADER_PATH\"" "$FILE"
                 fi
               fi
