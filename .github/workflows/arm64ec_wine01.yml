@@ -394,14 +394,12 @@ jobs:
           if [ -f "$FILE_DLL_FSYNC" ]; then
             echo "Patching $FILE_DLL_FSYNC: Linking shm_utils safely..."
             # unix_private.h 바로 뒤가 아니라, 파일의 헤더 포함 구역 맨 끝에 추가합니다.
-            # WINE_DEFAULT_DEBUG_CHANNEL 문구 직전에 삽입하는 것이 가장 안전합니다.
             sed -i '/WINE_DEFAULT_DEBUG_CHANNEL/i #include "../../../android/shm_utils/shm_utils.h"' "$FILE_DLL_FSYNC"
           fi
 
           FILE_SERVER_FSYNC="server/fsync.c"
           if [ -f "$FILE_SERVER_FSYNC" ]; then
             echo "Patching $FILE_SERVER_FSYNC..."
-            # 서버 측도 안전하게 채널 정의 직전에 삽입
             sed -i '/WINE_DEFAULT_DEBUG_CHANNEL/i #include "../android/shm_utils/shm_utils.h"' "$FILE_SERVER_FSYNC"
           fi
 
