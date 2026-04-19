@@ -239,9 +239,11 @@ jobs:
         run: |
           cd ${{ env.WINE_SOURCE_DIR }}/source
           mkdir -p android/shm_utils
-          cat <<EOF > android/shm_utils/shm_utils.h
+          # cat 명령어 시작 (EOF 앞뒤에 공백이 없어야 합니다)
+          cat <<'EOF' > android/shm_utils/shm_utils.h
           #ifndef __WINE_SERVER_SHM_UTILS_H
           #define __WINE_SERVER_SHM_UTILS_H
+
           #include <fcntl.h>
           #include <stdio.h>
           #include <stdlib.h>
@@ -250,33 +252,40 @@ jobs:
           #include <sys/types.h>
           #include <errno.h>
 
+          /* 8 Gen 5 & Termux glibc Compatibility: Redirect shm_open to a physical file */
           static inline int custom_shm_open(const char *name, int oflag, mode_t mode) {
               char *fname = NULL;
               const char *tmpdir = getenv("TMPDIR");
               if (!tmpdir) tmpdir = "/data/data/com.termux/files/usr/tmp";
-              if (name[0] == '/') name++;
-              if (asprintf(&fname, "%s/%s", tmpdir, name) == -1) return -1;
+              
+              /* /dev/shm 경로 무시를 위해 파일 이름 앞의 '/' 제거 */
+              const char *clean_name = (name[0] == '/') ? name + 1 : name;
+              if (asprintf(&fname, "%s/%s", tmpdir, clean_name) == -1) return -1;
+              
               int fd = open(fname, oflag, mode);
-              if (fd != -1 && (oflag & O_CREAT)) ftruncate(fd, 8 * 1024 * 1024);
+              /* [중요] mmap: No such device 방지를 위해 8MB 즉시 할당 */
+              if (fd != -1 && (oflag & O_CREAT)) {
+                  ftruncate(fd, 8 * 1024 * 1024);
+              }
+              
               free(fname);
               return fd;
           }
+
           static inline int custom_shm_unlink(const char *name) {
               char *fname = NULL;
               const char *tmpdir = getenv("TMPDIR");
               if (!tmpdir) tmpdir = "/data/data/com.termux/files/usr/tmp";
-              if (name[0] == '/') name++;
-              if (asprintf(&fname, "%s/%s", tmpdir, name) == -1) return -1;
+              
+              const char *clean_name = (name[0] == '/') ? name + 1 : name;
+              if (asprintf(&fname, "%s/%s", tmpdir, clean_name) == -1) return -1;
+              
               int ret = unlink(fname);
               free(fname);
               return ret;
           }
-          #define shm_open custom_shm_open
-          #define shm_unlink custom_shm_unlink
-          #endif
-          EOF
 
-          /* Wine 소스 코드 내의 shm_open 호출을 우리 함수로 강제 리다이렉트 */
+          /* Wine 소스 내의 호출을 가로챔 */
           #define shm_open custom_shm_open
           #define shm_unlink custom_shm_unlink
 
