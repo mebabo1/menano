@@ -384,21 +384,34 @@ jobs:
               }' "$FILE"
           fi
 
+          # 1. 대상 파일 리스트 (공백으로 구분)
           TARGET_FILES="dlls/ntdll/unix/virtual.c dlls/ntdll/unix/fsync.c server/fsync.c dlls/winex11.drv/bitblt.c"
 
           for FILE in $TARGET_FILES; do
             if [ -f "$FILE" ]; then
               echo "Applying SHM Hook to $FILE..."
+              
               case "$FILE" in
                 server/*)
+                  # server 폴더는 1단계 깊이
                   HEADER_PATH="../android/shm_utils/shm_utils.h"
                   ;;
-                *)
+                dlls/winex11.drv/*)
+                  # dlls/winex11.drv 폴더는 2단계 깊이
+                  HEADER_PATH="../../android/shm_utils/shm_utils.h"
+                  ;;
+                dlls/ntdll/unix/*)
+                  # dlls/ntdll/unix 폴더는 3단계 깊이
                   HEADER_PATH="../../../android/shm_utils/shm_utils.h"
                   ;;
+                *)
+                  # 그 외 기본값
+                  HEADER_PATH="../../android/shm_utils/shm_utils.h"
+                  ;;
               esac
+
               if ! grep -q "shm_utils.h" "$FILE"; then
-                # WINE_DEFAULT_DEBUG_CHANNEL 바로 위에 include 삽입
+                echo "Inserting header path: $HEADER_PATH into $FILE"
                 sed -i "/WINE_DEFAULT_DEBUG_CHANNEL/i #include \"$HEADER_PATH\"" "$FILE"
               fi
             fi
