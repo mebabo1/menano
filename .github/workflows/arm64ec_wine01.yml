@@ -243,7 +243,7 @@ jobs:
           #ifndef __WINE_SERVER_SHM_UTILS_H
           #define __WINE_SERVER_SHM_UTILS_H
 
-          #define _GNU_SOURCE
+          /* 8 Gen 5 & Termux glibc Compatibility Hook */
           #include <fcntl.h>
           #include <stdio.h>
           #include <stdlib.h>
@@ -251,10 +251,8 @@ jobs:
           #include <sys/stat.h>
           #include <sys/types.h>
 
-          #undef shm_open
-          #undef shm_unlink
-
-          static inline int shm_open(const char *name, int oflag, mode_t mode) {
+          /* 기존 shm_open 선언과 충돌을 피하기 위해 이름을 바꿉니다. */
+          static inline int custom_shm_open(const char *name, int oflag, mode_t mode) {
               char *fname = NULL;
               const char *tmpdir = getenv("TMPDIR");
               int fd;
@@ -267,7 +265,7 @@ jobs:
               return fd;
           }
 
-          static inline int shm_unlink(const char *name) {
+          static inline int custom_shm_unlink(const char *name) {
               char *fname = NULL;
               const char *tmpdir = getenv("TMPDIR");
               int ret;
@@ -279,6 +277,10 @@ jobs:
               free(fname);
               return ret;
           }
+
+          /* Wine 소스 코드 내의 shm_open 호출을 우리 함수로 강제 리다이렉트 */
+          #define shm_open custom_shm_open
+          #define shm_unlink custom_shm_unlink
 
           #endif
           EOF
