@@ -244,6 +244,7 @@ jobs:
           #ifndef _SYS_SHM_H
           #define _SYS_SHM_H 1
 
+          #define _GNU_SOURCE
           #include <stdint.h>
           #include <sys/types.h>
           #include <sys/ipc.h>
@@ -524,6 +525,13 @@ jobs:
           if [ -f "$FILE_SERVER_FSYNC" ]; then
             echo "Patching $FILE_SERVER_FSYNC..."
             sed -i '/WINE_DEFAULT_DEBUG_CHANNEL/i #include "../android/shm_utils/shm_utils.h"' "$FILE_SERVER_FSYNC"
+          fi
+
+          FILE_BITBLT="dlls/winex11.drv/bitblt.c"
+          if [ -f "$FILE_BITBLT" ]; then
+            echo "Patching $FILE_BITBLT for Custom SHM..."
+            # 기존 sys/shm.h 포함 줄을 우리 헤더로 교체하거나, 그 위에 강제 삽입합니다.
+            sed -i '/# include <sys\/shm.h>/c # include "../../android/android_sysvshm/sys/shm.h"' "$FILE_BITBLT"
           fi
 
           find . -type f \( -name "*.c" -o -name "*.h" \) \
