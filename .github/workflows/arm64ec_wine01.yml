@@ -397,8 +397,8 @@ jobs:
             sed -i 's/errno != ENOSYS && errno != EPERM/errno != ENOSYS/g' dlls/ntdll/unix/fsync.c
           fi
 
-          # 2. 대상 파일 리스트에 SHM Hook(shm_utils.h) 주입
-          TARGET_FILES="dlls/ntdll/unix/virtual.c dlls/ntdll/unix/fsync.c server/fsync.c dlls/winex11.drv/bitblt.c"
+          # 1. 대상 파일 리스트 업데이트 (서버 파일 2개 추가)
+          TARGET_FILES="dlls/ntdll/unix/virtual.c dlls/ntdll/unix/fsync.c server/fsync.c dlls/winex11.drv/bitblt.c server/fd.c server/mapping.c"
 
           for FILE in $TARGET_FILES; do
             if [ -f "$FILE" ]; then
@@ -406,6 +406,7 @@ jobs:
               
               case "$FILE" in
                 server/*)
+                  # server 폴더 내부 파일들은 1단계 상위인 android 폴더로 접근
                   HEADER_PATH="../android/shm_utils/shm_utils.h"
                   ;;
                 dlls/winex11.drv/*)
@@ -421,8 +422,14 @@ jobs:
 
               if ! grep -q "shm_utils.h" "$FILE"; then
                 echo "Inserting header path: $HEADER_PATH into $FILE"
-                # WINE_DEFAULT_DEBUG_CHANNEL 선언 바로 위에 include 삽입
-                sed -i "/WINE_DEFAULT_DEBUG_CHANNEL/i #include \"$HEADER_PATH\"" "$FILE"
+                # 서버 파일들은 WINE_DEFAULT_DEBUG_CHANNEL이 없을 수도 있으므로 
+                # 가장 안전하게 #include <config.h> 바로 아래에 삽입합니다.
+                if grep -q "#include \"config.h\"" "$FILE"; then
+                  sed -i "/#include \"config.h\"/a #include \"$HEADER_PATH\"" "$FILE"
+                else
+                  # config.h가 없으면 파일 맨 처음에 삽입
+                  sed -i "1i #include \"$HEADER_PATH\"" "$FILE"
+                fi
               fi
             fi
           done
