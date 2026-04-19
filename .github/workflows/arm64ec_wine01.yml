@@ -388,16 +388,13 @@ jobs:
           fi
 
           if [ -f "dlls/ntdll/unix/fsync.c" ]; then
-            echo "Forcing fsync_check_support to always return TRUE..."
             sed -i '/int fsync_check_support(void)/,/}/ s/return .*/return 1;/' dlls/ntdll/unix/fsync.c
             sed -i 's/if (status) return status;/if (status == 0xc0000002) return 0; if (status) return status;/g' dlls/ntdll/unix/fsync.c
           fi
 
-          FILE_SYNC="dlls/ntdll/unix/sync.c"
-          if [ -f "$FILE_SYNC" ]; then
-              echo "Patching $FILE_SYNC to force fsync engagement..."
-              sed -i '/if (do_fsync())/s/do_fsync()/1/g' "$FILE_SYNC"
-              sed -i 's/assert( token == reply->handle );/\/* assert disabled *\//g' "$FILE_SYNC"
+          if [ -f "dlls/ntdll/unix/sync.c" ]; then
+            sed -i '/if (do_fsync())/s/do_fsync()/1/g' dlls/ntdll/unix/sync.c
+            sed -i 's/assert( token == reply->handle );/\/* assert disabled *\//g' dlls/ntdll/unix/sync.c
           fi
 
           FILE_THREAD="server/thread.c"
