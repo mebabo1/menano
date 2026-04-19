@@ -100,6 +100,8 @@ If you install the Winlator pad DLL file and run this app through the wfm.exe fi
 ---------------------------
 [Dxvk](https://github.com/doitsujin/dxvk)
 
+[DXVK LOW-LATENCY](https://github.com/netborg-afps/dxvk-low-latency)
+
 [DXVK-Sarek](https://github.com/pythonlover02/DXVK-Sarek)
 
 [Wine](https://github.com/airidosas252/Wine-Builds)
