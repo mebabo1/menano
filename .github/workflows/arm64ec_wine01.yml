@@ -408,7 +408,7 @@ jobs:
             sed -i '/int get_inproc_device_fd(void)/,/}/ s/return fd;/return FSYNC_USED_BY_SERVER;/' "$FILE_INPROC"
           fi
 
-          TARGET_FILES="
+          TOTAL_TARGETS="
             dlls/ntdll/unix/virtual.c 
             dlls/ntdll/unix/fsync.c 
             dlls/ntdll/unix/sync.c 
@@ -422,24 +422,18 @@ jobs:
             dlls/winex11.drv/bitblt.c
           "
 
-          for FILE in $TARGET_FILES; do
+          for FILE in $TOTAL_TARGETS; do
             if [ -f "$FILE" ]; then
-              echo "Applying SHM Hook to $FILE..."
+              echo "Checking SHM Hook for $FILE..."
               case "$FILE" in
-                server/*)
-                  HEADER_PATH="../android/shm_utils/shm_utils.h"
-                  ;;
-                dlls/winex11.drv/*)
-                  HEADER_PATH="../../android/shm_utils/shm_utils.h"
-                  ;;
-                dlls/ntdll/unix/*)
-                  HEADER_PATH="../../../android/shm_utils/shm_utils.h"
-                  ;;
-                *)
-                  HEADER_PATH="../../android/shm_utils/shm_utils.h"
-                  ;;
+                server/*)           HEADER_PATH="../android/shm_utils/shm_utils.h" ;;
+                dlls/winex11.drv/*) HEADER_PATH="../../android/shm_utils/shm_utils.h" ;;
+                dlls/ntdll/unix/*)  HEADER_PATH="../../../android/shm_utils/shm_utils.h" ;;
+                *)                  HEADER_PATH="../../android/shm_utils/shm_utils.h" ;;
               esac
               if ! grep -q "shm_utils.h" "$FILE"; then
+                echo ">>> Injecting Hook into $FILE"
+                # config.h 바로 아래에 넣는 것이 가장 안전 (표준 include들이 가로채기 당하기 전)
                 if grep -q "#include \"config.h\"" "$FILE"; then
                   sed -i "/#include \"config.h\"/a #include \"$HEADER_PATH\"" "$FILE"
                 else
