@@ -235,48 +235,45 @@ jobs:
           fi
           echo "复制后 locale.nls 存在，大小: $(wc -c < /opt/wine64-native/nls/locale.nls) 字节"
 
-      - name: Create SHM Header in Patch Path
+      - name: Create SHM Header
         run: |
-          cd ${{ env.WINE_SOURCE_DIR }}/source
-          mkdir -p android/shm_utils
-          cat <<EOF > android/shm_utils/shm_utils.h
+          mkdir -p ${{ env.WINE_SOURCE_DIR }}/source/android/shm_utils
+          cat <<EOF > ${{ env.WINE_SOURCE_DIR }}/source/android/shm_utils/shm_utils.h
           #ifndef __WINE_SERVER_SHM_UTILS_H
           #define __WINE_SERVER_SHM_UTILS_H
-
-          /* 8 Gen 5 & Termux glibc Compatibility Hook */
           #include <fcntl.h>
           #include <stdio.h>
           #include <stdlib.h>
           #include <unistd.h>
           #include <sys/stat.h>
           #include <sys/types.h>
+          #include <errno.h>
 
-          /* 기존 shm_open 선언과 충돌을 피하기 위해 이름을 바꿉니다. */
           static inline int custom_shm_open(const char *name, int oflag, mode_t mode) {
               char *fname = NULL;
               const char *tmpdir = getenv("TMPDIR");
-              int fd;
-
-              if (!tmpdir) tmpdir = "/tmp";
+              if (!tmpdir) tmpdir = "/data/data/com.termux/files/usr/tmp";
+              if (name[0] == '/') name++;
               if (asprintf(&fname, "%s/%s", tmpdir, name) == -1) return -1;
-              
-              fd = open(fname, oflag, mode);
+              int fd = open(fname, oflag, mode);
+              if (fd != -1 && (oflag & O_CREAT)) ftruncate(fd, 8 * 1024 * 1024);
               free(fname);
               return fd;
           }
-
           static inline int custom_shm_unlink(const char *name) {
               char *fname = NULL;
               const char *tmpdir = getenv("TMPDIR");
-              int ret;
-
-              if (!tmpdir) tmpdir = "/tmp";
+              if (!tmpdir) tmpdir = "/data/data/com.termux/files/usr/tmp";
+              if (name[0] == '/') name++;
               if (asprintf(&fname, "%s/%s", tmpdir, name) == -1) return -1;
-              
-              ret = unlink(fname);
+              int ret = unlink(fname);
               free(fname);
               return ret;
           }
+          #define shm_open custom_shm_open
+          #define shm_unlink custom_shm_unlink
+          #endif
+          EOF
 
           /* Wine 소스 코드 내의 shm_open 호출을 우리 함수로 강제 리다이렉트 */
           #define shm_open custom_shm_open
@@ -390,6 +387,7 @@ jobs:
           if [ -f "dlls/ntdll/unix/fsync.c" ]; then
             sed -i '/int fsync_check_support(void)/,/}/ s/return .*/return 1;/' dlls/ntdll/unix/fsync.c
             sed -i 's/if (status) return status;/if (status == 0xc0000002) return 0; if (status) return status;/g' dlls/ntdll/unix/fsync.c
+            sed -i 's/MAP_SHARED/MAP_SHARED | MAP_ANONYMOUS/g' dlls/ntdll/unix/fsync.c
           fi
 
           if [ -f "dlls/ntdll/unix/sync.c" ]; then
