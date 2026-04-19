@@ -243,11 +243,6 @@ jobs:
           #ifndef __WINE_SERVER_SHM_UTILS_H
           #define __WINE_SERVER_SHM_UTILS_H
 
-          /* Termux glibc 및 8 Gen 5 대응: 
-             안드로이드 환경 변수 유무에 관계없이 
-             shm_open 시스템 콜 차단을 피하기 위해 파일 기반으로 강제 대체 
-          */
-
           #define _GNU_SOURCE
           #include <fcntl.h>
           #include <stdio.h>
@@ -256,31 +251,31 @@ jobs:
           #include <sys/stat.h>
           #include <sys/types.h>
 
-          /* 기존 정의와 충돌 방지를 위해 매크로 제거 후 재정의 */
           #undef shm_open
           #undef shm_unlink
 
           static inline int shm_open(const char *name, int oflag, mode_t mode) {
+              char *fname = NULL;
               const char *tmpdir = getenv("TMPDIR");
+              int fd;
+
               if (!tmpdir) tmpdir = "/tmp";
-              
-              char *fname;
-              /* /tmp/wine-shm-name 형식으로 경로 생성 */
               if (asprintf(&fname, "%s/%s", tmpdir, name) == -1) return -1;
               
-              int fd = open(fname, oflag, mode);
+              fd = open(fname, oflag, mode);
               free(fname);
               return fd;
           }
 
           static inline int shm_unlink(const char *name) {
+              char *fname = NULL;
               const char *tmpdir = getenv("TMPDIR");
+              int ret;
+
               if (!tmpdir) tmpdir = "/tmp";
-              
-              char *fname;
               if (asprintf(&fname, "%s/%s", tmpdir, name) == -1) return -1;
               
-              int ret = unlink(fname);
+              ret = unlink(fname);
               free(fname);
               return ret;
           }
@@ -393,21 +388,19 @@ jobs:
               }' "$FILE"
           fi
 
-          FILE_SERVER_FSYNC="server/fsync.c"
-          if [ -f "$FILE_SERVER_FSYNC" ]; then
-            echo "Patching $FILE_SERVER_FSYNC: Linking shm_utils for wineserver..."
-
-            # server/fsync.c는 경로가 다르므로 상대 경로를 한 단계 줄여서 삽입합니다.
-            # (server 폴더는 루트 바로 아래에 있으므로 ../android/shm_utils/shm_utils.h)
-            sed -i '/#include "unicode.h"/a #include "../android/shm_utils/shm_utils.h"' "$FILE_SERVER_FSYNC"
-            
-            # wineserver가 shm_open을 호출할 때 우리가 만든 가짜 함수를 쓰게 됩니다.
-          fi
-
           FILE_DLL_FSYNC="dlls/ntdll/unix/fsync.c"
           if [ -f "$FILE_DLL_FSYNC" ]; then
-            echo "Patching $FILE_DLL_FSYNC: Linking shm_utils for ntdll..."
-            sed -i '/#include "unix_private.h"/a #include "../../../android/shm_utils/shm_utils.h"' "$FILE_DLL_FSYNC"
+            echo "Patching $FILE_DLL_FSYNC: Linking shm_utils safely..."
+            # unix_private.h 바로 뒤가 아니라, 파일의 헤더 포함 구역 맨 끝에 추가합니다.
+            # WINE_DEFAULT_DEBUG_CHANNEL 문구 직전에 삽입하는 것이 가장 안전합니다.
+            sed -i '/WINE_DEFAULT_DEBUG_CHANNEL/i #include "../../../android/shm_utils/shm_utils.h"' "$FILE_DLL_FSYNC"
+          fi
+
+          FILE_SERVER_FSYNC="server/fsync.c"
+          if [ -f "$FILE_SERVER_FSYNC" ]; then
+            echo "Patching $FILE_SERVER_FSYNC..."
+            # 서버 측도 안전하게 채널 정의 직전에 삽입
+            sed -i '/WINE_DEFAULT_DEBUG_CHANNEL/i #include "../android/shm_utils/shm_utils.h"' "$FILE_SERVER_FSYNC"
           fi
 
           find . -type f \( -name "*.c" -o -name "*.h" \) \
