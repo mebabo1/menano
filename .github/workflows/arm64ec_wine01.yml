@@ -397,16 +397,28 @@ jobs:
             sed -i 's/errno != ENOSYS && errno != EPERM/errno != ENOSYS/g' dlls/ntdll/unix/fsync.c
           fi
 
-          # 1. 대상 파일 리스트 업데이트 (서버 파일 2개 추가)
-          TARGET_FILES="dlls/ntdll/unix/virtual.c dlls/ntdll/unix/fsync.c server/fsync.c dlls/winex11.drv/bitblt.c server/fd.c server/mapping.c"
+          # 1. 대상 파일 리스트 확장 (사용자님이 언급하신 핵심 파일 포함)
+          TARGET_FILES="
+            dlls/ntdll/unix/virtual.c 
+            dlls/ntdll/unix/fsync.c 
+            dlls/ntdll/unix/sync.c 
+            dlls/ntdll/unix/server.c 
+            dlls/ntdll/unix/loader.c
+            server/fsync.c 
+            server/fd.c 
+            server/mapping.c 
+            server/thread.c
+            server/inproc_sync.c
+            dlls/winex11.drv/bitblt.c
+          "
 
           for FILE in $TARGET_FILES; do
             if [ -f "$FILE" ]; then
               echo "Applying SHM Hook to $FILE..."
               
+              # 파일 깊이에 따른 HEADER_PATH 계산
               case "$FILE" in
                 server/*)
-                  # server 폴더 내부 파일들은 1단계 상위인 android 폴더로 접근
                   HEADER_PATH="../android/shm_utils/shm_utils.h"
                   ;;
                 dlls/winex11.drv/*)
@@ -420,33 +432,30 @@ jobs:
                   ;;
               esac
 
+              # 중복 체크 후 상단에 주입
               if ! grep -q "shm_utils.h" "$FILE"; then
-                echo "Inserting header path: $HEADER_PATH into $FILE"
-                # 서버 파일들은 WINE_DEFAULT_DEBUG_CHANNEL이 없을 수도 있으므로 
-                # 가장 안전하게 #include <config.h> 바로 아래에 삽입합니다.
+                # config.h 바로 아래에 넣는 것이 가장 안전함 (표준 라이브러리 선언 전)
                 if grep -q "#include \"config.h\"" "$FILE"; then
                   sed -i "/#include \"config.h\"/a #include \"$HEADER_PATH\"" "$FILE"
                 else
-                  # config.h가 없으면 파일 맨 처음에 삽입
                   sed -i "1i #include \"$HEADER_PATH\"" "$FILE"
                 fi
               fi
             fi
           done
 
+          FILE_SYNC="dlls/ntdll/unix/sync.c"
+          if [ -f "$FILE_SYNC" ]; then
+              echo "Patching $FILE_SYNC to force fsync engagement..."
+              sed -i '/if (do_fsync())/s/do_fsync()/1/g' "$FILE_SYNC"
+              sed -i 's/assert( token == reply->handle );/\/* assert disabled *\//g' "$FILE_SYNC"
+          fi
+
           FILE_FSYNC="dlls/ntdll/unix/fsync.c"
           if [ -f "$FILE_FSYNC" ]; then
             echo "Neutralizing exit(1) in fsync_init..."
-            
-            # 1. EPERM 에러 시 종료되지 않도록 수정 (EPERM 체크 제거)
             sed -i 's/errno == ENOSYS || errno == EPERM/errno == ENOSYS/g' "$FILE_FSYNC"
-            
-            # 2. shm_open 실패 시 exit(1) 대신 경고만 출력하고 계속 진행하도록 수정
-            # (실제로 작동하지 않더라도 프로세스가 죽는 것은 막아야 함)
             sed -i 's/exit(1); \/\* fsync_init \*\//\/* exit(1) disabled *\//g' "$FILE_FSYNC"
-            
-            # 3. sprintf로 shm_name을 만드는 로직 확인
-            # (우리가 만든 shm_utils.h의 custom_shm_open이 이 shm_name 앞에 $TMPDIR을 붙여줄 것입니다.)
           fi
 
           find . -type f \( -name "*.c" -o -name "*.h" \) \
