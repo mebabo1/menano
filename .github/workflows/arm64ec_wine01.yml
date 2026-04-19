@@ -235,21 +235,58 @@ jobs:
           fi
           echo "复制后 locale.nls 存在，大小: $(wc -c < /opt/wine64-native/nls/locale.nls) 字节"
 
-      - name: Add Esync Source Files
+      - name: Create SHM Header in Patch Path
         run: |
           cd ${{ env.WINE_SOURCE_DIR }}/source
-          RAW_URL="https://raw.githubusercontent.com/mebabo1/menano/main"
+          mkdir -p android/shm_utils
+          cat <<EOF > android/shm_utils/shm_utils.h
+          #ifndef __WINE_SERVER_SHM_UTILS_H
+          #define __WINE_SERVER_SHM_UTILS_H
 
-          echo "Downloading Esync files to existing source tree..."
-          curl -L "${RAW_URL}/dlls/ntdll/unix/esync.h" -o dlls/ntdll/unix/esync.h
-          curl -L "${RAW_URL}/dlls/ntdll/unix/esync.c" -o dlls/ntdll/unix/esync.c
-          curl -L "${RAW_URL}/server/esync.h" -o server/esync.h
-          curl -L "${RAW_URL}/server/esync.c" -o server/esync.c
+          /* Termux glibc 및 8 Gen 5 대응: 
+             안드로이드 환경 변수 유무에 관계없이 
+             shm_open 시스템 콜 차단을 피하기 위해 파일 기반으로 강제 대체 
+          */
 
-          echo "Esync files successfully added."
-          if [ ! -f "configure" ]; then
-            ./autogen.sh
-          fi
+          #define _GNU_SOURCE
+          #include <fcntl.h>
+          #include <stdio.h>
+          #include <stdlib.h>
+          #include <unistd.h>
+          #include <sys/stat.h>
+          #include <sys/types.h>
+
+          /* 기존 정의와 충돌 방지를 위해 매크로 제거 후 재정의 */
+          #undef shm_open
+          #undef shm_unlink
+
+          static inline int shm_open(const char *name, int oflag, mode_t mode) {
+              const char *tmpdir = getenv("TMPDIR");
+              if (!tmpdir) tmpdir = "/tmp";
+              
+              char *fname;
+              /* /tmp/wine-shm-name 형식으로 경로 생성 */
+              if (asprintf(&fname, "%s/%s", tmpdir, name) == -1) return -1;
+              
+              int fd = open(fname, oflag, mode);
+              free(fname);
+              return fd;
+          }
+
+          static inline int shm_unlink(const char *name) {
+              const char *tmpdir = getenv("TMPDIR");
+              if (!tmpdir) tmpdir = "/tmp";
+              
+              char *fname;
+              if (asprintf(&fname, "%s/%s", tmpdir, name) == -1) return -1;
+              
+              int ret = unlink(fname);
+              free(fname);
+              return ret;
+          }
+
+          #endif
+          EOF
 
       - name: Termux
         run: |
@@ -354,6 +391,23 @@ jobs:
                       if (object->memory_properties.memoryHeaps[k].flags \& VK_MEMORY_HEAP_DEVICE_LOCAL_BIT) \
                           object->memory_properties.memoryHeaps[k].size = s; \
               }' "$FILE"
+          fi
+
+          FILE_SERVER_FSYNC="server/fsync.c"
+          if [ -f "$FILE_SERVER_FSYNC" ]; then
+            echo "Patching $FILE_SERVER_FSYNC: Linking shm_utils for wineserver..."
+
+            # server/fsync.c는 경로가 다르므로 상대 경로를 한 단계 줄여서 삽입합니다.
+            # (server 폴더는 루트 바로 아래에 있으므로 ../android/shm_utils/shm_utils.h)
+            sed -i '/#include "unicode.h"/a #include "../android/shm_utils/shm_utils.h"' "$FILE_SERVER_FSYNC"
+            
+            # wineserver가 shm_open을 호출할 때 우리가 만든 가짜 함수를 쓰게 됩니다.
+          fi
+
+          FILE_DLL_FSYNC="dlls/ntdll/unix/fsync.c"
+          if [ -f "$FILE_DLL_FSYNC" ]; then
+            echo "Patching $FILE_DLL_FSYNC: Linking shm_utils for ntdll..."
+            sed -i '/#include "unix_private.h"/a #include "../../../android/shm_utils/shm_utils.h"' "$FILE_DLL_FSYNC"
           fi
 
           find . -type f \( -name "*.c" -o -name "*.h" \) \
