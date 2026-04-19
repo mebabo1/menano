@@ -235,15 +235,12 @@ jobs:
           fi
           echo "复制后 locale.nls 存在，大小: $(wc -c < /opt/wine64-native/nls/locale.nls) 字节"
 
-      - name: Create SHM Header in Patch Path
+      - name: Create SHM Header
         run: |
-          cd ${{ env.WINE_SOURCE_DIR }}/source
-          mkdir -p android/shm_utils
-          # cat 명령어 시작 (EOF 앞뒤에 공백이 없어야 합니다)
-          cat <<'EOF' > android/shm_utils/shm_utils.h
+          mkdir -p ${{ env.WINE_SOURCE_DIR }}/source/android/shm_utils
+          cat <<'EOF' > ${{ env.WINE_SOURCE_DIR }}/source/android/shm_utils/shm_utils.h
           #ifndef __WINE_SERVER_SHM_UTILS_H
           #define __WINE_SERVER_SHM_UTILS_H
-
           #include <fcntl.h>
           #include <stdio.h>
           #include <stdlib.h>
@@ -251,44 +248,32 @@ jobs:
           #include <sys/stat.h>
           #include <sys/types.h>
           #include <errno.h>
+          #include <string.h>
 
-          /* 8 Gen 5 & Termux glibc Compatibility: Redirect shm_open to a physical file */
           static inline int custom_shm_open(const char *name, int oflag, mode_t mode) {
               char *fname = NULL;
               const char *tmpdir = getenv("TMPDIR");
               if (!tmpdir) tmpdir = "/tmp";
-              
-              /* /dev/shm 경로 무시를 위해 파일 이름 앞의 '/' 제거 */
               const char *clean_name = (name[0] == '/') ? name + 1 : name;
               if (asprintf(&fname, "%s/%s", tmpdir, clean_name) == -1) return -1;
               
               int fd = open(fname, oflag, mode);
-              /* [중요] mmap: No such device 방지를 위해 8MB 즉시 할당 */
-              if (fd != -1 && (oflag & O_CREAT)) {
-                  ftruncate(fd, 8 * 1024 * 1024);
-              }
-              
+              if (fd != -1 && (oflag & O_CREAT)) ftruncate(fd, 8 * 1024 * 1024);
               free(fname);
               return fd;
           }
-
           static inline int custom_shm_unlink(const char *name) {
               char *fname = NULL;
               const char *tmpdir = getenv("TMPDIR");
               if (!tmpdir) tmpdir = "/tmp";
-              
               const char *clean_name = (name[0] == '/') ? name + 1 : name;
               if (asprintf(&fname, "%s/%s", tmpdir, clean_name) == -1) return -1;
-              
               int ret = unlink(fname);
               free(fname);
               return ret;
           }
-
-          /* Wine 소스 내의 호출을 가로챔 */
           #define shm_open custom_shm_open
           #define shm_unlink custom_shm_unlink
-
           #endif
           EOF
 
@@ -391,31 +376,25 @@ jobs:
           fi
 
           if [ -f "server/fsync.c" ]; then
-            sed -i 's/defined(__linux__) && !defined(__ANDROID__)/defined(__linux__)/g' server/fsync.c
+            sed -i 's/!defined(__ANDROID__)//g' server/fsync.c
+            # futex_waitv 체크로 인한 exit(1) 방지
+            sed -i 's/exit(1);/\/* disabled *\//g' server/fsync.c
           fi
 
+          # [3] dlls/ntdll/unix/fsync.c 패치 (mmap 및 강제 종료 방지)
           if [ -f "dlls/ntdll/unix/fsync.c" ]; then
-            echo "Patching dlls/ntdll/unix/fsync.c for 8 Gen 5 compatibility..."
-            
-            # 1. 지원 여부 체크 무조건 통과
-            sed -i '/int fsync_check_support(void)/,/}/ s/return .*/return 1;/' dlls/ntdll/unix/fsync.c
-            
-            # 2. STATUS_NOT_IMPLEMENTED(0xc0000002) 에러 우회 (서버-클라이언트 연결 보장)
-            sed -i 's/if (status) return status;/if (status == 0xc0000002) return 0; if (status) return status;/g' dlls/ntdll/unix/fsync.c
-            
-            # 3. [핵심] futex_waitv 부재로 인한 강제 종료(exit) 제거
-            # 로그의 "Server is running with WINEFSYNC but..." 에러 후 종료되는 것을 막습니다.
-            sed -i 's/exit(1);/\/* exit disabled *\//g' dlls/ntdll/unix/fsync.c
-            
-            # 4. [주의] MAP_ANONYMOUS 제거
-            # 파일 기반 SHM을 사용해야 하므로 기존 mmap 설정을 건드리지 않거나, 
-            # 확실하게 MAP_SHARED만 사용하도록 고정합니다.
+            # futex_waitv 부재 시 종료 방지
+            sed -i 's/exit(1);/\/* disabled *\//g' dlls/ntdll/unix/fsync.c
+            # MAP_ANONYMOUS 제거 (파일 기반 SHM 사용을 위해)
             sed -i 's/MAP_SHARED | MAP_ANONYMOUS/MAP_SHARED/g' dlls/ntdll/unix/fsync.c
+            # ftruncate 중복 호출 방지 (우리가 이미 했으므로 에러 날 수 있음)
+            sed -i 's/if (ftruncate/ \/\/ if (ftruncate/g' dlls/ntdll/unix/fsync.c
           fi
 
+          # [4] dlls/ntdll/unix/sync.c 패치
           if [ -f "dlls/ntdll/unix/sync.c" ]; then
             sed -i '/if (do_fsync())/s/do_fsync()/1/g' dlls/ntdll/unix/sync.c
-            sed -i 's/assert( token == reply->handle );/\/* assert disabled *\//g' dlls/ntdll/unix/sync.c
+            sed -i 's/assert( token == reply->handle );/\/* disabled *\//g' dlls/ntdll/unix/sync.c
           fi
 
           FILE_THREAD="server/thread.c"
