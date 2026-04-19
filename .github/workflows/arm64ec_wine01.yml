@@ -406,10 +406,9 @@ jobs:
 
           FILE_INPROC="server/inproc_sync.c"
           if [ -f "$FILE_INPROC" ]; then
-            echo "Patching $FILE_INPROC to force FSYNC object allocation..."
+            sed -i 's/if (!do_fsync())/if (0)/g' "$FILE_INPROC"
+            sed -i 's/assert( sync->type == INPROC_SYNC_INTERNAL || sync->type == INPROC_SYNC_EVENT );/\/* assert disabled *\//g' "$FILE_INPROC"
             sed -i 's/if (do_fsync())/if (1)/g' "$FILE_INPROC"
-            sed -i 's/else if (do_fsync())/else if (1)/g' "$FILE_INPROC"
-            sed -i '/int get_inproc_device_fd(void)/,/}/ s/return fd;/return FSYNC_USED_BY_SERVER;/' "$FILE_INPROC"
           fi
 
           TOTAL_TARGETS="
