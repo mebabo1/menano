@@ -256,7 +256,7 @@ jobs:
           static inline int custom_shm_open(const char *name, int oflag, mode_t mode) {
               char *fname = NULL;
               const char *tmpdir = getenv("TMPDIR");
-              if (!tmpdir) tmpdir = "/data/data/com.termux/files/usr/tmp";
+              if (!tmpdir) tmpdir = "/tmp";
               
               /* /dev/shm 경로 무시를 위해 파일 이름 앞의 '/' 제거 */
               const char *clean_name = (name[0] == '/') ? name + 1 : name;
@@ -275,7 +275,7 @@ jobs:
           static inline int custom_shm_unlink(const char *name) {
               char *fname = NULL;
               const char *tmpdir = getenv("TMPDIR");
-              if (!tmpdir) tmpdir = "/data/data/com.termux/files/usr/tmp";
+              if (!tmpdir) tmpdir = "/tmp";
               
               const char *clean_name = (name[0] == '/') ? name + 1 : name;
               if (asprintf(&fname, "%s/%s", tmpdir, clean_name) == -1) return -1;
