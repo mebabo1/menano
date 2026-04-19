@@ -235,10 +235,11 @@ jobs:
           fi
           echo "复制后 locale.nls 存在，大小: $(wc -c < /opt/wine64-native/nls/locale.nls) 字节"
 
-      - name: Create SHM Header
+      - name: Create SHM Header in Patch Path
         run: |
-          mkdir -p ${{ env.WINE_SOURCE_DIR }}/source/android/shm_utils
-          cat <<EOF > ${{ env.WINE_SOURCE_DIR }}/source/android/shm_utils/shm_utils.h
+          cd ${{ env.WINE_SOURCE_DIR }}/source
+          mkdir -p android/shm_utils
+          cat <<EOF > android/shm_utils/shm_utils.h
           #ifndef __WINE_SERVER_SHM_UTILS_H
           #define __WINE_SERVER_SHM_UTILS_H
           #include <fcntl.h>
