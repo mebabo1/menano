@@ -456,7 +456,7 @@ jobs:
           export CXX="clang++ --target=aarch64-linux-gnu"
           export CROSSCC="arm64ec-w64-mingw32-clang"
           export CROSSCXX="arm64ec-w64-mingw32-clang++"
-          export CFLAGS="-O2 -pipe"
+          export CFLAGS="-O2 -pipe -I$depsg/include $CFLAGS"
           export CXXFLAGS="-O2 -pipe"
           export CROSSCFLAGS="-O2 -pipe"
           export CROSSCXXFLAGS="-O2 -pipe"
