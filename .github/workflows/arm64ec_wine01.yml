@@ -369,7 +369,6 @@ jobs:
               echo "✔ wine.inf integrated patch applied."
           fi
 
-          # 8. Vulkan VRAM Faking 적용
           FILE="dlls/winevulkan/vulkan.c"
           if [ -f "$FILE" ] && ! grep -q 'WINE_VRAM_SIZE' "$FILE" ; then
             echo "Applying VRAM faking to winevulkan..."
@@ -409,7 +408,6 @@ jobs:
             sed -i '/int get_inproc_device_fd(void)/,/}/ s/return fd;/return FSYNC_USED_BY_SERVER;/' "$FILE_INPROC"
           fi
 
-          # 1. 대상 파일 리스트 확장 (사용자님이 언급하신 핵심 파일 포함)
           TARGET_FILES="
             dlls/ntdll/unix/virtual.c 
             dlls/ntdll/unix/fsync.c 
@@ -427,8 +425,6 @@ jobs:
           for FILE in $TARGET_FILES; do
             if [ -f "$FILE" ]; then
               echo "Applying SHM Hook to $FILE..."
-              
-              # 파일 깊이에 따른 HEADER_PATH 계산
               case "$FILE" in
                 server/*)
                   HEADER_PATH="../android/shm_utils/shm_utils.h"
@@ -443,10 +439,7 @@ jobs:
                   HEADER_PATH="../../android/shm_utils/shm_utils.h"
                   ;;
               esac
-
-              # 중복 체크 후 상단에 주입
               if ! grep -q "shm_utils.h" "$FILE"; then
-                # config.h 바로 아래에 넣는 것이 가장 안전함 (표준 라이브러리 선언 전)
                 if grep -q "#include \"config.h\"" "$FILE"; then
                   sed -i "/#include \"config.h\"/a #include \"$HEADER_PATH\"" "$FILE"
                 else
