@@ -335,18 +335,23 @@ jobs:
               }' "$FILE"
           fi
 
-          # [1] server/fsync.c 패치: 안전하게 주석 처리
+          # [1] server/fsync.c 패치: 문법 구조를 유지하며 에러 함수 제거
           if [ -f "server/fsync.c" ]; then
-            echo "Repairing server/fsync.c..."
+            echo "Patching server/fsync.c for Android 8 Gen 5 compatibility..."
+            
+            # 안드로이드 체크 해제
             sed -i 's/!defined(__ANDROID__)//g' server/fsync.c
-            sed -i 's/&& errno != ENOSYS && errno != EPERM//g' server/fsync.c
             
-            # fatal_error() 호출부만 깔끔하게 주석 처리 (에러가 났던 87번 라인 근처 해결)
-            sed -i 's/fatal_error(/ \/\/ fatal_error(/g' server/fsync.c
-            sed -i 's/exit(1);/\/* exit disabled *\//g' server/fsync.c
+            # fatal_error를 빈 문장(;)으로 대체 (문법 에러 방지 핵심)
+            # 'fatal_error( "... " );' 전체를 '; /* fatal_error(...) */' 로 변경
+            sed -i 's/fatal_error(.*;/ ; \/* fatal_error disabled *\/ /g' server/fsync.c
             
-            # perror 주석 처리
+            # exit(1) 방지
+            sed -i 's/exit(1);/ ; \/* exit disabled *\/ /g' server/fsync.c
+            
+            # perror 및 fprintf(stderr, ...) 주석 처리 (로그 도배 및 에러 전파 방지)
             sed -i 's/perror(/ \/\/ perror(/g' server/fsync.c
+            sed -i 's/fprintf( stderr/ \/\/ fprintf( stderr/g' server/fsync.c
           fi
 
           # [2] dlls/ntdll/unix/fsync.c 패치: 구조 파괴 방지
