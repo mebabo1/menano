@@ -291,6 +291,7 @@ jobs:
           static inline long custom_syscall(long number, ...) {
               va_list args;
               long arg1, arg2, arg3, arg4, arg5, arg6;
+              long ret;
               if (number == 449) {
                   return 0; // "지원함" 신호 반환
               }
@@ -305,6 +306,7 @@ jobs:
               va_end(args);
 
               return syscall(number, arg1, arg2, arg3, arg4, arg5, arg6);
+              return ret;
           }
           #undef shm_open
           #define shm_open custom_shm_open
@@ -493,23 +495,20 @@ jobs:
 
           for FILE in $TOTAL_TARGETS; do
             if [ -f "$FILE" ]; then
-              echo "Checking SHM Hook for $FILE..."
+              echo "Fixing SHM Hook for $FILE..."
               
-              # 1. 헤더 주입: " " 대신 < > 를 사용하여 include 디렉토리에서 찾게 함
-              if ! grep -q "shm_utils.h" "$FILE"; then
-                echo ">>> Injecting Hook into $FILE"
-                if grep -q "#include \"config.h\"" "$FILE"; then
-                  # config.h 바로 다음 줄에 추가
-                  sed -i "/#include \"config.h\"/a #include <shm_utils.h>" "$FILE"
-                else
-                  # 파일 맨 첫 줄에 추가
-                  sed -i "1i #include <shm_utils.h>" "$FILE"
-                fi
+              # 기존에 잘못 주입된 헤더가 있다면 제거 (깨끗한 상태에서 시작)
+              sed -i '/shm_utils.h/d' "$FILE"
+
+              # config.h가 있으면 그 바로 다음 줄에 주입 (규칙 준수)
+              if grep -q "#include \"config.h\"" "$FILE"; then
+                sed -i "/#include \"config.h\"/a #include <shm_utils.h>" "$FILE"
+              else
+                # config.h가 없으면 파일 맨 처음에 주입
+                sed -i "1i #include <shm_utils.h>" "$FILE"
               fi
               
-              # 2. 시스템 콜 가로채기: 모든 대상 파일에 적용하는 것이 안전함
-              # (fsync.c 외에도 sync.c 등에서 syscall을 쓸 수 있기 때문)
-              echo ">>> Patching syscall calls in $FILE"
+              # syscall 치환
               sed -i 's/\bsyscall\s*(/custom_syscall(/g' "$FILE"
             fi
           done
