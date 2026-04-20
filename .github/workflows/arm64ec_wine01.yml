@@ -335,23 +335,27 @@ jobs:
               }' "$FILE"
           fi
 
-          # [1] server/fsync.c 패치: 실행 로직은 살리고 에러 종료만 차단
+          # [1] server/fsync.c 패치: 문법 구조를 유지하며 에러 함수만 무력화
           if [ -f "server/fsync.c" ]; then
-            echo "Fine-tuning server/fsync.c..."
+            echo "Fine-tuning server/fsync.c with Syntax Guard..."
             
             # 안드로이드 제약 해제
             sed -i 's/!defined(__ANDROID__)//g' server/fsync.c
             sed -i 's/&& errno != ENOSYS && errno != EPERM//g' server/fsync.c
             
-            # fatal_error 호출만 무력화 (매크로 방식 대신 직접 치환)
-            sed -i 's/fatal_error(/ \/\/ fatal_error(/g' server/fsync.c
+            # [수정] fatal_error(...) 전체를 빈 문장(;)으로 치환하여 문법 유지
+            # fatal_error( "..." ); -> ; /* fatal_error( "..." ); */
+            sed -i 's/fatal_error(/ ; \/* fatal_error(/g' server/fsync.c
+            sed -i 's/ );/ ); *\//g' server/fsync.c
+            
+            # [수정] perror(...) 전체를 빈 문장(;)으로 치환
+            sed -i 's/perror(/ ; \/* perror(/g' server/fsync.c
             
             # exit(1) 방지
             sed -i 's/exit(1);/ ; /g' server/fsync.c
-            
-            # 중요: shm_open, ftruncate 등 실행문은 if(0)으로 감싸지 않도록 주의!
-            # 대신 perror만 주석 처리합니다.
-            sed -i 's/perror(/ \/\/ perror(/g' server/fsync.c
+
+            # fprintf(stderr, ...) 주석 처리 (로그 도배 방지)
+            sed -i 's/fprintf( stderr/ \/\/ fprintf( stderr/g' server/fsync.c
           fi
 
           # [2] dlls/ntdll/unix/fsync.c 패치: 8 Gen 5 강제 활성화 버전
