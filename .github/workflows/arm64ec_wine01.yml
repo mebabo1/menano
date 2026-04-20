@@ -471,7 +471,6 @@ jobs:
           "
 
           for FILE in $TOTAL_TARGETS; do
-          for FILE in $TOTAL_TARGETS; do
             if [ -f "$FILE" ]; then
               echo "Checking SHM Hook for $FILE..."
               if ! grep -q "shm_utils.h" "$FILE"; then
