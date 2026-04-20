@@ -335,50 +335,36 @@ jobs:
               }' "$FILE"
           fi
 
-          # [1] server/fsync.c 패치: 헤더 충돌 없는 안전한 방식
+          # [1] server/fsync.c 패치 (서버 자살 방지)
           if [ -f "server/fsync.c" ]; then
-            echo "Applying header-safe patch to server/fsync.c..."
-            
-            # 1. 안드로이드 제약 조건 제거 (기존 유지)
+            echo "Patching server/fsync.c..."
             sed -i 's/!defined(__ANDROID__)//g' server/fsync.c
-            sed -i 's/&& errno != ENOSYS && errno != EPERM//g' server/fsync.c
             
-            # 2. fatal_error 호출부를 if(0)으로 감싸기 (선언과 충돌하지 않음)
-            # fatal_error( "msg" ); -> if(0) fatal_error( "msg" );
-            sed -i 's/fatal_error(/if(0) fatal_error(/g' server/fsync.c
-            
-            # 3. perror 및 fprintf(stderr) 무력화
-            sed -i 's/perror(/if(0) perror(/g' server/fsync.c
-            sed -i 's/fprintf( stderr/if(0) fprintf( stderr/g' server/fsync.c
-            
-            # 4. exit(1) 호출 무력화
-            sed -i 's/exit(1);/ ; /g' server/fsync.c
+            # fatal_error() 함수가 호출되어도 프로세스가 종료되지 않게 dummy로 교체
+            # (매크로 방식이 헤더와 충돌한다면, 호출부 앞에 if(0)을 더 확실히 넣습니다)
+            sed -i 's/fatal_error(/if(0)fatal_error(/g' server/fsync.c
+            sed -i 's/exit(1);/;/g' server/fsync.c
+            sed -i 's/perror(/if(0)perror(/g' server/fsync.c
           fi
 
-          # [2] dlls/ntdll/unix/fsync.c 패치: 8 Gen 5 강제 활성화 버전
+          # [2] dlls/ntdll/unix/fsync.c 패치 (클라이언트 강제 활성화)
           if [ -f "dlls/ntdll/unix/fsync.c" ]; then
             echo "Hard-patching dlls/ntdll/unix/fsync.c..."
             
-            # 1. 시스템 콜 번호 강제 주입 (최상단)
+            # 시스템 콜 번호 강제 주입
             sed -i '1i #undef __NR_futex_waitv\n#define __NR_futex_waitv 449' dlls/ntdll/unix/fsync.c
             
-            # 2. fsync_check_support 함수를 무조건 1 리턴하도록 완전히 개조
-            # 기존 return 문을 찾아서 'return 1;'로 바꿉니다.
+            # do_futex_waitv 변수를 무조건 1로 고정 (에러의 핵심 원인 해결)
+            sed -i 's/static int do_futex_waitv = -1;/static int do_futex_waitv = 1;/g' dlls/ntdll/unix/fsync.c
+            sed -i 's/do_futex_waitv = 0;/do_futex_waitv = 1;/g' dlls/ntdll/unix/fsync.c
+
+            # fsync_check_support 무조건 1
             sed -i '/int fsync_check_support(void)/,/}/ s/return .*/return 1; }/' dlls/ntdll/unix/fsync.c
 
-            # 3. "this process can't use __NR_futex_waitv" 에러가 발생하는 조건문 무력화
-            # futex_waitv가 없다고 판단하여 에러를 내는 부분을 강제로 주석 처리하거나 통과시킵니다.
-            sed -i 's/if (!do_futex_waitv)/if (0 \&\& !do_futex_waitv)/g' dlls/ntdll/unix/fsync.c
+            # 8 Gen 5에서 에러를 뱉는 시스템 콜 체크 구문 원천 차단
+            sed -i 's/if (!do_futex_waitv)/if (0)/g' dlls/ntdll/unix/fsync.c
             
-            # 4. 공유 메모리 파일 오픈 실패 시 exit 방지
-            sed -i 's/fatal_error/ \/\/ fatal_error/g' dlls/ntdll/unix/fsync.c
-            sed -i 's/exit(1);/ ; /g' dlls/ntdll/unix/fsync.c
-
-            # 5. 파일 기반 SHM 설정 (기존 유지)
             sed -i 's/MAP_SHARED | MAP_ANONYMOUS/MAP_SHARED/g' dlls/ntdll/unix/fsync.c
-            
-            # 6. ntdll에서의 중복 ftruncate는 에러를 유발할 수 있으므로 제거
-            sed -i 's/ftruncate( fd, / \/\/ ftruncate( fd, /g' dlls/ntdll/unix/fsync.c
           fi
           
           
