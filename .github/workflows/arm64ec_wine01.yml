@@ -462,19 +462,23 @@ jobs:
           for FILE in $TOTAL_TARGETS; do
             if [ -f "$FILE" ]; then
               echo "Checking SHM Hook for $FILE..."
+              
+              # 1. 헤더 주입: " " 대신 < > 를 사용하여 include 디렉토리에서 찾게 함
               if ! grep -q "shm_utils.h" "$FILE"; then
                 echo ">>> Injecting Hook into $FILE"
                 if grep -q "#include \"config.h\"" "$FILE"; then
-                  sed -i "/#include \"config.h\"/a #include \"shm_utils.h\"" "$FILE"
+                  # config.h 바로 다음 줄에 추가
+                  sed -i "/#include \"config.h\"/a #include <shm_utils.h>" "$FILE"
                 else
-                  sed -i "1i #include \"shm_utils.h\"" "$FILE"
+                  # 파일 맨 첫 줄에 추가
+                  sed -i "1i #include <shm_utils.h>" "$FILE"
                 fi
               fi
               
-              if [[ "$FILE" == *"fsync.c" ]]; then
-                echo ">>> Patching syscall in $FILE"
-                sed -i 's/\bsyscall(/custom_syscall(/g' "$FILE"
-              fi
+              # 2. 시스템 콜 가로채기: 모든 대상 파일에 적용하는 것이 안전함
+              # (fsync.c 외에도 sync.c 등에서 syscall을 쓸 수 있기 때문)
+              echo ">>> Patching syscall calls in $FILE"
+              sed -i 's/\bsyscall\s*(/custom_syscall(/g' "$FILE"
             fi
           done
 
