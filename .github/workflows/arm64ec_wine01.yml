@@ -335,25 +335,24 @@ jobs:
               }' "$FILE"
           fi
 
-          # [1] server/fsync.c 패치: 매크로 주입 및 if(0) 방식 혼합
+          # [1] server/fsync.c 패치: 헤더 충돌 없는 안전한 방식
           if [ -f "server/fsync.c" ]; then
-            echo "Applying non-destructive patch to server/fsync.c..."
+            echo "Applying header-safe patch to server/fsync.c..."
             
-            # 1. 안드로이드 제약 조건 제거
+            # 1. 안드로이드 제약 조건 제거 (기존 유지)
             sed -i 's/!defined(__ANDROID__)//g' server/fsync.c
             sed -i 's/&& errno != ENOSYS && errno != EPERM//g' server/fsync.c
             
-            # 2. fatal_error 함수 자체를 무력화 (파일 최상단에 주입)
-            # 함수 이름은 그대로 두되, 안에서 아무것도 안 하게 만듭니다.
-            sed -i '1i #define fatal_error(...) do { } while(0)' server/fsync.c
+            # 2. fatal_error 호출부를 if(0)으로 감싸기 (선언과 충돌하지 않음)
+            # fatal_error( "msg" ); -> if(0) fatal_error( "msg" );
+            sed -i 's/fatal_error(/if(0) fatal_error(/g' server/fsync.c
             
-            # 3. exit(1) 호출을 빈 문장으로 변경
-            sed -i 's/exit(1);/ ; /g' server/fsync.c
-            
-            # 4. perror 및 fprintf(stderr)를 if(0)으로 감싸기
-            # 주석 기호(/* */)를 쓰지 않으므로 괄호가 깨질 일이 없습니다.
+            # 3. perror 및 fprintf(stderr) 무력화
             sed -i 's/perror(/if(0) perror(/g' server/fsync.c
             sed -i 's/fprintf( stderr/if(0) fprintf( stderr/g' server/fsync.c
+            
+            # 4. exit(1) 호출 무력화
+            sed -i 's/exit(1);/ ; /g' server/fsync.c
           fi
 
           # [2] dlls/ntdll/unix/fsync.c 패치: 8 Gen 5 강제 활성화 버전
