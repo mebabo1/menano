@@ -289,12 +289,12 @@ jobs:
               return ret;
           }
           static inline long custom_syscall(long number, ...) {
+              va_list args;
+              long arg1, arg2, arg3, arg4, arg5, arg6;
               if (number == 449) {
                   return 0; // "지원함" 신호 반환
               }
 
-              // 가변 인자 처리하여 원래 syscall 호출
-              va_list args;
               va_start(args, number);
               long arg1 = va_arg(args, long);
               long arg2 = va_arg(args, long);
@@ -428,17 +428,19 @@ jobs:
           if [ -f "dlls/ntdll/unix/fsync.c" ]; then
             echo "Deep patching mmap for dlls/ntdll/unix/fsync.c..."
             
-            # 1. 가로채기 및 시스템 콜 번호 정의 (기존 유지)
-            sed -i 's/\bsyscall(/custom_syscall(/g' dlls/ntdll/unix/fsync.c
-            sed -i '1i #undef __NR_futex_waitv\n#define __NR_futex_waitv 449' dlls/ntdll/unix/fsync.c
+            # 1. 시스템 콜 번호 정의: config.h 바로 다음 줄에 추가하여 충돌 방지
+            if grep -q "#include \"config.h\"" dlls/ntdll/unix/fsync.c; then
+              sed -i "/#include \"config.h\"/a #undef __NR_futex_waitv\n#define __NR_futex_waitv 449" dlls/ntdll/unix/fsync.c
+            fi
 
-            # 2. [핵심] No such device 해결을 위한 mmap 플래그 전면 수정
-            # MAP_ANONYMOUS를 확실히 제거하고, MAP_SHARED만 남김
-            sed -i 's/MAP_SHARED | MAP_ANONYMOUS/MAP_SHARED/g' dlls/ntdll/unix/fsync.c
-            sed -i 's/MAP_SHARED|MAP_ANONYMOUS/MAP_SHARED/g' dlls/ntdll/unix/fsync.c
+            # 2. syscall 가로채기
+            sed -i 's/\bsyscall\s*(/custom_syscall(/g' dlls/ntdll/unix/fsync.c
+
+            # 3. No such device 해결을 위한 mmap 플래그 수정 (정규표현식 보강)
+            # 공백 유무와 상관없이 모든 MAP_ANONYMOUS 조합을 제거
+            sed -i 's/MAP_SHARED\s*|\s*MAP_ANONYMOUS/MAP_SHARED/g' dlls/ntdll/unix/fsync.c
             
-            # 3. 추가적인 mmap 관련 보호 로직 (일부 환경에서 발생하는 에러 방지)
-            sed -i 's/PROT_READ | PROT_WRITE/PROT_READ | PROT_WRITE/g' dlls/ntdll/unix/fsync.c
+            echo "✔ fsync.c deep patch applied."
           fi
 
           # [3] dlls/ntdll/unix/sync.c 패치 (shm_utils.h 대응 버전)
