@@ -463,7 +463,7 @@ jobs:
       - name: Create SHM Header
         run: |
           mkdir -p ${{ env.WINE_SOURCE_DIR }}/source/android/shm_utils
-          cat <<'EOF' > ${{ env.WINE_SOURCE_DIR }}/source/android/shm_utils/shm_utils.h
+          cat <<'EOF' > ${{ env.WINE_SOURCE_DIR }}/source/include/shm_utils.h
           #ifndef __WINE_SERVER_SHM_UTILS_H
           #define __WINE_SERVER_SHM_UTILS_H
           #define _GNU_SOURCE
