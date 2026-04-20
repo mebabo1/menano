@@ -127,10 +127,10 @@ jobs:
     - name: Create WCP
       run: |
         cd final_package
-        tar -cJf ../${{ env.VERSION_NAME }}.wcp .
+        tar -cJf ../${{ env.VERSION_NAME }}.tar.gz .
 
     - name: Upload Artifact
       uses: actions/upload-artifact@v4
       with:
         name: fexcore-nightly
-        path: '*.wcp'
+        path: '*.tar.gz'
