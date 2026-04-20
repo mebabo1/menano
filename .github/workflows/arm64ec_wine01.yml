@@ -534,6 +534,10 @@ jobs:
           #endif
           EOF
 
+          if [ ! -f "configure" ]; then
+            ./autogen.sh
+          fi
+
       - name: ARM64 WOW64
         run: |
           cd ${{ env.WINE_SOURCE_DIR }}/source
