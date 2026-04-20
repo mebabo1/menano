@@ -412,10 +412,7 @@ jobs:
           # [1] server/fsync.c 패치 (서버 자살 방지 및 syscall 가로채기)
           if [ -f "server/fsync.c" ]; then
             echo "Patching server/fsync.c..."
-            
-            # 1. 최상단에 shm_utils.h 주입 (가장 먼저 실행)
-            sed -i '1i #include "shm_utils.h"' server/fsync.c
-            
+                  
             # 2. 안드로이드 제약 제거
             sed -i 's/!defined(__ANDROID__)//g' server/fsync.c
             
@@ -432,10 +429,7 @@ jobs:
           # [2] dlls/ntdll/unix/fsync.c 패치 (클라이언트 가로채기 추가)
           if [ -f "dlls/ntdll/unix/fsync.c" ]; then
             echo "Hard-patching dlls/ntdll/unix/fsync.c..."
-            
-            # 1. 최상단에 shm_utils.h 주입
-            sed -i '1i #include "shm_utils.h"' dlls/ntdll/unix/fsync.c
-            
+                        
             # 2. 시스템 콜 번호 정의 및 가로채기
             sed -i '1i #undef __NR_futex_waitv\n#define __NR_futex_waitv 449' dlls/ntdll/unix/fsync.c
             sed -i 's/\bsyscall(/custom_syscall(/g' dlls/ntdll/unix/fsync.c
