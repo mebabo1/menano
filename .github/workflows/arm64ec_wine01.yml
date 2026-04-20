@@ -409,36 +409,25 @@ jobs:
               }' "$FILE"
           fi
 
-          # [1] server/fsync.c 패치 (서버 자살 방지 및 syscall 가로채기)
+          # [1] server/fsync.c 패치 (핵심: 자살 방지)
           if [ -f "server/fsync.c" ]; then
-            echo "Patching server/fsync.c..."
-                  
-            # 2. 안드로이드 제약 제거
+            echo "Simplified patching for server/fsync.c..."
+            # 안드로이드라고 Fsync를 끄지 못하게 매크로 제거
             sed -i 's/!defined(__ANDROID__)//g' server/fsync.c
-            
-            # 3. [추가] syscall 호출부를 custom_syscall로 변경
-            # \b는 단어 경계로, 다른 함수 이름에 포함된 syscall은 건드리지 않습니다.
+            # syscall 호출부만 이름 변경 (shm_utils.h의 가로채기 활성화)
             sed -i 's/\bsyscall(/custom_syscall(/g' server/fsync.c
-            
-            # 4. 자살 방지 로직 (기존 유지)
+            # 서버가 에러로 종료되는 것 방지
             sed -i 's/fatal_error(/if(0)fatal_error(/g' server/fsync.c
-            sed -i 's/exit(1);/;/g' server/fsync.c
-            sed -i 's/perror(/if(0)perror(/g' server/fsync.c
           fi
 
-          # [2] dlls/ntdll/unix/fsync.c 패치 (클라이언트 가로채기 추가)
+          # [2] dlls/ntdll/unix/fsync.c 패치 (핵심: 클라이언트 강제 활성화)
           if [ -f "dlls/ntdll/unix/fsync.c" ]; then
-            echo "Hard-patching dlls/ntdll/unix/fsync.c..."
-                        
-            # 2. 시스템 콜 번호 정의 및 가로채기
-            sed -i '1i #undef __NR_futex_waitv\n#define __NR_futex_waitv 449' dlls/ntdll/unix/fsync.c
+            echo "Simplified patching for dlls/ntdll/unix/fsync.c..."
+            # syscall 호출부 이름 변경 (커널 체크 통과용)
             sed -i 's/\bsyscall(/custom_syscall(/g' dlls/ntdll/unix/fsync.c
-            
-            # 3. 변수 및 리턴값 고정 (기존 유지)
-            sed -i 's/static int do_futex_waitv = -1;/static int do_futex_waitv = 1;/g' dlls/ntdll/unix/fsync.c
-            sed -i 's/do_futex_waitv = 0;/do_futex_waitv = 1;/g' dlls/ntdll/unix/fsync.c
-            sed -i '/int fsync_check_support(void)/,/}/ s/return .*/return 1; }/' dlls/ntdll/unix/fsync.c
-            sed -i 's/if (!do_futex_waitv)/if (0)/g' dlls/ntdll/unix/fsync.c
+            # 시스템 콜 번호만 정의 (커널 헤더에 없을 경우 대비)
+            sed -i '1i #undef __NR_futex_waitv\n#define __NR_futex_waitv 449' dlls/ntdll/unix/fsync.c
+            # 익명 공유 메모리 대신 파일 기반 공유 메모리 사용 (No such device 에러 방지)
             sed -i 's/MAP_SHARED | MAP_ANONYMOUS/MAP_SHARED/g' dlls/ntdll/unix/fsync.c
           fi
 
