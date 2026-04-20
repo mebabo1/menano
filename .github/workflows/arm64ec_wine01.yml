@@ -353,13 +353,14 @@ jobs:
             sed -i 's/exit(1);/do { } while(0);/g' server/fsync.c
           fi
 
-          # [2] dlls/ntdll/unix/fsync.c 패치 (이하 동일하게 매크로 방식 적용 가능)
+          # [2] dlls/ntdll/unix/fsync.c 패치 (기존과 동일하되 더 안전하게)
           if [ -f "dlls/ntdll/unix/fsync.c" ]; then
-            echo "Patching dlls/ntdll/unix/fsync.c with Macro Injection..."
-            sed -i '1i #ifndef __NR_futex_waitv\n#define __NR_futex_waitv 449\n#endif' dlls/ntdll/unix/fsync.c
-            sed -i '1i #define exit(x) do { } while(0)' dlls/ntdll/unix/fsync.c
-            
-            sed -i 's/return getenv/return 1 || getenv/g' dlls/ntdll/unix/fsync.c
+            echo "Repairing dlls/ntdll/unix/fsync.c..."
+            if ! grep -q "__NR_futex_waitv" dlls/ntdll/unix/fsync.c; then
+              sed -i '1i #ifndef __NR_futex_waitv\n#define __NR_futex_waitv 449\n#endif' dlls/ntdll/unix/fsync.c
+            fi
+            sed -i 's/return getenv/return 1 || getenv/g' dlls/ntdll/unix/fsync.c  
+            sed -i 's/exit(1);/\/* disabled *\//g' dlls/ntdll/unix/fsync.c
             sed -i 's/MAP_SHARED | MAP_ANONYMOUS/MAP_SHARED/g' dlls/ntdll/unix/fsync.c
             sed -i 's/if (ftruncate/ \/\/ if (ftruncate/g' dlls/ntdll/unix/fsync.c
           fi
