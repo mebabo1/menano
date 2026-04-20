@@ -235,48 +235,6 @@ jobs:
           fi
           echo "复制后 locale.nls 存在，大小: $(wc -c < /opt/wine64-native/nls/locale.nls) 字节"
 
-      - name: Create SHM Header
-        run: |
-          mkdir -p ${{ env.WINE_SOURCE_DIR }}/source/android/shm_utils
-          cat <<'EOF' > ${{ env.WINE_SOURCE_DIR }}/source/android/shm_utils/shm_utils.h
-          #ifndef __WINE_SERVER_SHM_UTILS_H
-          #define __WINE_SERVER_SHM_UTILS_H
-          #include <fcntl.h>
-          #include <stdio.h>
-          #include <stdlib.h>
-          #include <unistd.h>
-          #include <sys/stat.h>
-          #include <sys/types.h>
-          #include <errno.h>
-          #include <string.h>
-
-          static inline int custom_shm_open(const char *name, int oflag, mode_t mode) {
-              char *fname = NULL;
-              const char *tmpdir = getenv("TMPDIR");
-              if (!tmpdir) tmpdir = "/data/data/com.termux/files/usr/tmp";
-              const char *clean_name = (name[0] == '/') ? name + 1 : name;
-              if (asprintf(&fname, "%s/%s", tmpdir, clean_name) == -1) return -1;
-              
-              int fd = open(fname, oflag, mode);
-              if (fd != -1 && (oflag & O_CREAT)) ftruncate(fd, 8 * 1024 * 1024);
-              free(fname);
-              return fd;
-          }
-          static inline int custom_shm_unlink(const char *name) {
-              char *fname = NULL;
-              const char *tmpdir = getenv("TMPDIR");
-              if (!tmpdir) tmpdir = "/data/data/com.termux/files/usr/tmp";
-              const char *clean_name = (name[0] == '/') ? name + 1 : name;
-              if (asprintf(&fname, "%s/%s", tmpdir, clean_name) == -1) return -1;
-              int ret = unlink(fname);
-              free(fname);
-              return ret;
-          }
-          #define shm_open custom_shm_open
-          #define shm_unlink custom_shm_unlink
-          #endif
-          EOF
-
       - name: Termux
         run: |
           cd ${{ env.WINE_SOURCE_DIR }}/source
@@ -376,9 +334,23 @@ jobs:
           fi
 
           if [ -f "server/fsync.c" ]; then
+            echo "Finalizing server/fsync.c for 8 Gen 5..."
+            
+            # 1. 안드로이드 제외 조건문 삭제 (기존 유지)
             sed -i 's/!defined(__ANDROID__)//g' server/fsync.c
-            # futex_waitv 체크로 인한 exit(1) 방지
+            
+            # 2. futex_waitv 지원 여부 체크를 무조건 통과하도록 수정 (핵심!)
+            # 원본: return getenv(...) && errno != ENOSYS ...;
+            # 수정: return getenv(...) && atoi(getenv(...));
+            sed -i 's/&& errno != ENOSYS && errno != EPERM//g' server/fsync.c
+            
+            # 3. exit(1) 방지 (기존 유지)
             sed -i 's/exit(1);/\/* disabled *\//g' server/fsync.c
+            
+            # 4. perror로 인한 로그 도배 방지 (선택 사항이지만 권장)
+            # shm_open이나 ftruncate 실패 메시지가 너무 많이 뜨면 성능 저하가 올 수 있음
+            sed -i 's/perror( "shm_open" );/\/* perror disabled *\//g' server/fsync.c
+            sed -i 's/perror( "ftruncate" );/\/* perror disabled *\//g' server/fsync.c
           fi
 
           # [3] dlls/ntdll/unix/fsync.c 패치 (mmap 및 강제 종료 방지)
@@ -482,6 +454,48 @@ jobs:
           if [ ! -f "configure" ]; then
             ./autogen.sh
           fi
+
+      - name: Create SHM Header
+        run: |
+          mkdir -p ${{ env.WINE_SOURCE_DIR }}/source/android/shm_utils
+          cat <<'EOF' > ${{ env.WINE_SOURCE_DIR }}/source/android/shm_utils/shm_utils.h
+          #ifndef __WINE_SERVER_SHM_UTILS_H
+          #define __WINE_SERVER_SHM_UTILS_H
+          #include <fcntl.h>
+          #include <stdio.h>
+          #include <stdlib.h>
+          #include <unistd.h>
+          #include <sys/stat.h>
+          #include <sys/types.h>
+          #include <errno.h>
+          #include <string.h>
+
+          static inline int custom_shm_open(const char *name, int oflag, mode_t mode) {
+              char *fname = NULL;
+              const char *tmpdir = getenv("TMPDIR");
+              if (!tmpdir) tmpdir = "/data/data/com.termux/files/usr/tmp";
+              const char *clean_name = (name[0] == '/') ? name + 1 : name;
+              if (asprintf(&fname, "%s/%s", tmpdir, clean_name) == -1) return -1;
+              
+              int fd = open(fname, oflag, mode);
+              if (fd != -1 && (oflag & O_CREAT)) ftruncate(fd, 8 * 1024 * 1024);
+              free(fname);
+              return fd;
+          }
+          static inline int custom_shm_unlink(const char *name) {
+              char *fname = NULL;
+              const char *tmpdir = getenv("TMPDIR");
+              if (!tmpdir) tmpdir = "/data/data/com.termux/files/usr/tmp";
+              const char *clean_name = (name[0] == '/') ? name + 1 : name;
+              if (asprintf(&fname, "%s/%s", tmpdir, clean_name) == -1) return -1;
+              int ret = unlink(fname);
+              free(fname);
+              return ret;
+          }
+          #define shm_open custom_shm_open
+          #define shm_unlink custom_shm_unlink
+          #endif
+          EOF
 
       - name: ARM64 WOW64
         run: |
