@@ -354,16 +354,30 @@ jobs:
             sed -i 's/perror(/ \/\/ perror(/g' server/fsync.c
           fi
 
-          # [2] dlls/ntdll/unix/fsync.c 패치 (기존과 동일하되 더 안전하게)
+          # [2] dlls/ntdll/unix/fsync.c 패치: 8 Gen 5 강제 활성화 버전
           if [ -f "dlls/ntdll/unix/fsync.c" ]; then
-            echo "Repairing dlls/ntdll/unix/fsync.c..."
-            if ! grep -q "__NR_futex_waitv" dlls/ntdll/unix/fsync.c; then
-              sed -i '1i #ifndef __NR_futex_waitv\n#define __NR_futex_waitv 449\n#endif' dlls/ntdll/unix/fsync.c
-            fi
-            sed -i 's/return getenv/return 1 || getenv/g' dlls/ntdll/unix/fsync.c  
-            sed -i 's/exit(1);/\/* disabled *\//g' dlls/ntdll/unix/fsync.c
+            echo "Hard-patching dlls/ntdll/unix/fsync.c..."
+            
+            # 1. 시스템 콜 번호 강제 주입 (최상단)
+            sed -i '1i #undef __NR_futex_waitv\n#define __NR_futex_waitv 449' dlls/ntdll/unix/fsync.c
+            
+            # 2. fsync_check_support 함수를 무조건 1 리턴하도록 완전히 개조
+            # 기존 return 문을 찾아서 'return 1;'로 바꿉니다.
+            sed -i '/int fsync_check_support(void)/,/}/ s/return .*/return 1; }/' dlls/ntdll/unix/fsync.c
+
+            # 3. "this process can't use __NR_futex_waitv" 에러가 발생하는 조건문 무력화
+            # futex_waitv가 없다고 판단하여 에러를 내는 부분을 강제로 주석 처리하거나 통과시킵니다.
+            sed -i 's/if (!do_futex_waitv)/if (0 \&\& !do_futex_waitv)/g' dlls/ntdll/unix/fsync.c
+            
+            # 4. 공유 메모리 파일 오픈 실패 시 exit 방지
+            sed -i 's/fatal_error/ \/\/ fatal_error/g' dlls/ntdll/unix/fsync.c
+            sed -i 's/exit(1);/ ; /g' dlls/ntdll/unix/fsync.c
+
+            # 5. 파일 기반 SHM 설정 (기존 유지)
             sed -i 's/MAP_SHARED | MAP_ANONYMOUS/MAP_SHARED/g' dlls/ntdll/unix/fsync.c
-            sed -i 's/if (ftruncate/ \/\/ if (ftruncate/g' dlls/ntdll/unix/fsync.c
+            
+            # 6. ntdll에서의 중복 ftruncate는 에러를 유발할 수 있으므로 제거
+            sed -i 's/ftruncate( fd, / \/\/ ftruncate( fd, /g' dlls/ntdll/unix/fsync.c
           fi
           
           
