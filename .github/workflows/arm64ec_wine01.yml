@@ -476,11 +476,11 @@ jobs:
           "
 
           for FILE in $TOTAL_TARGETS; do
+          for FILE in $TOTAL_TARGETS; do
             if [ -f "$FILE" ]; then
-              # 상대 경로 대신 파일 이름만 주입
+              echo "Checking SHM Hook for $FILE..."
               if ! grep -q "shm_utils.h" "$FILE"; then
                 echo ">>> Injecting Hook into $FILE"
-                # config.h 바로 아래에 넣는 것이 가장 안전
                 if grep -q "#include \"config.h\"" "$FILE"; then
                   sed -i "/#include \"config.h\"/a #include \"shm_utils.h\"" "$FILE"
                 else
@@ -488,7 +488,6 @@ jobs:
                 fi
               fi
               
-              # [추가] syscall 호출부를 custom_syscall로 변경 (이전 에러 해결책)
               if [[ "$FILE" == *"fsync.c" ]]; then
                 echo ">>> Patching syscall in $FILE"
                 sed -i 's/\bsyscall(/custom_syscall(/g' "$FILE"
