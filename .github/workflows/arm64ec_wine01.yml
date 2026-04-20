@@ -441,6 +441,31 @@ jobs:
             sed -i 's/PROT_READ | PROT_WRITE/PROT_READ | PROT_WRITE/g' dlls/ntdll/unix/fsync.c
           fi
 
+          # [3] dlls/ntdll/unix/sync.c 패치 (shm_utils.h 대응 버전)
+          FILE_SYNC="dlls/ntdll/unix/sync.c"
+          if [ -f "$FILE_SYNC" ]; then
+            echo "Patching $FILE_SYNC for updated shm_utils.h..."
+            
+            # 1. 헤더 주입 (꺽쇠 사용으로 경로 문제 해결)
+            if ! grep -q "shm_utils.h" "$FILE_SYNC"; then
+              sed -i '1i #include <shm_utils.h>' "$FILE_SYNC"
+            fi
+
+            # 2. [핵심] syscall 이름을 custom_syscall로 치환
+            # 이 작업이 없으면 shm_utils.h의 가로채기 로직이 작동하지 않습니다.
+            sed -i 's/\bsyscall\s*(/custom_syscall(/g' "$FILE_SYNC"
+
+            # 3. futex_waitv 지원 여부 강제화
+            # 커널 체크 결과를 기다리지 않고 무조건 '지원함(1)'을 반환하게 함
+            sed -i '/int\s*futex_waitv_supported/,/}/ s/return .*/return 1; }/' "$FILE_SYNC"
+            
+            # 4. 에러 발생 시 무시 로직
+            # 일부 안드로이드 커널에서 리턴값이 튀어도 Wine이 죽지 않게 보호
+            sed -i 's/return futex_waitv/return 0; \/\/ forced success/g' "$FILE_SYNC"
+            
+            echo "✔ sync.c restoration complete."
+          fi
+
           FILE_THREAD="server/thread.c"
           if [ -f "$FILE_THREAD" ]; then
             echo "Patching $FILE_THREAD to ensure fsync signaling..."
