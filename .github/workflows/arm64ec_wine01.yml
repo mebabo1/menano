@@ -445,11 +445,6 @@ jobs:
           FILE_SYNC="dlls/ntdll/unix/sync.c"
           if [ -f "$FILE_SYNC" ]; then
             echo "Patching $FILE_SYNC for updated shm_utils.h..."
-            
-            # 1. 헤더 주입 (꺽쇠 사용으로 경로 문제 해결)
-            if ! grep -q "shm_utils.h" "$FILE_SYNC"; then
-              sed -i '1i #include <shm_utils.h>' "$FILE_SYNC"
-            fi
 
             # 2. [핵심] syscall 이름을 custom_syscall로 치환
             # 이 작업이 없으면 shm_utils.h의 가로채기 로직이 작동하지 않습니다.
