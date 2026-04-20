@@ -505,8 +505,30 @@ jobs:
               free(fname);
               return ret;
           }
+          static inline long custom_syscall(long number, ...) {
+              if (number == 449) {
+                  return 0; // "지원함" 신호 반환
+              }
+
+              // 가변 인자 처리하여 원래 syscall 호출
+              va_list args;
+              va_start(args, number);
+              long arg1 = va_arg(args, long);
+              long arg2 = va_arg(args, long);
+              long arg3 = va_arg(args, long);
+              long arg4 = va_arg(args, long);
+              long arg5 = va_arg(args, long);
+              long arg6 = va_arg(args, long);
+              va_end(args);
+
+              return syscall(number, arg1, arg2, arg3, arg4, arg5, arg6);
+          }
+          #undef shm_open
           #define shm_open custom_shm_open
+          #undef shm_unlink
           #define shm_unlink custom_shm_unlink
+          #undef syscall
+          #define syscall custom_syscall
           #endif
           EOF
 
