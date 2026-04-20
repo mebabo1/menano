@@ -335,42 +335,43 @@ jobs:
               }' "$FILE"
           fi
 
-          # [1] server/fsync.c 패치 (서버 자살 방지)
+          # [1] server/fsync.c 패치 (서버 자살 방지 및 syscall 가로채기)
           if [ -f "server/fsync.c" ]; then
             echo "Patching server/fsync.c..."
+            
+            # 1. 최상단에 shm_utils.h 주입 (가장 먼저 실행)
+            sed -i '1i #include "shm_utils.h"' server/fsync.c
+            
+            # 2. 안드로이드 제약 제거
             sed -i 's/!defined(__ANDROID__)//g' server/fsync.c
             
-            # fatal_error() 함수가 호출되어도 프로세스가 종료되지 않게 dummy로 교체
-            # (매크로 방식이 헤더와 충돌한다면, 호출부 앞에 if(0)을 더 확실히 넣습니다)
+            # 3. [추가] syscall 호출부를 custom_syscall로 변경
+            # \b는 단어 경계로, 다른 함수 이름에 포함된 syscall은 건드리지 않습니다.
+            sed -i 's/\bsyscall(/custom_syscall(/g' server/fsync.c
+            
+            # 4. 자살 방지 로직 (기존 유지)
             sed -i 's/fatal_error(/if(0)fatal_error(/g' server/fsync.c
             sed -i 's/exit(1);/;/g' server/fsync.c
             sed -i 's/perror(/if(0)perror(/g' server/fsync.c
           fi
 
-          # [2] dlls/ntdll/unix/fsync.c 패치 (클라이언트 강제 활성화)
+          # [2] dlls/ntdll/unix/fsync.c 패치 (클라이언트 가로채기 추가)
           if [ -f "dlls/ntdll/unix/fsync.c" ]; then
             echo "Hard-patching dlls/ntdll/unix/fsync.c..."
             
-            # 시스템 콜 번호 강제 주입
-            sed -i '1i #undef __NR_futex_waitv\n#define __NR_futex_waitv 449' dlls/ntdll/unix/fsync.c
+            # 1. 최상단에 shm_utils.h 주입
+            sed -i '1i #include "shm_utils.h"' dlls/ntdll/unix/fsync.c
             
-            # do_futex_waitv 변수를 무조건 1로 고정 (에러의 핵심 원인 해결)
+            # 2. 시스템 콜 번호 정의 및 가로채기
+            sed -i '1i #undef __NR_futex_waitv\n#define __NR_futex_waitv 449' dlls/ntdll/unix/fsync.c
+            sed -i 's/\bsyscall(/custom_syscall(/g' dlls/ntdll/unix/fsync.c
+            
+            # 3. 변수 및 리턴값 고정 (기존 유지)
             sed -i 's/static int do_futex_waitv = -1;/static int do_futex_waitv = 1;/g' dlls/ntdll/unix/fsync.c
             sed -i 's/do_futex_waitv = 0;/do_futex_waitv = 1;/g' dlls/ntdll/unix/fsync.c
-
-            # fsync_check_support 무조건 1
             sed -i '/int fsync_check_support(void)/,/}/ s/return .*/return 1; }/' dlls/ntdll/unix/fsync.c
-
-            # 8 Gen 5에서 에러를 뱉는 시스템 콜 체크 구문 원천 차단
             sed -i 's/if (!do_futex_waitv)/if (0)/g' dlls/ntdll/unix/fsync.c
-            
             sed -i 's/MAP_SHARED | MAP_ANONYMOUS/MAP_SHARED/g' dlls/ntdll/unix/fsync.c
-          fi
-          
-          
-          if [ -f "dlls/ntdll/unix/sync.c" ]; then
-            sed -i '/if (do_fsync())/s/do_fsync()/1/g' dlls/ntdll/unix/sync.c
-            sed -i 's/assert( token == reply->handle );/\/* disabled *\//g' dlls/ntdll/unix/sync.c
           fi
 
           FILE_THREAD="server/thread.c"
@@ -530,8 +531,6 @@ jobs:
           #define shm_open custom_shm_open
           #undef shm_unlink
           #define shm_unlink custom_shm_unlink
-          #undef syscall
-          #define syscall custom_syscall
           #endif
           EOF
 
