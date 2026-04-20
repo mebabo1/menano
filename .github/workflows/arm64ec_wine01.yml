@@ -235,6 +235,80 @@ jobs:
           fi
           echo "复制后 locale.nls 存在，大小: $(wc -c < /opt/wine64-native/nls/locale.nls) 字节"
 
+      - name: Create SHM Header
+        run: |
+          mkdir -p ${{ env.WINE_SOURCE_DIR }}/source/android/shm_utils
+          cat <<'EOF' > ${{ env.WINE_SOURCE_DIR }}/source/include/shm_utils.h
+          #ifndef __WINE_SERVER_SHM_UTILS_H
+          #define __WINE_SERVER_SHM_UTILS_H
+          #define _GNU_SOURCE
+          #include <fcntl.h>
+          #include <stdio.h>
+          #include <stdlib.h>
+          #include <unistd.h>
+          #include <sys/stat.h>
+          #include <sys/types.h>
+          #include <errno.h>
+          #include <string.h>
+          #include <stdarg.h>
+          #include <sys/syscall.h>
+
+          static inline int custom_shm_open(const char *name, int oflag, mode_t mode) {
+              char *fname = NULL;
+              const char *tmpdir;
+              const char *clean_name;
+              int fd;
+
+              tmpdir = getenv("TMPDIR");
+              if (!tmpdir) tmpdir = "/data/data/com.termux/files/usr/tmp";
+              clean_name = (name[0] == '/') ? name + 1 : name;
+              
+              if (asprintf(&fname, "%s/%s", tmpdir, clean_name) == -1) return -1;
+              fd = open(fname, oflag, mode);
+              if (fd != -1 && (oflag & O_CREAT)) ftruncate(fd, 8 * 1024 * 1024);
+              free(fname);
+              return fd;
+          }
+          static inline int custom_shm_unlink(const char *name) {
+              char *fname = NULL;
+              const char *tmpdir;
+              const char *clean_name;
+              int ret;
+
+              tmpdir = getenv("TMPDIR");
+              if (!tmpdir) tmpdir = "/data/data/com.termux/files/usr/tmp";
+              clean_name = (name[0] == '/') ? name + 1 : name;
+              
+              if (asprintf(&fname, "%s/%s", tmpdir, clean_name) == -1) return -1;
+              ret = unlink(fname);
+              free(fname);
+              return ret;
+          }
+          static inline long custom_syscall(long number, ...) {
+              if (number == 449) {
+                  return 0; // "지원함" 신호 반환
+              }
+
+              // 가변 인자 처리하여 원래 syscall 호출
+              va_list args;
+              va_start(args, number);
+              long arg1 = va_arg(args, long);
+              long arg2 = va_arg(args, long);
+              long arg3 = va_arg(args, long);
+              long arg4 = va_arg(args, long);
+              long arg5 = va_arg(args, long);
+              long arg6 = va_arg(args, long);
+              va_end(args);
+
+              return syscall(number, arg1, arg2, arg3, arg4, arg5, arg6);
+          }
+          #undef shm_open
+          #define shm_open custom_shm_open
+          #undef shm_unlink
+          #define shm_unlink custom_shm_unlink
+          #endif
+          EOF
+
       - name: Termux
         run: |
           cd ${{ env.WINE_SOURCE_DIR }}/source
@@ -455,80 +529,6 @@ jobs:
           done
           echo "--------------------------------------------"
           echo "✔ All patch processes completed"
-
-      - name: Create SHM Header
-        run: |
-          mkdir -p ${{ env.WINE_SOURCE_DIR }}/source/android/shm_utils
-          cat <<'EOF' > ${{ env.WINE_SOURCE_DIR }}/source/include/shm_utils.h
-          #ifndef __WINE_SERVER_SHM_UTILS_H
-          #define __WINE_SERVER_SHM_UTILS_H
-          #define _GNU_SOURCE
-          #include <fcntl.h>
-          #include <stdio.h>
-          #include <stdlib.h>
-          #include <unistd.h>
-          #include <sys/stat.h>
-          #include <sys/types.h>
-          #include <errno.h>
-          #include <string.h>
-          #include <stdarg.h>
-          #include <sys/syscall.h>
-
-          static inline int custom_shm_open(const char *name, int oflag, mode_t mode) {
-              char *fname = NULL;
-              const char *tmpdir;
-              const char *clean_name;
-              int fd;
-
-              tmpdir = getenv("TMPDIR");
-              if (!tmpdir) tmpdir = "/data/data/com.termux/files/usr/tmp";
-              clean_name = (name[0] == '/') ? name + 1 : name;
-              
-              if (asprintf(&fname, "%s/%s", tmpdir, clean_name) == -1) return -1;
-              fd = open(fname, oflag, mode);
-              if (fd != -1 && (oflag & O_CREAT)) ftruncate(fd, 8 * 1024 * 1024);
-              free(fname);
-              return fd;
-          }
-          static inline int custom_shm_unlink(const char *name) {
-              char *fname = NULL;
-              const char *tmpdir;
-              const char *clean_name;
-              int ret;
-
-              tmpdir = getenv("TMPDIR");
-              if (!tmpdir) tmpdir = "/data/data/com.termux/files/usr/tmp";
-              clean_name = (name[0] == '/') ? name + 1 : name;
-              
-              if (asprintf(&fname, "%s/%s", tmpdir, clean_name) == -1) return -1;
-              ret = unlink(fname);
-              free(fname);
-              return ret;
-          }
-          static inline long custom_syscall(long number, ...) {
-              if (number == 449) {
-                  return 0; // "지원함" 신호 반환
-              }
-
-              // 가변 인자 처리하여 원래 syscall 호출
-              va_list args;
-              va_start(args, number);
-              long arg1 = va_arg(args, long);
-              long arg2 = va_arg(args, long);
-              long arg3 = va_arg(args, long);
-              long arg4 = va_arg(args, long);
-              long arg5 = va_arg(args, long);
-              long arg6 = va_arg(args, long);
-              va_end(args);
-
-              return syscall(number, arg1, arg2, arg3, arg4, arg5, arg6);
-          }
-          #undef shm_open
-          #define shm_open custom_shm_open
-          #undef shm_unlink
-          #define shm_unlink custom_shm_unlink
-          #endif
-          EOF
 
       - name: configure
         run: |
