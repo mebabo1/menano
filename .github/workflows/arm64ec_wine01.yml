@@ -456,10 +456,6 @@ jobs:
           echo "--------------------------------------------"
           echo "✔ All patch processes completed"
 
-          if [ ! -f "configure" ]; then
-            ./autogen.sh
-          fi
-
       - name: Create SHM Header
         run: |
           mkdir -p ${{ env.WINE_SOURCE_DIR }}/source/android/shm_utils
@@ -533,6 +529,13 @@ jobs:
           #define shm_unlink custom_shm_unlink
           #endif
           EOF
+
+      - name: configure
+        run: |
+          cd ${{ env.WINE_SOURCE_DIR }}/source
+          if [ ! -f "configure" ]; then
+            ./autogen.sh
+          fi
 
       - name: ARM64 WOW64
         run: |
