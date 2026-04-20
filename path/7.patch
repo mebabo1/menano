@@ -7,7 +7,7 @@ index dd9ddb2..dcec77e 100644
  # include <X11/extensions/XShm.h>
  # ifdef HAVE_SYS_SHM_H
 +#ifdef __ANDROID__
-+#  include "../../android/android_sysvshm/sys/shm.h"
++#  include "../android/shm_utils/shm_utils.h"
 +#else
  #  include <sys/shm.h>
 +#endif
