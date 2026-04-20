@@ -335,27 +335,25 @@ jobs:
               }' "$FILE"
           fi
 
-          # [1] server/fsync.c 패치: 문법 구조를 유지하며 에러 함수만 무력화
+          # [1] server/fsync.c 패치: 매크로 주입 및 if(0) 방식 혼합
           if [ -f "server/fsync.c" ]; then
-            echo "Fine-tuning server/fsync.c with Syntax Guard..."
+            echo "Applying non-destructive patch to server/fsync.c..."
             
-            # 안드로이드 제약 해제
+            # 1. 안드로이드 제약 조건 제거
             sed -i 's/!defined(__ANDROID__)//g' server/fsync.c
             sed -i 's/&& errno != ENOSYS && errno != EPERM//g' server/fsync.c
             
-            # [수정] fatal_error(...) 전체를 빈 문장(;)으로 치환하여 문법 유지
-            # fatal_error( "..." ); -> ; /* fatal_error( "..." ); */
-            sed -i 's/fatal_error(/ ; \/* fatal_error(/g' server/fsync.c
-            sed -i 's/ );/ ); *\//g' server/fsync.c
+            # 2. fatal_error 함수 자체를 무력화 (파일 최상단에 주입)
+            # 함수 이름은 그대로 두되, 안에서 아무것도 안 하게 만듭니다.
+            sed -i '1i #define fatal_error(...) do { } while(0)' server/fsync.c
             
-            # [수정] perror(...) 전체를 빈 문장(;)으로 치환
-            sed -i 's/perror(/ ; \/* perror(/g' server/fsync.c
-            
-            # exit(1) 방지
+            # 3. exit(1) 호출을 빈 문장으로 변경
             sed -i 's/exit(1);/ ; /g' server/fsync.c
-
-            # fprintf(stderr, ...) 주석 처리 (로그 도배 방지)
-            sed -i 's/fprintf( stderr/ \/\/ fprintf( stderr/g' server/fsync.c
+            
+            # 4. perror 및 fprintf(stderr)를 if(0)으로 감싸기
+            # 주석 기호(/* */)를 쓰지 않으므로 괄호가 깨질 일이 없습니다.
+            sed -i 's/perror(/if(0) perror(/g' server/fsync.c
+            sed -i 's/fprintf( stderr/if(0) fprintf( stderr/g' server/fsync.c
           fi
 
           # [2] dlls/ntdll/unix/fsync.c 패치: 8 Gen 5 강제 활성화 버전
