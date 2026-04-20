@@ -335,22 +335,23 @@ jobs:
               }' "$FILE"
           fi
 
-          # [1] server/fsync.c 패치: 매크로 주입 방식으로 변경 (안전성 100%)
+          # [1] server/fsync.c 패치: 매크로 방식 최적화
           if [ -f "server/fsync.c" ]; then
-            echo "Patching server/fsync.c with Macro Injection..."
+            echo "Patching server/fsync.c with Safe Macro Injection..."
             
-            # 1. 파일 상단(Header)에 에러 함수들을 무력화하는 매크로 삽입
-            # fatal_error, perror, fprintf(stderr...)가 아무것도 하지 않게 만듭니다.
-            sed -i '1i #define fatal_error(...) do { } while(0)' server/fsync.c
-            sed -i '1i #define perror(...) do { } while(0)' server/fsync.c
-            sed -i '1i #define fprintf(stream, ...) do { if(stream != stderr) fprintf(stream, __VA_ARGS__); } while(0)' server/fsync.c
-            
-            # 2. 안드로이드 체크 해제 (기존 로직)
+            # 1. 안드로이드 제약 해제 (먼저 수행)
             sed -i 's/!defined(__ANDROID__)//g' server/fsync.c
             sed -i 's/&& errno != ENOSYS && errno != EPERM//g' server/fsync.c
             
-            # 3. exit(1)만 직접 치환 (단일 문장이므로 안전)
-            sed -i 's/exit(1);/do { } while(0);/g' server/fsync.c
+            # 2. 에러 함수 무력화 (기존 함수명을 건드리지 않고 인자만 무력화하는 방식)
+            # stderr로 나가는 fprintf를 주석 처리하거나 빈 블록으로 대체
+            # 아래 방식은 fprintf 자체를 재정의하지 않고, stderr를 사용하는 문장만 안전하게 바꿉니다.
+            sed -i 's/fprintf( stderr/if(0) fprintf( stderr/g' server/fsync.c
+            sed -i 's/perror(/if(0) perror(/g' server/fsync.c
+            sed -i 's/fatal_error(/if(0) fatal_error(/g' server/fsync.c
+            
+            # 3. exit(1) 처리
+            sed -i 's/exit(1);/ ; /g' server/fsync.c
           fi
 
           # [2] dlls/ntdll/unix/fsync.c 패치 (기존과 동일하되 더 안전하게)
