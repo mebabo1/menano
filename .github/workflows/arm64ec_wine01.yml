@@ -465,6 +465,7 @@ jobs:
           cat <<'EOF' > ${{ env.WINE_SOURCE_DIR }}/source/android/shm_utils/shm_utils.h
           #ifndef __WINE_SERVER_SHM_UTILS_H
           #define __WINE_SERVER_SHM_UTILS_H
+          #define _GNU_SOURCE
           #include <fcntl.h>
           #include <stdio.h>
           #include <stdlib.h>
@@ -473,6 +474,8 @@ jobs:
           #include <sys/types.h>
           #include <errno.h>
           #include <string.h>
+          #include <stdarg.h>
+          #include <sys/syscall.h>
 
           static inline int custom_shm_open(const char *name, int oflag, mode_t mode) {
               char *fname = NULL;
