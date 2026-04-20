@@ -1,6 +1,5 @@
 FILE_VIRTUAL="dlls/ntdll/unix/virtual.c"
 if [ -f "$FILE_VIRTUAL" ]; then
     echo "Patching $FILE_VIRTUAL: Disabling userfaultfd to prevent SIGSYS 374..."
-    # 함수의 시작 중괄호({) 바로 다음에 return; 을 삽입하여 기능을 무력화합니다.
     sed -i '/static void kernel_writewatch_init(void)/!b;n;a \    return;' "$FILE_VIRTUAL"
 fi
