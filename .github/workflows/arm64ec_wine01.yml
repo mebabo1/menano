@@ -335,6 +335,18 @@ jobs:
               }' "$FILE"
           fi
 
+          # [1] server/fsync.c 패치 (서버 자살 방지)
+          if [ -f "server/fsync.c" ]; then
+            echo "Patching server/fsync.c..."
+            sed -i 's/!defined(__ANDROID__)//g' server/fsync.c
+            
+            # fatal_error() 함수가 호출되어도 프로세스가 종료되지 않게 dummy로 교체
+            # (매크로 방식이 헤더와 충돌한다면, 호출부 앞에 if(0)을 더 확실히 넣습니다)
+            sed -i 's/fatal_error(/if(0)fatal_error(/g' server/fsync.c
+            sed -i 's/exit(1);/;/g' server/fsync.c
+            sed -i 's/perror(/if(0)perror(/g' server/fsync.c
+          fi
+
           # [2] dlls/ntdll/unix/fsync.c 패치 (클라이언트 강제 활성화 - 수정본)
           if [ -f "dlls/ntdll/unix/fsync.c" ]; then
             echo "Hard-patching dlls/ntdll/unix/fsync.c for 8 Gen 5..."
