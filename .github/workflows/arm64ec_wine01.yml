@@ -309,6 +309,8 @@ jobs:
             echo "Patching $FILE_VIRTUAL: Completely neutralizing userfaultfd..."
             sed -i 's/uffd_fd = syscall( __NR_userfaultfd/uffd_fd = -1; \/\/ syscall( __NR_userfaultfd/g' "$FILE_VIRTUAL"
             sed -i '/static void kernel_writewatch_init(void)/{n;s/^{/{\n    return;/}' "$FILE_VIRTUAL"
+            sed -i 's/return STATUS_INTERNAL_ERROR;/return STATUS_SUCCESS; \/* Bypassed for Android *\//g' "$FILE_VIRTUAL"
+            sed -i 's/goto err;/return STATUS_SUCCESS;/g' "$FILE_VIRTUAL"
           fi
           
           INF="loader/wine.inf.in"
