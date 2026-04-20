@@ -228,56 +228,6 @@ jobs:
           fi
           echo "复制后 locale.nls 存在，大小: $(wc -c < /opt/wine64-native/nls/locale.nls) 字节"
 
-      - name: Create SHM Header in Patch Path
-        run: |
-          cd ${{ env.WINE_SOURCE_DIR }}/source
-          mkdir -p android/shm_utils
-          cat <<EOF > android/shm_utils/shm_utils.h
-          #ifndef __WINE_SERVER_SHM_UTILS_H
-          #define __WINE_SERVER_SHM_UTILS_H
-
-          /* 8 Gen 5 & Termux glibc Compatibility Hook */
-          #include <fcntl.h>
-          #include <stdio.h>
-          #include <stdlib.h>
-          #include <unistd.h>
-          #include <sys/stat.h>
-          #include <sys/types.h>
-
-          /* 기존 shm_open 선언과 충돌을 피하기 위해 이름을 바꿉니다. */
-          static inline int custom_shm_open(const char *name, int oflag, mode_t mode) {
-              char *fname = NULL;
-              const char *tmpdir = getenv("TMPDIR");
-              int fd;
-
-              if (!tmpdir) tmpdir = "/tmp";
-              if (asprintf(&fname, "%s/%s", tmpdir, name) == -1) return -1;
-              
-              fd = open(fname, oflag, mode);
-              free(fname);
-              return fd;
-          }
-
-          static inline int custom_shm_unlink(const char *name) {
-              char *fname = NULL;
-              const char *tmpdir = getenv("TMPDIR");
-              int ret;
-
-              if (!tmpdir) tmpdir = "/tmp";
-              if (asprintf(&fname, "%s/%s", tmpdir, name) == -1) return -1;
-              
-              ret = unlink(fname);
-              free(fname);
-              return ret;
-          }
-
-          /* Wine 소스 코드 내의 shm_open 호출을 우리 함수로 강제 리다이렉트 */
-          #define shm_open custom_shm_open
-          #define shm_unlink custom_shm_unlink
-
-          #endif
-          EOF
-
       - name: Termux
         run: |
           cd ${{ env.WINE_SOURCE_DIR }}/source
@@ -303,13 +253,6 @@ jobs:
             echo "Removing M_PERTURB calls from $FILE_LOADER..."
             # mallopt( M_PERTURB, ... ) 로 시작하는 모든 줄을 주석 처리 (// 추가)
             sed -i 's/^[[:space:]]*mallopt( M_PERTURB,/\/\/ mallopt( M_PERTURB,/g' "$FILE_LOADER"
-          fi
-
-          if [ -f "server/fsync.c" ]; then
-            sed -i 's/defined(__linux__) && !defined(__ANDROID__)/defined(__linux__)/g' server/fsync.c
-          fi
-          if [ -f "dlls/ntdll/unix/fsync.c" ]; then
-            sed -i 's/errno != ENOSYS && errno != EPERM/errno != ENOSYS/g' dlls/ntdll/unix/fsync.c
           fi
 
           TOTAL_TARGETS="
@@ -347,12 +290,47 @@ jobs:
             fi
           done
 
-          FILE_SYNC="dlls/ntdll/unix/sync.c"
-          if [ -f "$FILE_SYNC" ]; then
-              echo "Patching $FILE_SYNC to force fsync engagement..."
-              sed -i '/if (do_fsync())/s/do_fsync()/1/g' "$FILE_SYNC"
-              sed -i 's/assert( token == reply->handle );/\/* assert disabled *\//g' "$FILE_SYNC"
-          fi
+      - name: Create SHM Header
+        run: |
+          mkdir -p ${{ env.WINE_SOURCE_DIR }}/source/android/shm_utils
+          cat <<'EOF' > ${{ env.WINE_SOURCE_DIR }}/source/android/shm_utils/shm_utils.h
+          #ifndef __WINE_SERVER_SHM_UTILS_H
+          #define __WINE_SERVER_SHM_UTILS_H
+          #include <fcntl.h>
+          #include <stdio.h>
+          #include <stdlib.h>
+          #include <unistd.h>
+          #include <sys/stat.h>
+          #include <sys/types.h>
+          #include <errno.h>
+          #include <string.h>
+
+          static inline int custom_shm_open(const char *name, int oflag, mode_t mode) {
+              char *fname = NULL;
+              const char *tmpdir = getenv("TMPDIR");
+              if (!tmpdir) tmpdir = "/data/data/com.termux/files/usr/tmp";
+              const char *clean_name = (name[0] == '/') ? name + 1 : name;
+              if (asprintf(&fname, "%s/%s", tmpdir, clean_name) == -1) return -1;
+              
+              int fd = open(fname, oflag, mode);
+              if (fd != -1 && (oflag & O_CREAT)) ftruncate(fd, 8 * 1024 * 1024);
+              free(fname);
+              return fd;
+          }
+          static inline int custom_shm_unlink(const char *name) {
+              char *fname = NULL;
+              const char *tmpdir = getenv("TMPDIR");
+              if (!tmpdir) tmpdir = "/data/data/com.termux/files/usr/tmp";
+              const char *clean_name = (name[0] == '/') ? name + 1 : name;
+              if (asprintf(&fname, "%s/%s", tmpdir, clean_name) == -1) return -1;
+              int ret = unlink(fname);
+              free(fname);
+              return ret;
+          }
+          #define shm_open custom_shm_open
+          #define shm_unlink custom_shm_unlink
+          #endif
+          EOF
 
       - name: configure
         run: |
