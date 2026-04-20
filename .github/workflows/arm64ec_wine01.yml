@@ -340,37 +340,43 @@ jobs:
             echo "Finalizing server/fsync.c for 8 Gen 5..."
             # 안드로이드 제약 해제
             sed -i 's/!defined(__ANDROID__)//g' server/fsync.c
-            # 시스템 콜 에러 체크 무시 (errno 체크 삭제)
+            # 시스템 콜 에러 체크 무시
             sed -i 's/&& errno != ENOSYS && errno != EPERM//g' server/fsync.c
-            # [추가] 서버 강제 종료 방지 (fatal_error를 경고로 변경)
-            sed -i 's/fatal_error/fprintf \/\/ fatal_error/g' server/fsync.c
+            
+            # [수정] fatal_error 라인 전체를 주석 처리 (가장 안전)
+            sed -i 's/fatal_error/ \/\/ fatal_error/g' server/fsync.c
+            
+            # [수정] exit(1) 방지
             sed -i 's/exit(1);/\/* disabled *\//g' server/fsync.c
-            # 로그 도배 방지
-            sed -i 's/perror( "shm_open" );/\/* disabled *\//g' server/fsync.c
-            sed -i 's/perror( "ftruncate" );/\/* disabled *\//g' server/fsync.c
+            
+            # perror 및 기타 에러 출력 주석 처리
+            sed -i 's/perror( "/\/\/ perror( "/g' server/fsync.c
           fi
 
-          # [2] dlls/ntdll/unix/fsync.c 패치: 클라이언트 통신 유지
+          # [2] dlls/ntdll/unix/fsync.c 패치
           if [ -f "dlls/ntdll/unix/fsync.c" ]; then
             echo "Finalizing dlls/ntdll/unix/fsync.c..."
-            # 시스템 콜 번호 강제 주입 (AArch64: 449)
-            sed -i '1i #ifndef __NR_futex_waitv\n#define __NR_futex_waitv 449\n#endif' dlls/ntdll/unix/fsync.c
+            # 시스템 콜 번호 강제 주입
+            if ! grep -q "__NR_futex_waitv" dlls/ntdll/unix/fsync.c; then
+              sed -i '1i #ifndef __NR_futex_waitv\n#define __NR_futex_waitv 449\n#endif' dlls/ntdll/unix/fsync.c
+            fi
             
-            # futex_waitv 지원 여부 무조건 1 리턴 (check_support 함수 개조)
-            sed -i '/int fsync_check_support(void)/,/}/ s/return .*/return 1;/' dlls/ntdll/unix/fsync.c
-            
-            # 강제 종료 방지
+            # fsync_check_support 함수가 무조건 1을 반환하도록 수정
+            # (함수 바디 전체를 return 1;로 교체)
+            sed -i '/int fsync_check_support(void)/,/}/ s/return .*/return 1; } \/* /' dlls/ntdll/unix/fsync.c
+            # 위 구문이 복잡할 경우 아래와 같이 단순 치환
+            sed -i 's/return getenv( "WINEFSYNC" ) .*/return 1;/g' dlls/ntdll/unix/fsync.c
+
             sed -i 's/exit(1);/\/* disabled *\//g' dlls/ntdll/unix/fsync.c
-            # 파일 기반 SHM을 위해 MAP_ANONYMOUS 제거
             sed -i 's/MAP_SHARED | MAP_ANONYMOUS/MAP_SHARED/g' dlls/ntdll/unix/fsync.c
-            # 중복 ftruncate 주석 처리
             sed -i 's/if (ftruncate/ \/\/ if (ftruncate/g' dlls/ntdll/unix/fsync.c
           fi
 
-          # [3] 추가: 모든 fsync 관련 파일에서 에러 발생 시 리턴값 조작
-          # 서버와 통신 중 Broken pipe가 나더라도 클라이언트가 무시하고 진행하게 함
-          find . -name "fsync.c" | xargs sed -i 's/return STATUS_PENDING;/return STATUS_SUCCESS; \/* Bypassed *\//g'
+          # [3] 에러 리턴값 조작 (더 정교하게)
+          # 'return STATUS_PENDING;'만 찾아 바꾸기
+          find . -name "fsync.c" -exec sed -i 's/return STATUS_PENDING;/return STATUS_SUCCESS;/g' {} +
 
+          
           # [4] dlls/ntdll/unix/sync.c 패치
           if [ -f "dlls/ntdll/unix/sync.c" ]; then
             sed -i '/if (do_fsync())/s/do_fsync()/1/g' dlls/ntdll/unix/sync.c
