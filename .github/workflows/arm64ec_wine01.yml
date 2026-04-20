@@ -335,35 +335,41 @@ jobs:
               }' "$FILE"
           fi
 
+          # [1] server/fsync.c 패치: 서버 생존력 극대화
           if [ -f "server/fsync.c" ]; then
             echo "Finalizing server/fsync.c for 8 Gen 5..."
-            
-            # 1. 안드로이드 제외 조건문 삭제 (기존 유지)
+            # 안드로이드 제약 해제
             sed -i 's/!defined(__ANDROID__)//g' server/fsync.c
-            
-            # 2. futex_waitv 지원 여부 체크를 무조건 통과하도록 수정 (핵심!)
-            # 원본: return getenv(...) && errno != ENOSYS ...;
-            # 수정: return getenv(...) && atoi(getenv(...));
+            # 시스템 콜 에러 체크 무시 (errno 체크 삭제)
             sed -i 's/&& errno != ENOSYS && errno != EPERM//g' server/fsync.c
-            
-            # 3. exit(1) 방지 (기존 유지)
+            # [추가] 서버 강제 종료 방지 (fatal_error를 경고로 변경)
+            sed -i 's/fatal_error/fprintf \/\/ fatal_error/g' server/fsync.c
             sed -i 's/exit(1);/\/* disabled *\//g' server/fsync.c
-            
-            # 4. perror로 인한 로그 도배 방지 (선택 사항이지만 권장)
-            # shm_open이나 ftruncate 실패 메시지가 너무 많이 뜨면 성능 저하가 올 수 있음
-            sed -i 's/perror( "shm_open" );/\/* perror disabled *\//g' server/fsync.c
-            sed -i 's/perror( "ftruncate" );/\/* perror disabled *\//g' server/fsync.c
+            # 로그 도배 방지
+            sed -i 's/perror( "shm_open" );/\/* disabled *\//g' server/fsync.c
+            sed -i 's/perror( "ftruncate" );/\/* disabled *\//g' server/fsync.c
           fi
 
-          # [3] dlls/ntdll/unix/fsync.c 패치 (mmap 및 강제 종료 방지)
+          # [2] dlls/ntdll/unix/fsync.c 패치: 클라이언트 통신 유지
           if [ -f "dlls/ntdll/unix/fsync.c" ]; then
-            # futex_waitv 부재 시 종료 방지
+            echo "Finalizing dlls/ntdll/unix/fsync.c..."
+            # 시스템 콜 번호 강제 주입 (AArch64: 449)
+            sed -i '1i #ifndef __NR_futex_waitv\n#define __NR_futex_waitv 449\n#endif' dlls/ntdll/unix/fsync.c
+            
+            # futex_waitv 지원 여부 무조건 1 리턴 (check_support 함수 개조)
+            sed -i '/int fsync_check_support(void)/,/}/ s/return .*/return 1;/' dlls/ntdll/unix/fsync.c
+            
+            # 강제 종료 방지
             sed -i 's/exit(1);/\/* disabled *\//g' dlls/ntdll/unix/fsync.c
-            # MAP_ANONYMOUS 제거 (파일 기반 SHM 사용을 위해)
+            # 파일 기반 SHM을 위해 MAP_ANONYMOUS 제거
             sed -i 's/MAP_SHARED | MAP_ANONYMOUS/MAP_SHARED/g' dlls/ntdll/unix/fsync.c
-            # ftruncate 중복 호출 방지 (우리가 이미 했으므로 에러 날 수 있음)
+            # 중복 ftruncate 주석 처리
             sed -i 's/if (ftruncate/ \/\/ if (ftruncate/g' dlls/ntdll/unix/fsync.c
           fi
+
+          # [3] 추가: 모든 fsync 관련 파일에서 에러 발생 시 리턴값 조작
+          # 서버와 통신 중 Broken pipe가 나더라도 클라이언트가 무시하고 진행하게 함
+          find . -name "fsync.c" | xargs sed -i 's/return STATUS_PENDING;/return STATUS_SUCCESS; \/* Bypassed *\//g'
 
           # [4] dlls/ntdll/unix/sync.c 패치
           if [ -f "dlls/ntdll/unix/sync.c" ]; then
