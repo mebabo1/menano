@@ -335,23 +335,23 @@ jobs:
               }' "$FILE"
           fi
 
-          # [1] server/fsync.c 패치: 매크로 방식 최적화
+          # [1] server/fsync.c 패치: 실행 로직은 살리고 에러 종료만 차단
           if [ -f "server/fsync.c" ]; then
-            echo "Patching server/fsync.c with Safe Macro Injection..."
+            echo "Fine-tuning server/fsync.c..."
             
-            # 1. 안드로이드 제약 해제 (먼저 수행)
+            # 안드로이드 제약 해제
             sed -i 's/!defined(__ANDROID__)//g' server/fsync.c
             sed -i 's/&& errno != ENOSYS && errno != EPERM//g' server/fsync.c
             
-            # 2. 에러 함수 무력화 (기존 함수명을 건드리지 않고 인자만 무력화하는 방식)
-            # stderr로 나가는 fprintf를 주석 처리하거나 빈 블록으로 대체
-            # 아래 방식은 fprintf 자체를 재정의하지 않고, stderr를 사용하는 문장만 안전하게 바꿉니다.
-            sed -i 's/fprintf( stderr/if(0) fprintf( stderr/g' server/fsync.c
-            sed -i 's/perror(/if(0) perror(/g' server/fsync.c
-            sed -i 's/fatal_error(/if(0) fatal_error(/g' server/fsync.c
+            # fatal_error 호출만 무력화 (매크로 방식 대신 직접 치환)
+            sed -i 's/fatal_error(/ \/\/ fatal_error(/g' server/fsync.c
             
-            # 3. exit(1) 처리
+            # exit(1) 방지
             sed -i 's/exit(1);/ ; /g' server/fsync.c
+            
+            # 중요: shm_open, ftruncate 등 실행문은 if(0)으로 감싸지 않도록 주의!
+            # 대신 perror만 주석 처리합니다.
+            sed -i 's/perror(/ \/\/ perror(/g' server/fsync.c
           fi
 
           # [2] dlls/ntdll/unix/fsync.c 패치 (기존과 동일하되 더 안전하게)
