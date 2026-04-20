@@ -404,21 +404,21 @@ jobs:
 
           for FILE in $TOTAL_TARGETS; do
             if [ -f "$FILE" ]; then
-              echo "Checking SHM Hook for $FILE..."
-              case "$FILE" in
-                server/*)           HEADER_PATH="../android/shm_utils/shm_utils.h" ;;
-                dlls/winex11.drv/*) HEADER_PATH="../../android/shm_utils/shm_utils.h" ;;
-                dlls/ntdll/unix/*)  HEADER_PATH="../../../android/shm_utils/shm_utils.h" ;;
-                *)                  HEADER_PATH="../../android/shm_utils/shm_utils.h" ;;
-              esac
+              # 상대 경로 대신 파일 이름만 주입
               if ! grep -q "shm_utils.h" "$FILE"; then
                 echo ">>> Injecting Hook into $FILE"
-                # config.h 바로 아래에 넣는 것이 가장 안전 (표준 include들이 가로채기 당하기 전)
+                # config.h 바로 아래에 넣는 것이 가장 안전
                 if grep -q "#include \"config.h\"" "$FILE"; then
-                  sed -i "/#include \"config.h\"/a #include \"$HEADER_PATH\"" "$FILE"
+                  sed -i "/#include \"config.h\"/a #include \"shm_utils.h\"" "$FILE"
                 else
-                  sed -i "1i #include \"$HEADER_PATH\"" "$FILE"
+                  sed -i "1i #include \"shm_utils.h\"" "$FILE"
                 fi
+              fi
+              
+              # [추가] syscall 호출부를 custom_syscall로 변경 (이전 에러 해결책)
+              if [[ "$FILE" == *"fsync.c" ]]; then
+                echo ">>> Patching syscall in $FILE"
+                sed -i 's/\bsyscall(/custom_syscall(/g' "$FILE"
               fi
             fi
           done
