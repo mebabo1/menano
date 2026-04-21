@@ -284,7 +284,7 @@ jobs:
               if (fd != -1) {
                   struct stat st;
                   if (fstat(fd, &st) == 0 && st.st_size == 0) {
-                      ftruncate(fd, 1024 * 1024);
+                      ftruncate(fd, 4 * 1024 * 1024);
                   }
               }
               free(fname);
@@ -448,7 +448,7 @@ jobs:
             sed -i 's/\bopen\s*(/custom_shm_open(/g' server/fsync.c
             sed -i 's/\bshm_open\s*(/custom_shm_open(/g' server/fsync.c
             sed -i 's/\bshm_unlink\s*(/custom_shm_unlink(/g' server/fsync.c
-            sed -i 's/shm_size\s*=\s*FSYNC_SHM_PAGE_SIZE/shm_size = 1024*1024/g' server/fsync.c
+            sed -i 's/shm_size\s*=\s*FSYNC_SHM_PAGE_SIZE/shm_size = 4*1024*1024/g' server/fsync.c
             sed -i 's/ftruncate\s*(\s*shm_fd[^)]*)/ftruncate(shm_fd, shm_size)/g' server/fsync.c
             sed -i 's/!defined(__ANDROID__)//g' server/fsync.c
             sed -i 's/\bsyscall\s*(/custom_syscall(/g' server/fsync.c
