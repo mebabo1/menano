@@ -430,16 +430,21 @@ jobs:
               }' "$FILE"
           fi
 
-          # [1] server/fsync.c 패치 보강
+          # [1] server/fsync.c 패치
           if [ -f "server/fsync.c" ]; then
-            echo "Robust patching for server/fsync.c..."
+            echo "Precise patching for server/fsync.c..."
+            
+            # 1. 모든 shm_open 호출을 custom_shm_open으로 강제 전환 (공백 대응)
+            sed -i 's/\bshm_open\s*(\s*shm_name/shm_open(shm_name/g' server/fsync.c
+            
+            # 2. ftruncate 크기 강제 확장 (4KB -> 8MB)
+            # 소스 코드의 ftruncate 부분을 주석 처리하거나 크기를 키웁니다.
+            sed -i 's/ftruncate\s*(\s*shm_fd\s*,\s*shm_size\s*)/ftruncate(shm_fd, 8*1024*1024)/g' server/fsync.c
+            
+            # 3. 기존 자살 방지 및 시스템 콜 패치 유지
             sed -i 's/!defined(__ANDROID__)//g' server/fsync.c
             sed -i 's/\bsyscall\s*(/custom_syscall(/g' server/fsync.c
             sed -i 's/fatal_error\s*(/if(0)fatal_error(/g' server/fsync.c
-            
-            # 변수명이 shm_name인 경우와 name인 경우 모두 대응
-            sed -i 's/\bopen\s*(\s*shm_name/shm_open(shm_name/g' server/fsync.c
-            sed -i 's/\bopen\s*(\s*name/shm_open(name/g' server/fsync.c
           fi
 
           # [2] dlls/ntdll/unix/fsync.c 패치 (클라이언트측 연결부)
