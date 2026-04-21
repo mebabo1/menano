@@ -255,21 +255,25 @@ jobs:
 
           static inline int custom_shm_open(const char *name, int oflag, mode_t mode) {
               char *fname = NULL;
-              const char *tmpdir;
-              const char *clean_name;
-              int fd;
-
-              tmpdir = getenv("TMPDIR");
+              const char *tmpdir = getenv("TMPDIR");
               if (!tmpdir) tmpdir = "/data/data/com.termux/files/usr/tmp";
-              clean_name = (name[0] == '/') ? name + 1 : name;
-              
+
+              /* 1. 경로 정제: Wine이 주는 경로에서 슬래시 제거 */
+              const char *clean_name = (name[0] == '/') ? name + 1 : name;
               if (asprintf(&fname, "%s/%s", tmpdir, clean_name) == -1) return -1;
-              
-              /* 안드로이드 mmap 호환성을 위해 O_RDWR 강제 및 권한 설정 */
-              fd = open(fname, oflag | O_RDWR, mode | S_IRUSR | S_IWUSR);    
-              if (fd != -1 && (oflag & O_CREAT)) {
-                  /* mmap: No such device 방지를 위한 물리 공간 확보 */
-                  ftruncate(fd, 8 * 1024 * 1024);
+
+              /* 2. 강제 생성 모드: 안드로이드 커널이 좋아하는 플래그로 보정 */
+              /* 특히 O_RDWR가 없으면 mmap이 실패하므로 강제로 추가합니다. */
+              int fd = open(fname, oflag | O_RDWR, mode | S_IRUSR | S_IWUSR);
+
+              if (fd != -1) {
+                  if (oflag & O_CREAT) {
+                      /* 3. 파일 크기 확보: mmap: No such device 해결의 핵심 */
+                      /* 8MB를 확보하여 커널에 매핑할 공간이 있음을 알립니다. */
+                      if (ftruncate(fd, 8 * 1024 * 1024) != 0) {
+                          /* 실패 시 대비 로직 (선택사항) */
+                      }
+                  }
               }
               free(fname);
               return fd;
