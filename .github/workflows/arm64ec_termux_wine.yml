@@ -374,6 +374,16 @@ jobs:
             fi
           fi
 
+          FILE_VIRTUAL="dlls/ntdll/unix/virtual.c"
+          if [ -f "$FILE_VIRTUAL" ]; then
+            echo "Patching $FILE_VIRTUAL: Specific SHM & Kernel bypass..."
+            sed -i 's/uffd_fd = syscall( __NR_userfaultfd/uffd_fd = -1; \/\/ bypassed/g' "$FILE_VIRTUAL"
+            sed -i '/static void kernel_writewatch_init(void)/{n;s/^{/{\n    return;/}' "$FILE_VIRTUAL"
+            sed -i 's/\bshm_open\s*(\s*buf/shm_open(buf/g' "$FILE_VIRTUAL"
+            sed -i 's/ftruncate\s*(\s*fd\s*,\s*info->map_size\s*)/ftruncate(fd, 8*1024*1024)/g' "$FILE_VIRTUAL"
+            echo "✔ virtual.c: SHM redirection & safe bypass applied."
+          fi
+
           FILE_LOADER="dlls/ntdll/loader.c"
           if [ -f "$FILE_LOADER" ]; then
             echo "Applying combined patches to loader.c..."
