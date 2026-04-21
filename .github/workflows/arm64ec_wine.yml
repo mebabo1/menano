@@ -228,6 +228,101 @@ jobs:
           fi
           echo "复制后 locale.nls 存在，大小: $(wc -c < /opt/wine64-native/nls/locale.nls) 字节"
 
+      - name: Create SHM Header
+        run: |
+          mkdir -p ${{ env.WINE_SOURCE_DIR }}/source/include
+          cat <<'EOF' > ${{ env.WINE_SOURCE_DIR }}/source/include/shm_utils.h
+          #ifndef __WINE_SERVER_SHM_UTILS_H
+          #define __WINE_SERVER_SHM_UTILS_H
+          #define _GNU_SOURCE
+          #include <fcntl.h>
+          #include <stdio.h>
+          #include <stdlib.h>
+          #include <unistd.h>
+          #include <sys/stat.h>
+          #include <sys/types.h>
+          #include <errno.h>
+          #include <string.h>
+          #include <stdarg.h>
+          #include <sys/syscall.h>
+
+          static inline int custom_shm_open(const char *name, int oflag, mode_t mode) {
+              char *fname = NULL;
+              char *dname = NULL;
+              char *slash = NULL;
+              const char *tmpdir = getenv("TMPDIR");
+              if (!tmpdir) tmpdir = "/data/data/com.termux/files/usr/tmp";
+
+              /* 1. 전체 경로 생성 */
+              const char *clean_name = (name[0] == '/') ? name + 1 : name;
+              if (asprintf(&fname, "%s/%s", tmpdir, clean_name) == -1) return -1;
+
+              /* 2. 부모 디렉토리 생성 (수동으로 만들지 않아도 되게끔 보강) */
+              dname = strdup(fname);
+              if (dname) {
+                  slash = strrchr(dname, '/');
+                  if (slash) {
+                      *slash = '\0';
+                      /* 부모 폴더가 없으면 생성 (EEXIST 에러는 무시됨) */
+                      mkdir(dname, 0700); 
+                  }
+                  free(dname);
+              }
+
+              /* 3. 파일 열기: O_CREAT와 O_RDWR를 명시적으로 보정 */
+              /* wineserver가 생성 모드로 호출할 때 확실히 생성되도록 만듭니다. */
+              int fd = open(fname, oflag | O_RDWR, mode | 0600);
+
+              if (fd != -1) {
+                  /* 파일이 방금 생성되었거나 크기가 0이면 8MB 강제 할당 */
+                  struct stat st;
+                  if (fstat(fd, &st) == 0 && st.st_size == 0) {
+                      ftruncate(fd, 8 * 1024 * 1024);
+                  }
+              }
+              
+              free(fname);
+              return fd;
+          }
+
+          static inline int custom_shm_unlink(const char *name) {
+              char *fname = NULL;
+              const char *tmpdir = getenv("TMPDIR");
+              if (!tmpdir) tmpdir = "/data/data/com.termux/files/usr/tmp";
+              const char *clean_name = (name[0] == '/') ? name + 1 : name;
+              if (asprintf(&fname, "%s/%s", tmpdir, clean_name) == -1) return -1;
+              int ret = unlink(fname);
+              free(fname);
+              return ret;
+          }
+
+          static inline long custom_syscall(long number, ...) {
+              va_list args;
+              long a1, a2, a3, a4, a5, a6;
+              long ret;
+
+              if (number == 449) return 0;
+
+              va_start(args, number);
+              a1 = va_arg(args, long);
+              a2 = va_arg(args, long);
+              a3 = va_arg(args, long);
+              a4 = va_arg(args, long);
+              a5 = va_arg(args, long);
+              a6 = va_arg(args, long);
+              va_end(args);
+
+              ret = syscall(number, a1, a2, a3, a4, a5, a6);
+              return ret;
+          }
+
+          #undef shm_open
+          #define shm_open custom_shm_open
+          #undef shm_unlink
+          #define shm_unlink custom_shm_unlink
+          #endif
+          EOF
+
       - name: Termux
         run: |
           cd ${{ env.WINE_SOURCE_DIR }}/source
@@ -258,12 +353,10 @@ jobs:
           TOTAL_TARGETS="
             dlls/ntdll/unix/virtual.c 
             dlls/ntdll/unix/fsync.c 
-            dlls/ntdll/unix/esync.c 
             dlls/ntdll/unix/sync.c 
             dlls/ntdll/unix/server.c 
             dlls/ntdll/unix/loader.c
             server/fsync.c 
-            server/esync.c 
             server/fd.c 
             server/mapping.c 
             server/thread.c
@@ -273,75 +366,21 @@ jobs:
 
           for FILE in $TOTAL_TARGETS; do
             if [ -f "$FILE" ]; then
-              echo "Checking SHM Hook for $FILE..."
-              case "$FILE" in
-                server/*)           HEADER_PATH="../android/shm_utils/shm_utils.h" ;;
-                dlls/winex11.drv/*) HEADER_PATH="../../android/shm_utils/shm_utils.h" ;;
-                dlls/ntdll/unix/*)  HEADER_PATH="../../../android/shm_utils/shm_utils.h" ;;
-                *)                  HEADER_PATH="../../android/shm_utils/shm_utils.h" ;;
-              esac
-              if ! grep -q "shm_utils.h" "$FILE"; then
-                echo ">>> Injecting Hook into $FILE"
-                # config.h 바로 아래에 넣는 것이 가장 안전 (표준 include들이 가로채기 당하기 전)
-                if grep -q "#include \"config.h\"" "$FILE"; then
-                  sed -i "/#include \"config.h\"/a #include \"$HEADER_PATH\"" "$FILE"
-                else
-                  sed -i "1i #include \"$HEADER_PATH\"" "$FILE"
-                fi
+              echo "Fixing SHM Hook for $FILE..."
+              
+              # 기존에 잘못 주입된 헤더가 있다면 제거 (깨끗한 상태에서 시작)
+              sed -i '/shm_utils.h/d' "$FILE"
+
+              # config.h가 있으면 그 바로 다음 줄에 주입 (규칙 준수)
+              if grep -q "#include \"config.h\"" "$FILE"; then
+                sed -i "/#include \"config.h\"/a #include <shm_utils.h>" "$FILE"
+              else
+                # config.h가 없으면 파일 맨 처음에 주입
+                sed -i "1i #include <shm_utils.h>" "$FILE"
               fi
+              sed -i 's/\bsyscall\s*(/custom_syscall(/g' "$FILE"
             fi
           done
-
-      - name: Create SHM Header
-        run: |
-          mkdir -p ${{ env.WINE_SOURCE_DIR }}/source/android/shm_utils
-          cat <<'EOF' > ${{ env.WINE_SOURCE_DIR }}/source/android/shm_utils/shm_utils.h
-          #ifndef __WINE_SERVER_SHM_UTILS_H
-          #define __WINE_SERVER_SHM_UTILS_H
-          #include <fcntl.h>
-          #include <stdio.h>
-          #include <stdlib.h>
-          #include <unistd.h>
-          #include <sys/stat.h>
-          #include <sys/types.h>
-          #include <errno.h>
-          #include <string.h>
-
-          static inline int custom_shm_open(const char *name, int oflag, mode_t mode) {
-              char *fname = NULL;
-              const char *tmpdir;
-              const char *clean_name;
-              int fd;
-
-              tmpdir = getenv("TMPDIR");
-              if (!tmpdir) tmpdir = "/data/data/com.termux/files/usr/tmp";
-              clean_name = (name[0] == '/') ? name + 1 : name;
-              
-              if (asprintf(&fname, "%s/%s", tmpdir, clean_name) == -1) return -1;
-              fd = open(fname, oflag, mode);
-              if (fd != -1 && (oflag & O_CREAT)) ftruncate(fd, 8 * 1024 * 1024);
-              free(fname);
-              return fd;
-          }
-          static inline int custom_shm_unlink(const char *name) {
-              char *fname = NULL;
-              const char *tmpdir;
-              const char *clean_name;
-              int ret;
-
-              tmpdir = getenv("TMPDIR");
-              if (!tmpdir) tmpdir = "/data/data/com.termux/files/usr/tmp";
-              clean_name = (name[0] == '/') ? name + 1 : name;
-              
-              if (asprintf(&fname, "%s/%s", tmpdir, clean_name) == -1) return -1;
-              ret = unlink(fname);
-              free(fname);
-              return ret;
-          }
-          #define shm_open custom_shm_open
-          #define shm_unlink custom_shm_unlink
-          #endif
-          EOF
 
       - name: configure
         run: |
