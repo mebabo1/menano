@@ -438,16 +438,18 @@ jobs:
               }' "$FILE"
           fi
 
-          # [1] server/fsync.c 패치 (서버측 생성부 - 가장 중요!)
+          # [1] server/fsync.c 패치
           if [ -f "server/fsync.c" ]; then
-            echo "Robust patching for server/fsync.c..."
-            sed -i 's/!defined(__ANDROID__)//g' server/fsync.c
-            sed -i 's/\bsyscall\s*(/custom_syscall(/g' server/fsync.c
-            sed -i 's/fatal_error\s*(/if(0)fatal_error(/g' server/fsync.c
+            echo "Aggressive patching for server/fsync.c..."
+            # 모든 open/shm_open을 매크로가 인식할 수 있는 shm_open으로 통일
+            sed -i 's/\bopen\s*(/shm_open(/g' server/fsync.c
+            sed -i 's/\bshm_open\s*(/shm_open(/g' server/fsync.c
+            
+            # ftruncate가 서버 코드에서 다시 크기를 줄이지 못하게 강제 고정
             sed -i 's/ftruncate\s*(\s*shm_fd[^)]*)/ftruncate(shm_fd, 8*1024*1024)/g' server/fsync.c
             
-            # 모든 형태의 open( shm_name... 을 shm_open으로 치환
-            sed -i 's/\bopen\s*(\s*shm_name/shm_open(shm_name/g' server/fsync.c
+            sed -i 's/!defined(__ANDROID__)//g' server/fsync.c
+            sed -i 's/\bsyscall\s*(/custom_syscall(/g' server/fsync.c
           fi
 
           # [2] dlls/ntdll/unix/fsync.c 패치 (클라이언트측 연결부)
