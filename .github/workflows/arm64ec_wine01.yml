@@ -524,7 +524,6 @@ jobs:
             dlls/ntdll/unix/virtual.c 
             dlls/ntdll/unix/fsync.c 
             dlls/ntdll/unix/sync.c 
-            dlls/ntdll/unix/server.c 
             dlls/ntdll/unix/loader.c
             server/fsync.c 
             server/fd.c 
