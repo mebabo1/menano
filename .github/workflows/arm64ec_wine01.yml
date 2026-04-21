@@ -260,28 +260,29 @@ jobs:
               const char *tmpdir = getenv("TMPDIR");
               if (!tmpdir) tmpdir = "/data/data/com.termux/files/usr/tmp";
 
-              /* 1. 전체 경로 생성 */
               const char *clean_name = (name[0] == '/') ? name + 1 : name;
               if (asprintf(&fname, "%s/%s", tmpdir, clean_name) == -1) return -1;
 
-              /* 2. [추가] 부모 디렉토리 강제 생성 로직 */
               dname = strdup(fname);
               if (dname) {
                   slash = strrchr(dname, '/');
                   if (slash) {
                       *slash = '\0';
-                      /* 재귀적으로 폴더를 만들 순 없지만, Wine의 1단계 하위 폴더는 생성 가능 */
                       mkdir(dname, 0700); 
                   }
                   free(dname);
               }
 
-              /* 3. 파일 열기 (O_RDWR 강제 및 권한 부여) */
-              int fd = open(fname, oflag | O_RDWR, mode | 0600);
+              /* [수정] O_RDWR를 강제하고, 권한을 0600으로 고정하여 확실하게 생성/접근 */
+              int fd = open(fname, oflag | O_RDWR, 0600);
 
-              if (fd != -1 && (oflag & O_CREAT)) {
-                  /* mmap: No such device 해결을 위한 8MB 공간 할당 */
-                  ftruncate(fd, 8 * 1024 * 1024);
+              if (fd != -1) {
+                  /* [핵심] 플래그와 상관없이, 파일 크기가 0이면 무조건 8MB 할당 */
+                  /* mmap: No such device 에러를 원천 봉쇄합니다. */
+                  struct stat st;
+                  if (fstat(fd, &st) == 0 && st.st_size == 0) {
+                      ftruncate(fd, 8 * 1024 * 1024);
+                  }
               }
               free(fname);
               return fd;
