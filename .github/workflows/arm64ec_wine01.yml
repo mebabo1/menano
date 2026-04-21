@@ -444,6 +444,7 @@ jobs:
             sed -i 's/!defined(__ANDROID__)//g' server/fsync.c
             sed -i 's/\bsyscall\s*(/custom_syscall(/g' server/fsync.c
             sed -i 's/fatal_error\s*(/if(0)fatal_error(/g' server/fsync.c
+            sed -i 's/ftruncate\s*(\s*shm_fd[^)]*)/ftruncate(shm_fd, 8*1024*1024)/g' server/fsync.c
             
             # 모든 형태의 open( shm_name... 을 shm_open으로 치환
             sed -i 's/\bopen\s*(\s*shm_name/shm_open(shm_name/g' server/fsync.c
