@@ -231,82 +231,100 @@ jobs:
           fi
           echo "复制后 locale.nls 存在，大小: $(wc -c < /opt/wine64-native/nls/locale.nls) 字节"
 
+      - name: Create SHM Header
+        run: |
+          mkdir -p ${{ env.WINE_SOURCE_DIR }}/source/include
+          cat <<'EOF' > ${{ env.WINE_SOURCE_DIR }}/source/include/shm_utils.h
+          #ifndef __WINE_SERVER_SHM_UTILS_H
+          #define __WINE_SERVER_SHM_UTILS_H
+          #define _GNU_SOURCE
+          #include <fcntl.h>
+          #include <stdio.h>
+          #include <stdlib.h>
+          #include <unistd.h>
+          #include <sys/stat.h>
+          #include <sys/types.h>
+          #include <errno.h>
+          #include <string.h>
+          #include <stdarg.h>
+          #include <sys/syscall.h>
 
+          static inline int custom_shm_open(const char *name, int oflag, mode_t mode) {
+              char *fname = NULL;
+              char *dname = NULL;
+              char *slash = NULL;
+              const char *tmpdir = getenv("TMPDIR");
+              if (!tmpdir) tmpdir = "/data/data/com.termux/files/usr/tmp";
 
-          /* Mode bits for 'msgget', 'semget', and 'shmget' */
-          #define IPC_CREAT   01000
-          #define IPC_EXCL    02000
-          #define IPC_NOWAIT  04000
+              /* 1. 전체 경로 생성 */
+              const char *clean_name = (name[0] == '/') ? name + 1 : name;
+              if (asprintf(&fname, "%s/%s", tmpdir, clean_name) == -1) return -1;
 
-          /* Control commands for 'msgctl', 'semctl', and 'shmctl' */
-          #define IPC_RMID    0
-          #define IPC_SET     1
-          #define IPC_STAT    2
-          #define IPC_INFO    3
+              /* 2. 부모 디렉토리 생성 (수동으로 만들지 않아도 되게끔 보강) */
+              dname = strdup(fname);
+              if (dname) {
+                  slash = strrchr(dname, '/');
+                  if (slash) {
+                      *slash = '\0';
+                      /* 부모 폴더가 없으면 생성 (EEXIST 에러는 무시됨) */
+                      mkdir(dname, 0700); 
+                  }
+                  free(dname);
+              }
 
-          /* Special key values */
-          #define IPC_PRIVATE ((key_t) 0)
+              /* 3. 파일 열기: O_CREAT와 O_RDWR를 명시적으로 보정 */
+              /* wineserver가 생성 모드로 호출할 때 확실히 생성되도록 만듭니다. */
+              int fd = open(fname, oflag | O_RDWR, mode | 0600);
 
-          /* Permission flag for shmget */
-          #define SHM_R       0400
-          #define SHM_W       0200
+              if (fd != -1) {
+                  /* 파일이 방금 생성되었거나 크기가 0이면 8MB 강제 할당 */
+                  struct stat st;
+                  if (fstat(fd, &st) == 0 && st.st_size == 0) {
+                      ftruncate(fd, 8 * 1024 * 1024);
+                  }
+              }
+              
+              free(fname);
+              return fd;
+          }
 
-          /* Flags for 'shmat' */
-          #define SHM_RDONLY  010000
-          #define SHM_RND     020000
-          #define SHM_REMAP   040000
-          #define SHM_EXEC    0100000
+          static inline int custom_shm_unlink(const char *name) {
+              char *fname = NULL;
+              const char *tmpdir = getenv("TMPDIR");
+              if (!tmpdir) tmpdir = "/data/data/com.termux/files/usr/tmp";
+              const char *clean_name = (name[0] == '/') ? name + 1 : name;
+              if (asprintf(&fname, "%s/%s", tmpdir, clean_name) == -1) return -1;
+              int ret = unlink(fname);
+              free(fname);
+              return ret;
+          }
 
-          /* Commands for 'shmctl' */
-          #define SHM_LOCK    11
-          #define SHM_UNLOCK  12
+          static inline long custom_syscall(long number, ...) {
+              va_list args;
+              long a1, a2, a3, a4, a5, a6;
+              long ret;
 
-          typedef unsigned long int shmatt_t;
-          typedef long int __long_time_t;
+              if (number == 449) return 0;
 
-          /* Android Bionic과의 충돌을 방지하기 위한 Custom ipc_perm 구조체 */
-          struct debian_ipc_perm {
-              key_t __key;
-              __uid_t uid;
-              __gid_t gid;
-              __uid_t cuid;
-              __gid_t cgid;
-              unsigned short int mode;
-              unsigned short int __pad1;
-              unsigned short int __seq;
-              unsigned short int __pad2;
-              unsigned long int __unused1;
-              unsigned long int __unused2;
-          };
+              va_start(args, number);
+              a1 = va_arg(args, long);
+              a2 = va_arg(args, long);
+              a3 = va_arg(args, long);
+              a4 = va_arg(args, long);
+              a5 = va_arg(args, long);
+              a6 = va_arg(args, long);
+              va_end(args);
 
-          /* Shared memory segment description structure */
-          struct shmid_ds {
-              struct debian_ipc_perm shm_perm;
-              size_t shm_segsz;
-              __long_time_t shm_atime;
-              unsigned long int __unused1;
-              __long_time_t shm_dtime;
-              unsigned long int __unused2;
-              __long_time_t shm_ctime;
-              unsigned long int __unused3;
-              __pid_t shm_cpid;
-              __pid_t shm_lpid;
-              shmatt_t shm_nattch;
-              unsigned long int __unused4;
-              unsigned long int __unused5;
-          };
+              ret = syscall(number, a1, a2, a3, a4, a5, a6);
+              return ret;
+          }
 
-          /* SysV SHM Functions */
-          extern int shmctl (int __shmid, int __cmd, struct shmid_ds *__buf);
-          extern int shmget (key_t __key, size_t __size, int __shmflg);
-          extern void *shmat (int __shmid, const void *__shmaddr, int __shmflg);
-          extern int shmdt (const void *__shmaddr);
-
-          /* POSIX SHM Inline Utilities for Android */
-          static inline int shm_open(const char *name, int oflag, mode_t mode) {
-              char *tmpdir = getenv("TMPDIR") ? getenv("TMPDIR") : "/tmp";
-              char *fname;
-              if (asprintf(&fname, "%s/%s", tmpdir, name) == -1) return -1;
+          #undef shm_open
+          #define shm_open custom_shm_open
+          #undef shm_unlink
+          #define shm_unlink custom_shm_unlink
+          #endif
+          EOF
 
       - name: Termux
         run: |
@@ -354,19 +372,6 @@ jobs:
               echo "Disabling kernel writewatch for Android compatibility..."
               sed -i 's/use_kernel_writewatch = 1;/use_kernel_writewatch = 0;/g' "$FILE"
             fi
-          fi
-
-          FILE_VIRTUAL="dlls/ntdll/unix/virtual.c"
-          if [ -f "$FILE_VIRTUAL" ]; then
-            echo "Patching shm_open for Termux with safe delimiters..."
-            sed -i "s@fd = shm_open( buf, oflag, S_IRWXU | S_IRWXG | S_IRWXO );@char shm_p[256]; snprintf(shm_p, 256, \"/data/data/com.termux/files/usr/tmp/wine_shm_%s\", buf); fd = open(shm_p, oflag, S_IRWXU | S_IRWXG | S_IRWXO);@g" "$FILE_VIRTUAL"
-          fi
-
-          FILE_VIRTUAL="dlls/ntdll/unix/virtual.c"
-          if [ -f "$FILE_VIRTUAL" ]; then
-            echo "Patching $FILE_VIRTUAL: Completely neutralizing userfaultfd..."
-            sed -i 's/uffd_fd = syscall( __NR_userfaultfd/uffd_fd = -1; \/\/ syscall( __NR_userfaultfd/g' "$FILE_VIRTUAL"
-            sed -i '/static void kernel_writewatch_init(void)/{n;s/^{/{\n    return;/}' "$FILE_VIRTUAL"
           fi
 
           FILE_LOADER="dlls/ntdll/loader.c"
@@ -427,6 +432,42 @@ jobs:
             sed -i 's/$(PTHREAD_LIBS) -lm/$(PTHREAD_LIBS) -lm -landroid-shmem/' "$FILE_X11_MK"
           fi
 
+          TOTAL_TARGETS="
+            dlls/ntdll/unix/virtual.c 
+            dlls/ntdll/unix/fsync.c 
+            dlls/ntdll/unix/sync.c 
+            dlls/ntdll/unix/server.c 
+            dlls/ntdll/unix/loader.c
+            dlls/ntdll/unix/esync.c 
+            server/fsync.c 
+            server/esync.c 
+            server/fd.c 
+            server/mapping.c 
+            server/thread.c
+            server/inproc_sync.c
+            dlls/winex11.drv/bitblt.c
+          "
+
+          for FILE in $TOTAL_TARGETS; do
+            if [ -f "$FILE" ]; then
+              echo "Fixing SHM Hook for $FILE..."
+              
+              # 기존에 잘못 주입된 헤더가 있다면 제거 (깨끗한 상태에서 시작)
+              sed -i '/shm_utils.h/d' "$FILE"
+
+              # config.h가 있으면 그 바로 다음 줄에 주입 (규칙 준수)
+              if grep -q "#include \"config.h\"" "$FILE"; then
+                sed -i "/#include \"config.h\"/a #include <shm_utils.h>" "$FILE"
+              else
+                # config.h가 없으면 파일 맨 처음에 주입
+                sed -i "1i #include <shm_utils.h>" "$FILE"
+              fi
+              
+              # syscall 치환
+              sed -i 's/\bsyscall\s*(/custom_syscall(/g' "$FILE"
+            fi
+          done
+
           find . -type f \( -name "*.c" -o -name "*.h" \) \
             -exec sed -i 's/xtajit64\.dll/libarm64ecfex.dll/g' {} +
           find . -type f \( -name "*.c" -o -name "*.h" \) \
@@ -436,7 +477,7 @@ jobs:
 
           export PATCH_BASE="https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/path"
 
-          PATCH_FILES="1.patch 2.patch 3.patch 4.patch 5.patch 6.patch 7.patch 8.patch"
+          PATCH_FILES="1.patch 2.patch 8.patch"
           echo "Applying external patches from $PATCH_BASE..."
           for FILE in $PATCH_FILES; do
             URL="${PATCH_BASE}/${FILE}"
@@ -463,57 +504,6 @@ jobs:
           if [ ! -f "configure" ]; then
             ./autogen.sh
           fi
-
-      - name: Create SHM Header
-        run: |
-          mkdir -p ${{ env.WINE_SOURCE_DIR }}/source/android/shm_utils
-          cat <<'EOF' > ${{ env.WINE_SOURCE_DIR }}/source/android/shm_utils/shm_utils.h
-          #ifndef __WINE_SERVER_SHM_UTILS_H
-          #define __WINE_SERVER_SHM_UTILS_H
-          #include <fcntl.h>
-          #include <stdio.h>
-          #include <stdlib.h>
-          #include <unistd.h>
-          #include <sys/stat.h>
-          #include <sys/types.h>
-          #include <errno.h>
-          #include <string.h>
-
-          static inline int custom_shm_open(const char *name, int oflag, mode_t mode) {
-              char *fname = NULL;
-              const char *tmpdir;
-              const char *clean_name;
-              int fd;
-
-              tmpdir = getenv("TMPDIR");
-              if (!tmpdir) tmpdir = "/data/data/com.termux/files/usr/tmp";
-              clean_name = (name[0] == '/') ? name + 1 : name;
-              
-              if (asprintf(&fname, "%s/%s", tmpdir, clean_name) == -1) return -1;
-              fd = open(fname, oflag, mode);
-              if (fd != -1 && (oflag & O_CREAT)) ftruncate(fd, 8 * 1024 * 1024);
-              free(fname);
-              return fd;
-          }
-          static inline int custom_shm_unlink(const char *name) {
-              char *fname = NULL;
-              const char *tmpdir;
-              const char *clean_name;
-              int ret;
-
-              tmpdir = getenv("TMPDIR");
-              if (!tmpdir) tmpdir = "/data/data/com.termux/files/usr/tmp";
-              clean_name = (name[0] == '/') ? name + 1 : name;
-              
-              if (asprintf(&fname, "%s/%s", tmpdir, clean_name) == -1) return -1;
-              ret = unlink(fname);
-              free(fname);
-              return ret;
-          }
-          #define shm_open custom_shm_open
-          #define shm_unlink custom_shm_unlink
-          #endif
-          EOF
 
       - name: ARM64 WOW64
         run: |
