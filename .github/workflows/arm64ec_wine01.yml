@@ -493,28 +493,25 @@ jobs:
           # [3] dlls/ntdll/unix/sync.c 패치 (shm_utils.h 대응 버전)
           FILE_SYNC="dlls/ntdll/unix/sync.c"
           if [ -f "$FILE_SYNC" ]; then
-            sed -i 's/\bsyscall\s*(/custom_syscall(/g' "$FILE_SYNC"
-            sed -i '/int\s*futex_waitv_supported/,/}/ s/return .*/return 1; }/' "$FILE_SYNC"
+            # sed -i 's/\bsyscall\s*(/custom_syscall(/g' "$FILE_SYNC"
+            # sed -i '/int\s*futex_waitv_supported/,/}/ s/return .*/return 1; }/' "$FILE_SYNC"
           fi
 
           FILE_THREAD="server/thread.c"
           if [ -f "$FILE_THREAD" ]; then
-            sed -i '/shm_utils.h/d' "$FILE_THREAD"
-            sed -i "/#include \"config.h\"/a #include \"shm_utils.h\"" "$FILE_THREAD"
+            # sed -i '/shm_utils.h/d' "$FILE_THREAD"
+            # sed -i "/#include \"config.h\"/a #include \"shm_utils.h\"" "$FILE_THREAD"
           fi
 
           FILE_INPROC="server/inproc_sync.c"
           if [ -f "$FILE_INPROC" ]; then    
-            sed -i 's/\bopen\s*(/shm_open(/g' "$FILE_INPROC"
-            sed -i 's/\bshm_open\s*(/shm_open(/g' "$FILE_INPROC"
+            # sed -i 's/\bopen\s*(/shm_open(/g' "$FILE_INPROC"
+            # sed -i 's/\bshm_open\s*(/shm_open(/g' "$FILE_INPROC"
           fi
 
           TOTAL_TARGETS=" 
             dlls/ntdll/unix/fsync.c 
             dlls/ntdll/unix/sync.c 
-            server/fsync.c 
-            server/inproc_sync.c
-            dlls/winex11.drv/bitblt.c
           "
 
           for FILE in $TOTAL_TARGETS; do
