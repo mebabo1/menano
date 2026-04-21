@@ -439,26 +439,28 @@ jobs:
               }' "$FILE"
           fi
 
-          # [1] server/fsync.c 패치
+          # [1] server/fsync.c 패치 (서버측 생성부)
           if [ -f "server/fsync.c" ]; then
-            echo "Precise patching for server/fsync.c..."
+            echo "Aggressive patching for server/fsync.c..."
             
-            # 1. 모든 shm_open 호출을 custom_shm_open으로 강제 전환 (공백 대응)
-            sed -i 's/\bshm_open\s*(\s*shm_name/shm_open(shm_name/g' server/fsync.c
-            
-            # 2. ftruncate 크기 강제 확장 (4KB -> 8MB)
-            # 소스 코드의 ftruncate 부분을 주석 처리하거나 크기를 키웁니다.
-            sed -i 's/ftruncate\s*(\s*shm_fd\s*,\s*shm_size\s*)/ftruncate(shm_fd, 8*1024*1024)/g' server/fsync.c
-            
-            # 3. 기존 자살 방지 및 시스템 콜 패치 유지
+            # 1. 안드로이드 제한 해제 및 시스템 콜 가로채기
             sed -i 's/!defined(__ANDROID__)//g' server/fsync.c
             sed -i 's/\bsyscall\s*(/custom_syscall(/g' server/fsync.c
             sed -i 's/fatal_error\s*(/if(0)fatal_error(/g' server/fsync.c
+            
+            # 2. [중요] 모든 open/shm_open을 custom_shm_open으로 강제 리다이렉션
+            # 변수명에 상관없이 모든 호출을 가로채서 shm_utils.h 로직을 태웁니다.
+            sed -i 's/\bshm_open\s*(/shm_open(/g' server/fsync.c
+            sed -i 's/\bopen\s*(/shm_open(/g' server/fsync.c
+            
+            # 3. ftruncate 크기 강제 확장 (No such device 방어 최전선)
+            # shm_size 변수를 쓰든 숫자를 쓰든 무조건 8MB를 할당하게 바꿉니다.
+            sed -i 's/ftruncate\s*(\s*shm_fd[^)]*)/ftruncate(shm_fd, 8*1024*1024)/g' server/fsync.c
           fi
 
           # [2] dlls/ntdll/unix/fsync.c 패치 (클라이언트측 연결부)
           if [ -f "dlls/ntdll/unix/fsync.c" ]; then
-            echo "Deep patching for ntdll fsync.c..."
+            echo "Aggressive patching for ntdll fsync.c..."
             
             # 1. 시스템 콜 정의 및 가로채기
             if grep -q "#include \"config.h\"" dlls/ntdll/unix/fsync.c; then
@@ -466,20 +468,19 @@ jobs:
             fi
             sed -i 's/\bsyscall\s*(/custom_syscall(/g' dlls/ntdll/unix/fsync.c
 
-            # 2. [핵심] 변수명 대응 (shm_name으로 변경)
-            # 소스에서 확인된 shm_name을 사용하는 모든 open/shm_open을 가로챕니다.
-            sed -i 's/\bshm_open\s*(\s*shm_name/shm_open(shm_name/g' dlls/ntdll/unix/fsync.c
-            sed -i 's/\bopen\s*(\s*shm_name/shm_open(shm_name/g' dlls/ntdll/unix/fsync.c
+            # 2. [핵심] 모든 open/shm_open을 가로채기
+            # ntdll에서도 변수명을 가리지 않고 우리 커스텀 함수를 호출하게 합니다.
+            sed -i 's/\bshm_open\s*(/shm_open(/g' dlls/ntdll/unix/fsync.c
+            sed -i 's/\bopen\s*(/shm_open(/g' dlls/ntdll/unix/fsync.c
 
-            # 3. [추가] 안드로이드 커널 호환성 문제로 인한 강제 종료 방지
-            # futex_waitv 체크 실패 시 exit(1) 하는 부분을 주석 처리합니다.
+            # 3. 자살 방지 로직 (exit(1) 무력화)
             sed -i 's/exit\s*(1\s*)/\/* exit(1) disabled *\//g' dlls/ntdll/unix/fsync.c
 
-            # 4. mmap 호환성 패치 (No such device 방어)
+            # 4. mmap 호환성 패치
             sed -i 's/MAP_SHARED\s*|\s*MAP_ANONYMOUS/MAP_SHARED/g' dlls/ntdll/unix/fsync.c
             sed -i 's/MAP_SHARED|MAP_ANONYMOUS/MAP_SHARED/g' dlls/ntdll/unix/fsync.c
             
-            echo "✔ ntdll fsync.c: shm_name & exit-guard patch applied."
+            echo "✔ ntdll fsync.c: Aggressive open-redirection applied."
           fi
 
           # [3] dlls/ntdll/unix/sync.c 패치 (shm_utils.h 대응 버전)
