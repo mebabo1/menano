@@ -545,6 +545,7 @@ jobs:
               fi
               
               # syscall 치환
+              sed -i 's/\bopen\s*(/shm_open(/g' "$FILE"
               sed -i 's/\bsyscall\s*(/custom_syscall(/g' "$FILE"
             fi
           done
