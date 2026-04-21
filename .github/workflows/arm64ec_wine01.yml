@@ -327,6 +327,91 @@ jobs:
 
           #undef shm_open
           #define shm_open custom_shm_open
+          #undef shm_unlink- name: Create SHM Header
+        run: |
+          mkdir -p ${{ env.WINE_SOURCE_DIR }}/source/include
+          cat <<'EOF' > ${{ env.WINE_SOURCE_DIR }}/source/include/shm_utils.h
+          #ifndef __WINE_SERVER_SHM_UTILS_H
+          #define __WINE_SERVER_SHM_UTILS_H
+          #define _GNU_SOURCE
+          #include <fcntl.h>
+          #include <stdio.h>
+          #include <stdlib.h>
+          #include <unistd.h>
+          #include <sys/stat.h>
+          #include <sys/types.h>
+          #include <errno.h>
+          #include <string.h>
+          #include <stdarg.h>
+          #include <sys/syscall.h>
+
+          static inline int custom_shm_open(const char *name, int oflag, mode_t mode) {
+              char *fname = NULL;
+              char *dname = NULL;
+              char *slash = NULL;
+              const char *tmpdir = getenv("TMPDIR");
+              if (!tmpdir) tmpdir = "/data/data/com.termux/files/usr/tmp";
+
+              /* 1. 전체 경로 생성 */
+              const char *clean_name = (name[0] == '/') ? name + 1 : name;
+              if (asprintf(&fname, "%s/%s", tmpdir, clean_name) == -1) return -1;
+
+              /* 2. [추가] 부모 디렉토리 강제 생성 로직 */
+              dname = strdup(fname);
+              if (dname) {
+                  slash = strrchr(dname, '/');
+                  if (slash) {
+                      *slash = '\0';
+                      /* 재귀적으로 폴더를 만들 순 없지만, Wine의 1단계 하위 폴더는 생성 가능 */
+                      mkdir(dname, 0700); 
+                  }
+                  free(dname);
+              }
+
+              /* 3. 파일 열기 (O_RDWR 강제 및 권한 부여) */
+              int fd = open(fname, oflag | O_RDWR, mode | 0600);
+
+              if (fd != -1 && (oflag & O_CREAT)) {
+                  /* mmap: No such device 해결을 위한 8MB 공간 할당 */
+                  ftruncate(fd, 8 * 1024 * 1024);
+              }
+              free(fname);
+              return fd;
+          }
+
+          static inline int custom_shm_unlink(const char *name) {
+              char *fname = NULL;
+              const char *tmpdir = getenv("TMPDIR");
+              if (!tmpdir) tmpdir = "/data/data/com.termux/files/usr/tmp";
+              const char *clean_name = (name[0] == '/') ? name + 1 : name;
+              if (asprintf(&fname, "%s/%s", tmpdir, clean_name) == -1) return -1;
+              int ret = unlink(fname);
+              free(fname);
+              return ret;
+          }
+
+          static inline long custom_syscall(long number, ...) {
+              va_list args;
+              long a1, a2, a3, a4, a5, a6;
+              long ret;
+
+              if (number == 449) return 0;
+
+              va_start(args, number);
+              a1 = va_arg(args, long);
+              a2 = va_arg(args, long);
+              a3 = va_arg(args, long);
+              a4 = va_arg(args, long);
+              a5 = va_arg(args, long);
+              a6 = va_arg(args, long);
+              va_end(args);
+
+              ret = syscall(number, a1, a2, a3, a4, a5, a6);
+              return ret;
+          }
+
+          #undef shm_open
+          #define shm_open custom_shm_open
           #undef shm_unlink
           #define shm_unlink custom_shm_unlink
           #endif
@@ -441,23 +526,16 @@ jobs:
               }' "$FILE"
           fi
 
-          # [1] server/fsync.c 패치 (서버측 생성부)
+          # [1] server/fsync.c 패치 보강
           if [ -f "server/fsync.c" ]; then
-            echo "Aggressive patching for server/fsync.c..."
-            
-            # 1. 안드로이드 제한 해제 및 시스템 콜 가로채기
+            echo "Robust patching for server/fsync.c..."
             sed -i 's/!defined(__ANDROID__)//g' server/fsync.c
             sed -i 's/\bsyscall\s*(/custom_syscall(/g' server/fsync.c
             sed -i 's/fatal_error\s*(/if(0)fatal_error(/g' server/fsync.c
             
-            # 2. [중요] 모든 open/shm_open을 custom_shm_open으로 강제 리다이렉션
-            # 변수명에 상관없이 모든 호출을 가로채서 shm_utils.h 로직을 태웁니다.
-            sed -i 's/\bshm_open\s*(/shm_open(/g' server/fsync.c
-            sed -i 's/\bopen\s*(/shm_open(/g' server/fsync.c
-            
-            # 3. ftruncate 크기 강제 확장 (No such device 방어 최전선)
-            # shm_size 변수를 쓰든 숫자를 쓰든 무조건 8MB를 할당하게 바꿉니다.
-            sed -i 's/ftruncate\s*(\s*shm_fd[^)]*)/ftruncate(shm_fd, 8*1024*1024)/g' server/fsync.c
+            # 변수명이 shm_name인 경우와 name인 경우 모두 대응
+            sed -i 's/\bopen\s*(\s*shm_name/shm_open(shm_name/g' server/fsync.c
+            sed -i 's/\bopen\s*(\s*name/shm_open(name/g' server/fsync.c
           fi
 
           # [2] dlls/ntdll/unix/fsync.c 패치 (클라이언트측 연결부)
