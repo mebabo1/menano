@@ -304,21 +304,20 @@ jobs:
           }
           
           static inline long custom_syscall(long number, ...) {
-              // [1] 모든 변수 선언을 함수 최상단으로 이동 (C89/C99 호환성)
               va_list args;
               long a1, a2, a3, a4, a5, a6;
               struct timespec ts;
 
-              // [2] 449번 가로채기 로직
+              // [2] 449번 가로채기: "성공"이라고 속이지만, CPU를 쉬게 만듦
               if (number == 449) {
-                  errno = ENOSYS;
-              
-                  // 발열 제어를 위한 미세 지연 (50us)
+                  // Wine이 "오, 449번 기능이 있네!"라고 믿게 만듭니다.
+                  // 하지만 루프를 돌 때마다 100~200마이크로초씩 강제로 쉬게 해서 
+                  // CPU 점유율과 발열을 물리적으로 억제합니다.
                   ts.tv_sec = 0;
-                  ts.tv_nsec = 50000;
+                  ts.tv_nsec = 150000; // 50us에서 150us로 늘려 발열을 더 억제
                   nanosleep(&ts, NULL);
               
-                  return -1;
+                  return 0; // -1 대신 0을 반환하여 Fsync를 강제 활성화
               }
 
               // [3] 나머지 시스템 콜 처리
