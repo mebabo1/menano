@@ -260,30 +260,29 @@ jobs:
               const char *clean_name = (name[0] == '/') ? name + 1 : name;
               if (asprintf(&fname, "%s/%s", tmpdir, clean_name) == -1) return -1;
 
-              /* 2. 부모 디렉토리 생성 (수동으로 만들지 않아도 되게끔 보강) */
+              /* 2. [강화] 하위 디렉토리(wine-xxxx-fsync) 자동 생성 */
               dname = strdup(fname);
               if (dname) {
                   slash = strrchr(dname, '/');
                   if (slash) {
                       *slash = '\0';
-                      /* 부모 폴더가 없으면 생성 (EEXIST 에러는 무시됨) */
-                      mkdir(dname, 0700); 
+                      /* stat으로 폴더 존재 확인 후 없으면 생성 */
+                      struct stat st;
+                      if (stat(dname, &st) == -1) {
+                          mkdir(dname, 0700); 
+                      }
                   }
                   free(dname);
               }
 
-              /* 3. 파일 열기: O_CREAT와 O_RDWR를 명시적으로 보정 */
-              /* wineserver가 생성 모드로 호출할 때 확실히 생성되도록 만듭니다. */
-              int fd = open(fname, oflag | O_RDWR, mode | 0600);
-
+              /* 3. 파일 열기 (권한 강제 및 O_RDWR 부여) */
+              int fd = open(fname, oflag | O_RDWR, 0600);
               if (fd != -1) {
-                  /* 파일이 방금 생성되었거나 크기가 0이면 8MB 강제 할당 */
                   struct stat st;
                   if (fstat(fd, &st) == 0 && st.st_size == 0) {
                       ftruncate(fd, 8 * 1024 * 1024);
                   }
               }
-              
               free(fname);
               return fd;
           }
