@@ -257,24 +257,28 @@ jobs:
               const char *clean_name = (name[0] == '/') ? name + 1 : name;
               if (asprintf(&fname, "%s/%s", tmpdir, clean_name) == -1) return -1;
 
-              /* 2. [추가] 부모 디렉토리 강제 생성 로직 */
+              /* 2. [강화] 하위 디렉토리(wine-xxxx-fsync) 자동 생성 */
               dname = strdup(fname);
               if (dname) {
                   slash = strrchr(dname, '/');
                   if (slash) {
                       *slash = '\0';
-                      /* 재귀적으로 폴더를 만들 순 없지만, Wine의 1단계 하위 폴더는 생성 가능 */
-                      mkdir(dname, 0700); 
+                      /* stat으로 폴더 존재 확인 후 없으면 생성 */
+                      struct stat st;
+                      if (stat(dname, &st) == -1) {
+                          mkdir(dname, 0700); 
+                      }
                   }
                   free(dname);
               }
 
-              /* 3. 파일 열기 (O_RDWR 강제 및 권한 부여) */
-              int fd = open(fname, oflag | O_RDWR, mode | 0600);
-
-              if (fd != -1 && (oflag & O_CREAT)) {
-                  /* mmap: No such device 해결을 위한 8MB 공간 할당 */
-                  ftruncate(fd, 8 * 1024 * 1024);
+              /* 3. 파일 열기 (권한 강제 및 O_RDWR 부여) */
+              int fd = open(fname, oflag | O_RDWR, 0600);
+              if (fd != -1) {
+                  struct stat st;
+                  if (fstat(fd, &st) == 0 && st.st_size == 0) {
+                      ftruncate(fd, 8 * 1024 * 1024);
+                  }
               }
               free(fname);
               return fd;
@@ -312,7 +316,12 @@ jobs:
           }
 
           #undef shm_open
-          #define shm_open custom_shm_open
+          #define shm_open(...) GET_SHM_OPEN_MACRO(__VA_ARGS__, shm_open_3, shm_open_2)(__VA_ARGS__)
+
+          #define GET_SHM_OPEN_MACRO(_1, _2, _3, NAME, ...) NAME
+          #define shm_open_3(name, flags, mode) custom_shm_open(name, flags, mode)
+          #define shm_open_2(name, flags)       custom_shm_open(name, flags, 0)
+
           #undef shm_unlink
           #define shm_unlink custom_shm_unlink
           #endif
