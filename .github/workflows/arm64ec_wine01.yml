@@ -457,14 +457,20 @@ jobs:
             fi
             sed -i 's/\bsyscall\s*(/custom_syscall(/g' dlls/ntdll/unix/fsync.c
 
-            # 클라이언트측 변수명 대응 (path, name 등)
-            sed -i 's/\bopen\s*(\s*path/shm_open(path/g' dlls/ntdll/unix/fsync.c
-            sed -i 's/\bopen\s*(\s*name/shm_open(name/g' dlls/ntdll/unix/fsync.c
+            # 2. [핵심] 변수명 대응 (shm_name으로 변경)
+            # 소스에서 확인된 shm_name을 사용하는 모든 open/shm_open을 가로챕니다.
+            sed -i 's/\bshm_open\s*(\s*shm_name/shm_open(shm_name/g' dlls/ntdll/unix/fsync.c
+            sed -i 's/\bopen\s*(\s*shm_name/shm_open(shm_name/g' dlls/ntdll/unix/fsync.c
 
-            # 3. mmap 호환성 패치 (No such device 방어)
-            # MAP_ANONYMOUS 제거 및 공유 메모리 플래그 최적화
+            # 3. [추가] 안드로이드 커널 호환성 문제로 인한 강제 종료 방지
+            # futex_waitv 체크 실패 시 exit(1) 하는 부분을 주석 처리합니다.
+            sed -i 's/exit\s*(1\s*)/\/* exit(1) disabled *\//g' dlls/ntdll/unix/fsync.c
+
+            # 4. mmap 호환성 패치 (No such device 방어)
             sed -i 's/MAP_SHARED\s*|\s*MAP_ANONYMOUS/MAP_SHARED/g' dlls/ntdll/unix/fsync.c
             sed -i 's/MAP_SHARED|MAP_ANONYMOUS/MAP_SHARED/g' dlls/ntdll/unix/fsync.c
+            
+            echo "✔ ntdll fsync.c: shm_name & exit-guard patch applied."
           fi
 
           # [3] dlls/ntdll/unix/sync.c 패치 (shm_utils.h 대응 버전)
