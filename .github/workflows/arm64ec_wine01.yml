@@ -255,20 +255,32 @@ jobs:
 
           static inline int custom_shm_open(const char *name, int oflag, mode_t mode) {
               char *fname = NULL;
+              char *dname = NULL;
+              char *slash = NULL;
               const char *tmpdir = getenv("TMPDIR");
               if (!tmpdir) tmpdir = "/data/data/com.termux/files/usr/tmp";
 
-              /* [안전장치] 디렉토리가 없으면 생성 (EEXIST 무시) */
-              mkdir(tmpdir, 0700); 
-
+              /* 1. 전체 경로 생성 */
               const char *clean_name = (name[0] == '/') ? name + 1 : name;
               if (asprintf(&fname, "%s/%s", tmpdir, clean_name) == -1) return -1;
 
-              /* O_RDWR를 강제하여 mmap 권한 충돌 방지 */
+              /* 2. [추가] 부모 디렉토리 강제 생성 로직 */
+              dname = strdup(fname);
+              if (dname) {
+                  slash = strrchr(dname, '/');
+                  if (slash) {
+                      *slash = '\0';
+                      /* 재귀적으로 폴더를 만들 순 없지만, Wine의 1단계 하위 폴더는 생성 가능 */
+                      mkdir(dname, 0700); 
+                  }
+                  free(dname);
+              }
+
+              /* 3. 파일 열기 (O_RDWR 강제 및 권한 부여) */
               int fd = open(fname, oflag | O_RDWR, mode | 0600);
 
               if (fd != -1 && (oflag & O_CREAT)) {
-                  /* 파일 크기 강제 할당 (No such device 에러 해결사) */
+                  /* mmap: No such device 해결을 위한 8MB 공간 할당 */
                   ftruncate(fd, 8 * 1024 * 1024);
               }
               free(fname);
@@ -277,16 +289,11 @@ jobs:
 
           static inline int custom_shm_unlink(const char *name) {
               char *fname = NULL;
-              const char *tmpdir;
-              const char *clean_name;
-              int ret;
-
-              tmpdir = getenv("TMPDIR");
+              const char *tmpdir = getenv("TMPDIR");
               if (!tmpdir) tmpdir = "/data/data/com.termux/files/usr/tmp";
-              clean_name = (name[0] == '/') ? name + 1 : name;
-              
+              const char *clean_name = (name[0] == '/') ? name + 1 : name;
               if (asprintf(&fname, "%s/%s", tmpdir, clean_name) == -1) return -1;
-              ret = unlink(fname);
+              int ret = unlink(fname);
               free(fname);
               return ret;
           }
@@ -296,12 +303,8 @@ jobs:
               long a1, a2, a3, a4, a5, a6;
               long ret;
 
-              /* 1. 모든 변수 선언은 함수 시작 부분에 위치해야 함 (C89 준수) */
-              if (number == 449) {
-                  return 0; /* futex_waitv 지원함 신호 */
-              }
+              if (number == 449) return 0;
 
-              /* 2. 가변 인자 처리: 변수 타입(long)을 다시 붙이지 않고 할당만 수행 */
               va_start(args, number);
               a1 = va_arg(args, long);
               a2 = va_arg(args, long);
