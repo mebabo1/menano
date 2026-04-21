@@ -434,16 +434,15 @@ jobs:
               }' "$FILE"
           fi
 
-          # [1] server/fsync.c 패치 보강
+          # [1] server/fsync.c 패치 (서버측 생성부 - 가장 중요!)
           if [ -f "server/fsync.c" ]; then
             echo "Robust patching for server/fsync.c..."
             sed -i 's/!defined(__ANDROID__)//g' server/fsync.c
             sed -i 's/\bsyscall\s*(/custom_syscall(/g' server/fsync.c
             sed -i 's/fatal_error\s*(/if(0)fatal_error(/g' server/fsync.c
             
-            # 변수명이 shm_name인 경우와 name인 경우 모두 대응
+            # 모든 형태의 open( shm_name... 을 shm_open으로 치환
             sed -i 's/\bopen\s*(\s*shm_name/shm_open(shm_name/g' server/fsync.c
-            sed -i 's/\bopen\s*(\s*name/shm_open(name/g' server/fsync.c
           fi
 
           # [2] dlls/ntdll/unix/fsync.c 패치 (클라이언트측 연결부)
