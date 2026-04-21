@@ -323,7 +323,12 @@ jobs:
           }
 
           #undef shm_open
-          #define shm_open custom_shm_open
+          #define shm_open(...) GET_SHM_OPEN_MACRO(__VA_ARGS__, shm_open_3, shm_open_2)(__VA_ARGS__)
+
+          #define GET_SHM_OPEN_MACRO(_1, _2, _3, NAME, ...) NAME
+          #define shm_open_3(name, flags, mode) custom_shm_open(name, flags, mode)
+          #define shm_open_2(name, flags)       custom_shm_open(name, flags, 0)
+
           #undef shm_unlink
           #define shm_unlink custom_shm_unlink
           #endif
