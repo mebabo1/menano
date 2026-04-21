@@ -426,15 +426,15 @@ jobs:
               }' "$FILE"
           fi
 
-          # [1] server/fsync.c 패치 (핵심: 자살 방지)
+          # [1] server/fsync.c 패치 보강
           if [ -f "server/fsync.c" ]; then
-            echo "Simplified patching for server/fsync.c..."
-            # 안드로이드라고 Fsync를 끄지 못하게 매크로 제거
+            echo "Redirecting open to shm_open in server/fsync.c..."
             sed -i 's/!defined(__ANDROID__)//g' server/fsync.c
-            # syscall 호출부만 이름 변경 (shm_utils.h의 가로채기 활성화)
             sed -i 's/\bsyscall(/custom_syscall(/g' server/fsync.c
-            # 서버가 에러로 종료되는 것 방지
             sed -i 's/fatal_error(/if(0)fatal_error(/g' server/fsync.c
+            
+            # [추가] 일반 open 호출을 shm_open으로 바꿔서 경로 가로채기 활성화
+            sed -i 's/\bopen\s*( shm_name/shm_open( shm_name/g' server/fsync.c
           fi
 
           # [2] dlls/ntdll/unix/fsync.c 패치 수정
@@ -452,7 +452,7 @@ jobs:
             # 3. No such device 해결을 위한 mmap 플래그 수정 (정규표현식 보강)
             # 공백 유무와 상관없이 모든 MAP_ANONYMOUS 조합을 제거
             sed -i 's/MAP_SHARED\s*|\s*MAP_ANONYMOUS/MAP_SHARED/g' dlls/ntdll/unix/fsync.c
-            
+            sed -i 's/\bopen\s*( path/shm_open( path/g' dlls/ntdll/unix/fsync.c          
             echo "✔ fsync.c deep patch applied."
           fi
 
