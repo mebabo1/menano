@@ -438,16 +438,19 @@ jobs:
               }' "$FILE"
           fi
 
-          # [1] server/fsync.c 패치
+          # [1] server/fsync.c 패치 (서버측 생성부)
           if [ -f "server/fsync.c" ]; then
             echo "Aggressive patching for server/fsync.c..."
-            # 모든 open/shm_open을 매크로가 인식할 수 있는 shm_open으로 통일
+            
+            # 1. 모든 open/shm_open 호출을 shm_open으로 통일
+            # 이렇게 해야 shm_utils.h의 #define shm_open custom_shm_open 매크로가 작동합니다.
             sed -i 's/\bopen\s*(/shm_open(/g' server/fsync.c
             sed -i 's/\bshm_open\s*(/shm_open(/g' server/fsync.c
             
-            # ftruncate가 서버 코드에서 다시 크기를 줄이지 못하게 강제 고정
+            # 2. ftruncate 강제 고정 (소스 코드에서 크기를 0으로 줄이는 시도를 차단)
             sed -i 's/ftruncate\s*(\s*shm_fd[^)]*)/ftruncate(shm_fd, 8*1024*1024)/g' server/fsync.c
             
+            # 3. 안드로이드 차단 해제 및 커스텀 시스템 콜 적용
             sed -i 's/!defined(__ANDROID__)//g' server/fsync.c
             sed -i 's/\bsyscall\s*(/custom_syscall(/g' server/fsync.c
           fi
@@ -462,15 +465,16 @@ jobs:
             fi
             sed -i 's/\bsyscall\s*(/custom_syscall(/g' dlls/ntdll/unix/fsync.c
 
-            # 2. [핵심] 모든 open/shm_open을 가로채기
-            # ntdll에서도 변수명을 가리지 않고 우리 커스텀 함수를 호출하게 합니다.
-            sed -i 's/\bshm_open\s*(/shm_open(/g' dlls/ntdll/unix/fsync.c
+            # 2. [중요] 모든 파일 열기 호출을 shm_open으로 강제 전환
+            # ntdll.so 내부에 있는 open() 호출이 시스템 표준 open()이 아닌 
+            # 우리가 만든 '폴더 생성 기능'이 있는 함수를 타게 만듭니다.
             sed -i 's/\bopen\s*(/shm_open(/g' dlls/ntdll/unix/fsync.c
+            sed -i 's/\bshm_open\s*(/shm_open(/g' dlls/ntdll/unix/fsync.c
 
-            # 3. 자살 방지 로직 (exit(1) 무력화)
+            # 3. 비정상 종료 차단
             sed -i 's/exit\s*(1\s*)/\/* exit(1) disabled *\//g' dlls/ntdll/unix/fsync.c
 
-            # 4. mmap 호환성 패치
+            # 4. mmap 호환성 패치 (안드로이드에서 MAP_ANONYMOUS와 파일 매핑 혼용 금지 대응)
             sed -i 's/MAP_SHARED\s*|\s*MAP_ANONYMOUS/MAP_SHARED/g' dlls/ntdll/unix/fsync.c
             sed -i 's/MAP_SHARED|MAP_ANONYMOUS/MAP_SHARED/g' dlls/ntdll/unix/fsync.c
             
