@@ -284,7 +284,7 @@ jobs:
               if (fd != -1) {
                   struct stat st;
                   if (fstat(fd, &st) == 0 && st.st_size == 0) {
-                      ftruncate(fd, 8 * 1024 * 1024);
+                      ftruncate(fd, 1024 * 1024);
                   }
               }
               free(fname);
@@ -301,14 +301,21 @@ jobs:
               free(fname);
               return ret;
           }
-
+          
           static inline long custom_syscall(long number, ...) {
+              if (number == 449) {
+                  // 1. Wine에게 "이 기능은 지원하지 않는다"고 명확히 알림 (가장 중요)
+                  errno = ENOSYS; 
+                  // 2. CPU가 미친 듯이 루프 도는 것을 방지 (미세한 지연)
+                  // 10~50마이크로초 정도만 쉬어도 발열이 극적으로 줄어듭니다.
+                  struct timespec ts = {0, 50000}; // 50,000ns = 50us
+                  nanosleep(&ts, NULL);
+
+                  return -1; 
+              }
+
               va_list args;
               long a1, a2, a3, a4, a5, a6;
-              long ret;
-
-              if (number == 449) return 0;
-
               va_start(args, number);
               a1 = va_arg(args, long);
               a2 = va_arg(args, long);
@@ -317,11 +324,9 @@ jobs:
               a5 = va_arg(args, long);
               a6 = va_arg(args, long);
               va_end(args);
-
-              ret = syscall(number, a1, a2, a3, a4, a5, a6);
-              return ret;
+              
+              return syscall(number, a1, a2, a3, a4, a5, a6);
           }
-
           #undef shm_open
           #define shm_open(...) GET_SHM_OPEN_MACRO(__VA_ARGS__, shm_open_3, shm_open_2)(__VA_ARGS__)
 
@@ -443,7 +448,7 @@ jobs:
             sed -i 's/\bopen\s*(/custom_shm_open(/g' server/fsync.c
             sed -i 's/\bshm_open\s*(/custom_shm_open(/g' server/fsync.c
             sed -i 's/\bshm_unlink\s*(/custom_shm_unlink(/g' server/fsync.c
-            sed -i 's/shm_size\s*=\s*FSYNC_SHM_PAGE_SIZE/shm_size = 8*1024*1024/g' server/fsync.c
+            sed -i 's/shm_size\s*=\s*FSYNC_SHM_PAGE_SIZE/shm_size = 1024*1024/g' server/fsync.c
             sed -i 's/ftruncate\s*(\s*shm_fd[^)]*)/ftruncate(shm_fd, shm_size)/g' server/fsync.c
             sed -i 's/!defined(__ANDROID__)//g' server/fsync.c
             sed -i 's/\bsyscall\s*(/custom_syscall(/g' server/fsync.c
