@@ -441,12 +441,12 @@ jobs:
             sed -i '/shm_utils.h/d' server/fsync.c
             sed -i "1i #include \"shm_utils.h\"" server/fsync.c
             sed -i 's/\bopen\s*(/custom_shm_open(/g' server/fsync.c
-            sed -i 's/\bshm_open\s*(/custom_shm_open(/g' server/fsync.
+            sed -i 's/\bshm_open\s*(/custom_shm_open(/g' server/fsync
             sed -i 's/\bshm_unlink\s*(/custom_shm_unlink(/g' server/fsync.c
             sed -i 's/shm_size\s*=\s*FSYNC_SHM_PAGE_SIZE/shm_size = 8*1024*1024/g' server/fsync.c
             sed -i 's/ftruncate\s*(\s*shm_fd[^)]*)/ftruncate(shm_fd, shm_size)/g' server/fsync.c
             sed -i 's/!defined(__ANDROID__)//g' server/fsync.c
-            sed -i 's/\bsyscall\s*(/custom_syscall(/g' server/fsync.c  
+            sed -i 's/\bsyscall\s*(/custom_syscall(/g' server/fsync.c
             echo "✔ server/fsync.c: Ironclad patch applied."
           fi
 
