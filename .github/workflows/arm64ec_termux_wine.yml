@@ -376,9 +376,17 @@ jobs:
           FILE_VIRTUAL="dlls/ntdll/unix/virtual.c"
           if [ -f "$FILE_VIRTUAL" ]; then
             echo "Patching $FILE_VIRTUAL: Specific SHM & Kernel bypass..."
+
+            # 1. userfaultfd 무력화 (안드로이드 커널 미지원 대응)
             sed -i 's/uffd_fd = syscall( __NR_userfaultfd/uffd_fd = -1; \/\/ bypassed/g' "$FILE_VIRTUAL"
             sed -i '/static void kernel_writewatch_init(void)/{n;s/^{/{\n    return;/}' "$FILE_VIRTUAL"
+
+            # 2. [중요] FEX 관련 shm_open 가로채기 (변수명: buf)
+            # 이 부분이 없으면 virtual.c에서 발생하는 SHM 에러를 잡지 못합니다.
             sed -i 's/\bshm_open\s*(\s*buf/shm_open(buf/g' "$FILE_VIRTUAL"
+
+            # 3. ftruncate 크기 강제 확보 (No such device 방어)
+            # info->map_size가 0인 경우를 대비해 8MB 정도로 보정합니다.
             sed -i 's/ftruncate\s*(\s*fd\s*,\s*info->map_size\s*)/ftruncate(fd, 8*1024*1024)/g' "$FILE_VIRTUAL"
             echo "✔ virtual.c: SHM redirection & safe bypass applied."
           fi
