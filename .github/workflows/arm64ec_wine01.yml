@@ -474,8 +474,8 @@ jobs:
             # 2. [중요] 모든 파일 열기 호출을 shm_open으로 강제 전환
             # ntdll.so 내부에 있는 open() 호출이 시스템 표준 open()이 아닌 
             # 우리가 만든 '폴더 생성 기능'이 있는 함수를 타게 만듭니다.
-            sed -i 's/\bopen\s*(/custom_shm_open(/g' dlls/ntdll/unix/fsync.c
-            sed -i 's/\bshm_open\s*(/custom_shm_open(/g' dlls/ntdll/unix/fsync.c
+            sed -i 's/\bopen\s*(/shm_open(/g' dlls/ntdll/unix/fsync.c
+            sed -i 's/\bshm_open\s*(/shm_open(/g' dlls/ntdll/unix/fsync.c
 
             # 3. 비정상 종료 차단
             sed -i 's/exit\s*(1\s*)/\/* exit(1) disabled *\//g' dlls/ntdll/unix/fsync.c
