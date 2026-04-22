@@ -350,6 +350,7 @@ jobs:
           #define syscall custom_syscall
 
           #endif
+          EOF
 
       - name: Termux
         run: |
