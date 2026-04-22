@@ -354,35 +354,21 @@ jobs:
             sed -i 's/^[[:space:]]*mallopt( M_PERTURB,/\/\/ mallopt( M_PERTURB,/g' "$FILE_LOADER"
           fi
 
-          TOTAL_TARGETS="
-            dlls/ntdll/unix/virtual.c 
+          TOTAL_TARGETS=" 
             dlls/ntdll/unix/fsync.c 
-            dlls/ntdll/unix/sync.c 
-            dlls/ntdll/unix/server.c 
-            dlls/ntdll/unix/loader.c
             server/fsync.c 
-            server/fd.c 
-            server/mapping.c 
-            server/thread.c
-            server/inproc_sync.c
-            dlls/winex11.drv/bitblt.c
           "
 
           for FILE in $TOTAL_TARGETS; do
             if [ -f "$FILE" ]; then
               echo "Fixing SHM Hook for $FILE..."
-              
-              # 기존에 잘못 주입된 헤더가 있다면 제거 (깨끗한 상태에서 시작)
               sed -i '/shm_utils.h/d' "$FILE"
-
-              # config.h가 있으면 그 바로 다음 줄에 주입 (규칙 준수)
               if grep -q "#include \"config.h\"" "$FILE"; then
                 sed -i "/#include \"config.h\"/a #include <shm_utils.h>" "$FILE"
               else
-                # config.h가 없으면 파일 맨 처음에 주입
                 sed -i "1i #include <shm_utils.h>" "$FILE"
-              fi
-              sed -i 's/\bsyscall\s*(/custom_syscall(/g' "$FILE"
+              fi            
+              echo "Fixing SHM Hook for $FILE..."
             fi
           done
 
