@@ -241,7 +241,11 @@ jobs:
           cat <<'EOF' > ${{ env.WINE_SOURCE_DIR }}/source/include/shm_utils.h
           #ifndef __WINE_SERVER_SHM_UTILS_H
           #define __WINE_SERVER_SHM_UTILS_H
+
+          #ifndef _GNU_SOURCE
           #define _GNU_SOURCE
+          #endif
+
           #include <fcntl.h>
           #include <stdio.h>
           #include <stdlib.h>
@@ -254,57 +258,51 @@ jobs:
           #include <stdarg.h>
           #include <sys/syscall.h>
 
-          // 전역 변수로 딱 한 번만 설정될 값들을 저장합니다.
+          // 성능을 위해 FD와 경로를 모두 캐싱합니다.
+          static int cached_shm_fd = -1;
           static char *cached_full_path = NULL;
-          static const char *cached_tmpdir = NULL;
 
           static inline int custom_shm_open(const char *name, int oflag, mode_t mode) {
-              // [1] 이미 경로가 계산되어 있고 디렉토리가 있다면 바로 open만 실행
-              if (cached_full_path) {
-                  return open(cached_full_path, oflag, mode ? mode : 0600);
+              // [1] 이미 파일이 열려있다면, open 대신 dup을 사용합니다 (극강의 속도)
+              if (cached_shm_fd != -1) {
+                  return dup(cached_shm_fd);
               }
 
-              // [2] 최초 1회 로직 시작
-              if (!cached_tmpdir) {
-                  cached_tmpdir = getenv("TMPDIR");
-                  if (!cached_tmpdir) cached_tmpdir = "/data/data/com.termux/files/usr/tmp";
+              // [2] 경로가 이미 계산되어 있다면 즉시 open
+              if (cached_full_path) {
+                  cached_shm_fd = open(cached_full_path, oflag, mode ? mode : 0600);
+                  return cached_shm_fd;
               }
+
+              // [3] 최초 1회 경로 설정 및 디렉토리 생성 로직
+              const char *tmpdir = getenv("TMPDIR");
+              if (!tmpdir) tmpdir = "/data/data/com.termux/files/usr/tmp";
 
               const char *clean_name = (name[0] == '/') ? name + 1 : name;
-              if (asprintf(&cached_full_path, "%s/%s", cached_tmpdir, clean_name) == -1) return -1;
+              if (asprintf(&cached_full_path, "%s/%s", tmpdir, clean_name) == -1) return -1;
 
-              // 디렉토리 자동 생성 (딱 한 번만 수행)
               char *dname = strdup(cached_full_path);
               if (dname) {
                   char *slash = strrchr(dname, '/');
                   if (slash) {
                       *slash = '\0';
                       struct stat st;
-                      if (stat(dname, &st) == -1) {
-                          mkdir(dname, 0700); 
-                      }
+                      if (stat(dname, &st) == -1) mkdir(dname, 0700);
                   }
                   free(dname);
               }
 
-              return open(cached_full_path, oflag, mode ? mode : 0600);
+              cached_shm_fd = open(cached_full_path, oflag, mode ? mode : 0600);
+              return cached_shm_fd;
           }
 
           static inline int custom_shm_unlink(const char *name) {
-              // 이미 계산된 경로가 있다면 즉시 삭제
-              if (cached_full_path) {
-                  return unlink(cached_full_path);
+              if (cached_shm_fd != -1) {
+                  close(cached_shm_fd);
+                  cached_shm_fd = -1;
               }
-              
-              // 경로가 없다면 (거의 없겠지만) 임시로 계산해서 삭제
-              char *fname = NULL;
-              const char *tmpdir = getenv("TMPDIR");
-              if (!tmpdir) tmpdir = "/data/data/com.termux/files/usr/tmp";
-              const char *clean_name = (name[0] == '/') ? name + 1 : name;
-              if (asprintf(&fname, "%s/%s", tmpdir, clean_name) == -1) return -1;
-              int ret = unlink(fname);
-              free(fname);
-              return ret;
+              if (cached_full_path) return unlink(cached_full_path);
+              return 0;
           }
           
           static inline long custom_syscall(long number, ...) {
