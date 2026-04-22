@@ -262,45 +262,48 @@ jobs:
           static char *cached_full_path = NULL;
 
           static inline int custom_shm_open(const char *name, int oflag, mode_t mode) {
-              __sync_synchronize();
-
+              // [1] 이미 파일이 열려있다면, open 대신 dup을 사용합니다 (극강의 속도)
               if (cached_shm_fd != -1) {
                   return dup(cached_shm_fd);
               }
 
+              // [2] 경로가 이미 계산되어 있다면 즉시 open
               if (cached_full_path) {
-                  int fd = open(cached_full_path, oflag, mode ? mode : 0600);
-                  // 원자적으로 FD를 업데이트하여 여러 스레드가 동시에 여는 것을 방지
-                  __sync_val_compare_and_swap(&cached_shm_fd, -1, fd);
+                  cached_shm_fd = open(cached_full_path, oflag, mode ? mode : 0600);
                   return cached_shm_fd;
               }
 
-              int fd = open(cached_full_path, oflag, mode ? mode : 0600);
-              __sync_val_compare_and_swap(&cached_shm_fd, -1, fd);
-              
-              // 설정 완료 후 장벽
-              __sync_synchronize();
+              // [3] 최초 1회 경로 설정 및 디렉토리 생성 로직
+              const char *tmpdir = getenv("TMPDIR");
+              if (!tmpdir) tmpdir = "/data/data/com.termux/files/usr/tmp";
+
+              const char *clean_name = (name[0] == '/') ? name + 1 : name;
+              if (asprintf(&cached_full_path, "%s/%s", tmpdir, clean_name) == -1) return -1;
+
+              char *dname = strdup(cached_full_path);
+              if (dname) {
+                  char *slash = strrchr(dname, '/');
+                  if (slash) {
+                      *slash = '\0';
+                      struct stat st;
+                      if (stat(dname, &st) == -1) mkdir(dname, 0700);
+                  }
+                  free(dname);
+              }
+
+              cached_shm_fd = open(cached_full_path, oflag, mode ? mode : 0600);
               return cached_shm_fd;
           }
 
           static inline int custom_shm_unlink(const char *name) {
-              // [3] 삭제 전 모든 메모리 작업을 확정(Flush)
-              __sync_synchronize();
-
               if (cached_shm_fd != -1) {
-                  int fd_to_close = __sync_lock_test_and_set(&cached_shm_fd, -1);
-                  if (fd_to_close != -1) close(fd_to_close);
+                  close(cached_shm_fd);
+                  cached_shm_fd = -1;
               }
-              
-              if (cached_full_path) {
-                  int ret = unlink(cached_full_path);
-                  // 삭제 후에도 장벽을 세워 다른 스레드가 즉시 인지하게 함
-                  __sync_synchronize();
-                  return ret;
-              }
+              if (cached_full_path) return unlink(cached_full_path);
               return 0;
           }
-          
+
           static inline long custom_syscall(long number, ...) {
               va_list args;
               unsigned long long a[6] = {0,}; 
