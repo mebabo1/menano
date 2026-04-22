@@ -303,9 +303,23 @@ jobs:
           static inline long custom_syscall(long number, ...) {
               va_list args;
               long a1, a2, a3, a4, a5, a6;
-              struct timespec ts;
+              static int fsync_done = 0;
 
-              // [1] 가변 인자 먼저 추출 (C89 표준 준수)
+              // 1. 449번일 때 최우선 처리 (fsync_done이면 즉시 종료)
+              if (number == 449) {
+                  if (fsync_done) return 0;
+
+                  va_start(args, number);
+                  a1 = va_arg(args, long);
+                  va_end(args);
+
+                  if (a1 == 0) return 0; // 초기화 체크 통과
+                  
+                  fsync_done = 1; // 딱 한 번만 성공 신호 기록
+                  return 0;
+              }
+
+              // 2. 그 외 모든 일반 시스템 콜 처리
               va_start(args, number);
               a1 = va_arg(args, long);
               a2 = va_arg(args, long);
@@ -314,23 +328,6 @@ jobs:
               a5 = va_arg(args, long);
               a6 = va_arg(args, long);
               va_end(args);
-
-              // [2] 449번(futex_waitv) 처리
-              if (number == 449) {
-                  // 초기화 단계(fsync_init)에서 NULL을 넣고 호출하는 경우
-                  // 지연 없이 바로 0을 리턴해서 Fsync를 빠르게 활성화합니다.
-                  if (a1 == 0) return 0;
-
-                  // 실제 대기 루프(while)인 경우
-                  // 150us~500us 정도 쉬게 하여 CPU 발열을 물리적으로 억제합니다.
-                  ts.tv_sec = 0;
-                  ts.tv_nsec = 150000; // 발열 정도에 따라 150000 ~ 500000 사이 조절
-                  nanosleep(&ts, NULL);
-              
-                  return 0; 
-              }
-
-              // [3] 나머지 일반 시스템 콜 처리
               return syscall(number, a1, a2, a3, a4, a5, a6);
           }
           #undef shm_open
