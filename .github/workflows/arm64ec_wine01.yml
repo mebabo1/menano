@@ -492,7 +492,7 @@ jobs:
 
           TOTAL_TARGETS=" 
             dlls/ntdll/unix/fsync.c 
-            dlls/ntdll/unix/sync.c 
+            server/fsync.c 
           "
 
           for FILE in $TOTAL_TARGETS; do
