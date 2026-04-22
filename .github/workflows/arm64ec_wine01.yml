@@ -239,7 +239,117 @@ jobs:
         run: |
           mkdir -p ${{ env.WINE_SOURCE_DIR }}/source/include
           cat <<'EOF' > ${{ env.WINE_SOURCE_DIR }}/source/include/shm_utils.h
+          #ifndef __WINE_SHM_UTILS_H
+          #define __WINE_SHM_UTILS_H
 
+          #ifndef _GNU_SOURCE
+          #define _GNU_SOURCE
+          #endif
+
+          #include <fcntl.h>
+          #include <stdio.h>
+          #include <stdlib.h>
+          #include <unistd.h>
+          #include <sys/stat.h>
+          #include <sys/types.h>
+          #include <errno.h>
+          #include <time.h>
+          #include <string.h>
+          #include <stdarg.h>
+          #include <sys/syscall.h>
+
+          static inline int custom_shm_open(const char *name, int oflag, mode_t mode) {
+              char *full_path = NULL;
+              const char *tmpdir = getenv("TMPDIR");
+              if (!tmpdir) tmpdir = "/data/data/com.termux/files/usr/tmp";
+
+              const char *clean_name = (name[0] == '/') ? name + 1 : name;
+              if (asprintf(&full_path, "%s/%s", tmpdir, clean_name) == -1) return -1;
+
+              char *dname = strdup(full_path);
+              if (dname) {
+                  char *slash = strrchr(dname, '/');
+                  if (slash) {
+                      *slash = '\0';
+                      struct stat st;
+                      if (stat(dname, &st) == -1) mkdir(dname, 0700);
+                  }
+                  free(dname);
+              }
+
+              int fd = open(full_path, oflag, mode ? mode : 0600);
+              free(full_path);
+              return fd;
+          }
+
+          static inline int custom_shm_unlink(const char *name) {
+              char *full_path = NULL;
+              const char *tmpdir = getenv("TMPDIR");
+              if (!tmpdir) tmpdir = "/data/data/com.termux/files/usr/tmp";
+              const char *clean_name = (name[0] == '/') ? name + 1 : name;
+              if (asprintf(&full_path, "%s/%s", tmpdir, clean_name) != -1) {
+                  unlink(full_path);
+                  free(full_path);
+              }
+              return 0;
+          }
+
+          /* [2] 파일 크기 동기화 가속: ftruncate 직후 배리어 추가 */
+          static inline int custom_ftruncate(int fd, off_t length) {
+              int ret = ftruncate(fd, length);
+              __sync_synchronize(); // 파일 크기 할당 정보를 즉시 가시화
+              return ret;
+          }
+
+          /* [3] 시스템 콜 가로채기: 449번 지연 및 Futex Wake 배리어 */
+          static inline long custom_syscall(long number, ...) {
+              va_list args;
+              unsigned long long a[6] = {0,}; 
+
+              va_start(args, number);
+              for (int i = 0; i < 6; i++) {
+                  a[i] = va_arg(args, unsigned long long);
+              }
+              va_end(args);
+
+              // 신호를 보내는 Futex 작업(Wake)일 경우 메모리 쓰기 완료 보장
+              if (number == __NR_futex) {
+                  long op = a[1] & 127; // FUTEX_OP_MASK
+                  if (op == 1) { // FUTEX_WAKE
+                      __sync_synchronize();
+                  }
+              }
+
+              if (number == 449) { // futex_waitv
+                  if (a[0] == 0) return 0;
+                  struct timespec ts = {0, 150000}; // 지연 시간을 0.15ms로 최적화
+                  nanosleep(&ts, NULL);
+                  __sync_synchronize();
+                  return 0; 
+              }
+
+              long ret = syscall(number, a[0], a[1], a[2], a[3], a[4], a[5]);
+              __sync_synchronize();
+              return ret;
+          }
+
+          /* [4] 매크로 리디렉션 */
+          #undef shm_open
+          #define shm_open(...) GET_SHM_OPEN_MACRO(__VA_ARGS__, shm_open_3, shm_open_2)(__VA_ARGS__)
+          #define GET_SHM_OPEN_MACRO(_1, _2, _3, NAME, ...) NAME
+          #define shm_open_3(name, flags, mode) custom_shm_open(name, flags, mode)
+          #define shm_open_2(name, flags)       custom_shm_open(name, flags, 0)
+
+          #undef shm_unlink
+          #define shm_unlink custom_shm_unlink
+
+#undef ftruncate
+#define ftruncate custom_ftruncate
+
+#undef syscall
+#define syscall custom_syscall
+
+#endif
 
       - name: Termux
         run: |
