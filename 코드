@@ -1,61 +1,25 @@
           # [1] server/fsync.c 패치 (서버측 생성부 - 강화 버전)
           if [ -f "server/fsync.c" ]; then
-            echo "Applying Ironclad Patch for server/fsync.c..."
-            sed -i '/shm_utils.h/d' server/fsync.c
-            sed -i "1i #include \"shm_utils.h\"" server/fsync.c
-            sed -i 's/\bopen\s*(/custom_shm_open(/g' server/fsync.c
             sed -i 's/\bshm_open\s*(/custom_shm_open(/g' server/fsync.c
             sed -i 's/\bshm_unlink\s*(/custom_shm_unlink(/g' server/fsync.c
             # sed -i 's/shm_size\s*=\s*FSYNC_SHM_PAGE_SIZE/shm_size = 4*1024*1024/g' server/fsync.c
             sed -i 's/ftruncate\s*(\s*shm_fd[^)]*)/ftruncate(shm_fd, shm_size)/g' server/fsync.c
             sed -i 's/!defined(__ANDROID__)//g' server/fsync.c
-            sed -i 's/\bsyscall\s*(/custom_syscall(/g' server/fsync.c
             echo "✔ server/fsync.c: Ironclad patch applied."
           fi
 
           # [2] dlls/ntdll/unix/fsync.c 패치 (클라이언트측 연결부)
           if [ -f "dlls/ntdll/unix/fsync.c" ]; then
             echo "Aggressive patching for ntdll fsync.c..."
-            
-            # 1. 시스템 콜 정의 및 가로채기
             if grep -q "#include \"config.h\"" dlls/ntdll/unix/fsync.c; then
               sed -i "/#include \"config.h\"/a #undef __NR_futex_waitv\n#define __NR_futex_waitv 449" dlls/ntdll/unix/fsync.c
             fi
-            sed -i 's/\bsyscall\s*(/custom_syscall(/g' dlls/ntdll/unix/fsync.c
-
-            # 2. [중요] 모든 파일 열기 호출을 shm_open으로 강제 전환
-            # ntdll.so 내부에 있는 open() 호출이 시스템 표준 open()이 아닌 
-            # 우리가 만든 '폴더 생성 기능'이 있는 함수를 타게 만듭니다.
-            sed -i 's/\bopen\s*(/shm_open(/g' dlls/ntdll/unix/fsync.c
-            sed -i 's/\bshm_open\s*(/shm_open(/g' dlls/ntdll/unix/fsync.c
-
             # 3. 비정상 종료 차단
             sed -i 's/exit\s*(1\s*)/\/* exit(1) disabled *\//g' dlls/ntdll/unix/fsync.c
-
             # 4. mmap 호환성 패치 (안드로이드에서 MAP_ANONYMOUS와 파일 매핑 혼용 금지 대응)
             sed -i 's/MAP_SHARED\s*|\s*MAP_ANONYMOUS/MAP_SHARED/g' dlls/ntdll/unix/fsync.c
-            sed -i 's/MAP_SHARED|MAP_ANONYMOUS/MAP_SHARED/g' dlls/ntdll/unix/fsync.c
-            
+            sed -i 's/MAP_SHARED|MAP_ANONYMOUS/MAP_SHARED/g' dlls/ntdll/unix/fsync.c       
             echo "✔ ntdll fsync.c: Aggressive open-redirection applied."
-          fi
-
-          # [3] dlls/ntdll/unix/sync.c 패치 (shm_utils.h 대응 버전)
-          FILE_SYNC="dlls/ntdll/unix/sync.c"
-          if [ -f "$FILE_SYNC" ]; then
-            # sed -i 's/\bsyscall\s*(/custom_syscall(/g' "$FILE_SYNC"
-            # sed -i '/int\s*futex_waitv_supported/,/}/ s/return .*/return 1; }/' "$FILE_SYNC"
-          fi
-
-          FILE_THREAD="server/thread.c"
-          if [ -f "$FILE_THREAD" ]; then
-            # sed -i '/shm_utils.h/d' "$FILE_THREAD"
-            # sed -i "/#include \"config.h\"/a #include \"shm_utils.h\"" "$FILE_THREAD"
-          fi
-
-          FILE_INPROC="server/inproc_sync.c"
-          if [ -f "$FILE_INPROC" ]; then    
-            # sed -i 's/\bopen\s*(/shm_open(/g' "$FILE_INPROC"
-            # sed -i 's/\bshm_open\s*(/shm_open(/g' "$FILE_INPROC"
           fi
 
           TOTAL_TARGETS=" 
