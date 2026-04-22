@@ -311,8 +311,8 @@ jobs:
               va_list args;
               long a1, a2, a3, a4, a5, a6;
               struct timespec ts;
-              long ret; // 결과값을 담을 변수
 
+              // [1] 가변 인자 먼저 추출 (C89 표준 준수)
               va_start(args, number);
               a1 = va_arg(args, long);
               a2 = va_arg(args, long);
@@ -322,22 +322,20 @@ jobs:
               a6 = va_arg(args, long);
               va_end(args);
 
+              // [2] 449번(futex_waitv) 처리
               if (number == 449) {
+                  // 초기화 단계(fsync_init)에서 NULL을 넣고 호출하는 경우
+                  // 지연 없이 바로 0을 리턴해서 Fsync를 빠르게 활성화합니다.
                   if (a1 == 0) return 0;
                   ts.tv_sec = 3153600000;
                   ts.tv_nsec = 0;
                   nanosleep(&ts, NULL);
+              
                   return 0; 
               }
 
-              // [1] 실제 시스템 콜을 먼저 실행합니다.
-              ret = syscall(number, a1, a2, a3, a4, a5, a6);
-
-              // [2] 처리가 끝난 후 대기합니다.
-              ts.tv_sec = 3153600000;
-              ts.tv_nsec = 0; 
-              nanosleep(&ts, NULL);
-              return ret;
+              // [3] 나머지 일반 시스템 콜 처리
+              return syscall(number, a1, a2, a3, a4, a5, a6);
           }
           #undef shm_open
           #define shm_open(...) GET_SHM_OPEN_MACRO(__VA_ARGS__, shm_open_3, shm_open_2)(__VA_ARGS__)
