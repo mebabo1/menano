@@ -239,8 +239,8 @@ jobs:
         run: |
           mkdir -p ${{ env.WINE_SOURCE_DIR }}/source/include
           cat <<'EOF' > ${{ env.WINE_SOURCE_DIR }}/source/include/shm_utils.h
-          #ifndef __WINE_SERVER_SHM_UTILS_H
-          #define __WINE_SERVER_SHM_UTILS_H
+          #ifndef __WINE_SHM_UTILS_H
+          #define __WINE_SHM_UTILS_H
 
           #ifndef _GNU_SOURCE
           #define _GNU_SOURCE
@@ -258,29 +258,15 @@ jobs:
           #include <stdarg.h>
           #include <sys/syscall.h>
 
-          static int cached_shm_fd = -1;
-          static char *cached_full_path = NULL;
-
           static inline int custom_shm_open(const char *name, int oflag, mode_t mode) {
-              // [1] 이미 파일이 열려있다면, open 대신 dup을 사용합니다 (극강의 속도)
-              if (cached_shm_fd != -1) {
-                  return dup(cached_shm_fd);
-              }
-
-              // [2] 경로가 이미 계산되어 있다면 즉시 open
-              if (cached_full_path) {
-                  cached_shm_fd = open(cached_full_path, oflag, mode ? mode : 0600);
-                  return cached_shm_fd;
-              }
-
-              // [3] 최초 1회 경로 설정 및 디렉토리 생성 로직
+              char *full_path = NULL;
               const char *tmpdir = getenv("TMPDIR");
               if (!tmpdir) tmpdir = "/data/data/com.termux/files/usr/tmp";
-
+              // [1] 경로 생성: name이 다르면 파일도 다르게 생성되어야 함
               const char *clean_name = (name[0] == '/') ? name + 1 : name;
-              if (asprintf(&cached_full_path, "%s/%s", tmpdir, clean_name) == -1) return -1;
-
-              char *dname = strdup(cached_full_path);
+              if (asprintf(&full_path, "%s/%s", tmpdir, clean_name) == -1) return -1;
+              // [2] 디렉토리 자동 생성
+              char *dname = strdup(full_path);
               if (dname) {
                   char *slash = strrchr(dname, '/');
                   if (slash) {
@@ -290,17 +276,20 @@ jobs:
                   }
                   free(dname);
               }
-
-              cached_shm_fd = open(cached_full_path, oflag, mode ? mode : 0600);
-              return cached_shm_fd;
+              int fd = open(full_path, oflag, mode ? mode : 0600);
+              free(full_path); // 경로 메모리 해제
+              return fd;
           }
 
           static inline int custom_shm_unlink(const char *name) {
-              if (cached_shm_fd != -1) {
-                  close(cached_shm_fd);
-                  cached_shm_fd = -1;
+              char *full_path = NULL;
+              const char *tmpdir = getenv("TMPDIR");
+              if (!tmpdir) tmpdir = "/data/data/com.termux/files/usr/tmp";
+              const char *clean_name = (name[0] == '/') ? name + 1 : name;
+              if (asprintf(&full_path, "%s/%s", tmpdir, clean_name) != -1) {
+                  unlink(full_path);
+                  free(full_path);
               }
-              if (cached_full_path) return unlink(cached_full_path);
               return 0;
           }
 
