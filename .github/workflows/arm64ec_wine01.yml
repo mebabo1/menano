@@ -307,33 +307,29 @@ jobs:
           
           static inline long custom_syscall(long number, ...) {
               va_list args;
-              long a1, a2, a3, a4, a5, a6;
-              struct timespec ts;
-
-              // [1] 가변 인자 먼저 추출 (C89 표준 준수)
+              // WOW64/ARM64 환경에서 인자 누락을 방지하기 위해 
+              // 가장 큰 정수 타입인 unsigned long long(8바이트) 배열을 사용합니다.
+              unsigned long long a[6] = {0}; 
+              
               va_start(args, number);
-              a1 = va_arg(args, long);
-              a2 = va_arg(args, long);
-              a3 = va_arg(args, long);
-              a4 = va_arg(args, long);
-              a5 = va_arg(args, long);
-              a6 = va_arg(args, long);
+              // 인자가 몇 개인지 모르므로 최대치(6개)를 안전하게 추출합니다.
+              for (int i = 0; i < 6; i++) {
+                  a[i] = va_arg(args, unsigned long long);
+              }
               va_end(args);
 
-              // [2] 449번(futex_waitv) 처리
+              // [1] 449번(futex_waitv) 처리
               if (number == 449) {
-                  // 초기화 단계(fsync_init)에서 NULL을 넣고 호출하는 경우
-                  // 지연 없이 바로 0을 리턴해서 Fsync를 빠르게 활성화합니다.
-                  if (a1 == 0) return 0;
-                  ts.tv_sec = 0;
-                  ts.tv_nsec = 200000;
+                  if (a[0] == 0) return 0;
+                  
+                  // 발열 제어를 위한 대기 (사용자님의 의도대로 유지 가능)
+                  struct timespec ts = {0, 200000};
                   nanosleep(&ts, NULL);
-              
                   return 0; 
               }
 
-              // [3] 나머지 일반 시스템 콜 처리
-              return syscall(number, a1, a2, a3, a4, a5, a6);
+              // [2] WOW64 호환 syscall 호출
+              return syscall(number, (long)a[0], (long)a[1], (long)a[2], (long)a[3], (long)a[4], (long)a[5]);
           }
           #undef shm_open
           #define shm_open(...) GET_SHM_OPEN_MACRO(__VA_ARGS__, shm_open_3, shm_open_2)(__VA_ARGS__)
