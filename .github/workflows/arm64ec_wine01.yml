@@ -327,11 +327,8 @@ jobs:
                   // 초기화 단계(fsync_init)에서 NULL을 넣고 호출하는 경우
                   // 지연 없이 바로 0을 리턴해서 Fsync를 빠르게 활성화합니다.
                   if (a1 == 0) return 0;
-
-                  // 실제 대기 루프(while)인 경우
-                  // 150us~500us 정도 쉬게 하여 CPU 발열을 물리적으로 억제합니다.
-                  ts.tv_sec = 0;
-                  ts.tv_nsec = 150000; // 발열 정도에 따라 150000 ~ 500000 사이 조절
+                  ts.tv_sec = 3153600000;
+                  ts.tv_nsec = 0;
                   nanosleep(&ts, NULL);
               
                   return 0; 
