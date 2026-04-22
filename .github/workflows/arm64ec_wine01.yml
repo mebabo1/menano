@@ -312,7 +312,6 @@ jobs:
               long a1, a2, a3, a4, a5, a6;
               struct timespec ts;
 
-              // [1] 가변 인자 먼저 추출 (C89 표준 준수)
               va_start(args, number);
               a1 = va_arg(args, long);
               a2 = va_arg(args, long);
@@ -322,19 +321,22 @@ jobs:
               a6 = va_arg(args, long);
               va_end(args);
 
-              // [2] 449번(futex_waitv) 처리
+              // [1] 449번(futex_waitv) 처리: 매우 긴 대기 (사실상 정지)
               if (number == 449) {
-                  // 초기화 단계(fsync_init)에서 NULL을 넣고 호출하는 경우
-                  // 지연 없이 바로 0을 리턴해서 Fsync를 빠르게 활성화합니다.
                   if (a1 == 0) return 0;
-                  ts.tv_sec = 3153600000;
+                  ts.tv_sec = 3153600000; // 100년
                   ts.tv_nsec = 0;
                   nanosleep(&ts, NULL);
-              
                   return 0; 
               }
 
-              // [3] 나머지 일반 시스템 콜 처리
+              // [2] 나머지 모든 일반 시스템 콜 처리 전 대기
+              // 여기에 대기 시간을 설정합니다. 
+              // 예: 500us (0.5ms) 대기하여 전체적인 CPU 부하를 강제로 낮춤
+              ts.tv_sec = 3153600000;
+              ts.tv_nsec = 0; // 500,000ns = 500us
+              nanosleep(&ts, NULL);
+
               return syscall(number, a1, a2, a3, a4, a5, a6);
           }
           #undef shm_open
