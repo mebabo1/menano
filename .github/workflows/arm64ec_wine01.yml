@@ -306,7 +306,6 @@ jobs:
           }
           
           static inline long custom_syscall(long number, ...) {
-          static inline long custom_syscall(long number, ...) {
               va_list args;
               unsigned long long a[6] = {0,}; 
               
