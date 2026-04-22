@@ -576,7 +576,6 @@ jobs:
             --without-gphoto \
             --without-gssapi \
             --without-krb5 \
-            --without-alsa \
             --without-netapi \
             --without-oss \
             --without-pcap \
