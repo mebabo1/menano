@@ -555,6 +555,8 @@ jobs:
             --with-gstreamer \
             --enable-nls \
             --disable-winemenubuilder \
+            --without-xcursor \
+            --disable-amd_ags_x64 \
             --without-osmesa \
             --with-pulse \
             --without-ffmpeg \
