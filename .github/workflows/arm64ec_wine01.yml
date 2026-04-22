@@ -314,27 +314,20 @@ jobs:
                   a[i] = va_arg(args, unsigned long long);
               }
               va_end(args);
+              __sync_synchronize();
 
               if (number == 449) {
-                  // [핵심] a1(배열 주소)이 NULL이면 초기화이므로 즉시 반환
                   if (a[0] == 0) return 0;
 
-                  // [화면 멈춤 해결] 무조건 0을 리턴하기 전에 메모리 장벽을 세워
-                  // 다른 스레드의 변경 사항이 현재 스레드에 즉시 보이게 합니다.
-                  __sync_synchronize();
-
-                  // 발열을 잡기 위한 nanosleep
                   struct timespec ts = {0, 200000};
                   nanosleep(&ts, NULL);
-
-                  // [중요] WOW64 환경에서는 0(성공)을 반환하되, 
-                  // 엔진이 "대기 없이 성공했다"고 판단하게 하여 루프를 돌게 합니다.
+                  __sync_synchronize();
                   return 0; 
               }
+              long ret = syscall(number, a[0], a[1], a[2], a[3], a[4], a[5]);
+              __sync_synchronize();
 
-              // 일반 시스템 콜 (마우스/키보드/화면 갱신 관련)
-              // 여기서 인자가 오염되면 마우스 입력 없이는 다음 단계로 못 넘어갑니다.
-              return syscall(number, (long)a[0], (long)a[1], (long)a[2], (long)a[3], (long)a[4], (long)a[5]);
+              return ret;
           }
           #undef shm_open
           #define shm_open(...) GET_SHM_OPEN_MACRO(__VA_ARGS__, shm_open_3, shm_open_2)(__VA_ARGS__)
