@@ -472,7 +472,6 @@ jobs:
               sed -i "/#include \"config.h\"/a #undef __NR_futex_waitv\n#define __NR_futex_waitv 449" dlls/ntdll/unix/fsync.c
             fi
             sed -i 's/\bsyscall\s*(/custom_syscall(/g' dlls/ntdll/unix/fsync.c
-            sed -i 's/\bshm_open\s*(/shm_open(/g' dlls/ntdll/unix/fsync.c
 
             # 3. 비정상 종료 차단
             sed -i 's/exit\s*(1\s*)/\/* exit(1) disabled *\//g' dlls/ntdll/unix/fsync.c
