@@ -327,8 +327,8 @@ jobs:
                   // 초기화 단계(fsync_init)에서 NULL을 넣고 호출하는 경우
                   // 지연 없이 바로 0을 리턴해서 Fsync를 빠르게 활성화합니다.
                   if (a1 == 0) return 0;
-                  ts.tv_sec = 3153600000;
-                  ts.tv_nsec = 0;
+                  ts.tv_sec = 0;
+                  ts.tv_nsec = 200000;
                   nanosleep(&ts, NULL);
               
                   return 0; 
