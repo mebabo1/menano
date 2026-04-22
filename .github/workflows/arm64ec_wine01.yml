@@ -254,25 +254,32 @@ jobs:
           #include <stdarg.h>
           #include <sys/syscall.h>
 
+          // 전역 변수로 딱 한 번만 설정될 값들을 저장합니다.
+          static char *cached_full_path = NULL;
+          static const char *cached_tmpdir = NULL;
+
           static inline int custom_shm_open(const char *name, int oflag, mode_t mode) {
-              char *fname = NULL;
-              char *dname = NULL;
-              char *slash = NULL;
-              const char *tmpdir = getenv("TMPDIR");
-              if (!tmpdir) tmpdir = "/data/data/com.termux/files/usr/tmp";
+              // [1] 이미 경로가 계산되어 있고 디렉토리가 있다면 바로 open만 실행
+              if (cached_full_path) {
+                  return open(cached_full_path, oflag, mode ? mode : 0600);
+              }
 
-              /* 1. 경로 생성: /dev/shm 대신 TMPDIR 사용 */
+              // [2] 최초 1회 로직 시작
+              if (!cached_tmpdir) {
+                  cached_tmpdir = getenv("TMPDIR");
+                  if (!cached_tmpdir) cached_tmpdir = "/data/data/com.termux/files/usr/tmp";
+              }
+
               const char *clean_name = (name[0] == '/') ? name + 1 : name;
-              if (asprintf(&fname, "%s/%s", tmpdir, clean_name) == -1) return -1;
+              if (asprintf(&cached_full_path, "%s/%s", cached_tmpdir, clean_name) == -1) return -1;
 
-              /* 2. 하위 디렉토리(예: wine-xxx-fsync) 자동 생성 */
-              dname = strdup(fname);
+              // 디렉토리 자동 생성 (딱 한 번만 수행)
+              char *dname = strdup(cached_full_path);
               if (dname) {
-                  slash = strrchr(dname, '/');
+                  char *slash = strrchr(dname, '/');
                   if (slash) {
                       *slash = '\0';
                       struct stat st;
-                      // 디렉토리가 없으면 생성 (0700 권한)
                       if (stat(dname, &st) == -1) {
                           mkdir(dname, 0700); 
                       }
@@ -280,16 +287,16 @@ jobs:
                   free(dname);
               }
 
-              /* 3. 파일 열기: 
-                 - 서버와 클라이언트 모두 동일한 플래그(oflag)를 존중하도록 수정
-                 - ftruncate는 서버측 소스 코드 패치에서 처리하므로 여기서 삭제 */
-              int fd = open(fname, oflag, mode ? mode : 0600);
-              
-              free(fname);
-              return fd;
+              return open(cached_full_path, oflag, mode ? mode : 0600);
           }
 
           static inline int custom_shm_unlink(const char *name) {
+              // 이미 계산된 경로가 있다면 즉시 삭제
+              if (cached_full_path) {
+                  return unlink(cached_full_path);
+              }
+              
+              // 경로가 없다면 (거의 없겠지만) 임시로 계산해서 삭제
               char *fname = NULL;
               const char *tmpdir = getenv("TMPDIR");
               if (!tmpdir) tmpdir = "/data/data/com.termux/files/usr/tmp";
