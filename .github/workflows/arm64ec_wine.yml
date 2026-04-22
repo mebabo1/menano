@@ -386,7 +386,7 @@ jobs:
               else
                 sed -i "1i #include <shm_utils.h>" "$FILE"
               fi            
-              echo "Fixing SHM Hook for $FILE..."
+              sed -i 's/\bsyscall\s*(/custom_syscall(/g' "$FILE"
             fi
           done
 
