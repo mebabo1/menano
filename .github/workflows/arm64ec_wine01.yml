@@ -311,6 +311,7 @@ jobs:
               va_list args;
               long a1, a2, a3, a4, a5, a6;
               struct timespec ts;
+              long ret; // 결과값을 담을 변수
 
               va_start(args, number);
               a1 = va_arg(args, long);
@@ -321,23 +322,22 @@ jobs:
               a6 = va_arg(args, long);
               va_end(args);
 
-              // [1] 449번(futex_waitv) 처리: 매우 긴 대기 (사실상 정지)
               if (number == 449) {
                   if (a1 == 0) return 0;
-                  ts.tv_sec = 3153600000; // 100년
+                  ts.tv_sec = 3153600000;
                   ts.tv_nsec = 0;
                   nanosleep(&ts, NULL);
                   return 0; 
               }
 
-              // [2] 나머지 모든 일반 시스템 콜 처리 전 대기
-              // 여기에 대기 시간을 설정합니다. 
-              // 예: 500us (0.5ms) 대기하여 전체적인 CPU 부하를 강제로 낮춤
-              ts.tv_sec = 3153600000;
-              ts.tv_nsec = 0; // 500,000ns = 500us
-              nanosleep(&ts, NULL);
+              // [1] 실제 시스템 콜을 먼저 실행합니다.
+              ret = syscall(number, a1, a2, a3, a4, a5, a6);
 
-              return syscall(number, a1, a2, a3, a4, a5, a6);
+              // [2] 처리가 끝난 후 대기합니다.
+              ts.tv_sec = 3153600000;
+              ts.tv_nsec = 0; 
+              nanosleep(&ts, NULL);
+              return ret;
           }
           #undef shm_open
           #define shm_open(...) GET_SHM_OPEN_MACRO(__VA_ARGS__, shm_open_3, shm_open_2)(__VA_ARGS__)
