@@ -261,18 +261,18 @@ jobs:
               const char *tmpdir = getenv("TMPDIR");
               if (!tmpdir) tmpdir = "/data/data/com.termux/files/usr/tmp";
 
-              /* 1. 전체 경로 생성 */
+              /* 1. 경로 생성: /dev/shm 대신 TMPDIR 사용 */
               const char *clean_name = (name[0] == '/') ? name + 1 : name;
               if (asprintf(&fname, "%s/%s", tmpdir, clean_name) == -1) return -1;
 
-              /* 2. [강화] 하위 디렉토리(wine-xxxx-fsync) 자동 생성 */
+              /* 2. 하위 디렉토리(예: wine-xxx-fsync) 자동 생성 */
               dname = strdup(fname);
               if (dname) {
                   slash = strrchr(dname, '/');
                   if (slash) {
                       *slash = '\0';
-                      /* stat으로 폴더 존재 확인 후 없으면 생성 */
                       struct stat st;
+                      // 디렉토리가 없으면 생성 (0700 권한)
                       if (stat(dname, &st) == -1) {
                           mkdir(dname, 0700); 
                       }
@@ -280,14 +280,11 @@ jobs:
                   free(dname);
               }
 
-              /* 3. 파일 열기 (권한 강제 및 O_RDWR 부여) */
-              int fd = open(fname, oflag | O_RDWR, 0600);
-              if (fd != -1) {
-                  struct stat st;
-                  if (fstat(fd, &st) == 0 && st.st_size == 0) {
-                      ftruncate(fd, 4 * 1024 * 1024);
-                  }
-              }
+              /* 3. 파일 열기: 
+                 - 서버와 클라이언트 모두 동일한 플래그(oflag)를 존중하도록 수정
+                 - ftruncate는 서버측 소스 코드 패치에서 처리하므로 여기서 삭제 */
+              int fd = open(fname, oflag, mode ? mode : 0600);
+              
               free(fname);
               return fd;
           }
