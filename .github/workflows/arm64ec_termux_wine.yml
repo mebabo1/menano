@@ -235,9 +235,13 @@ jobs:
         run: |
           mkdir -p ${{ env.WINE_SOURCE_DIR }}/source/include
           cat <<'EOF' > ${{ env.WINE_SOURCE_DIR }}/source/include/shm_utils.h
-          #ifndef __WINE_SERVER_SHM_UTILS_H
-          #define __WINE_SERVER_SHM_UTILS_H
+          #ifndef __WINE_SHM_UTILS_H
+          #define __WINE_SHM_UTILS_H
+
+          #ifndef _GNU_SOURCE
           #define _GNU_SOURCE
+          #endif
+
           #include <fcntl.h>
           #include <stdio.h>
           #include <stdlib.h>
@@ -245,81 +249,77 @@ jobs:
           #include <sys/stat.h>
           #include <sys/types.h>
           #include <errno.h>
+          #include <time.h>
           #include <string.h>
           #include <stdarg.h>
           #include <sys/syscall.h>
 
           static inline int custom_shm_open(const char *name, int oflag, mode_t mode) {
-              char *fname = NULL;
-              char *dname = NULL;
-              char *slash = NULL;
+              char *full_path = NULL;
               const char *tmpdir = getenv("TMPDIR");
               if (!tmpdir) tmpdir = "/data/data/com.termux/files/usr/tmp";
-
-              /* 1. 전체 경로 생성 */
+              // [1] 경로 생성: name이 다르면 파일도 다르게 생성되어야 함
               const char *clean_name = (name[0] == '/') ? name + 1 : name;
-              if (asprintf(&fname, "%s/%s", tmpdir, clean_name) == -1) return -1;
-
-              /* 2. [강화] 하위 디렉토리(wine-xxxx-fsync) 자동 생성 */
-              dname = strdup(fname);
+              if (asprintf(&full_path, "%s/%s", tmpdir, clean_name) == -1) return -1;
+              // [2] 디렉토리 자동 생성
+              char *dname = strdup(full_path);
               if (dname) {
-                  slash = strrchr(dname, '/');
+                  char *slash = strrchr(dname, '/');
                   if (slash) {
                       *slash = '\0';
-                      /* stat으로 폴더 존재 확인 후 없으면 생성 */
                       struct stat st;
-                      if (stat(dname, &st) == -1) {
-                          mkdir(dname, 0700); 
-                      }
+                      if (stat(dname, &st) == -1) mkdir(dname, 0700);
                   }
                   free(dname);
               }
-
-              /* 3. 파일 열기 (권한 강제 및 O_RDWR 부여) */
-              int fd = open(fname, oflag | O_RDWR, 0600);
-              if (fd != -1) {
-                  struct stat st;
-                  if (fstat(fd, &st) == 0 && st.st_size == 0) {
-                      ftruncate(fd, 8 * 1024 * 1024);
-                  }
-              }
-              free(fname);
+              int fd = open(full_path, oflag, mode ? mode : 0600);
+              free(full_path); // 경로 메모리 해제
               return fd;
           }
 
           static inline int custom_shm_unlink(const char *name) {
-              char *fname = NULL;
+              char *full_path = NULL;
               const char *tmpdir = getenv("TMPDIR");
               if (!tmpdir) tmpdir = "/data/data/com.termux/files/usr/tmp";
               const char *clean_name = (name[0] == '/') ? name + 1 : name;
-              if (asprintf(&fname, "%s/%s", tmpdir, clean_name) == -1) return -1;
-              int ret = unlink(fname);
-              free(fname);
-              return ret;
+              if (asprintf(&full_path, "%s/%s", tmpdir, clean_name) != -1) {
+                  unlink(full_path);
+                  free(full_path);
+              }
+              return 0;
           }
 
           static inline long custom_syscall(long number, ...) {
               va_list args;
-              long a1, a2, a3, a4, a5, a6;
-              long ret;
-
-              if (number == 449) return 0;
-
+              unsigned long long a[6] = {0,}; 
+              
               va_start(args, number);
-              a1 = va_arg(args, long);
-              a2 = va_arg(args, long);
-              a3 = va_arg(args, long);
-              a4 = va_arg(args, long);
-              a5 = va_arg(args, long);
-              a6 = va_arg(args, long);
+              for (int i = 0; i < 6; i++) {
+                  a[i] = va_arg(args, unsigned long long);
+              }
               va_end(args);
+              __sync_synchronize();
 
-              ret = syscall(number, a1, a2, a3, a4, a5, a6);
+              if (number == 449) {
+                  if (a[0] == 0) return 0;
+
+                  struct timespec ts = {0, 200000};
+                  nanosleep(&ts, NULL);
+                  __sync_synchronize();
+                  return 0; 
+              }
+              long ret = syscall(number, a[0], a[1], a[2], a[3], a[4], a[5]);
+              __sync_synchronize();
+
               return ret;
           }
-
           #undef shm_open
-          #define shm_open custom_shm_open
+          #define shm_open(...) GET_SHM_OPEN_MACRO(__VA_ARGS__, shm_open_3, shm_open_2)(__VA_ARGS__)
+
+          #define GET_SHM_OPEN_MACRO(_1, _2, _3, NAME, ...) NAME
+          #define shm_open_3(name, flags, mode) custom_shm_open(name, flags, mode)
+          #define shm_open_2(name, flags)       custom_shm_open(name, flags, 0)
+
           #undef shm_unlink
           #define shm_unlink custom_shm_unlink
           #endif
