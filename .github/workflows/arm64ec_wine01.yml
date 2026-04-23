@@ -306,6 +306,9 @@ jobs:
           static inline long custom_syscall(long number, ...) {
               va_list args;
               unsigned long long a[6] = {0,}; 
+              // 최근 처리된 콜 기록 (스레드 간 간섭 최소화를 위해 static 유지)
+              static long history[4] = {-1, -1, -1, -1};
+              static int history_idx = 0;
 
               va_start(args, number);
               for (int i = 0; i < 6; i++) {
@@ -313,35 +316,42 @@ jobs:
               }
               va_end(args);
 
-              // 신호를 보내는 Futex 작업(Wake)일 경우 메모리 쓰기 완료 보장
-              if (number == __NR_futex) {
-                  long op = a[1] & 127; // FUTEX_OP_MASK
-                  if (op == 1) { // FUTEX_WAKE
-                      __sync_synchronize();
+              int is_recent = 0;
+              for (int i = 0; i < 4; i++) {
+                  if (history[i] == number) {
+                      is_recent = 1;
+                      break;
                   }
               }
-
-              if (number == 449) { // futex_waitv
-                  if (a[0] == 0) return 0;
-                  __sync_synchronize();
-                  sched_yield();
-                  struct timespec ts = {0, 350000}; // 지연 시간을 0.15ms로 최적화
-                  nanosleep(&ts, NULL);
-                  __sync_synchronize();
-                  return 0; 
-              }
-
+              // 2. 통합 대기 로직 (449번과 일반 콜의 대기 시간만 차등화)
               __sync_synchronize();
               sched_yield(); 
-              // 일반 콜은 너무 길면 안 되므로 449번보다 훨씬 짧은 지연(약 0.05ms)을 줍니다.
-              struct timespec general_ts = {0, 350000}; 
-              nanosleep(&general_ts, NULL);
+
+              struct timespec ts;
+              ts.tv_sec = 0;
+
+              if (is_recent) {
+                  // 중복 호출 시: 더 긴 휴식을 주어 다른 스레드(3, 4, 5번)에게 기회 제공
+                  ts.tv_nsec = (number == 449) ? 600000 : 400000; // 449번은 0.6ms, 일반은 0.4ms
+              } else {
+                  // 신규 호출 시: 아주 미세하게만 쉬고 통과
+                  ts.tv_nsec = 50000; // 0.05ms
+              }
+              nanosleep(&ts, NULL);
+              // 3. 기록 업데이트
+              history[history_idx] = number;
+              history_idx = (history_idx + 1) % 4;
+              // 4. 실행 및 분기
+              // 449번(futex_waitv)은 커널에 보내지 않고 성공으로 속임 (Fsync 클라이언트 특성)
+              if (number == 449) {
+                  __sync_synchronize();
+                  return 0;
+              }
+              // 그 외 모든 콜은 실제 커널 시스템 콜 수행
               long ret = syscall(number, a[0], a[1], a[2], a[3], a[4], a[5]);
-              __sync_synchronize(); // 콜 직후에도 메모리 일관성 보장
+              __sync_synchronize();
               return ret;
           }
-
-          /* [4] 매크로 리디렉션 */
           #undef shm_open
           #define shm_open(...) GET_SHM_OPEN_MACRO(__VA_ARGS__, shm_open_3, shm_open_2)(__VA_ARGS__)
           #define GET_SHM_OPEN_MACRO(_1, _2, _3, NAME, ...) NAME
