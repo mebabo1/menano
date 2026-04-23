@@ -485,9 +485,7 @@ jobs:
           FILE_KEYBOARD="dlls/winex11.drv/keyboard.c"
           if [ -f "$FILE_KEYBOARD" ]; then
             echo "Forcing X11DRV_ActivateKeyboardLayout to always return TRUE..."
-            
-            # 함수 정의 시작 부분을 찾아서 '{' 바로 다음 줄에 'return TRUE;' 삽입
-            sed -i '/BOOL X11DRV_ActivateKeyboardLayout(HKL hkl, UINT flags)/,+1a \    return TRUE;' "$FILE_KEYBOARD"
+            sed -i '/BOOL X11DRV_ActivateKeyboardLayout(HKL hkl, UINT flags)/,/^{/ { /^{/ a \    return TRUE;' "$FILE_KEYBOARD"
           fi
 
           TOTAL_TARGETS=" 
