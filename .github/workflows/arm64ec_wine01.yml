@@ -372,8 +372,12 @@ jobs:
 
           FILE_KEYBOARD="dlls/winex11.drv/keyboard.c"
           if [ -f "$FILE_KEYBOARD" ]; then
-            echo "Completely bypassing X11DRV_ActivateKeyboardLayout synchronization..."
-            sed -i '/BOOL X11DRV_ActivateKeyboardLayout(HKL hkl, UINT flags)/,+1a \    return TRUE;' "$FILE_KEYBOARD"
+            echo "Forcing X11DRV_ActivateKeyboardLayout to always return TRUE..."
+            
+            # 1. 함수 이름을 찾고
+            # 2. 그 아래에서 처음 나오는 '{'를 찾은 뒤
+            # 3. 그 바로 다음 줄에 'return TRUE;'를 삽입합니다.
+            sed -i '/X11DRV_ActivateKeyboardLayout/,/^{/ { /^{/ a \    return TRUE;' "$FILE_KEYBOARD"
           fi
 
           FILE3="dlls/wdscore/wdscore.spec"
