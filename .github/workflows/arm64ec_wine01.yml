@@ -487,7 +487,9 @@ jobs:
           FILE_KEYBOARD="dlls/winex11.drv/keyboard.c"
           if [ -f "$FILE_KEYBOARD" ]; then
             echo "Forcing X11DRV_ActivateKeyboardLayout to always return TRUE..."
-            sed -i '/BOOL X11DRV_ActivateKeyboardLayout(HKL hkl, UINT flags)/,/^{/ { /^{/ a \    return TRUE;' "$FILE_KEYBOARD"
+            
+            # 마지막에 '}'를 추가하여 sed의 블록 구문을 닫아줍니다.
+            sed -i '/BOOL X11DRV_ActivateKeyboardLayout(HKL hkl, UINT flags)/,/^{/ { /^{/ a \    return TRUE; \n}' "$FILE_KEYBOARD"
           fi
 
           TOTAL_TARGETS=" 
