@@ -450,8 +450,7 @@ jobs:
               }' "$FILE"
           fi
 
-          # usleep(0)을 메모리 장벽과 빈 구문으로 교체
-          sed -i 's/usleep\s*(0\s*)/{ __sync_synchronize(); }/g' dlls/ntdll/unix/fsync.c
+          sed -i 's/usleep\s*(0\s*)/usleep(10)/g' dlls/ntdll/unix/fsync.c
 
           TOTAL_TARGETS=" 
             dlls/ntdll/unix/fsync.c 
