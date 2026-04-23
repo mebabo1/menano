@@ -322,7 +322,7 @@ jobs:
 
               if (number == 449) { // futex_waitv
                   if (a[0] == 0) return 0;
-                  struct timespec ts = {0, 150000}; // 지연 시간을 0.15ms로 최적화
+                  struct timespec ts = {0, 350000}; // 지연 시간을 0.15ms로 최적화
                   nanosleep(&ts, NULL);
                   __sync_synchronize();
                   return 0; 
