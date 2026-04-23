@@ -372,11 +372,16 @@ jobs:
 
           FILE_KEYBOARD="dlls/winex11.drv/keyboard.c"
           if [ -f "$FILE_KEYBOARD" ]; then
-            echo "Forcing X11DRV_ActivateKeyboardLayout to always return TRUE..."
-            
-            # X11DRV_ActivateKeyboardLayout 함수 정의와 그 다음 '{'를 찾아서 
-            # '{' 바로 뒤에 '\n    return TRUE;'를 삽입합니다.
-            perl -i -0777 -pe 's/(X11DRV_ActivateKeyboardLayout\(.*?\)\s*\{)/$1\n    return TRUE;/s' "$FILE_KEYBOARD"
+            echo "Patching X11DRV_ActivateKeyboardLayout using AWK print method..."
+            awk '/X11DRV_ActivateKeyboardLayout/,/^{/ {
+                print $0
+                if ($0 ~ /^{/) {
+                    print "    return TRUE;"
+                    next
+                }
+                next
+            } { print $0 }' "$FILE_KEYBOARD" > "$FILE_KEYBOARD.tmp"
+            mv "$FILE_KEYBOARD.tmp" "$FILE_KEYBOARD"
           fi
 
           FILE3="dlls/wdscore/wdscore.spec"
