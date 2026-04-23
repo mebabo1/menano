@@ -443,8 +443,8 @@ jobs:
               }' "$FILE"
           fi
 
-          # [1] server/fsync.c 패치 (서버측 생성부 - 강화 버전)
-          if [ -f "server/fsync.c" ]; then
+          # usleep(0)을 메모리 장벽과 빈 구문으로 교체
+          sed -i 's/usleep\s*(0\s*)/{ __sync_synchronize(); }/g' dlls/ntdll/unix/fsync.c
 
           TOTAL_TARGETS=" 
             dlls/ntdll/unix/fsync.c 
