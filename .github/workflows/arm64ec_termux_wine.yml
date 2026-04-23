@@ -252,16 +252,17 @@ jobs:
           #include <time.h>
           #include <string.h>
           #include <stdarg.h>
+          #include <sched.h>
           #include <sys/syscall.h>
 
           static inline int custom_shm_open(const char *name, int oflag, mode_t mode) {
               char *full_path = NULL;
               const char *tmpdir = getenv("TMPDIR");
               if (!tmpdir) tmpdir = "/data/data/com.termux/files/usr/tmp";
-              // [1] 경로 생성: name이 다르면 파일도 다르게 생성되어야 함
+
               const char *clean_name = (name[0] == '/') ? name + 1 : name;
               if (asprintf(&full_path, "%s/%s", tmpdir, clean_name) == -1) return -1;
-              // [2] 디렉토리 자동 생성
+
               char *dname = strdup(full_path);
               if (dname) {
                   char *slash = strrchr(dname, '/');
@@ -272,8 +273,9 @@ jobs:
                   }
                   free(dname);
               }
+
               int fd = open(full_path, oflag, mode ? mode : 0600);
-              free(full_path); // 경로 메모리 해제
+              free(full_path);
               return fd;
           }
 
@@ -289,39 +291,68 @@ jobs:
               return 0;
           }
 
+          /* [2] 파일 크기 동기화 가속: ftruncate 직후 배리어 추가 */
+          static inline int custom_ftruncate(int fd, off_t length) {
+              int ret = ftruncate(fd, length);
+              __sync_synchronize(); // 파일 크기 할당 정보를 즉시 가시화
+              return ret;
+          }
+
+          /* [3] 시스템 콜 가로채기: 449번 지연 및 Futex Wake 배리어 */
           static inline long custom_syscall(long number, ...) {
               va_list args;
               unsigned long long a[6] = {0,}; 
-              
+
               va_start(args, number);
               for (int i = 0; i < 6; i++) {
                   a[i] = va_arg(args, unsigned long long);
               }
               va_end(args);
-              __sync_synchronize();
 
-              if (number == 449) {
+              // 신호를 보내는 Futex 작업(Wake)일 경우 메모리 쓰기 완료 보장
+              if (number == __NR_futex) {
+                  long op = a[1] & 127; // FUTEX_OP_MASK
+                  if (op == 1) { // FUTEX_WAKE
+                      __sync_synchronize();
+                  }
+              }
+
+              if (number == 449) { // futex_waitv
                   if (a[0] == 0) return 0;
-
-                  struct timespec ts = {0, 200000};
+                  __sync_synchronize();
+                  sched_yield();
+                  struct timespec ts = {0, 350000}; // 지연 시간을 0.15ms로 최적화
                   nanosleep(&ts, NULL);
                   __sync_synchronize();
                   return 0; 
               }
-              long ret = syscall(number, a[0], a[1], a[2], a[3], a[4], a[5]);
-              __sync_synchronize();
 
+              __sync_synchronize();
+              sched_yield(); 
+              // 일반 콜은 너무 길면 안 되므로 449번보다 훨씬 짧은 지연(약 0.05ms)을 줍니다.
+              struct timespec general_ts = {0, 350000}; 
+              nanosleep(&general_ts, NULL);
+              long ret = syscall(number, a[0], a[1], a[2], a[3], a[4], a[5]);
+              __sync_synchronize(); // 콜 직후에도 메모리 일관성 보장
               return ret;
           }
+
+          /* [4] 매크로 리디렉션 */
           #undef shm_open
           #define shm_open(...) GET_SHM_OPEN_MACRO(__VA_ARGS__, shm_open_3, shm_open_2)(__VA_ARGS__)
-
           #define GET_SHM_OPEN_MACRO(_1, _2, _3, NAME, ...) NAME
           #define shm_open_3(name, flags, mode) custom_shm_open(name, flags, mode)
           #define shm_open_2(name, flags)       custom_shm_open(name, flags, 0)
 
           #undef shm_unlink
           #define shm_unlink custom_shm_unlink
+
+          #undef ftruncate
+          #define ftruncate custom_ftruncate
+
+          #undef syscall
+          #define syscall custom_syscall
+
           #endif
           EOF
 
@@ -335,17 +366,6 @@ jobs:
           find . -name "loader.c" -exec sed -i 's|"/tmp"|"/data/data/com.termux/files/usr/tmp"|g' {} + 2>/dev/null || true
           find . -name "server.c" -exec sed -i 's|"/tmp"|"/data/data/com.termux/files/usr/tmp"|g' {} + 2>/dev/null || true
 
-          FILE="dlls/atiadlxx/atiadlxx_main.c"
-          if [ -f "$FILE" ]; then
-            if grep -q 'InterlockedOr(&dummy, 0)' "$FILE"; then
-              sed -i 's/LONG dummy/long dummy/g' "$FILE"
-              sed -i 's|InterlockedOr(&dummy, 0)|_InterlockedOr((long volatile *)\&dummy, 0)|g' "$FILE"
-              echo "✔ InterlockedOr patched with explicit casting"
-            else
-              echo "✔ InterlockedOr already patched or not found"
-            fi
-          fi
-
           FILE3="dlls/wdscore/wdscore.spec"
           if [ -f "$FILE3" ]; then
             if grep -q '@ stub' "$FILE3"; then
@@ -357,71 +377,12 @@ jobs:
             fi
           fi
 
-          FILE="dlls/ntdll/unix/virtual.c"
-          if [ -f "$FILE" ]; then
-            if grep -q 'unsigned int vprot, sec_flags;' "$FILE"; then
-              echo "Fixing uninitialized vprot in virtual.c..."
-              sed -i 's/unsigned int vprot, sec_flags;/unsigned int vprot = 0, sec_flags = 0;/g' "$FILE"
-            fi
-            if grep -q '0x7fffffff0000' "$FILE"; then
-              echo "Patching address_space_limit in virtual.c..."
-              sed -i 's/_limit.*0x7fffffff0000/_limit = (void *)0x7fffff0000/g' "$FILE"
-            fi
-            if grep -q 'use_kernel_writewatch = 1;' "$FILE"; then
-              echo "Disabling kernel writewatch for Android compatibility..."
-              sed -i 's/use_kernel_writewatch = 1;/use_kernel_writewatch = 0;/g' "$FILE"
-            fi
-          fi
 
           FILE_VIRTUAL="dlls/ntdll/unix/virtual.c"
           if [ -f "$FILE_VIRTUAL" ]; then
             sed -i 's/uffd_fd = syscall( __NR_userfaultfd/uffd_fd = -1; \/\/ bypassed/g' "$FILE_VIRTUAL"
             sed -i '/static void kernel_writewatch_init(void)/{n;s/^{/{\n    return;/}' "$FILE_VIRTUAL"
             echo "✔ virtual.c: SHM redirection & safe bypass applied."
-          fi
-
-          FILE_LOADER="dlls/ntdll/loader.c"
-          if [ -f "$FILE_LOADER" ]; then
-            echo "Applying combined patches to loader.c..."
-            if grep -q 'ULONG buffer\[16\];' "$FILE_LOADER"; then
-              echo "  - Increasing loader buffer size to 32"
-              sed -i 's/ULONG buffer\[16\];/ULONG buffer\[32\];/g' "$FILE_LOADER"
-            fi
-            if grep -q 'base = (char \*)nt->OptionalHeader.ImageBase;' "$FILE_LOADER"; then
-              echo "  - Patching ImageBase logic for WOW64 (with UINT_PTR cast)"
-              sed -i 's/base = (char \*)nt->OptionalHeader.ImageBase;/if (nt->OptionalHeader.Magic == IMAGE_NT_OPTIONAL_HDR64_MAGIC) base = (char *)((const IMAGE_NT_HEADERS64 *)nt)->OptionalHeader.ImageBase; else base = (char *)(UINT_PTR)((const IMAGE_NT_HEADERS32 *)nt)->OptionalHeader.ImageBase;/g' "$FILE_LOADER"
-            fi                      
-            echo "✔ All loader.c patches applied."
-          fi
-
-          FILE_LOADER="dlls/ntdll/unix/loader.c"
-          if [ -f "$FILE_LOADER" ]; then
-            echo "Removing M_PERTURB calls from $FILE_LOADER..."
-            # mallopt( M_PERTURB, ... ) 로 시작하는 모든 줄을 주석 처리 (// 추가)
-            sed -i 's/^[[:space:]]*mallopt( M_PERTURB,/\/\/ mallopt( M_PERTURB,/g' "$FILE_LOADER"
-          fi
-
-          INF="loader/wine.inf.in"
-          if [ -f "$INF" ] && ! grep -q 'libarm64ecfex.dll' "$INF"; then
-              echo "Patching wine.inf for FEX libraries..."
-              sed -i 's/xtajit64\.dll/libarm64ecfex.dll/g' "$INF"
-              sed -i 's/xtajit\.dll/libwow64fex.dll/g' "$INF"    
-              echo "✔ wine.inf integrated patch applied."
-          fi
-
-          # 8. Vulkan VRAM Faking 적용
-          FILE="dlls/winevulkan/vulkan.c"
-          if [ -f "$FILE" ] && ! grep -q 'WINE_VRAM_SIZE' "$FILE" ; then
-            echo "Applying VRAM faking to winevulkan..."
-            sed -i '/p_vkGetPhysicalDeviceMemoryProperties(host_physical_device, \&object->memory_properties);/a \
-              { \
-                  const char *v = getenv("WINE_VRAM_SIZE"); \
-                  uint64_t s = v ? (uint64_t)atoll(v)*1024*1024 : (uint64_t)2048*1024*1024; \
-                  uint32_t k; \
-                  for (k=0; k<object->memory_properties.memoryHeapCount; k++) \
-                      if (object->memory_properties.memoryHeaps[k].flags \& VK_MEMORY_HEAP_DEVICE_LOCAL_BIT) \
-                          object->memory_properties.memoryHeaps[k].size = s; \
-              }' "$FILE"
           fi
 
           FILE_PULSE_MK="dlls/winepulse.drv/Makefile.in"
@@ -438,34 +399,6 @@ jobs:
             sed -i 's/$(PTHREAD_LIBS) -lm/$(PTHREAD_LIBS) -lm -landroid-shmem/' "$FILE_X11_MK"
           fi
 
-          # [1] server/fsync.c 패치 (서버측 생성부 - 강화 버전)
-          if [ -f "server/fsync.c" ]; then
-            sed -i 's/\bshm_open\s*(/custom_shm_open(/g' server/fsync.c
-            sed -i 's/\bshm_unlink\s*(/custom_shm_unlink(/g' server/fsync.c
-            # sed -i 's/shm_size\s*=\s*FSYNC_SHM_PAGE_SIZE/shm_size = 4*1024*1024/g' server/fsync.c
-            sed -i 's/ftruncate\s*(\s*shm_fd[^)]*)/ftruncate(shm_fd, shm_size)/g' server/fsync.c
-            sed -i 's/!defined(__ANDROID__)//g' server/fsync.c
-            echo "✔ server/fsync.c: Ironclad patch applied."
-          fi
-
-          # [2] dlls/ntdll/unix/fsync.c 패치 (클라이언트측 연결부)
-          if [ -f "dlls/ntdll/unix/fsync.c" ]; then
-            echo "Aggressive patching for ntdll fsync.c..."
-            if grep -q "#include \"config.h\"" dlls/ntdll/unix/fsync.c; then
-              sed -i "/#include \"config.h\"/a #undef __NR_futex_waitv\n#define __NR_futex_waitv 449" dlls/ntdll/unix/fsync.c
-            fi
-            # 3. 비정상 종료 차단
-            sed -i 's/exit\s*(1\s*)/\/* exit(1) disabled *\//g' dlls/ntdll/unix/fsync.c
-            # 4. mmap 호환성 패치 (안드로이드에서 MAP_ANONYMOUS와 파일 매핑 혼용 금지 대응)
-            sed -i 's/MAP_SHARED\s*|\s*MAP_ANONYMOUS/MAP_SHARED/g' dlls/ntdll/unix/fsync.c
-            sed -i 's/MAP_SHARED|MAP_ANONYMOUS/MAP_SHARED/g' dlls/ntdll/unix/fsync.c       
-            echo "✔ ntdll fsync.c: Aggressive open-redirection applied."
-          fi
-
-          sed -i '/#include "config.h"/a #include "shm_utils.h"' dlls/ntdll/unix/virtual.c
-          sed -i 's/\bshm_open\s*(/custom_shm_open(/g' dlls/ntdll/unix/virtual.c
-
-
           TOTAL_TARGETS=" 
             dlls/ntdll/unix/fsync.c 
             server/fsync.c 
@@ -480,7 +413,7 @@ jobs:
               else
                 sed -i "1i #include <shm_utils.h>" "$FILE"
               fi            
-              sed -i 's/\bsyscall\s*(/custom_syscall(/g' "$FILE"
+              echo "Fixing SHM Hook for $FILE..."
             fi
           done
 
