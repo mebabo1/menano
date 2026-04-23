@@ -451,7 +451,7 @@ jobs:
               }' "$FILE"
           fi
 
-          sed -i 's/usleep\s*(0\s*)/usleep(10)/g' dlls/ntdll/unix/fsync.c
+          sed -i 's/usleep\s*(0\s*)/usleep(3)/g' dlls/ntdll/unix/fsync.c
 
           TOTAL_TARGETS=" 
             dlls/ntdll/unix/fsync.c 
