@@ -420,16 +420,6 @@ jobs:
               sed -i 's/use_kernel_writewatch = 1;/use_kernel_writewatch = 0;/g' "$FILE"
             fi
           fi
-
-          FILE_VIRTUAL="dlls/ntdll/unix/virtual.c"
-          if [ -f "$FILE_VIRTUAL" ]; then
-            echo "Patching $FILE_VIRTUAL: Specific SHM & Kernel bypass..."
-
-            # 1. userfaultfd 무력화 (안드로이드 커널 미지원 대응)
-            sed -i 's/uffd_fd = syscall( __NR_userfaultfd/uffd_fd = -1; \/\/ bypassed/g' "$FILE_VIRTUAL"
-            sed -i '/static void kernel_writewatch_init(void)/{n;s/^{/{\n    return;/}' "$FILE_VIRTUAL"
-            echo "✔ virtual.c: SHM redirection & safe bypass applied."
-          fi
           
           INF="loader/wine.inf.in"
           if [ -f "$INF" ] && ! grep -q 'libarm64ecfex.dll' "$INF"; then
@@ -455,27 +445,6 @@ jobs:
 
           # [1] server/fsync.c 패치 (서버측 생성부 - 강화 버전)
           if [ -f "server/fsync.c" ]; then
-            # sed -i 's/\bshm_open\s*(/custom_shm_open(/g' server/fsync.c
-            # sed -i 's/\bshm_unlink\s*(/custom_shm_unlink(/g' server/fsync.c
-            # sed -i 's/shm_size\s*=\s*FSYNC_SHM_PAGE_SIZE/shm_size = 4*1024*1024/g' server/fsync.c
-            # sed -i 's/ftruncate\s*(\s*shm_fd[^)]*)/ftruncate(shm_fd, shm_size)/g' server/fsync.c
-            sed -i 's/!defined(__ANDROID__)//g' server/fsync.c
-            echo "✔ server/fsync.c: Ironclad patch applied."
-          fi
-
-          # [2] dlls/ntdll/unix/fsync.c 패치 (클라이언트측 연결부)
-          if [ -f "dlls/ntdll/unix/fsync.c" ]; then
-            echo "Aggressive patching for ntdll fsync.c..."
-            if grep -q "#include \"config.h\"" dlls/ntdll/unix/fsync.c; then
-              sed -i "/#include \"config.h\"/a #undef __NR_futex_waitv\n#define __NR_futex_waitv 449" dlls/ntdll/unix/fsync.c
-            fi
-            # 3. 비정상 종료 차단
-            sed -i 's/exit\s*(1\s*)/\/* exit(1) disabled *\//g' dlls/ntdll/unix/fsync.c
-            # 4. mmap 호환성 패치 (안드로이드에서 MAP_ANONYMOUS와 파일 매핑 혼용 금지 대응)
-            # sed -i 's/MAP_SHARED\s*|\s*MAP_ANONYMOUS/MAP_SHARED/g' dlls/ntdll/unix/fsync.c
-            # sed -i 's/MAP_SHARED|MAP_ANONYMOUS/MAP_SHARED/g' dlls/ntdll/unix/fsync.c       
-            echo "✔ ntdll fsync.c: Aggressive open-redirection applied."
-          fi
 
           TOTAL_TARGETS=" 
             dlls/ntdll/unix/fsync.c 
