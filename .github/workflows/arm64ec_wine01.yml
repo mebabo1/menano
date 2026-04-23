@@ -335,8 +335,8 @@ jobs:
               if (repeat_count > 0) {
                   // 반복될수록 벌칙 강화 (0.8ms ~ 1.5ms까지)
                   // 로그의 0x10 같은 녀석들을 확실히 잠재웁니다.
-                  ts.tv_nsec = 800000 + (repeat_count * 150000); 
-                  if (ts.tv_nsec > 2000000) ts.tv_nsec = 2000000; // 최대 2ms 제한
+                  ts.tv_nsec = 800000 + (repeat_count * 500000); 
+                  if (ts.tv_nsec > 30000000) ts.tv_nsec = 30000000; // 최대 2ms 제한
               } else {
                   // 처음 보는 객체(3, 4, 5번 등)는 즉시 통과
                   ts.tv_nsec = 20000; // 0.02ms
