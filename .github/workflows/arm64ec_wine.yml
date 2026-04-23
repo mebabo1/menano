@@ -249,16 +249,17 @@ jobs:
           #include <time.h>
           #include <string.h>
           #include <stdarg.h>
+          #include <sched.h>
           #include <sys/syscall.h>
 
           static inline int custom_shm_open(const char *name, int oflag, mode_t mode) {
               char *full_path = NULL;
               const char *tmpdir = getenv("TMPDIR");
               if (!tmpdir) tmpdir = "/data/data/com.termux/files/usr/tmp";
-              // [1] 경로 생성: name이 다르면 파일도 다르게 생성되어야 함
+
               const char *clean_name = (name[0] == '/') ? name + 1 : name;
               if (asprintf(&full_path, "%s/%s", tmpdir, clean_name) == -1) return -1;
-              // [2] 디렉토리 자동 생성
+
               char *dname = strdup(full_path);
               if (dname) {
                   char *slash = strrchr(dname, '/');
@@ -269,8 +270,9 @@ jobs:
                   }
                   free(dname);
               }
+
               int fd = open(full_path, oflag, mode ? mode : 0600);
-              free(full_path); // 경로 메모리 해제
+              free(full_path);
               return fd;
           }
 
@@ -286,39 +288,68 @@ jobs:
               return 0;
           }
 
+          /* [2] 파일 크기 동기화 가속: ftruncate 직후 배리어 추가 */
+          static inline int custom_ftruncate(int fd, off_t length) {
+              int ret = ftruncate(fd, length);
+              __sync_synchronize(); // 파일 크기 할당 정보를 즉시 가시화
+              return ret;
+          }
+
+          /* [3] 시스템 콜 가로채기: 449번 지연 및 Futex Wake 배리어 */
           static inline long custom_syscall(long number, ...) {
               va_list args;
               unsigned long long a[6] = {0,}; 
-              
+
               va_start(args, number);
               for (int i = 0; i < 6; i++) {
                   a[i] = va_arg(args, unsigned long long);
               }
               va_end(args);
-              __sync_synchronize();
 
-              if (number == 449) {
+              // 신호를 보내는 Futex 작업(Wake)일 경우 메모리 쓰기 완료 보장
+              if (number == __NR_futex) {
+                  long op = a[1] & 127; // FUTEX_OP_MASK
+                  if (op == 1) { // FUTEX_WAKE
+                      __sync_synchronize();
+                  }
+              }
+
+              if (number == 449) { // futex_waitv
                   if (a[0] == 0) return 0;
-
-                  struct timespec ts = {0, 200000};
+                  __sync_synchronize();
+                  sched_yield();
+                  struct timespec ts = {0, 350000}; // 지연 시간을 0.15ms로 최적화
                   nanosleep(&ts, NULL);
                   __sync_synchronize();
                   return 0; 
               }
-              long ret = syscall(number, a[0], a[1], a[2], a[3], a[4], a[5]);
-              __sync_synchronize();
 
+              __sync_synchronize();
+              sched_yield(); 
+              // 일반 콜은 너무 길면 안 되므로 449번보다 훨씬 짧은 지연(약 0.05ms)을 줍니다.
+              struct timespec general_ts = {0, 350000}; 
+              nanosleep(&general_ts, NULL);
+              long ret = syscall(number, a[0], a[1], a[2], a[3], a[4], a[5]);
+              __sync_synchronize(); // 콜 직후에도 메모리 일관성 보장
               return ret;
           }
+
+          /* [4] 매크로 리디렉션 */
           #undef shm_open
           #define shm_open(...) GET_SHM_OPEN_MACRO(__VA_ARGS__, shm_open_3, shm_open_2)(__VA_ARGS__)
-
           #define GET_SHM_OPEN_MACRO(_1, _2, _3, NAME, ...) NAME
           #define shm_open_3(name, flags, mode) custom_shm_open(name, flags, mode)
           #define shm_open_2(name, flags)       custom_shm_open(name, flags, 0)
 
           #undef shm_unlink
           #define shm_unlink custom_shm_unlink
+
+          #undef ftruncate
+          #define ftruncate custom_ftruncate
+
+          #undef syscall
+          #define syscall custom_syscall
+
           #endif
           EOF
 
