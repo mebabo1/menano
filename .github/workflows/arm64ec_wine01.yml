@@ -396,17 +396,6 @@ jobs:
           find . -name "loader.c" -exec sed -i 's|"/tmp"|"/data/data/com.termux/files/usr/tmp"|g' {} + 2>/dev/null || true
           find . -name "server.c" -exec sed -i 's|"/tmp"|"/data/data/com.termux/files/usr/tmp"|g' {} + 2>/dev/null || true
 
-          FILE="dlls/atiadlxx/atiadlxx_main.c"
-          if [ -f "$FILE" ]; then
-            if grep -q 'InterlockedOr(&dummy, 0)' "$FILE"; then
-              sed -i 's/LONG dummy/long dummy/g' "$FILE"
-              sed -i 's|InterlockedOr(&dummy, 0)|_InterlockedOr((long volatile *)\&dummy, 0)|g' "$FILE"
-              echo "✔ InterlockedOr patched with explicit casting"
-            else
-              echo "✔ InterlockedOr already patched or not found"
-            fi
-          fi
-
           FILE3="dlls/wdscore/wdscore.spec"
           if [ -f "$FILE3" ]; then
             if grep -q '@ stub' "$FILE3"; then
@@ -418,56 +407,11 @@ jobs:
             fi
           fi
 
-          FILE_LOADER="dlls/ntdll/loader.c"
-          if [ -f "$FILE_LOADER" ]; then
-            echo "Applying combined patches to loader.c..."
-            if grep -q 'ULONG buffer\[16\];' "$FILE_LOADER"; then
-              echo "  - Increasing loader buffer size to 32"
-              sed -i 's/ULONG buffer\[16\];/ULONG buffer\[32\];/g' "$FILE_LOADER"
-            fi
-            if grep -q 'base = (char \*)nt->OptionalHeader.ImageBase;' "$FILE_LOADER"; then
-              echo "  - Patching ImageBase logic for WOW64 (with UINT_PTR cast)"
-              sed -i 's/base = (char \*)nt->OptionalHeader.ImageBase;/if (nt->OptionalHeader.Magic == IMAGE_NT_OPTIONAL_HDR64_MAGIC) base = (char *)((const IMAGE_NT_HEADERS64 *)nt)->OptionalHeader.ImageBase; else base = (char *)(UINT_PTR)((const IMAGE_NT_HEADERS32 *)nt)->OptionalHeader.ImageBase;/g' "$FILE_LOADER"
-            fi                      
-            echo "✔ All loader.c patches applied."
-          fi
-
-          FILE_LOADER="dlls/ntdll/unix/loader.c"
-          if [ -f "$FILE_LOADER" ]; then
-            echo "Removing M_PERTURB calls from $FILE_LOADER..."
-            # mallopt( M_PERTURB, ... ) 로 시작하는 모든 줄을 주석 처리 (// 추가)
-            sed -i 's/^[[:space:]]*mallopt( M_PERTURB,/\/\/ mallopt( M_PERTURB,/g' "$FILE_LOADER"
-          fi
-
-          FILE="dlls/ntdll/unix/virtual.c"
-          if [ -f "$FILE" ]; then
-            if grep -q 'unsigned int vprot, sec_flags;' "$FILE"; then
-              echo "Fixing uninitialized vprot in virtual.c..."
-              sed -i 's/unsigned int vprot, sec_flags;/unsigned int vprot = 0, sec_flags = 0;/g' "$FILE"
-            fi
-            if grep -q '0x7fffffff0000' "$FILE"; then
-              echo "Patching address_space_limit in virtual.c..."
-              sed -i 's/_limit.*0x7fffffff0000/_limit = (void *)0x7fffff0000/g' "$FILE"
-            fi
-            if grep -q 'use_kernel_writewatch = 1;' "$FILE"; then
-              echo "Disabling kernel writewatch for Android compatibility..."
-              sed -i 's/use_kernel_writewatch = 1;/use_kernel_writewatch = 0;/g' "$FILE"
-            fi
-          fi
-
           FILE_VIRTUAL="dlls/ntdll/unix/virtual.c"
           if [ -f "$FILE_VIRTUAL" ]; then
             sed -i 's/uffd_fd = syscall( __NR_userfaultfd/uffd_fd = -1; \/\/ bypassed/g' "$FILE_VIRTUAL"
             sed -i '/static void kernel_writewatch_init(void)/{n;s/^{/{\n    return;/}' "$FILE_VIRTUAL"
             echo "✔ virtual.c: SHM redirection & safe bypass applied."
-          fi
-          
-          INF="loader/wine.inf.in"
-          if [ -f "$INF" ] && ! grep -q 'libarm64ecfex.dll' "$INF"; then
-              echo "Patching wine.inf for FEX libraries..."
-              sed -i 's/xtajit64\.dll/libarm64ecfex.dll/g' "$INF"
-              sed -i 's/xtajit\.dll/libwow64fex.dll/g' "$INF"    
-              echo "✔ wine.inf integrated patch applied."
           fi
 
           FILE="dlls/winevulkan/vulkan.c"
@@ -487,7 +431,6 @@ jobs:
           TOTAL_TARGETS=" 
             dlls/ntdll/unix/fsync.c 
             server/fsync.c 
-            dlls/ntdll/unix/virtual.c
           "
 
           for FILE in $TOTAL_TARGETS; do
