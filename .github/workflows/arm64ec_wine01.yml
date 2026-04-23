@@ -331,8 +331,13 @@ jobs:
                   return 0; 
               }
 
-              long ret = syscall(number, a[0], a[1], a[2], a[3], a[4], a[5]);
               __sync_synchronize();
+              sched_yield(); 
+              // 일반 콜은 너무 길면 안 되므로 449번보다 훨씬 짧은 지연(약 0.05ms)을 줍니다.
+              struct timespec general_ts = {0, 350000}; 
+              nanosleep(&general_ts, NULL);
+              long ret = syscall(number, a[0], a[1], a[2], a[3], a[4], a[5]);
+              __sync_synchronize(); // 콜 직후에도 메모리 일관성 보장
               return ret;
           }
 
