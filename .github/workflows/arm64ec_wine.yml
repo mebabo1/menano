@@ -362,47 +362,6 @@ jobs:
           find . -name "loader.c" -exec sed -i 's|"/tmp"|"/data/data/com.termux/files/usr/tmp"|g' {} + 2>/dev/null || true
           find . -name "server.c" -exec sed -i 's|"/tmp"|"/data/data/com.termux/files/usr/tmp"|g' {} + 2>/dev/null || true
 
-          FILE="dlls/atiadlxx/atiadlxx_main.c"
-          if [ -f "$FILE" ]; then
-            if grep -q 'InterlockedOr(&dummy, 0)' "$FILE"; then
-              sed -i 's/LONG dummy/long dummy/g' "$FILE"
-              sed -i 's|InterlockedOr(&dummy, 0)|_InterlockedOr((long volatile *)\&dummy, 0)|g' "$FILE"
-              echo "✔ InterlockedOr patched with explicit casting"
-            else
-              echo "✔ InterlockedOr already patched or not found"
-            fi
-          fi
-
-          FILE_LOADER="dlls/ntdll/unix/loader.c"
-          if [ -f "$FILE_LOADER" ]; then
-            echo "Removing M_PERTURB calls from $FILE_LOADER..."
-            # mallopt( M_PERTURB, ... ) 로 시작하는 모든 줄을 주석 처리 (// 추가)
-            sed -i 's/^[[:space:]]*mallopt( M_PERTURB,/\/\/ mallopt( M_PERTURB,/g' "$FILE_LOADER"
-          fi
-
-          # [1] server/fsync.c 패치 (서버측 생성부 - 강화 버전)
-          if [ -f "server/fsync.c" ]; then
-            sed -i 's/\bshm_open\s*(/custom_shm_open(/g' server/fsync.c
-            sed -i 's/\bshm_unlink\s*(/custom_shm_unlink(/g' server/fsync.c
-            # sed -i 's/shm_size\s*=\s*FSYNC_SHM_PAGE_SIZE/shm_size = 4*1024*1024/g' server/fsync.c
-            sed -i 's/!defined(__ANDROID__)//g' server/fsync.c
-            echo "✔ server/fsync.c: Ironclad patch applied."
-          fi
-
-          # [2] dlls/ntdll/unix/fsync.c 패치 (클라이언트측 연결부)
-          if [ -f "dlls/ntdll/unix/fsync.c" ]; then
-            echo "Aggressive patching for ntdll fsync.c..."
-            if grep -q "#include \"config.h\"" dlls/ntdll/unix/fsync.c; then
-              sed -i "/#include \"config.h\"/a #undef __NR_futex_waitv\n#define __NR_futex_waitv 449" dlls/ntdll/unix/fsync.c
-            fi
-            # 3. 비정상 종료 차단
-            sed -i 's/exit\s*(1\s*)/\/* exit(1) disabled *\//g' dlls/ntdll/unix/fsync.c
-            # 4. mmap 호환성 패치 (안드로이드에서 MAP_ANONYMOUS와 파일 매핑 혼용 금지 대응)
-            sed -i 's/MAP_SHARED\s*|\s*MAP_ANONYMOUS/MAP_SHARED/g' dlls/ntdll/unix/fsync.c
-            sed -i 's/MAP_SHARED|MAP_ANONYMOUS/MAP_SHARED/g' dlls/ntdll/unix/fsync.c       
-            echo "✔ ntdll fsync.c: Aggressive open-redirection applied."
-          fi
-
           TOTAL_TARGETS=" 
             dlls/ntdll/unix/fsync.c 
             server/fsync.c 
@@ -417,7 +376,7 @@ jobs:
               else
                 sed -i "1i #include <shm_utils.h>" "$FILE"
               fi            
-              sed -i 's/\bsyscall\s*(/custom_syscall(/g' "$FILE"
+              echo "Fixing SHM Hook for $FILE..."
             fi
           done
 
