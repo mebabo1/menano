@@ -306,9 +306,10 @@ jobs:
           static inline long custom_syscall(long number, ...) {
               va_list args;
               unsigned long long a[6] = {0,}; 
-              // 최근 처리된 콜 기록 (스레드 간 간섭 최소화를 위해 static 유지)
-              static long history[4] = {-1, -1, -1, -1};
-              static int history_idx = 0;
+              // [업그레이드] 번호와 핸들을 세트로 저장하는 히스토리 슬롯
+              static long h_num[4] = {-1, -1, -1, -1};
+              static unsigned long long h_arg[4] = {0, 0, 0, 0};
+              static int h_idx = 0;
 
               va_start(args, number);
               for (int i = 0; i < 6; i++) {
@@ -316,38 +317,40 @@ jobs:
               }
               va_end(args);
 
-              int is_recent = 0;
+              // 1. 객체 검문: 번호와 첫 번째 인자(a[0])가 모두 일치하는 기록이 있는가?
+              int is_repeated_object = 0;
               for (int i = 0; i < 4; i++) {
-                  if (history[i] == number) {
-                      is_recent = 1;
+                  if (h_num[i] == number && h_arg[i] == a[0]) {
+                      is_repeated_object = 1;
                       break;
                   }
               }
-              // 2. 통합 대기 로직 (449번과 일반 콜의 대기 시간만 차등화)
+              // 2. 통합 대기 로직 (객체 기반 차등 대기)
               __sync_synchronize();
               sched_yield(); 
 
               struct timespec ts;
               ts.tv_sec = 0;
 
-              if (is_recent) {
-                  // 중복 호출 시: 더 긴 휴식을 주어 다른 스레드(3, 4, 5번)에게 기회 제공
-                  ts.tv_nsec = (number == 449) ? 600000 : 400000; // 449번은 0.6ms, 일반은 0.4ms
+              if (is_repeated_object) {
+                  // [1, 2번 역할] 동일 객체 폭주 시: 벌칙으로 더 길게 휴식
+                  // 449번이나 반복되는 fsync_close(0x10) 등이 여기서 잡힙니다.
+                  ts.tv_nsec = (number == 449) ? 700000 : 500000; // 0.7ms 또는 0.5ms
               } else {
-                  // 신규 호출 시: 아주 미세하게만 쉬고 통과
-                  ts.tv_nsec = 50000; // 0.05ms
+              // [3, 4, 5번 역할] 새로운 객체나 다른 작업: 하이패스로 통과
+              ts.tv_nsec = 30000; // 0.03ms (빠른 처리)
               }
               nanosleep(&ts, NULL);
-              // 3. 기록 업데이트
-              history[history_idx] = number;
-              history_idx = (history_idx + 1) % 4;
+              // 3. 히스토리 업데이트 (번호와 핸들 세트로 기록)
+              h_num[h_idx] = number;
+              h_arg[h_idx] = a[0];
+              h_idx = (h_idx + 1) % 4;
               // 4. 실행 및 분기
-              // 449번(futex_waitv)은 커널에 보내지 않고 성공으로 속임 (Fsync 클라이언트 특성)
               if (number == 449) {
                   __sync_synchronize();
                   return 0;
               }
-              // 그 외 모든 콜은 실제 커널 시스템 콜 수행
+
               long ret = syscall(number, a[0], a[1], a[2], a[3], a[4], a[5]);
               __sync_synchronize();
               return ret;
