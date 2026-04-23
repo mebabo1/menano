@@ -309,49 +309,59 @@ jobs:
           static inline long custom_syscall(long number, ...) {
               va_list args;
               unsigned long long a[6] = {0,}; 
-              // [업그레이드] 번호와 핸들을 세트로 저장하는 히스토리 슬롯
-              static long h_num[6] = {-1, -1, -1, -1, -1, -1};
-              static unsigned long long h_arg[6] = {0, 0, 0, 0, 0, 0};
+              
+              // [수정 1] 히스토리 슬롯 확장 (6개 -> 32개)
+              // SD888의 속도를 감당하려면 최소 32개는 훑어야 '방금 지나간 놈'을 잡습니다.
+              #define HISTORY_SIZE 32
+              static long h_num[HISTORY_SIZE];
+              static unsigned long long h_arg[HISTORY_SIZE];
               static int h_idx = 0;
+              static int initialized = 0;
+
+              if (!initialized) {
+                  for(int i=0; i<HISTORY_SIZE; i++) h_num[i] = -1;
+                  initialized = 1;
+              }
 
               va_start(args, number);
-              for (int i = 0; i < 6; i++) {
-                  a[i] = va_arg(args, unsigned long long);
-              }
+              for (int i = 0; i < 6; i++) a[i] = va_arg(args, unsigned long long);
               va_end(args);
 
-              // 1. 객체 검문: 번호와 첫 번째 인자(a[0])가 모두 일치하는 기록이 있는가?
+              // [수정 2] 중복 판별 로직 강화
               int repeat_count = 0;
-              for (int i = 0; i < 6; i++) {
+              for (int i = 0; i < HISTORY_SIZE; i++) {
                   if (h_num[i] == number && h_arg[i] == a[0]) {
                       repeat_count++;
                   }
               }
+
+              // [추가] 직전 호출과 동일한가? (연속 폭주 잡기)
+              int last_idx = (h_idx - 1 + HISTORY_SIZE) % HISTORY_SIZE;
+              if (h_num[last_idx] == number && h_arg[last_idx] == a[0]) {
+                  repeat_count += 10; 
+              }
+
               // 2. 통합 대기 로직 (객체 기반 차등 대기)
               __sync_synchronize();
               sched_yield(); 
 
               struct timespec ts = {0, 0};
               if (repeat_count > 0) {
-                  // 반복될수록 벌칙 강화 (0.8ms ~ 1.5ms까지)
-                  // 로그의 0x10 같은 녀석들을 확실히 잠재웁니다.
-                  ts.tv_nsec = 800000 + (repeat_count * 150000); 
-                  if (ts.tv_nsec > 2000000) ts.tv_nsec = 2000000; // 최대 2ms 제한
+                  long long nsec = 800000LL + ((long long)repeat_count * 150000LL);
+                  if (nsec > 2000000LL) nsec = 2000000LL; 
+                  ts.tv_nsec = (long)nsec;
               } else {
-                  // 처음 보는 객체(3, 4, 5번 등)는 즉시 통과
-                  ts.tv_nsec = 20000; // 0.02ms
+                  ts.tv_nsec = 20000; 
               }
               nanosleep(&ts, NULL);
-              // 3. 히스토리 업데이트 (번호와 핸들 세트로 기록)
+
+              // 3. 히스토리 업데이트
               h_num[h_idx] = number;
               h_arg[h_idx] = a[0];
-              h_idx = (h_idx + 1) % 6;
-              // 4. 실행 및 분기
-              if (number == 449) {
-                  __sync_synchronize();
-                  return 0;
-              }
+              h_idx = (h_idx + 1) % HISTORY_SIZE;
 
+              if (number == 449) return 0;
+              
               long ret = syscall(number, a[0], a[1], a[2], a[3], a[4], a[5]);
               __sync_synchronize();
               return ret;
