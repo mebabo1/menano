@@ -335,7 +335,7 @@ jobs:
               if (repeat_count > 0) {
                   // 반복될수록 벌칙 강화 (0.8ms ~ 1.5ms까지)
                   // 로그의 0x10 같은 녀석들을 확실히 잠재웁니다.
-                  ts.tv_nsec = 800000 + (repeat_count * 100000000); 
+                  ts.tv_nsec = 800000LL + (repeat_count * 100000000LL); 
                   if (delay_ns > 10000000000LL) delay_ns = 10000000000LL; // 최대 10초 제한
                   ts.tv_sec = delay_ns / 1000000000LL;
                   ts.tv_nsec = delay_ns % 1000000000LL;
