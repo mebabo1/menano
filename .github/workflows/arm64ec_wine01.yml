@@ -477,13 +477,10 @@ jobs:
             echo "✔ ntdll fsync.c: Aggressive open-redirection applied."
           fi
 
-          sed -i '/#include "config.h"/a #include "shm_utils.h"' dlls/ntdll/unix/virtual.c
-          sed -i 's/\bshm_open\s*(/custom_shm_open(/g' dlls/ntdll/unix/virtual.c
-
-
           TOTAL_TARGETS=" 
             dlls/ntdll/unix/fsync.c 
             server/fsync.c 
+            dlls/ntdll/unix/virtual.c
           "
 
           for FILE in $TOTAL_TARGETS; do
