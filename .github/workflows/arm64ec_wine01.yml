@@ -258,9 +258,6 @@ jobs:
           #include <stdarg.h>
           #include <sched.h>
           #include <sys/syscall.h>
-          #ifndef __NR_futex
-          #define __NR_futex 202
-          #endif
 
           static inline int custom_shm_open(const char *name, int oflag, mode_t mode) {
               char *full_path = NULL;
@@ -308,66 +305,43 @@ jobs:
           /* [3] 시스템 콜 가로채기: 449번 지연 및 Futex Wake 배리어 */
           static inline long custom_syscall(long number, ...) {
               va_list args;
-              unsigned long long a[6] = {0,};
-              
-              #define HISTORY_SIZE 32
-              static long h_num[HISTORY_SIZE];
-              static unsigned long long h_arg[HISTORY_SIZE];
-              static int h_idx = 0;
-              static int initialized = 0;
-
-              if (!initialized) {
-                  for(int i=0; i<HISTORY_SIZE; i++) h_num[i] = -1;
-                  initialized = 1;
-              }
+              unsigned long long a[6] = {0,}; 
 
               va_start(args, number);
-              for (int i = 0; i < 6; i++) a[i] = va_arg(args, unsigned long long);
+              for (int i = 0; i < 6; i++) {
+                  a[i] = va_arg(args, unsigned long long);
+              }
               va_end(args);
 
-              if (number == 202) {
-                  return syscall(number, a[0], a[1], a[2], a[3], a[4], a[5]);
-              }
-
-              // [수정 2] 중복 판별 로직 강화
-              int repeat_count = 0;
-              for (int i = 0; i < HISTORY_SIZE; i++) {
-                  if (h_num[i] == number && h_arg[i] == a[0]) {
-                      repeat_count++;
+              // 신호를 보내는 Futex 작업(Wake)일 경우 메모리 쓰기 완료 보장
+              if (number == __NR_futex) {
+                  long op = a[1] & 127; // FUTEX_OP_MASK
+                  if (op == 1) { // FUTEX_WAKE
+                      __sync_synchronize();
                   }
               }
 
-              // [추가] 직전 호출과 동일한가? (연속 폭주 잡기)
-              int last_idx = (h_idx - 1 + HISTORY_SIZE) % HISTORY_SIZE;
-              if (h_num[last_idx] == number && h_arg[last_idx] == a[0]) {
-                  repeat_count += 10; 
+              if (number == 449) { // futex_waitv
+                  if (a[0] == 0) return 0;
+                  __sync_synchronize();
+                  sched_yield();
+                  struct timespec ts = {0, 350000}; // 지연 시간을 0.15ms로 최적화
+                  nanosleep(&ts, NULL);
+                  __sync_synchronize();
+                  return 0; 
               }
 
-              // 2. 통합 대기 로직 (객체 기반 차등 대기)
               __sync_synchronize();
               sched_yield(); 
-
-              struct timespec ts = {0, 0};
-              if (repeat_count > 0) {
-                  long long nsec = 800000LL + ((long long)repeat_count * 150000LL);
-                  if (nsec > 2000000LL) nsec = 2000000LL; 
-                  ts.tv_nsec = (long)nsec;
-              } else {
-                  ts.tv_nsec = 20000; 
-              }
-              nanosleep(&ts, NULL);
-
-              // 3. 히스토리 업데이트
-              h_num[h_idx] = number;
-              h_arg[h_idx] = a[0];
-              h_idx = (h_idx + 1) % HISTORY_SIZE;
-
-              if (number == 449) return 0;
-              
+              // 일반 콜은 너무 길면 안 되므로 449번보다 훨씬 짧은 지연(약 0.05ms)을 줍니다.
+              struct timespec general_ts = {0, 350000}; 
+              nanosleep(&general_ts, NULL);
               long ret = syscall(number, a[0], a[1], a[2], a[3], a[4], a[5]);
-              __sync_synchronize();
+              __sync_synchronize(); // 콜 직후에도 메모리 일관성 보장
               return ret;
           }
+
+          /* [4] 매크로 리디렉션 */
           #undef shm_open
           #define shm_open(...) GET_SHM_OPEN_MACRO(__VA_ARGS__, shm_open_3, shm_open_2)(__VA_ARGS__)
           #define GET_SHM_OPEN_MACRO(_1, _2, _3, NAME, ...) NAME
