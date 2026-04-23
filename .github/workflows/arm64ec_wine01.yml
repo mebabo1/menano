@@ -256,6 +256,7 @@ jobs:
           #include <time.h>
           #include <string.h>
           #include <stdarg.h>
+          #include <sched.h>
           #include <sys/syscall.h>
 
           static inline int custom_shm_open(const char *name, int oflag, mode_t mode) {
@@ -323,6 +324,7 @@ jobs:
               if (number == 449) { // futex_waitv
                   if (a[0] == 0) return 0;
                   __sync_synchronize();
+                  sched_yield();
                   struct timespec ts = {0, 350000}; // 지연 시간을 0.15ms로 최적화
                   nanosleep(&ts, NULL);
                   __sync_synchronize();
