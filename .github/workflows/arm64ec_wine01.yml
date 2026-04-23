@@ -333,22 +333,14 @@ jobs:
 
               struct timespec ts = {0, 0};
               if (repeat_count > 0) {
-                  // 1. 우선 전체 나노초(long long)를 계산합니다.
-                  // 기본 0.8ms + (반복 횟수 * 0.1초)
-                  long long delay_ns = 800000LL + ((long long)repeat_count * 100000000LL);
-                  // 2. 최대 10초 제한 (10,000,000,000 ns)
-                  if (delay_ns > 10000000000LL) {
-                  delay_ns = 10000000000LL;
-                  }
-                  // 3. timespec 구조체에 초(sec)와 나노초(nsec)를 나눠서 담습니다.
-                  ts.tv_sec = (time_t)(delay_ns / 1000000000LL);
-                  ts.tv_nsec = (long)(delay_ns % 1000000000LL);
+                  // 반복될수록 벌칙 강화 (0.8ms ~ 1.5ms까지)
+                  // 로그의 0x10 같은 녀석들을 확실히 잠재웁니다.
+                  ts.tv_nsec = 800000 + (repeat_count * 150000); 
+                  if (ts.tv_nsec > 2000000) ts.tv_nsec = 2000000; // 최대 2ms 제한
               } else {
-                  // 처음 보는 객체(3, 4, 5번 등)는 0.02ms만에 하이패스
-                  ts.tv_sec = 0;
-                  ts.tv_nsec = 20000; 
+                  // 처음 보는 객체(3, 4, 5번 등)는 즉시 통과
+                  ts.tv_nsec = 20000; // 0.02ms
               }
-              // 4. 실제로 잠들기
               nanosleep(&ts, NULL);
               // 3. 히스토리 업데이트 (번호와 핸들 세트로 기록)
               h_num[h_idx] = number;
