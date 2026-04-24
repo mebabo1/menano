@@ -346,43 +346,66 @@ jobs:
         run: |
           cd ${{ env.WINE_SOURCE_DIR }}/source
           
+          # 기존 /tmp 경로 수정 로직 (유지)
           find . -type f \( -name "*.c" -o -name "*.h" -o -name "*.in" -o -name "*.spec" \) -exec grep -l "/tmp" {} \; 2>/dev/null | xargs sed -i 's|/tmp/|/data/data/com.termux/files/usr/tmp/|g' 2>/dev/null || true
           find server -type f \( -name "*.c" -o -name "*.h" \) -exec sed -i 's|"/tmp"|"/data/data/com.termux/files/usr/tmp"|g' {} + 2>/dev/null || true
           find . -name "file.c" -exec sed -i 's|"/tmp"|"/data/data/com.termux/files/usr/tmp"|g' {} + 2>/dev/null || true
           find . -name "loader.c" -exec sed -i 's|"/tmp"|"/data/data/com.termux/files/usr/tmp"|g' {} + 2>/dev/null || true
           find . -name "server.c" -exec sed -i 's|"/tmp"|"/data/data/com.termux/files/usr/tmp"|g' {} + 2>/dev/null || true
 
+          # Keyboard 패치 (유지)
           FILE_KEYBOARD="dlls/winex11.drv/keyboard.c"
           if [ -f "$FILE_KEYBOARD" ]; then
-            echo "Patching X11DRV_ActivateKeyboardLayout using AWK print method..."
-            awk '/X11DRV_ActivateKeyboardLayout/,/^{/ {
-                print $0
-                if ($0 ~ /^{/) {
-                    print "    return TRUE;"
-                    next
-                }
-                next
-            } { print $0 }' "$FILE_KEYBOARD" > "$FILE_KEYBOARD.tmp"
-            mv "$FILE_KEYBOARD.tmp" "$FILE_KEYBOARD"
+                    echo "Patching X11DRV_ActivateKeyboardLayout..."
+                    awk '/X11DRV_ActivateKeyboardLayout/,/^{/ {
+                              print $0
+                              if ($0 ~ /^{/) {
+                                        print "    return TRUE;"
+                                        next
+                              }
+                              next
+                    } { print $0 }' "$FILE_KEYBOARD" > "$FILE_KEYBOARD.tmp"
+                    mv "$FILE_KEYBOARD.tmp" "$FILE_KEYBOARD"
           fi
+
+          # XINPUT 통합 패치 (3개 함수 대응 + 10칸 들여쓰기)
           FILE_XINPUT="dlls/winexinput.sys/main.c"
           if [ -f "$FILE_XINPUT" ]; then
-              echo "Patching try_complete_pending_read in winexinput.sys..."
-              awk '/static NTSTATUS try_complete_pending_read/,/^{/ {
-              print $0
-              if ($0 ~ /^{/) {
-                  print "    /* Forced Run: Prevent the driver from sleeping (PENDING) */"
-                  print "    return STATUS_SUCCESS;"
-                  next
-                  }
-                  next
-              } { print $0 }' "$FILE_XINPUT" > "$FILE_XINPUT.tmp"
+                    echo "Patching all 3 functions in winexinput.sys (10-space indent)..."
+                    
+                    # NtCurrentTeb 사용을 위한 헤더 추가
+                    if ! grep -q "winternl.h" "$FILE_XINPUT"; then
+                              sed -i '1i #include "winternl.h"' "$FILE_XINPUT"
+                    fi
 
-              mv "$FILE_XINPUT.tmp" "$FILE_XINPUT"
-              echo "Patch applied successfully."
+                    awk '
+                    # 1. try_complete_pending_read: 동기화 절단 (강제 실행)
+                    /static NTSTATUS try_complete_pending_read/,/^{/ {
+                              print $0
+                              if ($0 ~ /^{/) {
+                                        print "          /* Forced Run Patch: Prevent the driver from being PENDING */"
+                                        print "          return STATUS_SUCCESS;"
+                                        next
+                              }
+                              next
+                    }
+                    # 2. read_completion & remove_pending_irps: 소유권 확인 후 해제 (에러 방지)
+                    {
+                              if ($0 ~ /RtlLeaveCriticalSection\(&fdo->cs\);/) {
+                                        print "          if (fdo->cs.OwningThread == (HANDLE)NtCurrentTeb()->ClientId.UniqueThread)"
+                                        print "                    RtlLeaveCriticalSection(&fdo->cs);"
+                              } else {
+                                        print $0
+                              }
+                    }
+                    ' "$FILE_XINPUT" > "$FILE_XINPUT.tmp"
+
+                    mv "$FILE_XINPUT.tmp" "$FILE_XINPUT"
+                    echo "XINPUT Patch applied successfully."
           else
-              echo "Error: $FILE_XINPUT not found!"
+                    echo "Error: $FILE_XINPUT not found!"
           fi
+
           FILE3="dlls/wdscore/wdscore.spec"
           if [ -f "$FILE3" ]; then
             if grep -q '@ stub' "$FILE3"; then
