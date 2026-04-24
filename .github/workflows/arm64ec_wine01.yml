@@ -302,13 +302,13 @@ jobs:
                   __sync_synchronize();
                   
                   // 0.35ms 동안 스레드를 완전히 멈춰서 창 전환 효과 재현
-                  struct timespec ts = {0, 500000}; 
+                  struct timespec ts = {0, 400000}; 
                   nanosleep(&ts, NULL);
                   
                   __sync_synchronize();
                   
                   // 커널로 보내지 않고 에러(-EAGAIN) 반환하여 프로그램의 능동적 재시도 유도
-                  return -11;
+                  return -4;
               }
 
               // 3. 일반 시스템 콜 처리
