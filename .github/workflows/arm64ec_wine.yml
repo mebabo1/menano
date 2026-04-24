@@ -283,25 +283,26 @@ jobs:
           {
               va_list args;
               unsigned long long a[6] = {0};
+              long ret; /* 변수 선언을 함수 상단으로 이동 (C89 표준 준수) */
+              int i;
 
               va_start(args, number);
-              for (int i = 0; i < 6; i++)
+              for (i = 0; i < 6; i++)
                   a[i] = va_arg(args, unsigned long long);
               va_end(args);
 
-              /* [1] Futex Wait 계열 (449, 202 WAIT) - 성능 우선 최적화 */
+              /* [1] Futex Wait 계열 (449, 202 WAIT) */
               if (number == 449 || (number == 202 && ((int)a[1] & 0x7F) == 0))
               {
                   if (number == 449 && (a[0] == 0 || a[1] == 0)) return 0;
 
-                  // 상태 기록 (동기화 안정성을 위해 항상 syscall 호출)
                   last_futex_num = number;
                   last_futex_addr = a[0];
 
                   return syscall(number, a[0], a[1], a[2], a[3], a[4], a[5]);
               }
               __sync_synchronize();
-              long ret = syscall(number, a[0], a[1], a[2], a[3], a[4], a[5]);
+              ret = syscall(number, a[0], a[1], a[2], a[3], a[4], a[5]);
               __sync_synchronize();
               return ret;
           }
