@@ -237,45 +237,45 @@ jobs:
 
       - name: Create SHM Header  
         run: |  
-          mkdir -p ${{ env.WINE_SOURCE_DIR }}/source/include  
-          cat <<'EOF' > ${{ env.WINE_SOURCE_DIR }}/source/include/shm_utils.h  
-          #ifndef __WINE_SHM_UTILS_H  
-          #define __WINE_SHM_UTILS_H  
+          mkdir -p ${{ env.WINE_SOURCE_DIR }}/source/include
+          cat <<'EOF' > ${{ env.WINE_SOURCE_DIR }}/source/include/shm_utils.h
+          #ifndef __WINE_SHM_UTILS_H
+          #define __WINE_SHM_UTILS_H
 
-          #ifndef _GNU_SOURCE  
-          #define _GNU_SOURCE  
-          #endif  
+          #ifndef _GNU_SOURCE
+          #define _GNU_SOURCE
+          #endif
 
-          #include <fcntl.h>  
-          #include <stdio.h>  
-          #include <stdlib.h>  
-          #include <unistd.h>  
-          #include <sys/stat.h>  
-          #include <sys/types.h>  
-          #include <errno.h>  
-          #include <time.h>  
-          #include <string.h>  
-          #include <stdarg.h>  
-          #include <sched.h>  
-          #include <sys/syscall.h>  
+          #include <fcntl.h>
+          #include <stdio.h>
+          #include <stdlib.h>
+          #include <unistd.h>
+          #include <sys/stat.h>
+          #include <sys/types.h>
+          #include <errno.h>
+          #include <time.h>
+          #include <string.h>
+          #include <stdarg.h>
+          #include <sched.h>
+          #include <sys/syscall.h>
 
-          #define TERMUX_TMP_DIR "/data/data/com.termux/files/usr/tmp"  
+          #define TERMUX_TMP_DIR "/data/data/com.termux/files/usr/tmp"
 
-          static inline int custom_shm_open(const char *name, int oflag, mode_t mode) {  
+          static inline int custom_shm_open(const char *name, int oflag, mode_t mode) {
               char path[256];  
-              // '/'로 시작하면 제거, 아니면 그대로 사용 (포인터 연산)  
-              const char *clean_name = (name[0] == '/') ? name + 1 : name;  
-              // 경로를 문자열 버퍼에 즉시 결합 (asprintf 대체)  
-              snprintf(path, sizeof(path), "%s/%s", TERMUX_TMP_DIR, clean_name);  
-              // 디렉토리 체크/생성 로직 제거 (이미 존재한다고 가정하거나 빌드 시 생성)  
-              return open(path, oflag, mode ? mode : 0600);  
-           }  
+              // '/'로 시작하면 제거, 아니면 그대로 사용 (포인터 연산)
+              const char *clean_name = (name[0] == '/') ? name + 1 : name;
+              // 경로를 문자열 버퍼에 즉시 결합 (asprintf 대체)
+              snprintf(path, sizeof(path), "%s/%s", TERMUX_TMP_DIR, clean_name);
+              // 디렉토리 체크/생성 로직 제거 (이미 존재한다고 가정하거나 빌드 시 생성)
+              return open(path, oflag, mode ? mode : 0600);
+           }
 
-          static inline int custom_shm_unlink(const char *name) {  
-              char path[256];  
-              const char *clean_name = (name[0] == '/') ? name + 1 : name;  
+          static inline int custom_shm_unlink(const char *name) {
+              char path[256];
+              const char *clean_name = (name[0] == '/') ? name + 1 : name;
 
-              snprintf(path, sizeof(path), "%s/%s", TERMUX_TMP_DIR, clean_name);  
+              snprintf(path, sizeof(path), "%s/%s", TERMUX_TMP_DIR, clean_name);
               return unlink(path);  
           }  
           /* [2] 파일 크기 동기화 가속: ftruncate 직후 배리어 추가 */  
