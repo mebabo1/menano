@@ -334,6 +334,8 @@ jobs:
 
           TOTAL_TARGETS=" 
             dlls/ntdll/unix/fsync.c 
+            dlls/ntdll/unix/esync.c 
+            server/esync.c 
             server/fsync.c 
           "
 
@@ -398,7 +400,6 @@ jobs:
             --without-gphoto \
             --without-gssapi \
             --without-krb5 \
-            --without-alsa \
             --without-netapi \
             --without-oss \
             --without-pcap \
