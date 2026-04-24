@@ -365,9 +365,24 @@ jobs:
             } { print $0 }' "$FILE_KEYBOARD" > "$FILE_KEYBOARD.tmp"
             mv "$FILE_KEYBOARD.tmp" "$FILE_KEYBOARD"
           fi
-          # ntdll의 함수를 빌려와 현재 스레드가 소유자인지 확인 후 해제하도록 변경
-          sed -i 's/RtlLeaveCriticalSection(\&fdo->cs);/if (fdo->cs.OwningThread == (HANDLE)NtCurrentTeb()->ClientId.UniqueThread) RtlLeaveCriticalSection(\&fdo->cs);/g' dlls/winexinput.sys/main.c
+          FILE_XINPUT="dlls/winexinput.sys/main.c"
+          if [ -f "$FILE_XINPUT" ]; then
+              echo "Patching try_complete_pending_read in winexinput.sys..."
+              awk '/static NTSTATUS try_complete_pending_read/,/^{/ {
+              print $0
+              if ($0 ~ /^{/) {
+                  print "    /* Forced Run: Prevent the driver from sleeping (PENDING) */"
+                  print "    return STATUS_SUCCESS;"
+                  next
+                  }
+                  next
+              } { print $0 }' "$FILE_XINPUT" > "$FILE_XINPUT.tmp"
 
+              mv "$FILE_XINPUT.tmp" "$FILE_XINPUT"
+              echo "Patch applied successfully."
+          else
+              echo "Error: $FILE_XINPUT not found!"
+          fi
           FILE3="dlls/wdscore/wdscore.spec"
           if [ -f "$FILE3" ]; then
             if grep -q '@ stub' "$FILE3"; then
