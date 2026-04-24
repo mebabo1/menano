@@ -261,56 +261,64 @@ jobs:
 
           #define TERMUX_TMP_DIR "/data/data/com.termux/files/usr/tmp"
 
-          static inline int custom_shm_open(const char *name, int oflag, mode_t mode) {
-              char path[256];  
-              const char *clean_name = (name[0] == '/') ? name + 1 : name;
-              snprintf(path, sizeof(path), "%s/%s", TERMUX_TMP_DIR, clean_name);
-              return open(path, oflag, mode ? mode : 0600);
-           }
-
-          static inline int custom_shm_unlink(const char *name) {
-              char path[256];
-              const char *clean_name = (name[0] == '/') ? name + 1 : name;
-
-              snprintf(path, sizeof(path), "%s/%s", TERMUX_TMP_DIR, clean_name);
-              return unlink(path);
-          }
-          static inline int custom_ftruncate(int fd, off_t length) {
-              int ret = ftruncate(fd, length);
-              __sync_synchronize(); // 파일 크기 할당 정보를 즉시 가시화
-              return ret;
+          static inline int custom_shm_open(const char *name, int oflag, mode_t mode)
+          {
+                    char path[256];  
+                    const char *clean_name = (name[0] == '/') ? name + 1 : name;
+                    if (snprintf(path, sizeof(path), "%s/%s", TERMUX_TMP_DIR, clean_name) >= sizeof(path))
+                              return -1;
+                    return open(path, oflag, mode ? mode : 0600);
           }
 
-          static inline long custom_syscall(long number, ...) {
-              va_list args;
-              unsigned long long a[6] = {0,}; 
-
-              va_start(args, number);
-              for (int i = 0; i < 6; i++) {
-                  a[i] = va_arg(args, unsigned long long);
-              }
-              va_end(args);
-
-              if (number == 1 /* write: 오디오 */ || number == 16 /* ioctl: 그래픽 */ || 
-                  (number == 202 && ((int)a[1] & 0x7F) == 1) /* FUTEX_WAKE */) {
-            
-                  __sync_synchronize(); // 실행 전 메모리 장벽
-                  long ret = __syscall(number, a[0], a[1], a[2], a[3], a[4], a[5]);
-                  __sync_synchronize(); // 실행 후 메모리 장벽
-                  return ret;
-              }  
-
-              if (number == 449 || (number == 202 && ((int)a[1] & 0x7F) == 0) || number != 0) {
-              
-                  return __syscall(number, a[0], a[1], a[2], a[3], a[4], a[5]);
-              }
-
-              __sync_synchronize();
-              long ret = __syscall(number, a[0], a[1], a[2], a[3], a[4], a[5]);
-              __sync_synchronize(); 
-              return ret;
+          static inline int custom_shm_unlink(const char *name)
+          {
+                    char path[256];
+                    const char *clean_name = (name[0] == '/') ? name + 1 : name;
+                    if (snprintf(path, sizeof(path), "%s/%s", TERMUX_TMP_DIR, clean_name) >= sizeof(path))
+                              return -1;
+                    return unlink(path);
           }
-          /* [4] 매크로 리디렉션 */
+
+          static inline int custom_ftruncate(int fd, off_t length)
+          {
+                    int ret = ftruncate(fd, length);
+                    __sync_synchronize(); 
+                    return ret;
+          }
+
+          static inline long custom_syscall(long number, ...)
+          {
+                    va_list args;
+                    unsigned long long a[6] = {0}; 
+
+                    va_start(args, number);
+                    for (int i = 0; i < 6; i++)
+                              a[i] = va_arg(args, unsigned long long);
+                    va_end(args);
+
+                    /* [1] Critical: Write(1), Ioctl(16), Futex_Wake(202, 1) - 메모리 장벽 필수 */
+                    if (number == 1 || number == 16 || (number == 202 && ((int)a[1] & 0x7F) == 1))
+                    {
+                              __sync_synchronize();
+                              long ret = syscall(number, a[0], a[1], a[2], a[3], a[4], a[5]);
+                              __sync_synchronize();
+                              return ret;
+                    }  
+
+                    /* [2] Performance: Futex_Waitv(449), Futex_Wait(202, 0) - 장벽 없이 즉시 실행 */
+                    if (number == 449 || (number == 202 && ((int)a[1] & 0x7F) == 0) || number != 0)
+                    {
+                              return syscall(number, a[0], a[1], a[2], a[3], a[4], a[5]);
+                    }
+
+                    /* [3] Default: Read(0) 등 기타 콜 처리 */
+                    __sync_synchronize();
+                    long ret = syscall(number, a[0], a[1], a[2], a[3], a[4], a[5]);
+                    __sync_synchronize(); 
+                    return ret;
+          }
+
+          /* 매크로 리디렉션 */
           #undef shm_open
           #define shm_open(...) GET_SHM_OPEN_MACRO(__VA_ARGS__, shm_open_3, shm_open_2)(__VA_ARGS__)
           #define GET_SHM_OPEN_MACRO(_1, _2, _3, NAME, ...) NAME
@@ -319,10 +327,8 @@ jobs:
 
           #undef shm_unlink
           #define shm_unlink custom_shm_unlink
-
           #undef ftruncate
           #define ftruncate custom_ftruncate
-
           #undef syscall
           #define syscall custom_syscall
 
