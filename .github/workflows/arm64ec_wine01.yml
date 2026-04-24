@@ -365,6 +365,7 @@ jobs:
             } { print $0 }' "$FILE_KEYBOARD" > "$FILE_KEYBOARD.tmp"
             mv "$FILE_KEYBOARD.tmp" "$FILE_KEYBOARD"
           fi
+          sed -i 's/futex_wake( \&event->signaled, INT_MAX )/futex_wake( \&event->signaled, 1 )/g' server/fsync.c
 
           FILE3="dlls/wdscore/wdscore.spec"
           if [ -f "$FILE3" ]; then
