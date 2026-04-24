@@ -263,11 +263,8 @@ jobs:
 
           static inline int custom_shm_open(const char *name, int oflag, mode_t mode) {
               char path[256];  
-              // '/'로 시작하면 제거, 아니면 그대로 사용 (포인터 연산)
               const char *clean_name = (name[0] == '/') ? name + 1 : name;
-              // 경로를 문자열 버퍼에 즉시 결합 (asprintf 대체)
               snprintf(path, sizeof(path), "%s/%s", TERMUX_TMP_DIR, clean_name);
-              // 디렉토리 체크/생성 로직 제거 (이미 존재한다고 가정하거나 빌드 시 생성)
               return open(path, oflag, mode ? mode : 0600);
            }
 
@@ -278,7 +275,6 @@ jobs:
               snprintf(path, sizeof(path), "%s/%s", TERMUX_TMP_DIR, clean_name);
               return unlink(path);
           }
-          /* [2] 파일 크기 동기화 가속: ftruncate 직후 배리어 추가 */
           static inline int custom_ftruncate(int fd, off_t length) {
               int ret = ftruncate(fd, length);
               __sync_synchronize(); // 파일 크기 할당 정보를 즉시 가시화
