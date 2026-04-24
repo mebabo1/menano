@@ -301,23 +301,18 @@ jobs:
                   if (op == 1) { // FUTEX_WAKE
                       __sync_synchronize();
                   }
-              // 2. FSYNC 대기 콜(449, 202 WAIT) 및 모든 일반 콜 통합 처리
-              // 기존 조건 뒤에 '|| number != 0'을 붙여 모든 시스템 콜을 포함시켰습니다.
               if (number == 449 || (number == 202 && ((int)a[1] & 0x7F) == 0) || number != 0) {
                   if (a[0] == 0) return 0;
                   __sync_synchronize();
               
-                  // 0.35ms 동안 스레드를 완전히 멈춰서 창 전환 효과 재현
                   struct timespec ts = {0, 350000}; 
                   nanosleep(&ts, NULL);
               
                   __sync_synchronize();
               
-                  // 모든 콜에 대해 커널로 보내지 않고 에러(-EAGAIN) 반환
                   return -11;
               }
 
-              // 3. 일반 시스템 콜 처리 (위의 if문이 모든 콜을 가로채므로 실제로는 도달하지 않음)
               __sync_synchronize();
               sched_yield(); 
           
@@ -326,6 +321,7 @@ jobs:
               __sync_synchronize(); 
               return ret;
           }
+          
           /* [4] 매크로 리디렉션 */
           #undef shm_open
           #define shm_open(...) GET_SHM_OPEN_MACRO(__VA_ARGS__, shm_open_3, shm_open_2)(__VA_ARGS__)
