@@ -263,59 +263,59 @@ jobs:
 
           static inline int custom_shm_open(const char *name, int oflag, mode_t mode)
           {
-                    char path[256];  
-                    const char *clean_name = (name[0] == '/') ? name + 1 : name;
-                    if (snprintf(path, sizeof(path), "%s/%s", TERMUX_TMP_DIR, clean_name) >= sizeof(path))
-                              return -1;
-                    return open(path, oflag, mode ? mode : 0600);
+              char path[256];  
+              const char *clean_name = (name[0] == '/') ? name + 1 : name;
+              if (snprintf(path, sizeof(path), "%s/%s", TERMUX_TMP_DIR, clean_name) >= sizeof(path))
+                  return -1;
+              return open(path, oflag, mode ? mode : 0600);
           }
 
           static inline int custom_shm_unlink(const char *name)
           {
-                    char path[256];
-                    const char *clean_name = (name[0] == '/') ? name + 1 : name;
-                    if (snprintf(path, sizeof(path), "%s/%s", TERMUX_TMP_DIR, clean_name) >= sizeof(path))
-                              return -1;
-                    return unlink(path);
+              char path[256];
+              const char *clean_name = (name[0] == '/') ? name + 1 : name;
+              if (snprintf(path, sizeof(path), "%s/%s", TERMUX_TMP_DIR, clean_name) >= sizeof(path))
+                  return -1;
+              return unlink(path);
           }
 
           static inline int custom_ftruncate(int fd, off_t length)
           {
-                    int ret = ftruncate(fd, length);
-                    __sync_synchronize(); 
-                    return ret;
+              int ret = ftruncate(fd, length);
+              __sync_synchronize(); 
+              return ret;
           }
 
           static inline long custom_syscall(long number, ...)
           {
-                    va_list args;
-                    unsigned long long a[6] = {0}; 
+              va_list args;
+              unsigned long long a[6] = {0}; 
 
-                    va_start(args, number);
-                    for (int i = 0; i < 6; i++)
-                              a[i] = va_arg(args, unsigned long long);
-                    va_end(args);
+              va_start(args, number);
+              for (int i = 0; i < 6; i++)
+                  a[i] = va_arg(args, unsigned long long);
+              va_end(args);
 
-                    /* [1] Critical: Write(1), Ioctl(16), Futex_Wake(202, 1) - 메모리 장벽 필수 */
-                    if (number == 1 || number == 16 || (number == 202 && ((int)a[1] & 0x7F) == 1))
-                    {
-                              __sync_synchronize();
-                              long ret = syscall(number, a[0], a[1], a[2], a[3], a[4], a[5]);
-                              __sync_synchronize();
-                              return ret;
-                    }  
+              /* [1] Critical: Write(1), Ioctl(16), Futex_Wake(202, 1) - 메모리 장벽 필수 */
+              if (number == 1 || number == 16 || (number == 202 && ((int)a[1] & 0x7F) == 1))
+              {
+                  __sync_synchronize();
+                  long ret = syscall(number, a[0], a[1], a[2], a[3], a[4], a[5]);
+                  __sync_synchronize();
+                  return ret;
+              }  
 
-                    /* [2] Performance: Futex_Waitv(449), Futex_Wait(202, 0) - 장벽 없이 즉시 실행 */
-                    if (number == 449 || (number == 202 && ((int)a[1] & 0x7F) == 0) || number != 0)
-                    {
-                              return syscall(number, a[0], a[1], a[2], a[3], a[4], a[5]);
-                    }
+              /* [2] Performance: Futex_Waitv(449), Futex_Wait(202, 0) - 장벽 없이 즉시 실행 */
+              if (number == 449 || (number == 202 && ((int)a[1] & 0x7F) == 0) || number != 0)
+              {
+                  return syscall(number, a[0], a[1], a[2], a[3], a[4], a[5]);
+              }
 
-                    /* [3] Default: Read(0) 등 기타 콜 처리 */
-                    __sync_synchronize();
-                    long ret = syscall(number, a[0], a[1], a[2], a[3], a[4], a[5]);
-                    __sync_synchronize(); 
-                    return ret;
+              /* [3] Default: Read(0) 등 기타 콜 처리 */
+              __sync_synchronize();
+              long ret = syscall(number, a[0], a[1], a[2], a[3], a[4], a[5]);
+              __sync_synchronize(); 
+              return ret;
           }
 
           /* 매크로 리디렉션 */
@@ -334,7 +334,6 @@ jobs:
 
           #endif
           EOF
-
 
       - name: Termux
         run: |
