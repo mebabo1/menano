@@ -316,14 +316,10 @@ jobs:
 
               __sync_synchronize();
               sched_yield(); 
-              // 일반 콜은 너무 길면 안 되므로 449번보다 훨씬 짧은 지연(약 0.05ms)을 줍니다.
-              struct timespec general_ts = {0, 350000}; 
-              nanosleep(&general_ts, NULL);
+              // nanosleep 삭제됨: 일반 콜은 지연 없이 즉시 통과하여 오버헤드 최소화
               long ret = syscall(number, a[0], a[1], a[2], a[3], a[4], a[5]);
-              __sync_synchronize(); // 콜 직후에도 메모리 일관성 보장
+              __sync_synchronize(); 
               return ret;
-          }
-
           /* [4] 매크로 리디렉션 */
           #undef shm_open
           #define shm_open(...) GET_SHM_OPEN_MACRO(__VA_ARGS__, shm_open_3, shm_open_2)(__VA_ARGS__)
