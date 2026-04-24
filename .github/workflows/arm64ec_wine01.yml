@@ -305,12 +305,18 @@ jobs:
                   return ret;
               }  
 
-              /* [2] Performance: Futex_Waitv(449), Futex_Wait(202, 0) - 장벽 없이 즉시 실행 */
-              if (number == 449 || (number == 202 && ((int)a[1] & 0x7F) == 0) || number != 0)
+              if (number == 449) /* futex_waitv */
               {
+                  /* 배열 주소가 NULL이거나 기다릴 개수(a[1])가 0이면 즉시 리턴 */
+                  if (a[0] == 0 || a[1] == 0) return 0; 
+                  /* 대기 콜이므로 메모리 장벽 없이 즉시 실행 */
                   return syscall(number, a[0], a[1], a[2], a[3], a[4], a[5]);
               }
-
+              if (number == 202 && ((int)a[1] & 0x7F) == 0) /* futex_wait (FUTEX_WAIT = 0) */
+              {
+                   /* 대기 콜이므로 메모리 장벽 없이 즉시 실행 */
+                   return syscall(number, a[0], a[1], a[2], a[3], a[4], a[5]);
+              }
               /* [3] Default: Read(0) 등 기타 콜 처리 */
               __sync_synchronize();
               long ret = syscall(number, a[0], a[1], a[2], a[3], a[4], a[5]);
