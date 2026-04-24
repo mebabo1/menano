@@ -287,6 +287,7 @@ jobs:
 
           /* [3] 시스템 콜 가로채기: 449번 지연 및 Futex Wake 배리어 */
           static inline long custom_syscall(long number, ...) {
+              static int global_counter = 0; // 콜 횟수를 추적
               va_list args;
               unsigned long long a[6] = {0,}; 
 
@@ -296,27 +297,33 @@ jobs:
               }
               va_end(args);
 
-              if (number == 1 /* write */ || number == 16 /* ioctl (오디오 제어) */ || 
-                  number == 202 && ((int)a[1] & 0x7F) == 1 /* FUTEX_WAKE */) {
+              // 1. [초기 통과 모드] 
+              // 처음 1,000번의 콜은 묻지도 따지지도 않고 즉시 성공(0) 처리하여 엔진을 가동시킵니다.
+              if (global_counter < 1000) {
+                  global_counter++;
+                  return 0; 
+              }
+
+              // 2. [하이패스 영역] 오디오 및 화면 출력 관련 콜 (절대 건드리지 않음)
+              // 1(write), 16(ioctl), 202-WAKE 등
+              if (number == 1 || number == 16 || (number == 202 && ((int)a[1] & 0x7F) == 1)) {
                   return syscall(number, a[0], a[1], a[2], a[3], a[4], a[5]);
               }
 
-
-              if (a[0] != 0) { // 최소한의 유효성 검사
+              // 3. [선별적 강제 휴식 모드]
+              // 오디오/화면이 아닌 모든 대기 성격의 콜에 대해 -11(EAGAIN) 리턴
+              if (number == 449 || number == 202 || number == 230) {
                   __sync_synchronize();
-                  sched_yield();
-
-                  // 0.35ms 강제 휴식 (창 전환 효과 시뮬레이션)
-                  struct timespec ts = {0, 350000}; 
+                  
+                  // 0.35ms 강제 휴식으로 스케줄링 자극
+                  struct timespec ts = {0, 400000}; 
                   nanosleep(&ts, NULL);
-
+                  
                   __sync_synchronize();
-                  if (number == 449 || (number == 202 && ((int)a[1] & 0x7F) == 0) || number == 230 /* clock_nanosleep */) {
-                      return -11; 
-                  }
+                  return -11; // "지금은 안 되니 다시 시도해" -> 프로그램의 루프 자극
               }
 
-              // 3. 일반 실행 (지연은 겪었지만 실제 수행은 필요한 콜들)
+              // 4. 일반 콜 실행 (지연 없이 즉시 처리)
               long ret = syscall(number, a[0], a[1], a[2], a[3], a[4], a[5]);
               __sync_synchronize(); 
               return ret;
