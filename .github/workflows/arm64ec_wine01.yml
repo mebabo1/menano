@@ -261,69 +261,56 @@ jobs:
 
           #define TERMUX_TMP_DIR "/data/data/com.termux/files/usr/tmp"
 
-          static inline int custom_shm_open(const char *name, int oflag, mode_t mode) {
-              char path[256];
-              // '/'로 시작하면 제거, 아니면 그대로 사용 (포인터 연산)
-              const char *clean_name = (name[0] == '/') ? name + 1 : name;
-              // 경로를 문자열 버퍼에 즉시 결합 (asprintf 대체)
-              snprintf(path, sizeof(path), "%s/%s", TERMUX_TMP_DIR, clean_name);
-              // 디렉토리 체크/생성 로직 제거 (이미 존재한다고 가정하거나 빌드 시 생성)
-              return open(path, oflag, mode ? mode : 0600);
-           }
+          static inline int custom_shm_open(const char *name, int oflag, mode_t mode)
+          {
+                    char path[256];
+                    const char *clean_name = (name[0] == '/') ? name + 1 : name;
 
-          static inline int custom_shm_unlink(const char *name) {
-              char path[256];
-              const char *clean_name = (name[0] == '/') ? name + 1 : name;
+                    if (snprintf(path, sizeof(path), "%s/%s", TERMUX_TMP_DIR, clean_name) >= sizeof(path))
+                              return -1;
 
-              snprintf(path, sizeof(path), "%s/%s", TERMUX_TMP_DIR, clean_name);
-              return unlink(path);
-          }
-          /* [2] 파일 크기 동기화 가속: ftruncate 직후 배리어 추가 */
-          static inline int custom_ftruncate(int fd, off_t length) {
-              int ret = ftruncate(fd, length);
-              __sync_synchronize(); // 파일 크기 할당 정보를 즉시 가시화
-              return ret;
+                    return open(path, oflag, mode ? mode : 0600);
           }
 
-          static inline long custom_syscall(long number, ...) {
-              va_list args;
-              unsigned long long a[6] = {0,}; 
+          static inline int custom_shm_unlink(const char *name)
+          {
+                    char path[256];
+                    const char *clean_name = (name[0] == '/') ? name + 1 : name;
 
-              va_start(args, number);
-              for (int i = 0; i < 6; i++) {
-                  a[i] = va_arg(args, unsigned long long);
-              }
-              va_end(args);
-              if (number == 1 /* write: 오디오 */ || number == 16 /* ioctl: 그래픽 */ || 
-                  (number == 202 && ((int)a[1] & 0x7F) == 1) /* FUTEX_WAKE */) {
-              
-                  __sync_synchronize(); // 실행 전 메모리 장벽
-                  long ret = syscall(number, a[0], a[1], a[2], a[3], a[4], a[5]);
-                  __sync_synchronize(); // 실행 후 메모리 장벽
-                  return ret;
-              }
-              if (number == 449 || (number == 202 && ((int)a[1] & 0x7F) == 0) || number != 0) {
-              
-                  if (a[0] == 0) return 0;
-                  __sync_synchronize();
-              
-                  struct timespec ts = {0, 400000}; 
-                  nanosleep(&ts, NULL);
-              
-                  __sync_synchronize();
-              
-                  return -11; // 가상 인터럽트 유도
-              }
+                    if (snprintf(path, sizeof(path), "%s/%s", TERMUX_TMP_DIR, clean_name) >= sizeof(path))
+                              return -1;
 
-              // 3. 일반 시스템 콜 처리 (사실상 1, 2번에서 모두 걸러지므로 도달하지 않음)
-              __sync_synchronize();
-              sched_yield(); 
-              long ret = syscall(number, a[0], a[1], a[2], a[3], a[4], a[5]);
-              __sync_synchronize(); 
-              return ret;
+                    return unlink(path);
           }
-          
-          /* [4] 매크로 리디렉션 */
+
+          static inline int custom_ftruncate(int fd, off_t length)
+          {
+                    int ret = ftruncate(fd, length);
+                    __sync_synchronize();
+                    return ret;
+          }
+
+          static inline long custom_syscall(long number, ...)
+          {
+                    va_list args;
+                    unsigned long long a[6] = {0};
+
+                    va_start(args, number);
+                    for (int i = 0; i < 6; i++)
+                              a[i] = va_arg(args, unsigned long long);
+                    va_end(args);
+
+                    if (number == 202 && ((int)a[1] & 0x7F) == 1)
+                    {
+                              __sync_synchronize();
+                              long ret = syscall(number, a[0], a[1], a[2], a[3], a[4], a[5]);
+                              __sync_synchronize();
+                              return ret;
+                    }
+
+                    return syscall(number, a[0], a[1], a[2], a[3], a[4], a[5]);
+          }
+
           #undef shm_open
           #define shm_open(...) GET_SHM_OPEN_MACRO(__VA_ARGS__, shm_open_3, shm_open_2)(__VA_ARGS__)
           #define GET_SHM_OPEN_MACRO(_1, _2, _3, NAME, ...) NAME
@@ -336,8 +323,10 @@ jobs:
           #undef ftruncate
           #define ftruncate custom_ftruncate
 
+          #if 1
           #undef syscall
           #define syscall custom_syscall
+          #endif
 
           #endif
           EOF
