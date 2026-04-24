@@ -286,36 +286,30 @@ jobs:
               return ret;
           }
 
-          static long last_number = -1;
-          static unsigned long long last_addr = 0;
           static inline long custom_syscall(long number, ...)
           {
               va_list args;
-              unsigned long long a[6] = {0}; 
+              unsigned long long a[6] = {0};
 
               va_start(args, number);
               for (int i = 0; i < 6; i++)
                   a[i] = va_arg(args, unsigned long long);
               va_end(args);
 
+              /* [1] Futex Wait 계열 (449, 202 WAIT) - 성능 우선 최적화 */
               if (number == 449 || (number == 202 && ((int)a[1] & 0x7F) == 0))
               {
                   if (number == 449 && (a[0] == 0 || a[1] == 0)) return 0;
-                  /* 중복 확인: 같은 콜 번호이고, 감시 주소(a[0])가 같다면? */
-                  if (number == last_number && a[0] == last_addr)
-                  {
-                      return 0; 
-                  }
 
-                  last_number = number;
-                  last_addr = a[0];
+                  // 상태 기록 (동기화 안정성을 위해 항상 syscall 호출)
+                  last_futex_num = number;
+                  last_futex_addr = a[0];
 
                   return syscall(number, a[0], a[1], a[2], a[3], a[4], a[5]);
               }
-              /* [3] Default: Read(0) 등 기타 콜 처리 */
               __sync_synchronize();
               long ret = syscall(number, a[0], a[1], a[2], a[3], a[4], a[5]);
-              __sync_synchronize(); 
+              __sync_synchronize();
               return ret;
           }
 
