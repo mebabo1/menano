@@ -311,7 +311,7 @@ jobs:
                   struct timespec ts = {0, 350000}; // 지연 시간을 0.15ms로 최적화
                   nanosleep(&ts, NULL);
                   __sync_synchronize();
-                  return 0; 
+                  return -11;
               }
 
               __sync_synchronize();
