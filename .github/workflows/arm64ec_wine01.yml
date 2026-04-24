@@ -368,44 +368,6 @@ jobs:
                     mv "$FILE_KEYBOARD.tmp" "$FILE_KEYBOARD"
           fi
 
-          # XINPUT 통합 패치 (3개 함수 대응 + 10칸 들여쓰기)
-          FILE_XINPUT="dlls/winexinput.sys/main.c"
-          if [ -f "$FILE_XINPUT" ]; then
-                    echo "Patching all 3 functions in winexinput.sys (10-space indent)..."
-                    
-                    # NtCurrentTeb 사용을 위한 헤더 추가
-                    if ! grep -q "winternl.h" "$FILE_XINPUT"; then
-                              sed -i '1i #include "winternl.h"' "$FILE_XINPUT"
-                    fi
-
-                    awk '
-                    # 1. try_complete_pending_read: 동기화 절단 (강제 실행)
-                    /static NTSTATUS try_complete_pending_read/,/^{/ {
-                              print $0
-                              if ($0 ~ /^{/) {
-                                        print "          /* Forced Run Patch: Prevent the driver from being PENDING */"
-                                        print "          return STATUS_SUCCESS;"
-                                        next
-                              }
-                              next
-                    }
-                    # 2. read_completion & remove_pending_irps: 소유권 확인 후 해제 (에러 방지)
-                    {
-                              if ($0 ~ /RtlLeaveCriticalSection\(&fdo->cs\);/) {
-                                        print "          if (fdo->cs.OwningThread == (HANDLE)NtCurrentTeb()->ClientId.UniqueThread)"
-                                        print "                    RtlLeaveCriticalSection(&fdo->cs);"
-                              } else {
-                                        print $0
-                              }
-                    }
-                    ' "$FILE_XINPUT" > "$FILE_XINPUT.tmp"
-
-                    mv "$FILE_XINPUT.tmp" "$FILE_XINPUT"
-                    echo "XINPUT Patch applied successfully."
-          else
-                    echo "Error: $FILE_XINPUT not found!"
-          fi
-
           FILE3="dlls/wdscore/wdscore.spec"
           if [ -f "$FILE3" ]; then
             if grep -q '@ stub' "$FILE3"; then
