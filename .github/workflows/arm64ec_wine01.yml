@@ -353,19 +353,18 @@ jobs:
           find . -name "loader.c" -exec sed -i 's|"/tmp"|"/data/data/com.termux/files/usr/tmp"|g' {} + 2>/dev/null || true
           find . -name "server.c" -exec sed -i 's|"/tmp"|"/data/data/com.termux/files/usr/tmp"|g' {} + 2>/dev/null || true
 
-          # Keyboard 패치 (유지)
-          FILE_KEYBOARD="dlls/winex11.drv/keyboard.c"
-          if [ -f "$FILE_KEYBOARD" ]; then
-                    echo "Patching X11DRV_ActivateKeyboardLayout..."
-                    awk '/X11DRV_ActivateKeyboardLayout/,/^{/ {
-                              print $0
-                              if ($0 ~ /^{/) {
-                                        print "    return TRUE;"
-                                        next
-                              }
-                              next
-                    } { print $0 }' "$FILE_KEYBOARD" > "$FILE_KEYBOARD.tmp"
-                    mv "$FILE_KEYBOARD.tmp" "$FILE_KEYBOARD"
+          FILE_XINPUT="dlls/winexinput.sys/main.c"
+          if [ -f "$FILE_XINPUT" ]; then
+                    echo "Patching winexinput.sys for scheduler yield..."
+
+                    # 1. unistd.h include 추가 (없을 경우만)
+                    grep -q "unistd.h" "$FILE_XINPUT" || \
+                              sed -i '1i #include <unistd.h>' "$FILE_XINPUT"
+
+                    # 2. IoCompleteRequest 뒤에 usleep(0) 추가
+                    sed -i 's/IoCompleteRequest(gamepad_irp, IO_NO_INCREMENT);/IoCompleteRequest(gamepad_irp, IO_NO_INCREMENT);\n    usleep(0); \/\/ yield to scheduler/g' "$FILE_XINPUT"
+
+                    echo "✔ read_completion patched (usleep added)."
           fi
 
           FILE3="dlls/wdscore/wdscore.spec"
