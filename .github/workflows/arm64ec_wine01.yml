@@ -294,32 +294,24 @@ jobs:
                   a[i] = va_arg(args, unsigned long long);
               }
               va_end(args);
+
               if (number == 1 /* write: 오디오 */ || number == 16 /* ioctl: 그래픽 */ || 
                   (number == 202 && ((int)a[1] & 0x7F) == 1) /* FUTEX_WAKE */) {
             
                   __sync_synchronize(); // 실행 전 메모리 장벽
-                  long ret = syscall(number, a[0], a[1], a[2], a[3], a[4], a[5]);
+                  long ret = __syscall(number, a[0], a[1], a[2], a[3], a[4], a[5]);
                   __sync_synchronize(); // 실행 후 메모리 장벽
                   return ret;
               }  
+
               if (number == 449 || (number == 202 && ((int)a[1] & 0x7F) == 0) || number != 0) {
             
-                  if (a[0] == 0) return 0;
-                  __sync_synchronize();
-            
-                  struct timespec ts = {0, 400000};
-                  nanosleep(&ts, NULL);
-            
-                  __sync_synchronize();
-            
-                  return -11; // 가상 인터럽트 유도
+                  return __syscall(number, a[0], a[1], a[2], a[3], a[4], a[5]);
               }
 
-              // 3. 일반 시스템 콜 처리 (사실상 1, 2번에서 모두 걸러지므로 도달하지 않음)
               __sync_synchronize();
-              sched_yield(); 
-              long ret = syscall(number, a[0], a[1], a[2], a[3], a[4], a[5]);
-              __sync_synchronize()
+              long ret = __syscall(number, a[0], a[1], a[2], a[3], a[4], a[5]);
+              __sync_synchronize(); 
               return ret;
           }
           /* [4] 매크로 리디렉션 */
