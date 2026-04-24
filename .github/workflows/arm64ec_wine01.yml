@@ -342,20 +342,6 @@ jobs:
           find . -name "loader.c" -exec sed -i 's|"/tmp"|"/data/data/com.termux/files/usr/tmp"|g' {} + 2>/dev/null || true
           find . -name "server.c" -exec sed -i 's|"/tmp"|"/data/data/com.termux/files/usr/tmp"|g' {} + 2>/dev/null || true
 
-          FILE_XINPUT="dlls/winexinput.sys/main.c"
-          if [ -f "$FILE_XINPUT" ]; then
-                    echo "Patching winexinput.sys for scheduler yield..."
-
-                    # 1. unistd.h include 추가 (없을 경우만)
-                    grep -q "unistd.h" "$FILE_XINPUT" || \
-                              sed -i '1i #include <unistd.h>' "$FILE_XINPUT"
-
-                    # 2. IoCompleteRequest 뒤에 usleep(0) 추가
-                    sed -i 's/IoCompleteRequest(gamepad_irp, IO_NO_INCREMENT);/IoCompleteRequest(gamepad_irp, IO_NO_INCREMENT);\n    usleep(0); \/\/ yield to scheduler/g' "$FILE_XINPUT"
-
-                    echo "✔ read_completion patched (usleep added)."
-          fi
-
           FILE3="dlls/wdscore/wdscore.spec"
           if [ -f "$FILE3" ]; then
             if grep -q '@ stub' "$FILE3"; then
