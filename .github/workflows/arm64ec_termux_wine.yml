@@ -378,7 +378,7 @@ jobs:
             sed -i 's/$(PTHREAD_LIBS) -lm/$(PTHREAD_LIBS) -lm -landroid-shmem/' "$FILE_X11_MK"
           fi
 
-          sed -i '/#include <sys\/shm.h>/i #include "shm.h"' dlls/winex11.drv/bitblt.c
+          sed -i 's|#include <sys/shm.h>|#include "shm.h" /* replaced */|g' dlls/winex11.drv/bitblt.c
 
           TOTAL_TARGETS=" 
             dlls/ntdll/unix/fsync.c 
