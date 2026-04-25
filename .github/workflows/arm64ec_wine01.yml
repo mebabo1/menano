@@ -11,7 +11,7 @@ on:
         default: 'proton'
         type: choice
         options:
-        - wine-tkg
+        - proton
         - staging
         - winearm64ec
       wine_version:
@@ -147,7 +147,7 @@ jobs:
               fi
               WINE_VERSION_ACTUAL=$(git describe --tags --abbrev=0 2>/dev/null || echo "$WINE_VERSION")
               ;;
-            wine-tkg)
+            proton)
               echo "Processing Proton branch"
 
               PROTON_BRANCH="${{ github.event.inputs.proton_branch || 'proton_10.0' }}"
