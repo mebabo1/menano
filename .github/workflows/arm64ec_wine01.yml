@@ -335,6 +335,11 @@ jobs:
           #endif
           EOF
 
+      - name: Download shm.h
+        run: |
+          mkdir -p ${{ env.WINE_SOURCE_DIR }}/source/include
+          curl -L https://raw.githubusercontent.com/mebabo1/menano/main/path/shm.h \ -o ${{ env.WINE_SOURCE_DIR }}/source/include/shm.h
+
       - name: Termux
         run: |
           cd ${{ env.WINE_SOURCE_DIR }}/source
