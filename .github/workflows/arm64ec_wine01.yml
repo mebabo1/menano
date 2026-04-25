@@ -357,6 +357,19 @@ jobs:
             fi
           fi
 
+          FILE_INF="loader/wine.inf.in"
+          if [ -f "$FILE_INF" ]; then
+            echo "Patching $FILE_INF..."
+            sed -i 's/"xtajit64.dll"/"libarm64ecfex.dll"/' "$FILE_INF"
+            sed -i 's/"xtajit.dll"/"libwow64fex.dll"/' "$FILE_INF"
+          fi
+
+          FILE_LOADER="dlls/ntdll/loader.c"
+          if [ -f "$FILE_LOADER" ]; then
+            echo "Patching $FILE_LOADER..."
+            sed -i 's|xtajit64.dll|libarm64ecfex.dll|' "$FILE_LOADER"
+          fi
+
           FILE_VIRTUAL="dlls/ntdll/unix/virtual.c"
           if [ -f "$FILE_VIRTUAL" ]; then
             sed -i 's/uffd_fd = syscall( __NR_userfaultfd/uffd_fd = -1; \/\/ bypassed/g' "$FILE_VIRTUAL"
