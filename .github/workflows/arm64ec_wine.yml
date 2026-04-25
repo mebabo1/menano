@@ -328,10 +328,6 @@ jobs:
           #endif
           EOF
 
-      - name: Download shm.h
-        run: |
-          curl -L https://raw.githubusercontent.com/mebabo1/menano/main/path/shm.h -o ${{ env.WINE_SOURCE_DIR }}/source/include/shm.h
-
       - name: Termux
         run: |
           cd ${{ env.WINE_SOURCE_DIR }}/source
@@ -361,7 +357,6 @@ jobs:
             fi
           done
 
-          sed -i '/#include <sys\/shm.h>/i #include "shm.h"' dlls/winex11.drv/bitblt.c
 
       - name: configure
         run: |
