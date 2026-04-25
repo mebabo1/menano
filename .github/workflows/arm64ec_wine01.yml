@@ -234,7 +234,11 @@ jobs:
             fi
           fi
           echo "复制后 locale.nls 存在，大小: $(wc -c < /opt/wine64-native/nls/locale.nls) 字节"
-          
+
+      - name: Download shm.h
+        run: |
+          curl -L https://raw.githubusercontent.com/mebabo1/menano/main/path/shm.h -o ${{ env.WINE_SOURCE_DIR }}/source/include/shm.h
+    
       - name: Termux
         run: |
           cd ${{ env.WINE_SOURCE_DIR }}/source
@@ -245,6 +249,8 @@ jobs:
           find . -name "file.c" -exec sed -i 's|"/tmp"|"/data/data/com.termux/files/usr/tmp"|g' {} + 2>/dev/null || true
           find . -name "loader.c" -exec sed -i 's|"/tmp"|"/data/data/com.termux/files/usr/tmp"|g' {} + 2>/dev/null || true
           find . -name "server.c" -exec sed -i 's|"/tmp"|"/data/data/com.termux/files/usr/tmp"|g' {} + 2>/dev/null || true
+          sed -i 's|#include <sys/shm.h>|#include "shm.h" /* replaced */|g' dlls/winex11.drv/bitblt.c
+
 
           FILE3="dlls/wdscore/wdscore.spec"
           if [ -f "$FILE3" ]; then
