@@ -231,7 +231,7 @@ jobs:
           fi
           echo "复制后 locale.nls 存在，大小: $(wc -c < /opt/wine64-native/nls/locale.nls) 字节"
 
-       - name: Create SHM Header  
+      - name: Create SHM Header  
         run: |  
           mkdir -p ${{ env.WINE_SOURCE_DIR }}/source/include
           cat <<'EOF' > ${{ env.WINE_SOURCE_DIR }}/source/include/shm_utils.h
