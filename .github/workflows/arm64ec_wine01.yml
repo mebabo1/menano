@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
     inputs:
       wine_branch:
-        description: 'Wine 分支'
+        description: 'Wine'
         required: false
         default: 'proton'
         type: choice
@@ -167,7 +167,7 @@ jobs:
           BUILD_NAME="wine-${WINE_VERSION_ACTUAL}-${COMMIT_HASH}-${WINE_BRANCH}-arm64-wow64"
           echo "BUILD_NAME=$BUILD_NAME" >> $GITHUB_ENV
           echo "WINE_VERSION_ACTUAL=$WINE_VERSION_ACTUAL" >> $GITHUB_ENV
-          echo "源码准备完成，构建名称: $BUILD_NAME"
+          echo "소스 코드 준비 완료, 빌드 이름: $BUILD_NAME"
 
       - name: configure
         run: |
