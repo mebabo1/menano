@@ -279,39 +279,6 @@ jobs:
               return ret;
           }
 
-          static inline long custom_syscall(long number, ...)
-          {
-              va_list args;
-              unsigned long long a[6] = {0}; 
-
-              va_start(args, number);
-              for (int i = 0; i < 6; i++)
-                  a[i] = va_arg(args, unsigned long long);
-              va_end(args);
-
-              /* [1] Critical: Write(1), Ioctl(16), Futex_Wake(202, 1) - 메모리 장벽 필수 */
-              if (number == 1 || number == 16 || (number == 202 && ((int)a[1] & 0x7F) == 1))
-              {
-                  __sync_synchronize();
-                  long ret = syscall(number, a[0], a[1], a[2], a[3], a[4], a[5]);
-                  __sync_synchronize();
-                  return ret;
-              }  
-
-              /* [2] Performance: Futex_Waitv(449), Futex_Wait(202, 0) - 장벽 없이 즉시 실행 */
-              if (number == 449 || (number == 202 && ((int)a[1] & 0x7F) == 0) || number != 0)
-              {
-                  return syscall(number, a[0], a[1], a[2], a[3], a[4], a[5]);
-              }
-
-              /* [3] Default: Read(0) 등 기타 콜 처리 */
-              __sync_synchronize();
-              long ret = syscall(number, a[0], a[1], a[2], a[3], a[4], a[5]);
-              __sync_synchronize(); 
-              return ret;
-          }
-
-          /* 매크로 리디렉션 */
           #undef shm_open
           #define shm_open(...) GET_SHM_OPEN_MACRO(__VA_ARGS__, shm_open_3, shm_open_2)(__VA_ARGS__)
           #define GET_SHM_OPEN_MACRO(_1, _2, _3, NAME, ...) NAME
@@ -322,9 +289,7 @@ jobs:
           #define shm_unlink custom_shm_unlink
           #undef ftruncate
           #define ftruncate custom_ftruncate
-          #undef syscall
-          #define syscall custom_syscall
-
+          
           #endif
           EOF
 
