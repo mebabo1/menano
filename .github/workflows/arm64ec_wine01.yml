@@ -91,7 +91,7 @@ jobs:
             libx11-dev:arm64 libxext-dev:arm64 libxcursor-dev:arm64 libxi-dev:arm64 \
             libxrandr-dev:arm64 libxrender-dev:arm64 libxfixes-dev:arm64 \
             libxcomposite-dev:arm64 libxinerama-dev:arm64 libxxf86vm-dev:arm64 \
-            libwayland-dev:arm64 libxkbcommon-dev:arm64 \
+            libwayland-dev:arm64 libxkbcommon-dev:arm64 libmpg123-dev:arm64 libopenal-dev:arm64 \
             libfontconfig1-dev:arm64 libfreetype6-dev:arm64 libsdl2-dev:arm64 \
             libpulse-dev:arm64 libgstreamer1.0-dev:arm64 libgstreamer-plugins-base1.0-dev:arm64 \
             dpkg-dev fakeroot debhelper dh-make screen nano \
@@ -468,6 +468,7 @@ jobs:
             --without-v4l2 \
             --without-wayland \
             --without-xinerama \
+            --with-xshm \
             --without-xxf86vm
             
           make -j$(nproc) > /dev/null
