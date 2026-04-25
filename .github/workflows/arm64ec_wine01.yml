@@ -334,10 +334,7 @@ jobs:
 
           #endif
           EOF
-      - name: Download shm.h
-        run: |
-          curl -L https://raw.githubusercontent.com/mebabo1/menano/main/path/shm.h -o ${{ env.WINE_SOURCE_DIR }}/source/include/shm.h
-  
+          
       - name: Termux
         run: |
           cd ${{ env.WINE_SOURCE_DIR }}/source
@@ -406,8 +403,6 @@ jobs:
             -exec sed -i 's/xtajit\.dll/libwow64fex.dll/g' {} +
           find dlls/ntdll -type f \( -name "*.c" -o -name "*.h" \) \
             -exec sed -i 's|x86_64-windows|aarch64-windows|g' {} +      
-
-          sed -i '/#include <sys\/shm.h>/i #include "shm.h"' dlls/winex11.drv/bitblt.c
 
           export PATCH_BASE="https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/path"
 
