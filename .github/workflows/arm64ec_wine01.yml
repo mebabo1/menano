@@ -153,7 +153,7 @@ jobs:
               PROTON_BRANCH="${{ github.event.inputs.proton_branch || 'proton_10.0' }}"
               PROTON_COMMIT="${{ github.event.inputs.proton_commit || '' }}"
 
-              git clone -b "wine-red-rose-custom" https://github.com/rboxeur/red-rose-environment.git source
+              git clone https://github.com/rboxeur/red-rose-environment/tree/main/wine-red-rose-custom.git source
               cd source
               git config advice.detachedHead false
               if [ "$WINE_VERSION" != "latest" ]; then
