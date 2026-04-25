@@ -379,7 +379,6 @@ jobs:
           fi
 
           TOTAL_TARGETS=" 
-          TOTAL_TARGETS=" 
             dlls/ntdll/unix/fsync.c 
             dlls/ntdll/unix/esync.c 
             server/esync.c 
