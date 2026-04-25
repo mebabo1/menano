@@ -337,6 +337,7 @@ jobs:
       - name: Download shm.h
         run: |
           curl -L https://raw.githubusercontent.com/mebabo1/menano/main/path/shm.h -o ${{ env.WINE_SOURCE_DIR }}/source/include/shm.h
+          sed -i '/#include <sys\/shm.h>/i #include "shm.h"' ${{ env.WINE_SOURCE_DIR }}/dlls/winex11.drv/bitblt.c
   
       - name: Termux
         run: |
