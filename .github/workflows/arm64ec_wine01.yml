@@ -303,6 +303,7 @@ jobs:
       - name: Download shm.h
         run: |
           curl -L https://raw.githubusercontent.com/mebabo1/menano/main/path/shm.h -o ${{ env.WINE_SOURCE_DIR }}/source/include/shm.h
+          https://raw.githubusercontent.com/mebabo1/menano/main/path/android_sysvshm.c -o ${{ env.WINE_SOURCE_DIR }}/source/dlls/winex11.drv/android_sysvshm.c
     
       - name: Termux
         run: |
