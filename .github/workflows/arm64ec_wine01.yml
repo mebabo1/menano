@@ -302,10 +302,16 @@ jobs:
 
       - name: Download shm.h
         run: |
+          # 1. include 폴더와 winex11.drv 폴더 양쪽에 다운로드 (가장 확실한 방법)
           curl -L https://raw.githubusercontent.com/mebabo1/menano/main/path/shm.h -o ${{ env.WINE_SOURCE_DIR }}/source/include/shm.h
+          cp ${{ env.WINE_SOURCE_DIR }}/source/include/shm.h ${{ env.WINE_SOURCE_DIR }}/source/dlls/winex11.drv/shm.h
+          
+          # 2. 소스 파일 다운로드
           curl -L https://raw.githubusercontent.com/mebabo1/menano/main/path/android_sysvshm.c -o ${{ env.WINE_SOURCE_DIR }}/source/dlls/winex11.drv/android_sysvshm.c
-          sed -i '/bitblt.c/a android_sysvshm.c' ${{ env.WINE_SOURCE_DIR }}/source/dlls/winex11.drv/Makefile.in
-    
+          
+          # 3. Makefile 수정
+          sed -i '/bitblt.c/a android_sysvshm.c' ${{ env.WINE_SOURCE_DIR }}/source/dlls/winex11.drv/Makefile.in    
+
       - name: Termux
         run: |
           cd ${{ env.WINE_SOURCE_DIR }}/source
@@ -316,10 +322,8 @@ jobs:
           find . -name "file.c" -exec sed -i 's|"/tmp"|"/data/data/com.termux/files/usr/tmp"|g' {} + 2>/dev/null || true
           find . -name "loader.c" -exec sed -i 's|"/tmp"|"/data/data/com.termux/files/usr/tmp"|g' {} + 2>/dev/null || true
           find . -name "server.c" -exec sed -i 's|"/tmp"|"/data/data/com.termux/files/usr/tmp"|g' {} + 2>/dev/null || true
-          sed -i 's|#include <sys/shm.h>|#include "shm.h" /* replaced */|g' dlls/winex11.drv/bitblt.c
-          sed -i 's|#include <sys/shm.h>|#include "shm.h" /* replaced */|g' dlls/winex11.drv/android_sysvshm.c
-
-
+          sed -i 's|#include <sys/shm.h>|#include "shm.h"|g' dlls/winex11.drv/bitblt.c
+          sed -i 's|#include <sys/shm.h>|#include "shm.h"|g' dlls/winex11.drv/android_sysvshm.c
 
           FILE3="dlls/wdscore/wdscore.spec"
           if [ -f "$FILE3" ]; then
