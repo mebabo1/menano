@@ -86,7 +86,7 @@ jobs:
             libtiff-dev \
             libxml2-dev \
             gettext curl \
-            libvulkan-dev \
+            libvulkan-dev libmpg123-dev libopenal-dev \
             libgstreamer1.0-dev \
             libgstreamer-plugins-base1.0-dev \
             libgettextpo-dev
