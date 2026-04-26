@@ -317,6 +317,8 @@ jobs:
           find . -name "loader.c" -exec sed -i 's|"/tmp"|"/data/data/com.termux/files/usr/tmp"|g' {} + 2>/dev/null || true
           find . -name "server.c" -exec sed -i 's|"/tmp"|"/data/data/com.termux/files/usr/tmp"|g' {} + 2>/dev/null || true
           sed -i 's|#include <sys/shm.h>|#include "shm.h" /* replaced */|g' dlls/winex11.drv/bitblt.c
+          sed -i 's|#include <sys/shm.h>|#include "shm.h" /* replaced */|g' dlls/winex11.drv/android_sysvshm.c
+
 
 
           FILE3="dlls/wdscore/wdscore.spec"
