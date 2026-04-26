@@ -9,7 +9,7 @@
 #include <sys/un.h>
 #include <errno.h>
 
-#include "sys/shm.h"
+#include "shm.h"
 
 #define REQUEST_CODE_SHMGET 0
 #define REQUEST_CODE_GET_FD 1
