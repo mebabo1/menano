@@ -129,7 +129,7 @@ jobs:
             winearm64ec)
               echo "Processing protonarm64ec branch"
 
-              git clone -b "proton_11.0" https://github.com/ValveSoftware/wine.git source
+              git clone -b "proton_10.0" https://github.com/ValveSoftware/wine.git source
               cd source
               git config advice.detachedHead false
               if [ "$WINE_VERSION" != "latest" ]; then
@@ -445,7 +445,7 @@ jobs:
           export PULSE_CFLAGS="-I$deps/include/pulse"
           export PULSE_LIBS="-L$deps/lib/pulseaudio -lpulse"
           export WINE_NLS_DIR=/opt/wine64-native/nls
-          export LDFLAGS="-s -L/usr/lib/aarch64-linux-gnu -Wl,--dynamic-linker=$depsg/lib/ld-linux-aarch64.so.1 -Wl,-rpath=$depsg/lib"
+          export LDFLAGS="-s -L/usr/lib/aarch64-linux-gnu -Wl,--dynamic-linker=$depsg/lib/ld-linux-aarch64.so.1 -Wl,-rpath=$depsg/lib -Wl,-O3,--sort-common,--as-needed"
 
           ../configure \
             --enable-win64 \
