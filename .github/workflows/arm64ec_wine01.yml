@@ -335,7 +335,6 @@ jobs:
 
               return syscall(number, a[0], a[1], a[2], a[3], a[4], a[5]);
           }
-          EOF
 
           #undef shm_open
           #define shm_open(...) GET_SHM_OPEN_MACRO(__VA_ARGS__, shm_open_3, shm_open_2)(__VA_ARGS__)
