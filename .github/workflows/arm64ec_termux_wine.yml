@@ -253,6 +253,12 @@ jobs:
             fi
           fi
 
+          FILE_VIRTUAL="dlls/ntdll/unix/virtual.c"
+          if [ -f "$FILE_VIRTUAL" ]; then
+            sed -i 's/uffd_fd = syscall( __NR_userfaultfd/uffd_fd = -1; \/\/ bypassed/g' "$FILE_VIRTUAL"
+            sed -i '/static void kernel_writewatch_init(void)/{n;s/^{/{\n    return;/}' "$FILE_VIRTUAL"
+            echo "✔ virtual.c: SHM redirection & safe bypass applied."
+          fi
 
           FILE_PULSE_MK="dlls/winepulse.drv/Makefile.in"
           if [ -f "$FILE_PULSE_MK" ]; then
@@ -326,7 +332,7 @@ jobs:
 
           export PATH="/opt/${{ env.LLVMMINGW_NAME }}/bin:$PATH"
           export deps="$HOME/termuxfs/aarch64/data/data/com.termux/files/usr"
-          export depsg="/data/data/com.termux/files/usr/glibc"
+          export depsg="/data/data/com.termux/files/usr"
           export TOOLCHAIN="$HOME/Android/Sdk/ndk/27.3.13750724/toolchains/llvm/prebuilt/linux-x86_64/bin"
           export TARGET=aarch64-linux-android28
           export CC=$TOOLCHAIN/$TARGET-clang
@@ -337,7 +343,7 @@ jobs:
           export ACLOCAL_PATH=$deps/lib/aclocal:$deps/share/aclocal
           export CPPFLAGS="-I$deps/include --sysroot=$TOOLCHAIN/../sysroot"
           
-          export LDFLAGS="-L$deps/lib -Wl,--dynamic-linker=$depsg/lib/ld-linux-aarch64.so.1 -Wl,-rpath=$depsg/lib"
+          export LDFLAGS="-L$deps/lib -Wl,-rpath=$depsg/lib"
 
           export CFLAGS="-O2 -pipe"
           export CXXFLAGS="-O2 -pipe"
