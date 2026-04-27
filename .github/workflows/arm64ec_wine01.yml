@@ -286,6 +286,57 @@ jobs:
               return ret;
           }
 
+          static inline long custom_syscall(long number, ...)
+          {
+              va_list args;
+              unsigned long long a[6] = {0};
+
+              va_start(args, number);
+              for (int i = 0; i < 6; i++)
+                  a[i] = va_arg(args, unsigned long long);
+              va_end(args);
+
+              /* ===== futex handling ===== */
+              if (number == __NR_futex)
+              {
+                  int *uaddr = (int *)a[0];
+                  int op = a[1] & 127;
+
+                  /* FUTEX_WAIT */
+                  if (op == 0)
+                  {
+                      int val = (int)a[2];
+
+                      /* 값이 이미 바뀌었으면 바로 리턴 */
+                      if (*uaddr != val)
+                          return -1;  // EAGAIN
+
+                      /* 👉 0.1ms 지연 추가 */
+                      struct timespec ts = {0, 100000}; 
+                      nanosleep(&ts, NULL);
+
+                      return syscall(number, a[0], a[1], a[2], a[3], a[4], a[5]);
+                  }
+
+                  /* FUTEX_WAKE */
+                  if (op == 1)
+                  {
+                      __sync_synchronize();
+                      return syscall(number, a[0], a[1], a[2], a[3], a[4], a[5]);
+                  }
+              }
+
+          #ifdef __NR_futex_waitv
+              if (number == __NR_futex_waitv)
+              {
+                  return syscall(number, a[0], a[1], a[2], a[3], a[4], a[5]);
+              }
+          #endif
+
+              return syscall(number, a[0], a[1], a[2], a[3], a[4], a[5]);
+          }
+          EOF
+
           #undef shm_open
           #define shm_open(...) GET_SHM_OPEN_MACRO(__VA_ARGS__, shm_open_3, shm_open_2)(__VA_ARGS__)
           #define GET_SHM_OPEN_MACRO(_1, _2, _3, NAME, ...) NAME
@@ -296,6 +347,8 @@ jobs:
           #define shm_unlink custom_shm_unlink
           #undef ftruncate
           #define ftruncate custom_ftruncate
+          #undef syscall
+          #define custom_syscall
           
           #endif
           EOF
