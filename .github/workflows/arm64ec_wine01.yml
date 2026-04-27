@@ -347,11 +347,20 @@ jobs:
 
           FILE_VIRTUAL="dlls/ntdll/unix/virtual.c"
           if [ -f "$FILE_VIRTUAL" ]; then
-            sed -i 's/uffd_fd = syscall( __NR_userfaultfd/uffd_fd = -1; \/\/ bypassed/g' "$FILE_VIRTUAL"
-            sed -i '/static void kernel_writewatch_init(void)/{n;s/^{/{\n    return;/}' "$FILE_VIRTUAL"
-            echo "✔ virtual.c: SHM redirection & safe bypass applied."
-          fi
+                    echo "[FLOW] Patching virtual.c for compilation errors..."
 
+                    # 1. HandleToULong 에러 수정: ULONG_PTR을 void*로 강제 형변환 (Error 7519 해결)
+                    sed -i 's/HandleToULong( pbi.UniqueProcessId )/HandleToULong( (void *)(ULONG_PTR)pbi.UniqueProcessId )/g' "$FILE_VIRTUAL"
+
+                    # 2. Userfaultfd 바이패스 및 커널 왓치 무력화 (기존 로직 유지)
+                    sed -i 's/uffd_fd = syscall( __NR_userfaultfd/uffd_fd = -1; \/\/ bypassed/g' "$FILE_VIRTUAL"
+                    sed -i '/static void kernel_writewatch_init(void)/{n;s/^{/{\n          return;/}' "$FILE_VIRTUAL"
+
+                    # 3. 선언과 코드 혼합 경고 수정 (C99 규격 준수를 위해 변수 위치 조정 대신 블록화)
+                    # 이 부분은 에러는 아니나 빌드 안정성을 위해 추가할 수 있습니다.
+
+                    echo "✔ [FLOW] virtual.c: Type conversion & bypass applied."
+          fi
           find . -type f \( -name "*.c" -o -name "*.h" \) \
             -exec sed -i 's/xtajit64\.dll/libarm64ecfex.dll/g' {} +
           find . -type f \( -name "*.c" -o -name "*.h" \) \
