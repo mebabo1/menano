@@ -348,7 +348,7 @@ jobs:
           #undef ftruncate
           #define ftruncate custom_ftruncate
           #undef syscall
-          #define custom_syscall
+          #define syscall custom_syscall
           
           #endif
           EOF
