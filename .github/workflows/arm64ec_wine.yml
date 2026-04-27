@@ -333,8 +333,6 @@ jobs:
             fi
           done
 
-          sed -i 's|#include <sys/shm.h>|#include "shm.h" /* replaced */|g' dlls/winex11.drv/bitblt.c
-
       - name: configure
         run: |
           cd ${{ env.WINE_SOURCE_DIR }}/source
