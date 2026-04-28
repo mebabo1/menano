@@ -254,11 +254,16 @@ jobs:
 
           #define TERMUX_TMP_DIR "/data/data/com.termux/files/usr/tmp"
           #include <sys/file.h>
+          #define MAX_TABLE 1024
 
           static inline int get_lock_fd(void *uaddr)
           {
-              unsigned long key = ((unsigned long)uaddr) >> 4;
+              unsigned long key;
               int i;
+              char path[256];
+              int fd;
+              
+              key = ((unsigned long)uaddr) >> 4;
               for (i = 0; i < table_count; i++)
               {
                   if (table[i].key == key)
