@@ -245,6 +245,7 @@ jobs:
           #include <unistd.h>
           #include <sys/stat.h>
           #include <sys/types.h>
+          #include <sys/mman.h>
           #include <errno.h>
           #include <time.h>
           #include <string.h>
@@ -344,7 +345,7 @@ jobs:
 
                   shm_futex_t *f = get_futex(uaddr);
                   if (!f) 
-                      return -1
+                      return -1;
 
                   /* FUTEX_WAIT */
                   if (op == 0) 
