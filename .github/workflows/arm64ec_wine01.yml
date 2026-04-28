@@ -515,6 +515,8 @@ jobs:
             dlls/ntdll/unix/fsync.c 
             dlls/ntdll/unix/esync.c 
             dlls/ntdll/unix/sync.c 
+            dlls/ntdll/unix/thread.c 
+            dlls/ntdll/unix/server.c
             server/esync.c 
             server/fsync.c 
           "
