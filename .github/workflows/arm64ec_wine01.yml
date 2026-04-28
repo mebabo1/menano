@@ -260,6 +260,20 @@ jobs:
           #include <sys/syscall.h>
 
           #define TERMUX_TMP_DIR "/data/data/com.termux/files/usr/tmp"
+          #include <sys/file.h>
+
+          static inline int get_lock_fd(void *uaddr)
+          {
+              char path[256];
+
+              snprintf(path, sizeof(path),
+                  "%s/futex_%lx.lock",
+                  TERMUX_TMP_DIR,
+                  (unsigned long)uaddr);
+
+              int fd = open(path, O_CREAT | O_RDWR, 0600);
+              return fd;
+          }
 
           static inline int custom_shm_open(const char *name, int oflag, mode_t mode)
           {
