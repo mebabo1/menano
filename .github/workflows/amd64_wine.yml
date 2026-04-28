@@ -267,7 +267,7 @@ jobs:
               for (i = 0; i < table_count; i++)
               {
                   if (table[i].key == key)
-                  return table[i].fd;
+                      return table[i].fd;
               }
               
               snprintf(path, sizeof(path),
