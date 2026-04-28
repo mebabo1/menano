@@ -257,51 +257,6 @@ jobs:
           #define MAX_FUTEX 1024
           #define TERMUX_TMP_DIR "/data/data/com.termux/files/usr/tmp"
 
-          typedef struct {
-              unsigned long key;
-              volatile int state;   // 0: free, 1: locked, 2: waiting, 3: wake
-          } shm_futex_t;
-
-          static shm_futex_t *futex_table = NULL;
-
-          static inline void init_futex_shm(void)
-          {
-              if (futex_table) return;
-
-              int fd = open(TERMUX_TMP_DIR "/wine_futex_shm", O_CREAT | O_RDWR, 0600);
-              if (fd < 0) return;
-
-              ftruncate(fd, sizeof(shm_futex_t) * MAX_FUTEX);
-
-              futex_table = (shm_futex_t *)mmap(NULL,
-                                 sizeof(shm_futex_t) * MAX_FUTEX,
-                                 PROT_READ | PROT_WRITE,
-                                 MAP_SHARED,
-                                 fd, 0);
-              close(fd);
-          }
-
-          static inline shm_futex_t *get_futex(void *uaddr)
-          {
-              if (!futex_table) init_futex_shm();
-              if (!futex_table) return NULL;
-
-              unsigned long key = ((unsigned long)uaddr);
-
-              // 1st Pass: Find existing key
-              for (int i = 0; i < MAX_FUTEX; i++) {
-                  if (futex_table[i].key == key) return &futex_table[i];
-              }
-
-              // 2nd Pass: Assign new slot (Atomic-ish)
-              for (int i = 0; i < MAX_FUTEX; i++) {
-                  if (__sync_bool_compare_and_swap(&futex_table[i].key, 0, key)) {
-                      return &futex_table[i];
-                  }
-              }
-              return NULL;
-          }
-
           static inline int custom_shm_open(const char *name, int oflag, mode_t mode)
           {
               char path[256];  
@@ -327,6 +282,58 @@ jobs:
               return ret;
           }
 
+          typedef struct {
+              unsigned long key;
+              atomic_int flag;   // 0 = sleep, 1 = wake
+          } shm_futex_t;
+
+          static shm_futex_t *futex_table = NULL;
+
+          static inline void init_futex_shm(void)
+          {
+              if (futex_table) return;
+
+              int fd = open("/data/data/com.termux/files/usr/tmp/wine_futex_shm",
+                            O_CREAT | O_RDWR, 0600);
+
+              if (fd < 0) return;
+
+              ftruncate(fd, sizeof(shm_futex_t) * MAX_FUTEX);
+
+              futex_table = mmap(NULL,
+                                  sizeof(shm_futex_t) * MAX_FUTEX,
+                                  PROT_READ | PROT_WRITE,
+                                  MAP_SHARED,
+                                  fd, 0);
+
+              close(fd);
+
+              memset(futex_table, 0, sizeof(shm_futex_t) * MAX_FUTEX);
+          }
+
+          static inline shm_futex_t *get_futex(void *uaddr)
+          {
+              if (!futex_table) init_futex_shm();
+              if (!futex_table) return NULL;
+
+              unsigned long key = ((unsigned long)uaddr) >> 4;
+
+              for (int i = 0; i < MAX_FUTEX; i++)
+              {
+                  if (futex_table[i].key == key)
+                      return &futex_table[i];
+              }
+
+              for (int i = 0; i < MAX_FUTEX; i++)
+              {
+                  unsigned long expected = 0;
+                  if (__sync_bool_compare_and_swap(&futex_table[i].key, expected, key))
+                      return &futex_table[i];
+              }
+
+              return NULL;
+          }
+
           static inline long custom_syscall(long number, ...)
           {
               va_list args;
@@ -337,41 +344,40 @@ jobs:
                   a[i] = va_arg(args, unsigned long long);
               va_end(args);
 
-              /* FUTEX Emulation */
               if (number == __NR_futex)
               {
                   int *uaddr = (int *)a[0];
                   int op = (int)a[1] & 127;
 
                   shm_futex_t *f = get_futex(uaddr);
-                  if (!f) 
-                      return -1;
+                  if (!f) return -1;
 
-                  /* FUTEX_WAIT */
-                  if (op == 0) 
+                  if (op == FUTEX_WAIT)
                   {
                       int val = (int)a[2];
-                      if (*uaddr != val) 
-                          return -1; // EAGAIN
 
-                      __sync_synchronize();
-                      f->state = 2; // Set state to WAITING
+                      if (*uaddr != val)
+                          return -1;
 
-                      // Spin wait with yield to prevent CPU hogging
-                      while (f->state == 2) {
-                          if (*uaddr != val) break; 
+                      atomic_store_explicit(&f->flag, 0, memory_order_release);
+
+                      while (atomic_load_explicit(&f->flag, memory_order_acquire) == 0)
+                      {
+                          if (*uaddr != val)
+                              break;
+
                           sched_yield();
                       }
+
                       return 0;
                   }
 
-                  /* FUTEX_WAKE */
-                  if (op == 1) 
+                  if (op == FUTEX_WAKE)
                   {
-                      f->state = 3; // Set state to WAKE
-                      __sync_synchronize();
+                      atomic_store_explicit(&f->flag, 1, memory_order_release);
                       return 1;
                   }
+
                   return 0;
               }
 
@@ -382,16 +388,15 @@ jobs:
 
                   shm_futex_t *f = get_futex(uaddr);
                   if (f)
-                  {
-                      f->state = 3;
-                  }
+                      atomic_store(&f->flag, 1);
 
                   return 0;
               }
           #endif
 
-              /* Fallback for other syscalls */
-              return syscall(number, a[0], a[1], a[2], a[3], a[4], a[5]);
+              return syscall(number,
+                             a[0], a[1], a[2],
+                             a[3], a[4], a[5]);
           }
 
           #undef shm_open
