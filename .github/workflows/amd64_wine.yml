@@ -253,6 +253,7 @@ jobs:
           #include <sched.h>
           #include <sys/syscall.h>
           #include <linux/futex.h>
+          #include <stdatomic.h>
 
           #define MAX_FUTEX 1024
           #define TERMUX_TMP_DIR "/data/data/com.termux/files/usr/tmp"
