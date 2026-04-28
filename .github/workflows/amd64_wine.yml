@@ -261,8 +261,9 @@ jobs:
           static inline int get_lock_fd(void *uaddr)
           {
               unsigned long key = ((unsigned long)uaddr) >> 4;
-              if (cached_fd != -1 && cached_key == key)
-                  return cached_fd;
+              for (int i = 0; i < table_count; i++)
+                  if (table[i].key == key)
+                      return table[i].fd;
               
               char path[256];
               snprintf(path, sizeof(path),
@@ -271,8 +272,7 @@ jobs:
                   key);
 
               int fd = open(path, O_CREAT | O_RDWR, 0600);
-              cached_fd = fd;
-              cached_key = key;
+              table[table_count++] = (fd_entry){ key, fd };
               return fd;
           }
 
