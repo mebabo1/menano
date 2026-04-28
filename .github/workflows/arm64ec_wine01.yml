@@ -235,8 +235,8 @@ jobs:
           fi
           echo "复制后 locale.nls 存在，大小: $(wc -c < /opt/wine64-native/nls/locale.nls) 字节"
 
-      - name: Create SHM Header  
-        run: |  
+      - name: Create SHM Utils Header
+        run: |
           mkdir -p ${{ env.WINE_SOURCE_DIR }}/source/include
           cat <<'EOF' > ${{ env.WINE_SOURCE_DIR }}/source/include/shm_utils.h
           #ifndef __WINE_SHM_UTILS_H
@@ -252,55 +252,80 @@ jobs:
           #include <unistd.h>
           #include <sys/stat.h>
           #include <sys/types.h>
+          #include <sys/mman.h>
           #include <errno.h>
-          #include <time.h>
           #include <string.h>
           #include <stdarg.h>
           #include <sched.h>
           #include <sys/syscall.h>
+          #include <linux/futex.h>
+          #include <stdatomic.h>
 
+          #define MAX_FUTEX 1024
           #define TERMUX_TMP_DIR "/data/data/com.termux/files/usr/tmp"
-          #include <sys/file.h>
 
-          static inline int get_lock_fd(void *uaddr)
+          typedef struct {
+              unsigned long key;
+              atomic_int flag;   // 0 = sleep, 1 = wake
+          } shm_futex_t;
+
+          static shm_futex_t *futex_table = NULL;
+
+          static inline void init_futex_shm(void)
           {
-              char path[256];
+              if (futex_table) return;
 
-              snprintf(path, sizeof(path),
-                  "%s/futex_%lx.lock",
-                  TERMUX_TMP_DIR,
-                  (unsigned long)uaddr);
+              int fd = open(TERMUX_TMP_DIR "/wine_futex_shm", O_CREAT | O_RDWR, 0600);
+              if (fd < 0) return;
 
-              int fd = open(path, O_CREAT | O_RDWR, 0600);
-              return fd;
+              ftruncate(fd, sizeof(shm_futex_t) * MAX_FUTEX);
+
+              futex_table = mmap(NULL,
+                                 sizeof(shm_futex_t) * MAX_FUTEX,
+                                 PROT_READ | PROT_WRITE,
+                                 MAP_SHARED,
+                                 fd, 0);
+
+              close(fd);
+
+              if (futex_table)
+                  memset(futex_table, 0, sizeof(shm_futex_t) * MAX_FUTEX);
           }
 
-          static inline int custom_shm_open(const char *name, int oflag, mode_t mode)
+          static inline shm_futex_t *get_futex(void *uaddr)
           {
-              char path[256];  
-              const char *clean_name = (name[0] == '/') ? name + 1 : name;
-              if (snprintf(path, sizeof(path), "%s/%s", TERMUX_TMP_DIR, clean_name) >= sizeof(path))
-                  return -1;
-              return open(path, oflag, mode ? mode : 0600);
+              if (!futex_table) init_futex_shm();
+              if (!futex_table) return NULL;
+
+              unsigned long key = ((unsigned long)uaddr) >> 4;
+
+              for (int i = 0; i < MAX_FUTEX; i++)
+              {
+                  if (futex_table[i].key == key)
+                      return &futex_table[i];
+              }
+
+              for (int i = 0; i < MAX_FUTEX; i++)
+              {
+                  unsigned long expected = 0;
+                  if (__sync_bool_compare_and_swap(&futex_table[i].key, expected, key))
+                      return &futex_table[i];
+              }
+
+              return NULL;
           }
 
-          static inline int custom_shm_unlink(const char *name)
+          static inline long real_syscall(long number,
+                                         unsigned long long a0,
+                                         unsigned long long a1,
+                                         unsigned long long a2,
+                                         unsigned long long a3,
+                                         unsigned long long a4,
+                                         unsigned long long a5)
           {
-              char path[256];
-              const char *clean_name = (name[0] == '/') ? name + 1 : name;
-              if (snprintf(path, sizeof(path), "%s/%s", TERMUX_TMP_DIR, clean_name) >= sizeof(path))
-                  return -1;
-              return unlink(path);
+              return syscall(number, a0, a1, a2, a3, a4, a5);
           }
 
-          static inline int custom_ftruncate(int fd, off_t length)
-          {
-              int ret = ftruncate(fd, length);
-              __sync_synchronize(); 
-              return ret;
-          }
-
-          
           static inline long custom_syscall(long number, ...)
           {
               va_list args;
@@ -314,37 +339,49 @@ jobs:
               if (number == __NR_futex)
               {
                   int *uaddr = (int *)a[0];
-                  int op = a[1] & 127;
+                  int op = (int)a[1] & 127;
 
-                  if (op == 0)
+                  shm_futex_t *f = get_futex(uaddr);
+                  if (!f)
+                      return real_syscall(number, a[0], a[1], a[2], a[3], a[4], a[5]);
+
+                  if (op == FUTEX_WAIT)
                   {
                       int val = (int)a[2];
 
                       if (*uaddr != val)
                           return -1;
 
-                      int fd = get_lock_fd(uaddr);
-                      if (fd >= 0)
+                      atomic_store_explicit(&f->flag, 0, memory_order_release);
+
+                      int spin = 150;  // 튜닝 포인트
+
+                      while (spin--)
                       {
-                          flock(fd, LOCK_SH);   // block
-                          flock(fd, LOCK_UN);
+                          if (atomic_load_explicit(&f->flag, memory_order_acquire))
+                              return 0;
+
+                          if (*uaddr != val)
+                              return 0;
+
+                          sched_yield();
                       }
 
-                      return 0;
+                      /* fallback to kernel futex */
+                      return real_syscall(__NR_futex, a[0], a[1], a[2], a[3], a[4], a[5]);
                   }
 
-                  if (op == 1)
+                  if (op == FUTEX_WAKE)
                   {
-                      int fd = get_lock_fd(uaddr);
-                      if (fd >= 0)
-                      {
-                          flock(fd, LOCK_EX);
-                          flock(fd, LOCK_UN);
-                      }
-                      return 0;
+                      atomic_store_explicit(&f->flag, 1, memory_order_release);
+
+                      /* kernel wake도 같이 */
+                      real_syscall(__NR_futex, a[0], a[1], 1, a[3], a[4], a[5]);
+
+                      return 1;
                   }
 
-                  return 0;
+                  return real_syscall(number, a[0], a[1], a[2], a[3], a[4], a[5]);
               }
 
           #ifdef __NR_futex_waitv
@@ -352,32 +389,61 @@ jobs:
               {
                   void *uaddr = (void *)a[0];
 
-                  int fd = get_lock_fd(uaddr);
-                  if (fd >= 0)
-                  {
-                      flock(fd, LOCK_SH);
-                      flock(fd, LOCK_UN);
-                  }
+                  shm_futex_t *f = get_futex(uaddr);
+                  if (f)
+                      atomic_store_explicit(&f->flag, 1, memory_order_release);
 
-                  return 0;
+                  return real_syscall(number, a[0], a[1], a[2], a[3], a[4], a[5]);
               }
           #endif
-              return syscall(number, a[0], a[1], a[2], a[3], a[4], a[5]);
+
+              return real_syscall(number, a[0], a[1], a[2], a[3], a[4], a[5]);
+          }
+
+          static inline int custom_shm_open(const char *name, int oflag, mode_t mode)
+          {
+              char path[256];
+              const char *clean = (name[0] == '/') ? name + 1 : name;
+
+              if (snprintf(path, sizeof(path), "%s/%s", TERMUX_TMP_DIR, clean) >= sizeof(path))
+                  return -1;
+
+              return open(path, oflag, mode ? mode : 0600);
+          }
+
+          static inline int custom_shm_unlink(const char *name)
+          {
+              char path[256];
+              const char *clean = (name[0] == '/') ? name + 1 : name;
+
+              if (snprintf(path, sizeof(path), "%s/%s", TERMUX_TMP_DIR, clean) >= sizeof(path))
+                  return -1;
+
+              return unlink(path);
+          }
+
+          static inline int custom_ftruncate(int fd, off_t len)
+          {
+              int ret = ftruncate(fd, len);
+              __sync_synchronize();
+              return ret;
           }
 
           #undef shm_open
           #define shm_open(...) GET_SHM_OPEN_MACRO(__VA_ARGS__, shm_open_3, shm_open_2)(__VA_ARGS__)
-          #define GET_SHM_OPEN_MACRO(_1, _2, _3, NAME, ...) NAME
+          #define GET_SHM_OPEN_MACRO(_1,_2,_3,NAME,...) NAME
           #define shm_open_3(name, flags, mode) custom_shm_open(name, flags, mode)
           #define shm_open_2(name, flags)       custom_shm_open(name, flags, 0)
 
           #undef shm_unlink
           #define shm_unlink custom_shm_unlink
+
           #undef ftruncate
           #define ftruncate custom_ftruncate
+
           #undef syscall
           #define syscall custom_syscall
-          
+
           #endif
           EOF
 
@@ -448,6 +514,7 @@ jobs:
           TOTAL_TARGETS=" 
             dlls/ntdll/unix/fsync.c 
             dlls/ntdll/unix/esync.c 
+            dlls/ntdll/unix/sync.c 
             server/esync.c 
             server/fsync.c 
           "
