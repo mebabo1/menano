@@ -255,6 +255,9 @@ jobs:
           #define TERMUX_TMP_DIR "/data/data/com.termux/files/usr/tmp"
           #include <sys/file.h>
 
+          static __thread int cached_fd = -1;
+          static __thread unsigned long cached_key = 0;
+
           static inline int get_lock_fd(void *uaddr)
           {
               char path[256];
@@ -262,9 +265,11 @@ jobs:
               snprintf(path, sizeof(path),
                   "%s/futex_%lx.lock",
                   TERMUX_TMP_DIR,
-                  (unsigned long)uaddr);
+                  key);
 
               int fd = open(path, O_CREAT | O_RDWR, 0600);
+              cached_fd = fd;
+              cached_key = key;
               return fd;
           }
 
