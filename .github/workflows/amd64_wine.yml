@@ -251,64 +251,54 @@ jobs:
           #include <stdarg.h>
           #include <sched.h>
           #include <sys/syscall.h>
+          #include <linux/futex.h>
 
+          #define MAX_FUTEX 1024
           #define TERMUX_TMP_DIR "/data/data/com.termux/files/usr/tmp"
-          #include <sys/file.h>
-          #define MAX_TABLE 1024
 
           typedef struct {
               unsigned long key;
-              int fd;
-          } fd_entry;
+              volatile int state;   // 0: free, 1: locked, 2: waiting, 3: wake
+          } shm_futex_t;
 
-          static fd_entry table[MAX_TABLE];
-          static int table_count = 0;
+          static shm_futex_t *futex_table = NULL;
 
-          static inline int get_lock_fd(void *uaddr)
+          static inline void init_futex_shm(void)
           {
-              unsigned long key;
-              int i;
-              char path[256];
-              int fd;
-              
-              key = ((unsigned long)uaddr) >> 4;
-              for (i = 0; i < table_count; i++)
-              {
-                  if (table[i].key == key)
-                      return table[i].fd;
-              }
-              
-              snprintf(path, sizeof(path),
-                  "%s/futex_%lx.lock",
-                  TERMUX_TMP_DIR,
-                  key);
+              if (futex_table) return;
 
-              fd = open(path, O_CREAT | O_RDWR, 0600);
-              if (table_count < MAX_TABLE)
-              {
-                  table[table_count].key = key;
-                  table[table_count].fd = fd;
-                  table_count++;
-              }
-              return fd;
+              int fd = open(TERMUX_TMP_DIR "/wine_futex_shm", O_CREAT | O_RDWR, 0600);
+              if (fd < 0) return;
+
+              ftruncate(fd, sizeof(shm_futex_t) * MAX_FUTEX);
+
+              futex_table = (shm_futex_t *)mmap(NULL,
+                                 sizeof(shm_futex_t) * MAX_FUTEX,
+                                 PROT_READ | PROT_WRITE,
+                                 MAP_SHARED,
+                                 fd, 0);
+              close(fd);
           }
 
-          static inline int custom_shm_open(const char *name, int oflag, mode_t mode)
+          static inline shm_futex_t *get_futex(void *uaddr)
           {
-              char path[256];  
-              const char *clean_name = (name[0] == '/') ? name + 1 : name;
-              if (snprintf(path, sizeof(path), "%s/%s", TERMUX_TMP_DIR, clean_name) >= sizeof(path))
-                  return -1;
-              return open(path, oflag, mode ? mode : 0600);
-          }
+              if (!futex_table) init_futex_shm();
+              if (!futex_table) return NULL;
 
-          static inline int custom_shm_unlink(const char *name)
-          {
-              char path[256];
-              const char *clean_name = (name[0] == '/') ? name + 1 : name;
-              if (snprintf(path, sizeof(path), "%s/%s", TERMUX_TMP_DIR, clean_name) >= sizeof(path))
-                  return -1;
-              return unlink(path);
+              unsigned long key = ((unsigned long)uaddr);
+
+              // 1st Pass: Find existing key
+              for (int i = 0; i < MAX_FUTEX; i++) {
+                  if (futex_table[i].key == key) return &futex_table[i];
+              }
+
+              // 2nd Pass: Assign new slot (Atomic-ish)
+              for (int i = 0; i < MAX_FUTEX; i++) {
+                  if (__sync_bool_compare_and_swap(&futex_table[i].key, 0, key)) {
+                      return &futex_table[i];
+                  }
+              }
+              return NULL;
           }
 
           static inline int custom_ftruncate(int fd, off_t length)
