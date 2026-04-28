@@ -258,9 +258,12 @@ jobs:
           static inline int get_lock_fd(void *uaddr)
           {
               unsigned long key = ((unsigned long)uaddr) >> 4;
-              for (int i = 0; i < table_count; i++)
+              int i;
+              for (i = 0; i < table_count; i++)
+              {
                   if (table[i].key == key)
-                      return table[i].fd;
+                  return table[i].fd;
+              }
               
               char path[256];
               snprintf(path, sizeof(path),
