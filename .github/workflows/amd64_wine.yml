@@ -270,7 +270,6 @@ jobs:
                   return table[i].fd;
               }
               
-              char path[256];
               snprintf(path, sizeof(path),
                   "%s/futex_%lx.lock",
                   TERMUX_TMP_DIR,
@@ -334,7 +333,7 @@ jobs:
                       if (*uaddr != val)
                           return -1;
 
-                      int fd = get_lock_fd(uaddr);
+                      fd = get_lock_fd(uaddr);
                       if (fd >= 0)
                       {
                           flock(fd, LOCK_SH);   // block
@@ -346,7 +345,7 @@ jobs:
 
                   if (op == 1)
                   {
-                      int fd = get_lock_fd(uaddr);
+                      fd = get_lock_fd(uaddr);
                       if (fd >= 0)
                       {
                           flock(fd, LOCK_EX);
@@ -363,7 +362,7 @@ jobs:
               {
                   void *uaddr = (void *)a[0];
 
-                  int fd = get_lock_fd(uaddr);
+                  fd = get_lock_fd(uaddr);
                   if (fd >= 0)
                   {
                       flock(fd, LOCK_SH);
