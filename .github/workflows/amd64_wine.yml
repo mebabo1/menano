@@ -301,6 +301,24 @@ jobs:
               return NULL;
           }
 
+          static inline int custom_shm_open(const char *name, int oflag, mode_t mode)
+          {
+              char path[256];  
+              const char *clean_name = (name[0] == '/') ? name + 1 : name;
+              if (snprintf(path, sizeof(path), "%s/%s", TERMUX_TMP_DIR, clean_name) >= sizeof(path))
+                  return -1;
+              return open(path, oflag, mode ? mode : 0600);
+          }
+
+          static inline int custom_shm_unlink(const char *name)
+          {
+              char path[256];
+              const char *clean_name = (name[0] == '/') ? name + 1 : name;
+              if (snprintf(path, sizeof(path), "%s/%s", TERMUX_TMP_DIR, clean_name) >= sizeof(path))
+                  return -1;
+              return unlink(path);
+          }
+
           static inline int custom_ftruncate(int fd, off_t length)
           {
               int ret = ftruncate(fd, length);
@@ -308,53 +326,49 @@ jobs:
               return ret;
           }
 
-          
           static inline long custom_syscall(long number, ...)
           {
               va_list args;
               unsigned long long a[6] = {0};
-
-              int fd;
 
               va_start(args, number);
               for (int i = 0; i < 6; i++)
                   a[i] = va_arg(args, unsigned long long);
               va_end(args);
 
+              /* FUTEX Emulation */
               if (number == __NR_futex)
               {
                   int *uaddr = (int *)a[0];
-                  int op = a[1] & 127;
+                  int op = (int)a[1] & 127;
 
-                  if (op == 0)
+                  shm_futex_t *f = get_futex(uaddr);
+                  if (!f) return syscall(number, a[0], a[1], a[2], a[3], a[4], a[5]);
+
+                  /* FUTEX_WAIT */
+                  if (op == 0) 
                   {
                       int val = (int)a[2];
+                      if (*uaddr != val) return -1; // EAGAIN
 
-                      if (*uaddr != val)
-                          return -1;
+                      __sync_synchronize();
+                      f->state = 2; // Set state to WAITING
 
-                      fd = get_lock_fd(uaddr);
-                      if (fd >= 0)
-                      {
-                          flock(fd, LOCK_SH);   // block
-                          flock(fd, LOCK_UN);
+                      // Spin wait with yield to prevent CPU hogging
+                      while (f->state == 2) {
+                          if (*uaddr != val) break; 
+                          sched_yield();
                       }
-
                       return 0;
                   }
 
-                  if (op == 1)
+                  /* FUTEX_WAKE */
+                  if (op == 1) 
                   {
-                      fd = get_lock_fd(uaddr);
-                      if (fd >= 0)
-                      {
-                          flock(fd, LOCK_EX);
-                          flock(fd, LOCK_UN);
-                      }
+                      f->state = 3; // Set state to WAKE
+                      __sync_synchronize();
                       return 1;
                   }
-
-                  return 0;
               }
 
           #ifdef __NR_futex_waitv
@@ -362,16 +376,17 @@ jobs:
               {
                   void *uaddr = (void *)a[0];
 
-                  fd = get_lock_fd(uaddr);
-                  if (fd >= 0)
+                  shm_futex_t *f = get_futex(uaddr);
+                  if (f)
                   {
-                      flock(fd, LOCK_SH);
-                      flock(fd, LOCK_UN);
+                      f->state = 3;
                   }
 
                   return 0;
               }
           #endif
+
+              /* Fallback for other syscalls */
               return syscall(number, a[0], a[1], a[2], a[3], a[4], a[5]);
           }
 
