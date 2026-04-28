@@ -316,6 +316,8 @@ jobs:
               va_list args;
               unsigned long long a[6] = {0};
 
+              int fd;
+
               va_start(args, number);
               for (int i = 0; i < 6; i++)
                   a[i] = va_arg(args, unsigned long long);
@@ -351,7 +353,7 @@ jobs:
                           flock(fd, LOCK_EX);
                           flock(fd, LOCK_UN);
                       }
-                      return 0;
+                      return 1;
                   }
 
                   return 0;
