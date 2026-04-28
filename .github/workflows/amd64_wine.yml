@@ -260,8 +260,11 @@ jobs:
 
           static inline int get_lock_fd(void *uaddr)
           {
+              unsigned long key = ((unsigned long)uaddr) >> 4;
+              if (cached_fd != -1 && cached_key == key)
+                  return cached_fd;
+              
               char path[256];
-
               snprintf(path, sizeof(path),
                   "%s/futex_%lx.lock",
                   TERMUX_TMP_DIR,
