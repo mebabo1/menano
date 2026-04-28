@@ -456,6 +456,24 @@ jobs:
           find . -name "server.c" -exec sed -i 's|"/tmp"|"/data/data/com.termux/files/usr/tmp"|g' {} + 2>/dev/null || true
           sed -i 's|#include <sys/shm.h>|#include "shm.h"|g' dlls/winex11.drv/bitblt.c
 
+          FILE_VULKAN_H="include/wine/vulkan_driver.h"
+          if [ -f "$FILE_VULKAN_H" ] && ! grep -q "low_latency_enabled" "$FILE_VULKAN_H"; then
+            sed -i '/keyed_mutexes_enabled;/a \    BOOL low_latency_enabled;\n    BOOL use_standard_latency;' "$FILE_VULKAN_H"
+            sed -i '/PFN_vkQueuePresentKHR p_vkQueuePresentKHR;/a \    PFN_vkSetLatencySleepModeNV p_vkSetLatencySleepModeNV;\n    PFN_vkWaitForPresentKHR p_vkWaitForPresentKHR;' "$FILE_VULKAN_H"
+            echo "✔ vulkan_driver.h patched"
+          fi
+
+          FILE_VULKAN_C="dlls/win32u/vulkan.c"
+          if [ -f "$FILE_VULKAN_C" ] && ! grep -q "win32u_vkSetLatencySleepModeNV" "$FILE_VULKAN_C"; then
+            FUNC_DEF="static VkResult win32u_vkSetLatencySleepModeNV(VkDevice device, VkSwapchainKHR swapchain, const VkLatencySleepModeInfoNV *pSleepModeInfo) { VkLatencySleepModeInfoNV host; struct vulkan_device *vk_dev = vulkan_device_from_handle(device); struct swapchain *vk_sw = swapchain_from_handle(swapchain); vk_dev->low_latency_enabled = pSleepModeInfo->lowLatencyMode; vk_dev->use_standard_latency = pSleepModeInfo->lowLatencyMode; host.sType = VK_STRUCTURE_TYPE_LATENCY_SLEEP_MODE_INFO_NV; host.pNext = NULL; host.lowLatencyMode = pSleepModeInfo->lowLatencyMode; host.lowLatencyBoost = pSleepModeInfo->lowLatencyBoost; host.minimumIntervalUs = pSleepModeInfo->minimumIntervalUs; return vk_dev->p_vkSetLatencySleepModeNV(vk_dev->host.device, vk_sw->obj.host.swapchain, &host); }\\n\\nstatic void win32u_apply_standard_latency(struct vulkan_device *dev, VkSwapchainKHR sw, uint64_t id) { if (dev->p_vkWaitForPresentKHR) dev->p_vkWaitForPresentKHR(dev->host.device, sw, id, 1000000000); }\\n\\n#define win32u_vk_find_struct(s, t) win32u_vk_find_struct_((void *)s, VK_STRUCTURE_TYPE_##t)\\nstatic void *win32u_vk_find_struct_(void *s, VkStructureType t) { VkBaseOutStructure *h; for (h = s; h; h = h->pNext) { if (h->sType == t) return h; } return NULL; }\\n"
+            sed -i "/static VkResult win32u_vkCreateSwapchainKHR/i $FUNC_DEF" "$FILE_VULKAN_C"
+            sed -i '/VkPipelineStageFlags waitStage/a \        VkLatencySubmissionPresentIdNV latencySubmitInfo;\n        VkPresentIdKHR *present_id;' "$FILE_VULKAN_C"
+            QUEUE_LOGIC="        if ((present_id = win32u_vk_find_struct(&present_info_host, PRESENT_ID_KHR))) { if (queue->device->low_latency_enabled) { latencySubmitInfo.sType = VK_STRUCTURE_TYPE_LATENCY_SUBMISSION_PRESENT_ID_NV; latencySubmitInfo.pNext = NULL; latencySubmitInfo.presentID = *present_id->pPresentIds; submitInfo.pNext = &latencySubmitInfo; } if (queue->device->use_standard_latency) win32u_apply_standard_latency(queue->device, present_info->pSwapchains[0], *present_id->pPresentIds); }"
+            sed -i "/submitInfo.pSignalSemaphores = &blit_sema;/a $QUEUE_LOGIC" "$FILE_VULKAN_C"
+            sed -i '/.p_get_host_surface_extension = win32u_get_host_surface_extension,/a \    .p_vkSetLatencySleepModeNV = win32u_vkSetLatencySleepModeNV,' "$FILE_VULKAN_C"
+            echo "✔ vulkan.c latency logic patched"
+          fi
+
           TOTAL_TARGETS=" 
             dlls/ntdll/unix/fsync.c 
             dlls/ntdll/unix/esync.c 
