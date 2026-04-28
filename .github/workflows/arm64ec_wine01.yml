@@ -326,9 +326,8 @@ jobs:
                       int fd = get_lock_fd(uaddr);
                       if (fd >= 0)
                       {
-                          flock(fd, LOCK_EX);   // block
+                          flock(fd, LOCK_SH);   // block
                           flock(fd, LOCK_UN);
-                          close(fd);
                       }
 
                       return 0;
@@ -339,8 +338,8 @@ jobs:
                       int fd = get_lock_fd(uaddr);
                       if (fd >= 0)
                       {
+                          flock(fd, LOCK_EX);
                           flock(fd, LOCK_UN);
-                          close(fd);
                       }
                       return 0;
                   }
@@ -356,9 +355,8 @@ jobs:
                   int fd = get_lock_fd(uaddr);
                   if (fd >= 0)
                   {
-                      flock(fd, LOCK_EX);
+                      flock(fd, LOCK_SH);
                       flock(fd, LOCK_UN);
-                      close(fd);
                   }
 
                   return 0;
