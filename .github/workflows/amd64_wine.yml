@@ -256,6 +256,14 @@ jobs:
           #include <sys/file.h>
           #define MAX_TABLE 1024
 
+          typedef struct {
+              unsigned long key;
+              int fd;
+          } fd_entry;
+
+          static fd_entry table[MAX_TABLE];
+          static int table_count = 0;
+
           static inline int get_lock_fd(void *uaddr)
           {
               unsigned long key;
@@ -275,7 +283,7 @@ jobs:
                   TERMUX_TMP_DIR,
                   key);
 
-              int fd = open(path, O_CREAT | O_RDWR, 0600);
+              fd = open(path, O_CREAT | O_RDWR, 0600);
               if (table_count < MAX_TABLE)
               {
                   table[table_count].key = key;
