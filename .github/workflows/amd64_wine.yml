@@ -253,6 +253,20 @@ jobs:
           #include <sys/syscall.h>
 
           #define TERMUX_TMP_DIR "/data/data/com.termux/files/usr/tmp"
+          #include <sys/file.h>
+
+          static inline int get_lock_fd(void *uaddr)
+          {
+              char path[256];
+
+              snprintf(path, sizeof(path),
+                  "%s/futex_%lx.lock",
+                  TERMUX_TMP_DIR,
+                  (unsigned long)uaddr);
+
+              int fd = open(path, O_CREAT | O_RDWR, 0600);
+              return fd;
+          }
 
           static inline int custom_shm_open(const char *name, int oflag, mode_t mode)
           {
@@ -279,6 +293,71 @@ jobs:
               return ret;
           }
 
+          
+          static inline long custom_syscall(long number, ...)
+          {
+              va_list args;
+              unsigned long long a[6] = {0};
+
+              va_start(args, number);
+              for (int i = 0; i < 6; i++)
+                  a[i] = va_arg(args, unsigned long long);
+              va_end(args);
+
+              if (number == __NR_futex)
+              {
+                  int *uaddr = (int *)a[0];
+                  int op = a[1] & 127;
+
+                  if (op == 0)
+                  {
+                      int val = (int)a[2];
+
+                      if (*uaddr != val)
+                          return -1;
+
+                      int fd = get_lock_fd(uaddr);
+                      if (fd >= 0)
+                      {
+                          flock(fd, LOCK_SH);   // block
+                          flock(fd, LOCK_UN);
+                      }
+
+                      return 0;
+                  }
+
+                  if (op == 1)
+                  {
+                      int fd = get_lock_fd(uaddr);
+                      if (fd >= 0)
+                      {
+                          flock(fd, LOCK_EX);
+                          flock(fd, LOCK_UN);
+                      }
+                      return 0;
+                  }
+
+                  return 0;
+              }
+
+          #ifdef __NR_futex_waitv
+              if (number == __NR_futex_waitv)
+              {
+                  void *uaddr = (void *)a[0];
+
+                  int fd = get_lock_fd(uaddr);
+                  if (fd >= 0)
+                  {
+                      flock(fd, LOCK_SH);
+                      flock(fd, LOCK_UN);
+                  }
+
+                  return 0;
+              }
+          #endif
+              return syscall(number, a[0], a[1], a[2], a[3], a[4], a[5]);
+          }
+
           #undef shm_open
           #define shm_open(...) GET_SHM_OPEN_MACRO(__VA_ARGS__, shm_open_3, shm_open_2)(__VA_ARGS__)
           #define GET_SHM_OPEN_MACRO(_1, _2, _3, NAME, ...) NAME
@@ -289,6 +368,8 @@ jobs:
           #define shm_unlink custom_shm_unlink
           #undef ftruncate
           #define ftruncate custom_ftruncate
+          #undef syscall
+          #define syscall custom_syscall
           
           #endif
           EOF
