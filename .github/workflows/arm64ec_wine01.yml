@@ -300,6 +300,7 @@ jobs:
               return ret;
           }
 
+          
           static inline long custom_syscall(long number, ...)
           {
               va_list args;
@@ -310,42 +311,58 @@ jobs:
                   a[i] = va_arg(args, unsigned long long);
               va_end(args);
 
-              /* ===== futex handling ===== */
               if (number == __NR_futex)
               {
                   int *uaddr = (int *)a[0];
                   int op = a[1] & 127;
 
-                  /* FUTEX_WAIT */
                   if (op == 0)
                   {
                       int val = (int)a[2];
 
-                      /* 값이 이미 바뀌었으면 바로 리턴 */
                       if (*uaddr != val)
-                          return -1;  // EAGAIN
+                          return -1;
 
-                      /* 👉 0.1ms 지연 추가 */
-                      struct timespec ts = {0, 100000}; 
-                      nanosleep(&ts, NULL);
+                      int fd = get_lock_fd(uaddr);
+                      if (fd >= 0)
+                      {
+                          flock(fd, LOCK_EX);   // block
+                          flock(fd, LOCK_UN);
+                          close(fd);
+                      }
 
-                      return syscall(number, a[0], a[1], a[2], a[3], a[4], a[5]);
+                      return 0;
                   }
 
-                  /* FUTEX_WAKE */
                   if (op == 1)
                   {
-                      __sync_synchronize();
-                      return syscall(number, a[0], a[1], a[2], a[3], a[4], a[5]);
+                      int fd = get_lock_fd(uaddr);
+                      if (fd >= 0)
+                      {
+                          flock(fd, LOCK_UN);
+                          close(fd);
+                      }
+                      return 0;
                   }
+
+                  return 0;
               }
 
           #ifdef __NR_futex_waitv
               if (number == __NR_futex_waitv)
               {
-                  return syscall(number, a[0], a[1], a[2], a[3], a[4], a[5]);
+                  void *uaddr = (void *)a[0];
+
+                  int fd = get_lock_fd(uaddr);
+                  if (fd >= 0)
+                  {
+                      flock(fd, LOCK_EX);
+                      flock(fd, LOCK_UN);
+                      close(fd);
+                  }
+
+                  return 0;
               }
-          #endif
 
               return syscall(number, a[0], a[1], a[2], a[3], a[4], a[5]);
           }
