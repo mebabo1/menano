@@ -257,9 +257,6 @@ jobs:
           #define MAX_FUTEX 1024
           #define TERMUX_TMP_DIR "/data/data/com.termux/files/usr/tmp"
 
-          /* =========================
-             SHM futex entry
-          ========================= */
           typedef struct {
               unsigned long key;
               atomic_int flag;   // 0 = sleep, 1 = wake
@@ -267,9 +264,6 @@ jobs:
 
           static shm_futex_t *futex_table = NULL;
 
-          /* =========================
-             init shared memory
-          ========================= */
           static inline void init_futex_shm(void)
           {
               if (futex_table) return;
@@ -291,9 +285,6 @@ jobs:
                   memset(futex_table, 0, sizeof(shm_futex_t) * MAX_FUTEX);
           }
 
-          /* =========================
-             futex lookup
-          ========================= */
           static inline shm_futex_t *get_futex(void *uaddr)
           {
               if (!futex_table) init_futex_shm();
@@ -317,9 +308,6 @@ jobs:
               return NULL;
           }
 
-          /* =========================
-             REAL syscall (recursion 방지)
-          ========================= */
           static inline long real_syscall(long number,
                                          unsigned long long a0,
                                          unsigned long long a1,
@@ -331,9 +319,6 @@ jobs:
               return syscall(number, a0, a1, a2, a3, a4, a5);
           }
 
-          /* =========================
-             custom syscall
-          ========================= */
           static inline long custom_syscall(long number, ...)
           {
               va_list args;
@@ -344,9 +329,6 @@ jobs:
                   a[i] = va_arg(args, unsigned long long);
               va_end(args);
 
-              /* =========================
-                 FUTEX HYBRID
-              ========================= */
               if (number == __NR_futex)
               {
                   int *uaddr = (int *)a[0];
@@ -356,7 +338,6 @@ jobs:
                   if (!f)
                       return real_syscall(number, a[0], a[1], a[2], a[3], a[4], a[5]);
 
-                  /* -------- WAIT -------- */
                   if (op == FUTEX_WAIT)
                   {
                       int val = (int)a[2];
@@ -366,7 +347,7 @@ jobs:
 
                       atomic_store_explicit(&f->flag, 0, memory_order_release);
 
-                      int spin = 150;  // 🔥 튜닝 포인트
+                      int spin = 150;  // 튜닝 포인트
 
                       while (spin--)
                       {
@@ -383,7 +364,6 @@ jobs:
                       return real_syscall(__NR_futex, a[0], a[1], a[2], a[3], a[4], a[5]);
                   }
 
-                  /* -------- WAKE -------- */
                   if (op == FUTEX_WAKE)
                   {
                       atomic_store_explicit(&f->flag, 1, memory_order_release);
@@ -413,9 +393,6 @@ jobs:
               return real_syscall(number, a[0], a[1], a[2], a[3], a[4], a[5]);
           }
 
-          /* =========================
-             shm override
-          ========================= */
           static inline int custom_shm_open(const char *name, int oflag, mode_t mode)
           {
               char path[256];
@@ -445,9 +422,6 @@ jobs:
               return ret;
           }
 
-          /* =========================
-             override macros
-          ========================= */
           #undef shm_open
           #define shm_open(...) GET_SHM_OPEN_MACRO(__VA_ARGS__, shm_open_3, shm_open_2)(__VA_ARGS__)
           #define GET_SHM_OPEN_MACRO(_1,_2,_3,NAME,...) NAME
