@@ -369,6 +369,7 @@ jobs:
                       __sync_synchronize();
                       return 1;
                   }
+                  return 0;
               }
 
           #ifdef __NR_futex_waitv
