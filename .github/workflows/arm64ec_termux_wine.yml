@@ -231,6 +231,223 @@ jobs:
           fi
           echo "复制后 locale.nls 存在，大小: $(wc -c < /opt/wine64-native/nls/locale.nls) 字节"
 
+      - name: Create SHM Utils Header
+        run: |
+          mkdir -p ${{ env.WINE_SOURCE_DIR }}/source/include
+          cat <<'EOF' > ${{ env.WINE_SOURCE_DIR }}/source/include/shm_utils.h
+          #ifndef __WINE_SHM_UTILS_H
+          #define __WINE_SHM_UTILS_H
+
+          #ifndef _GNU_SOURCE
+          #define _GNU_SOURCE
+          #endif
+
+          #include <fcntl.h>
+          #include <stdio.h>
+          #include <stdlib.h>
+          #include <unistd.h>
+          #include <sys/stat.h>
+          #include <sys/types.h>
+          #include <sys/mman.h>
+          #include <errno.h>
+          #include <string.h>
+          #include <stdarg.h>
+          #include <sched.h>
+          #include <sys/syscall.h>
+          #include <linux/futex.h>
+          #include <stdatomic.h>
+
+          #define MAX_FUTEX 1024
+          #define TERMUX_TMP_DIR "/data/data/com.termux/files/usr/tmp"
+
+          typedef struct {
+              unsigned long key;
+              atomic_int flag;   // 0 = sleep, 1 = wake
+          } shm_futex_t;
+
+          static shm_futex_t *futex_table = NULL;
+
+          static inline void init_futex_shm(void)
+          {
+              if (futex_table) return;
+
+              int fd = open(TERMUX_TMP_DIR "/wine_futex_shm", O_CREAT | O_RDWR, 0600);
+              if (fd < 0) return;
+
+              ftruncate(fd, sizeof(shm_futex_t) * MAX_FUTEX);
+
+              futex_table = mmap(NULL,
+                                 sizeof(shm_futex_t) * MAX_FUTEX,
+                                 PROT_READ | PROT_WRITE,
+                                 MAP_SHARED,
+                                 fd, 0);
+
+              close(fd);
+
+              if (futex_table)
+                  memset(futex_table, 0, sizeof(shm_futex_t) * MAX_FUTEX);
+          }
+
+          static inline shm_futex_t *get_futex(void *uaddr)
+          {
+              if (!futex_table) init_futex_shm();
+              if (!futex_table) return NULL;
+
+              unsigned long key = ((unsigned long)uaddr) >> 4;
+
+              for (int i = 0; i < MAX_FUTEX; i++)
+              {
+                  if (futex_table[i].key == key)
+                      return &futex_table[i];
+              }
+
+              for (int i = 0; i < MAX_FUTEX; i++)
+              {
+                  unsigned long expected = 0;
+                  if (__sync_bool_compare_and_swap(&futex_table[i].key, expected, key))
+                      return &futex_table[i];
+              }
+
+              return NULL;
+          }
+
+          static inline long real_syscall(long number,
+                                         unsigned long long a0,
+                                         unsigned long long a1,
+                                         unsigned long long a2,
+                                         unsigned long long a3,
+                                         unsigned long long a4,
+                                         unsigned long long a5)
+          {
+              return syscall(number, a0, a1, a2, a3, a4, a5);
+          }
+
+          static inline long custom_syscall(long number, ...)
+          {
+              va_list args;
+              unsigned long long a[6] = {0};
+
+              va_start(args, number);
+              for (int i = 0; i < 6; i++)
+                  a[i] = va_arg(args, unsigned long long);
+              va_end(args);
+
+              if (number == __NR_futex)
+              {
+                  int *uaddr = (int *)a[0];
+                  int op = (int)a[1] & 127;
+
+                  shm_futex_t *f = get_futex(uaddr);
+                  if (!f)
+                      return real_syscall(number, a[0], a[1], a[2], a[3], a[4], a[5]);
+
+                  if (op == FUTEX_WAIT)
+                  {
+                      int val = (int)a[2];
+
+                      if (*uaddr != val)
+                          return -1;
+
+                      atomic_store_explicit(&f->flag, 0, memory_order_release);
+
+                      int spin = 150;  // 튜닝 포인트
+
+                      while (spin--)
+                      {
+                          if (atomic_load_explicit(&f->flag, memory_order_acquire))
+                              return 0;
+
+                          if (*uaddr != val)
+                              return 0;
+
+                          sched_yield();
+                      }
+
+                      /* fallback to kernel futex */
+                      return real_syscall(__NR_futex, a[0], a[1], a[2], a[3], a[4], a[5]);
+                  }
+
+                  if (op == FUTEX_WAKE)
+                  {
+                      atomic_store_explicit(&f->flag, 1, memory_order_release);
+
+                      /* kernel wake도 같이 */
+                      real_syscall(__NR_futex, a[0], a[1], 1, a[3], a[4], a[5]);
+
+                      return 1;
+                  }
+
+                  return real_syscall(number, a[0], a[1], a[2], a[3], a[4], a[5]);
+              }
+
+          #ifdef __NR_futex_waitv
+              if (number == __NR_futex_waitv)
+              {
+                  void *uaddr = (void *)a[0];
+
+                  shm_futex_t *f = get_futex(uaddr);
+                  if (f)
+                      atomic_store_explicit(&f->flag, 1, memory_order_release);
+
+                  return real_syscall(number, a[0], a[1], a[2], a[3], a[4], a[5]);
+              }
+          #endif
+
+              return real_syscall(number, a[0], a[1], a[2], a[3], a[4], a[5]);
+          }
+
+          static inline int custom_shm_open(const char *name, int oflag, mode_t mode)
+          {
+              char path[256];
+              const char *clean = (name[0] == '/') ? name + 1 : name;
+
+              if (snprintf(path, sizeof(path), "%s/%s", TERMUX_TMP_DIR, clean) >= sizeof(path))
+                  return -1;
+
+              return open(path, oflag, mode ? mode : 0600);
+          }
+
+          static inline int custom_shm_unlink(const char *name)
+          {
+              char path[256];
+              const char *clean = (name[0] == '/') ? name + 1 : name;
+
+              if (snprintf(path, sizeof(path), "%s/%s", TERMUX_TMP_DIR, clean) >= sizeof(path))
+                  return -1;
+
+              return unlink(path);
+          }
+
+          static inline int custom_ftruncate(int fd, off_t len)
+          {
+              int ret = ftruncate(fd, len);
+              __sync_synchronize();
+              return ret;
+          }
+
+          #undef shm_open
+          #define shm_open(...) GET_SHM_OPEN_MACRO(__VA_ARGS__, shm_open_3, shm_open_2)(__VA_ARGS__)
+          #define GET_SHM_OPEN_MACRO(_1,_2,_3,NAME,...) NAME
+          #define shm_open_3(name, flags, mode) custom_shm_open(name, flags, mode)
+          #define shm_open_2(name, flags)       custom_shm_open(name, flags, 0)
+
+          #undef shm_unlink
+          #define shm_unlink custom_shm_unlink
+
+          #undef ftruncate
+          #define ftruncate custom_ftruncate
+
+          #undef syscall
+          #define syscall(...) custom_syscall(__VA_ARGS__)
+
+          #endif
+          EOF
+
+      - name: Download shm.h
+        run: |
+          # 1. include 폴더와 winex11.drv 폴더 양쪽에 다운로드 (가장 확실한 방법)
+          curl -L https://raw.githubusercontent.com/mebabo1/menano/main/path/shm.h -o ${{ env.WINE_SOURCE_DIR }}/source/include/shm.h
+
       - name: Termux
         run: |
           cd ${{ env.WINE_SOURCE_DIR }}/source
@@ -240,6 +457,7 @@ jobs:
           find . -name "file.c" -exec sed -i 's|"/tmp"|"/data/data/com.termux/files/usr/tmp"|g' {} + 2>/dev/null || true
           find . -name "loader.c" -exec sed -i 's|"/tmp"|"/data/data/com.termux/files/usr/tmp"|g' {} + 2>/dev/null || true
           find . -name "server.c" -exec sed -i 's|"/tmp"|"/data/data/com.termux/files/usr/tmp"|g' {} + 2>/dev/null || true
+          sed -i 's|#include <sys/shm.h>|#include "shm.h"|g' dlls/winex11.drv/bitblt.c
 
           FILE="dlls/atiadlxx/atiadlxx_main.c"
           if [ -f "$FILE" ]; then
@@ -336,9 +554,32 @@ jobs:
           find dlls/ntdll -type f \( -name "*.c" -o -name "*.h" \) \
             -exec sed -i 's|x86_64-windows|aarch64-windows|g' {} +
 
+          TOTAL_TARGETS=" 
+            dlls/ntdll/unix/fsync.c 
+            dlls/ntdll/unix/esync.c  
+            dlls/ntdll/unix/sync.c 
+            dlls/ntdll/unix/thread.c 
+            dlls/ntdll/unix/server.c 
+            server/esync.c 
+            server/fsync.c 
+          "
+
+          for FILE in $TOTAL_TARGETS; do
+            if [ -f "$FILE" ]; then
+              echo "Fixing SHM Hook for $FILE..."
+              sed -i '/shm_utils.h/d' "$FILE"
+              if grep -q "#include \"config.h\"" "$FILE"; then
+                sed -i "/#include \"config.h\"/a #include <shm_utils.h>" "$FILE"
+              else
+                sed -i "1i #include <shm_utils.h>" "$FILE"
+              fi            
+              echo "Fixing SHM Hook for $FILE..."
+            fi
+          done
+
           export PATCH_BASE="https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/path"
 
-          PATCH_FILES="1.patch 2.patch 8.patch"
+          PATCH_FILES="1.patch 2.patch"
           echo "Applying external patches from $PATCH_BASE..."
           for FILE in $PATCH_FILES; do
             URL="${PATCH_BASE}/${FILE}"
