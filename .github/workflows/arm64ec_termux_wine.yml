@@ -483,10 +483,6 @@ jobs:
 
           FILE="dlls/ntdll/unix/virtual.c"
           if [ -f "$FILE" ]; then
-            if grep -q 'unsigned int vprot, sec_flags;' "$FILE"; then
-              echo "Fixing uninitialized vprot in virtual.c..."
-              sed -i 's/unsigned int vprot, sec_flags;/unsigned int vprot = 0, sec_flags = 0;/g' "$FILE"
-            fi
             if grep -q '0x7fffffff0000' "$FILE"; then
               echo "Patching address_space_limit in virtual.c..."
               sed -i 's/_limit.*0x7fffffff0000/_limit = (void *)0x7fffff0000/g' "$FILE"
