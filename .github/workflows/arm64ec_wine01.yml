@@ -456,6 +456,9 @@ jobs:
               }
           #endif
           
+              return syscall(number, a[0], a[1], a[2], a[3], a[4], a[5]);
+          }
+          
           static inline int custom_shm_open(const char *name, int oflag, mode_t mode)
           {
               char path[256];
