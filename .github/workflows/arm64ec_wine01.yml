@@ -385,49 +385,76 @@ jobs:
               }
 
           #ifdef __NR_futex_waitv
-              if (number == __NR_futex_waitv)
+          if (number == __NR_futex_waitv)
+          {
+              struct futex_waitv {
+                  uint64_t val;
+                  uint64_t uaddr;
+                  uint32_t flags;
+                  uint32_t __reserved;
+              };
+
+              struct futex_waitv *waiters = (struct futex_waitv *)a[0];
+              unsigned int nr = (unsigned int)a[1];
+              struct timespec *ts = (struct timespec *)a[3];
+
+              /* 1. EAGAIN check */
+              for (unsigned int i = 0; i < nr; i++)
               {
-                  struct futex_waitv {
-                      uint64_t val;
-                      uint64_t uaddr;
-                      uint32_t flags;
-                      uint32_t __reserved;
-                  };
+                  int *uaddr = (int *)(uintptr_t)waiters[i].uaddr;
+                  int val = (int)waiters[i].val;
 
-                  struct futex_waitv *waiters = (struct futex_waitv *)a[0];
-                  unsigned int nr = (unsigned int)a[1];
-
-                  int spin = 200;
-
-                  while (1)
+                  if (*uaddr != val)
                   {
-                      for (unsigned int i = 0; i < nr; i++)
-                      {
-                          int *uaddr = (int *)(uintptr_t)waiters[i].uaddr;
-                          int val = (int)waiters[i].val;
+                      errno = EAGAIN;
+                      return -1;
+                  }
+              }
 
-                          shm_futex_t *f = get_futex(uaddr);
-                          if (f && atomic_load_explicit(&f->flag, memory_order_acquire))
-                              return i;
+              long timeout_us = -1;
+              if (ts)
+                  timeout_us = ts->tv_sec * 1000000 + ts->tv_nsec / 1000;
 
-                          if (*uaddr != val)
-                              return i;
-                      }
+              long waited = 0;
+              int spin = 200;
 
-                      if (spin-- > 0)
+              while (1)
+              {
+                  for (unsigned int i = 0; i < nr; i++)
+                  {
+                      int *uaddr = (int *)(uintptr_t)waiters[i].uaddr;
+                      int val = (int)waiters[i].val;
+
+                      shm_futex_t *f = get_futex(uaddr);
+
+                      if (f && atomic_load_explicit(&f->flag, memory_order_acquire))
+                          return i;
+
+                      if (*uaddr != val)
+                          return i;
+                  }
+
+                  if (spin-- > 0)
+                  {
+                      sched_yield();
+                  }
+                  else
+                  {
+                      usleep(50);
+
+                      if (timeout_us >= 0)
                       {
-                          sched_yield();
-                      }
-                      else
-                      {
-                          usleep(50);
+                          waited += 50;
+                          if (waited >= timeout_us)
+                          {
+                              errno = ETIMEDOUT;
+                              return -1;
+                          }
                       }
                   }
               }
-          #endif
-
-              return real_syscall(number, a[0], a[1], a[2], a[3], a[4], a[5]);
           }
+          #endif
           
           static inline int custom_shm_open(const char *name, int oflag, mode_t mode)
           {
