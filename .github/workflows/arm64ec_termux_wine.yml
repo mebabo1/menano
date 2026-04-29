@@ -260,6 +260,11 @@ jobs:
           #define MAX_FUTEX 1024
           #define TERMUX_TMP_DIR "/data/data/com.termux/files/usr/tmp"
 
+          static inline int custom_shm_open(const char *name, int oflag, mode_t mode);
+          static inline int custom_shm_unlink(const char *name);
+          static inline int custom_ftruncate(int fd, off_t len);
+          static inline long custom_syscall(long number, ...);
+
           typedef struct {
               unsigned long key;
               atomic_int flag;   // 0 = sleep, 1 = wake
