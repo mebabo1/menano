@@ -432,7 +432,7 @@ jobs:
           #define shm_open_2(name, flags)       custom_shm_open(name, flags, 0)
 
           #undef shm_unlink
-          #define shm_unlink custom_shm_unlink
+          #define shm_unlink(...) custom_shm_unlink(__VA_ARGS__)
 
           #undef ftruncate
           #define ftruncate custom_ftruncate
