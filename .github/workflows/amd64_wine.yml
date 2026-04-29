@@ -474,13 +474,6 @@ jobs:
             echo "✔ vulkan.c latency logic patched"
           fi
 
-          FILE_STREAM="dlls/windowscodecs/stream.c"
-          if [ -f "$FILE_STREAM" ]; then
-              echo "Patching safe Commit logic in $FILE_STREAM..."
-              sed -i 's/return IStream_Commit(This->stream, grfCommitFlags);/if (This->stream) return IStream_Commit(This->stream, grfCommitFlags); return S_OK;/' "$FILE_STREAM"
-              echo "✔ Safe Commit fallback applied"
-          fi
-
           TOTAL_TARGETS=" 
             dlls/ntdll/unix/fsync.c 
             dlls/ntdll/unix/esync.c 
