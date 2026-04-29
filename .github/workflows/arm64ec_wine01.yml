@@ -540,7 +540,6 @@ jobs:
           TOTAL_TARGETS=" 
             dlls/ntdll/unix/fsync.c 
             dlls/ntdll/unix/esync.c  
-            dlls/ntdll/unix/virtual.c
             server/esync.c 
             server/fsync.c 
           "
