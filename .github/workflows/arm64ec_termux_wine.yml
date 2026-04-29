@@ -281,12 +281,6 @@ jobs:
 
           FILE_VIRTUAL="dlls/ntdll/unix/virtual.c"
           if [ -f "$FILE_VIRTUAL" ]; then
-            echo "Patching shm_open for Termux with safe delimiters..."
-            sed -i "s@fd = shm_open( buf, oflag, S_IRWXU | S_IRWXG | S_IRWXO );@char shm_p[256]; snprintf(shm_p, 256, \"/data/data/com.termux/files/usr/tmp/wine_shm_%s\", buf); fd = open(shm_p, oflag, S_IRWXU | S_IRWXG | S_IRWXO);@g" "$FILE_VIRTUAL"
-          fi
-
-          FILE_VIRTUAL="dlls/ntdll/unix/virtual.c"
-          if [ -f "$FILE_VIRTUAL" ]; then
             echo "Patching $FILE_VIRTUAL: Completely neutralizing userfaultfd..."
             sed -i 's/uffd_fd = syscall( __NR_userfaultfd/uffd_fd = -1; \/\/ syscall( __NR_userfaultfd/g' "$FILE_VIRTUAL"
             sed -i '/static void kernel_writewatch_init(void)/{n;s/^{/{\n    return;/}' "$FILE_VIRTUAL"
@@ -319,21 +313,6 @@ jobs:
               sed -i 's/xtajit64\.dll/libarm64ecfex.dll/g' "$INF"
               sed -i 's/xtajit\.dll/libwow64fex.dll/g' "$INF"    
               echo "✔ wine.inf integrated patch applied."
-          fi
-
-          # 8. Vulkan VRAM Faking 적용
-          FILE="dlls/winevulkan/vulkan.c"
-          if [ -f "$FILE" ] && ! grep -q 'WINE_VRAM_SIZE' "$FILE" ; then
-            echo "Applying VRAM faking to winevulkan..."
-            sed -i '/p_vkGetPhysicalDeviceMemoryProperties(host_physical_device, \&object->memory_properties);/a \
-              { \
-                  const char *v = getenv("WINE_VRAM_SIZE"); \
-                  uint64_t s = v ? (uint64_t)atoll(v)*1024*1024 : (uint64_t)2048*1024*1024; \
-                  uint32_t k; \
-                  for (k=0; k<object->memory_properties.memoryHeapCount; k++) \
-                      if (object->memory_properties.memoryHeaps[k].flags \& VK_MEMORY_HEAP_DEVICE_LOCAL_BIT) \
-                          object->memory_properties.memoryHeaps[k].size = s; \
-              }' "$FILE"
           fi
 
           FILE_PULSE_MK="dlls/winepulse.drv/Makefile.in"
