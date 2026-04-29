@@ -435,7 +435,7 @@ jobs:
           #define shm_unlink(...) custom_shm_unlink(__VA_ARGS__)
 
           #undef ftruncate
-          #define ftruncate custom_ftruncate
+          #define ftruncate(...) custom_ftruncate(__VA_ARGS__)
 
           #undef syscall
           #define syscall(...) custom_syscall(__VA_ARGS__)
