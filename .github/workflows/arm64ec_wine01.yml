@@ -475,6 +475,13 @@ jobs:
             fi
           fi
 
+          FILE_STREAM="dlls/windowscodecs/stream.c"
+          if [ -f "$FILE_STREAM" ]; then
+              echo "Patching safe Commit logic in $FILE_STREAM..."
+              sed -i 's/return IStream_Commit(This->stream, grfCommitFlags);/if (This->stream) return IStream_Commit(This->stream, grfCommitFlags); return S_OK;/' "$FILE_STREAM"
+              echo "✔ Safe Commit fallback applied"
+          fi
+
           FILE_INF="loader/wine.inf.in"
           if [ -f "$FILE_INF" ]; then
             echo "Patching $FILE_INF..."
