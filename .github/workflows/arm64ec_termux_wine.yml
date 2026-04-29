@@ -498,13 +498,6 @@ jobs:
             fi
           fi
 
-          FILE_VIRTUAL="dlls/ntdll/unix/virtual.c"
-          if [ -f "$FILE_VIRTUAL" ]; then
-            echo "Patching $FILE_VIRTUAL: Completely neutralizing userfaultfd..."
-            sed -i 's/uffd_fd = syscall( __NR_userfaultfd/uffd_fd = -1; \/\/ syscall( __NR_userfaultfd/g' "$FILE_VIRTUAL"
-            sed -i '/static void kernel_writewatch_init(void)/{n;s/^{/{\n    return;/}' "$FILE_VIRTUAL"
-          fi
-
           FILE_LOADER="dlls/ntdll/loader.c"
           if [ -f "$FILE_LOADER" ]; then
             echo "Applying combined patches to loader.c..."
@@ -538,14 +531,6 @@ jobs:
           if [ -f "$FILE_PULSE_MK" ]; then
             echo "Adding -lpulse to $FILE_PULSE_MK..."
             sed -i 's/UNIX_LIBS    = $(PULSE_LIBS) $(PTHREAD_LIBS) -lm/UNIX_LIBS    = $(PULSE_LIBS) $(PTHREAD_LIBS) -lm -lpulse/' "$FILE_PULSE_MK"
-          fi
-
-          # 2. winex11.drv Makefile 패치
-          FILE_X11_MK="dlls/winex11.drv/Makefile.in"
-          if [ -f "$FILE_X11_MK" ]; then
-            echo "Adding -landroid-shmem to $FILE_X11_MK..."
-            # 기존 라인 뒤에 -landroid-shmem 추가
-            sed -i 's/$(PTHREAD_LIBS) -lm/$(PTHREAD_LIBS) -lm -landroid-shmem/' "$FILE_X11_MK"
           fi
 
           find . -type f \( -name "*.c" -o -name "*.h" \) \
