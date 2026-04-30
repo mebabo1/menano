@@ -231,6 +231,40 @@ jobs:
           fi
           echo "复制后 locale.nls 存在，大小: $(wc -c < /opt/wine64-native/nls/locale.nls) 字节"
 
+      - name: Create SHM Header in Patch Path
+        run: |
+          cd ${{ env.WINE_SOURCE_DIR }}/source
+          mkdir -p android/shm_utils
+          cat <<EOF > android/shm_utils/shm_utils.h
+          #ifndef __WINE_SERVER_SHM_UTILS_H
+          #define __WINE_SERVER_SHM_UTILS_H
+          #ifdef __ANDROID__
+          #include <fcntl.h>
+          #include <stdio.h>
+          #include <stdlib.h>
+          #include <unistd.h>
+          #include <sys/stat.h>
+
+          static inline int shm_open(const char *name, int oflag, mode_t mode) {
+              char *tmpdir = getenv("TMPDIR") ? getenv("TMPDIR") : "/data/data/com.termux/files/usr/tmp";
+              char *fname;
+              if (asprintf(&fname, "%s/%s", tmpdir, name) == -1) return -1;
+              int fd = open(fname, oflag, mode);
+              free(fname);
+              return fd;
+          }
+
+          static inline int shm_unlink(const char *name) {
+              char *tmpdir = getenv("TMPDIR") ? getenv("TMPDIR") : "/data/data/com.termux/files/usr/tmp";
+              char *fname;
+              if (asprintf(&fname, "%s/%s", tmpdir, name) == -1) return -1;
+              int ret = unlink(fname);
+              free(fname);
+              return ret;
+          }
+          #endif
+          #endif
+          EOF
 
       - name: Termux
         run: |
