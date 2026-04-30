@@ -336,6 +336,10 @@ jobs:
                   a[i] = va_arg(args, unsigned long long);
               va_end(args);
 
+          #ifndef __NR_futex_waitv
+          #define __NR_futex_waitv 449
+          #endif
+
               if (number == __NR_futex)
               {
                   int *uaddr = (int *)a[0];
@@ -387,7 +391,6 @@ jobs:
                   return real_syscall(number, a[0], a[1], a[2], a[3], a[4], a[5]);
               }
 
-          #ifdef __NR_futex_waitv
               if (number == __NR_futex_waitv)
               {
                   struct futex_waitv {
@@ -401,7 +404,7 @@ jobs:
                   unsigned int nr = (unsigned int)a[1];
                   struct timespec *ts = (struct timespec *)a[3];
 
-                  if (!waiters || nr == 0)
+                  if (!waiters || nr == 0 || nr > 128 || (uintptr_t)waiters < 0x1000)
                   {
                       errno = EINVAL;
                       return -1;
@@ -462,7 +465,6 @@ jobs:
                       }
                   }
               }
-          #endif
           
               return real_syscall(number, a[0], a[1], a[2], a[3], a[4], a[5]);
           }
