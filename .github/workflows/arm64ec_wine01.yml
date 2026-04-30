@@ -640,19 +640,18 @@ jobs:
           BUILD_DIR="${{ env.WINE_SOURCE_DIR }}/source/build-arm64"
           SOURCE_DIR="${{ env.WINE64_DIR }}/source"
           NATIVE_NLS_DIR="/opt/wine64-native/nls"
-
+          
+          # Termux는 무조건 aarch64 환경임
           WINE_ARCH="aarch64"
 
           echo "=== 1. 구조 생성 및 모든 라이브러리 수집 ==="
-          mkdir -p "$TARGET_PREFIX/bin"
-          mkdir -p "$TARGET_PREFIX/lib/wine/$WINE_ARCH-unix"
           mkdir -p "$TARGET_PREFIX/share/wine/nls"
           mkdir -p "$TARGET_PREFIX/share/wine/fonts"
 
           # [중요] 삭제 전 모든 .so를 먼저 수집 (원본 확보)
-          find "$BUILD_DIR" -name "ntdll.so" -exec cp -vL {} "$TARGET_PREFIX/lib/wine/$WINE_ARCH-unix/" \;
-          find "$BUILD_DIR/dlls" -name "*.so" -exec cp -vL {} "$TARGET_PREFIX/lib/wine/$WINE_ARCH-unix/" \;
-          find "$BUILD_DIR/programs" -name "*.so" -exec cp -vL {} "$TARGET_PREFIX/lib/wine/$WINE_ARCH-unix/" \;
+          find "$BUILD_DIR" -name "ntdll.so" -exec cp -vL {} "$TARGET_PREFIX/arm64-v8a/lib/wine/$WINE_ARCH-unix/" \;
+          find "$BUILD_DIR/dlls" -name "*.so" -exec cp -vL {} "$TARGET_PREFIX/arm64-v8a/lib/wine/$WINE_ARCH-unix/" \;
+          find "$BUILD_DIR/programs" -name "*.so" -exec cp -vL {} "$TARGET_PREFIX/arm64-v8a/lib/wine/$WINE_ARCH-unix/" \;
 
           # 수집 완료 후 불필요한 폴더 제거 (이미 복사본이 있으므로 안전)
           if [ -d "$BUILD_DIR/dlls/ntdll/aarch64-windows" ]; then
@@ -668,13 +667,13 @@ jobs:
           PROGRAMS="wine wineserver wineboot winecfg regedit"
           for prog in $PROGRAMS; do
               found=$(find "$BUILD_DIR" -type f -name "$prog" -executable | head -1)
-              [ -n "$found" ] && cp -vL "$found" "$TARGET_PREFIX/bin/" || echo "⚠ $prog 찾지 못함"
+              [ -n "$found" ] && cp -vL "$found" "$TARGET_PREFIX/arm64-v8a/bin/" || echo "⚠ $prog 찾지 못함"
           done
 
           echo "=== 4. 심볼릭 링크 재생성 (절대 경로 에러 방어) ==="
           # ntdll.so 링크가 실제로 존재하는지 확인 후 생성
-          if [ -f "$TARGET_PREFIX/lib/wine/$WINE_ARCH-unix/ntdll.so" ]; then
-              cd "$TARGET_PREFIX/bin"
+          if [ -f "$TARGET_PREFIX/arm64-v8a/lib/wine/$WINE_ARCH-unix/ntdll.so" ]; then
+              cd "$TARGET_PREFIX/arm64-v8a/bin"
               # 상대 경로가 확실히 맞도록 해당 디렉토리로 이동 후 링크 생성
               ln -sf "../lib/wine/$WINE_ARCH-unix/ntdll.so" "ntdll.so"
               echo "✔ ntdll.so 심볼릭 링크 생성 완료"
@@ -686,9 +685,9 @@ jobs:
               cp -r wine wine64
           fi
           echo "=== 최종 검증 ==="
-          ls -l "$TARGET_PREFIX/bin/ntdll.so"
+          ls -l "$TARGET_PREFIX/arm64-v8a/bin/ntdll.so"
           # 링크가 가리키는 실제 파일의 존재 여부를 한 번 더 확인
-          ls -L "$TARGET_PREFIX/bin/ntdll.so" || { echo "❌ 링크가 깨졌습니다!"; exit 1; }
+          ls -L "$TARGET_PREFIX/arm64-v8a/bin/ntdll.so" || { echo "❌ 링크가 깨졌습니다!"; exit 1; }
 
       # ------------------------------------------------------------
       # 13. 验证安装目录内容（可选，便于调试）
