@@ -316,6 +316,36 @@ jobs:
             sed -i 's/UNIX_LIBS    = $(PULSE_LIBS) $(PTHREAD_LIBS) -lm/UNIX_LIBS    = $(PULSE_LIBS) $(PTHREAD_LIBS) -lm -lpulse/' "$FILE_PULSE_MK"
           fi
 
+          INF="loader/wine.inf.in"
+          if [ -f "$INF" ] && ! grep -q 'libarm64ecfex.dll' "$INF"; then
+              echo "Patching wine.inf for FEX libraries..."
+              sed -i 's/xtajit64\.dll/libarm64ecfex.dll/g' "$INF"
+              sed -i 's/xtajit\.dll/libwow64fex.dll/g' "$INF"    
+              echo "✔ wine.inf integrated patch applied."
+          fi
+
+          FILE_LOADER="dlls/ntdll/loader.c"
+          if [ -f "$FILE_LOADER" ]; then
+            echo "Applying combined patches to loader.c..."
+            if grep -q 'ULONG buffer\[16\];' "$FILE_LOADER"; then
+              echo "  - Increasing loader buffer size to 32"
+              sed -i 's/ULONG buffer\[16\];/ULONG buffer\[32\];/g' "$FILE_LOADER"
+            fi
+            if grep -q 'base = (char \*)nt->OptionalHeader.ImageBase;' "$FILE_LOADER"; then
+              echo "  - Patching ImageBase logic for WOW64 (with UINT_PTR cast)"
+              sed -i 's/base = (char \*)nt->OptionalHeader.ImageBase;/if (nt->OptionalHeader.Magic == IMAGE_NT_OPTIONAL_HDR64_MAGIC) base = (char *)((const IMAGE_NT_HEADERS64 *)nt)->OptionalHeader.ImageBase; else base = (char *)(UINT_PTR)((const IMAGE_NT_HEADERS32 *)nt)->OptionalHeader.ImageBase;/g' "$FILE_LOADER"
+            fi                      
+            echo "✔ All loader.c patches applied."
+          fi
+
+          find . -type f \( -name "*.c" -o -name "*.h" \) \
+            -exec sed -i 's/xtajit64\.dll/libarm64ecfex.dll/g' {} +
+          find . -type f \( -name "*.c" -o -name "*.h" \) \
+            -exec sed -i 's/xtajit\.dll/libwow64fex.dll/g' {} +
+          find dlls/ntdll -type f \( -name "*.c" -o -name "*.h" \) \
+            -exec sed -i 's|x86_64-windows|aarch64-windows|g' {} +
+
+
           export PATCH_BASE="https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/path"
 
           PATCH_FILES="1.patch 3.patch 4.patch 5.patch 6.patch 7.patch"
@@ -462,23 +492,23 @@ jobs:
               cp -v "$SOURCE_DIR/fonts"/*.ttf "$SOURCE_DIR/fonts"/*.fon "$TARGET_PREFIX/share/wine/fonts/" 2>/dev/null || true
           fi
           echo "=== 2. 유닉스 라이브러리(.so) 및 ntdll.so 강제 배치 ==="
-          find "$BUILD_DIR" -name "ntdll.so" -exec cp -vL {} "$TARGET_PREFIX/x86_64/lib/wine/$WINE_ARCH-unix/" \;
-          find "$BUILD_DIR/dlls" -name "*.so" -exec cp -vL {} "$TARGET_PREFIX/x86_64/lib/wine/$WINE_ARCH-unix/" \;
-          find "$BUILD_DIR/programs" -name "*.so" -exec cp -vL {} "$TARGET_PREFIX/x86_64/lib/wine/$WINE_ARCH-unix/" \;
+          find "$BUILD_DIR" -name "ntdll.so" -exec cp -vL {} "$TARGET_PREFIX/arm64-v8a/lib/wine/$WINE_ARCH-unix/" \;
+          find "$BUILD_DIR/dlls" -name "*.so" -exec cp -vL {} "$TARGET_PREFIX/arm64-v8a/lib/wine/$WINE_ARCH-unix/" \;
+          find "$BUILD_DIR/programs" -name "*.so" -exec cp -vL {} "$TARGET_PREFIX/arm64-v8a/lib/wine/$WINE_ARCH-unix/" \;
 
           echo "=== 3. 로더 및 실행 파일 복사 ==="
           PROGRAMS="wine wineserver wineboot winecfg regedit"
           for prog in $PROGRAMS; do
               found=$(find "$BUILD_DIR" -type f -name "$prog" -executable | head -1)
-              [ -n "$found" ] && cp -vL "$found" "$TARGET_PREFIX/x86_64/bin/" || echo "⚠ $prog 찾지 못함"
+              [ -n "$found" ] && cp -vL "$found" "$TARGET_PREFIX/arm64-v8a/bin/" || echo "⚠ $prog 찾지 못함"
           done
 
           echo "=== 4. 심볼릭 링크 재생성 (절대 경로 에러 방어) ==="
           # ntdll.so 링크가 실제로 존재하는지 확인 후 생성
-          if [ -f "$TARGET_PREFIX/x86_64/lib/wine/$WINE_ARCH-unix/ntdll.so" ]; then
-              cd "$TARGET_PREFIX/x86_64/bin"
+          if [ -f "$TARGET_PREFIX/arm64-v8a/lib/wine/$WINE_ARCH-unix/ntdll.so" ]; then
+              cd "$TARGET_PREFIX/arm64-v8a/bin"
               # 상대 경로가 확실히 맞도록 해당 디렉토리로 이동 후 링크 생성
-              ln -sf "../x86_64/lib/wine/$WINE_ARCH-unix/ntdll.so" "ntdll.so"
+              ln -sf "../arm64-v8a/lib/wine/$WINE_ARCH-unix/ntdll.so" "ntdll.so"
               echo "✔ ntdll.so 심볼릭 링크 생성 완료"
           else
               echo "❌ 치명적 오류: ntdll.so 원본 파일이 없습니다!"
@@ -489,8 +519,8 @@ jobs:
           fi
           echo "=== 5. 환경 변수 및 공백 에러 방지 처리 ==="
           echo "=== 최종 구조 검증 ==="
-          ls -l "$TARGET_PREFIX/x86_64/bin/wine"
-          ls -l "$TARGET_PREFIX/x86_64/lib/wine/$WINE_ARCH-unix/ntdll.so"
+          ls -l "$TARGET_PREFIX/arm64-v8a/bin/wine"
+          ls -l "$TARGET_PREFIX/arm64-v8a/lib/wine/$WINE_ARCH-unix/ntdll.so"
 
       # ------------------------------------------------------------
       # 13. 验证安装目录内容（可选，便于调试）
