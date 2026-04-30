@@ -88,7 +88,7 @@ jobs:
         mkdir build && cd build
         cmake .. \
             -DARM_DYNAREC=1 \
-            -DCMAKE_BUILD_TYPE=RelWithDebInfo \
+            -DCMAKE_BUILD_TYPE=Release \
             -DBAD_SIGNAL=ON \
             -DSD845=ON
         make -j4
