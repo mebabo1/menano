@@ -77,8 +77,8 @@ jobs:
         run: |
           mkdir -p $HOME/termuxfs/aarch64
           cd $HOME/termuxfs/aarch64
-          wget https://github.com/GameNative/termux-on-gha/releases/download/build-20260218/termuxfs-x86_64.tar
-          tar -xf termuxfs-x86_64.tar
+          wget https://github.com/GameNative/termux-on-gha/releases/download/build-20260218/termuxfs-aarch64.tar
+          tar -xf termuxfs-aarch64.tar
           ls -la $HOME/termuxfs/aarch64/
 
       - name: Cache Android NDK
@@ -356,7 +356,7 @@ jobs:
           export deps="$HOME/termuxfs/aarch64/data/data/com.termux/files/usr"
           export RUNTIME_PATH="/data/data/com.termux/files/usr"
           export TOOLCHAIN="$HOME/Android/Sdk/ndk/27.3.13750724/toolchains/llvm/prebuilt/linux-x86_64/bin"
-          export TARGET=x86_64-linux-android28
+          export TARGET=aarch64-linux-android28
           export CC=$TOOLCHAIN/$TARGET-clang
           # export AS=$CC
           export CXX=$TOOLCHAIN/$TARGET-clang++      
@@ -394,7 +394,7 @@ jobs:
             --host=$TARGET \
             --prefix=/tmp/wine-install-wow64 \
             --with-mingw=clang \
-            --enable-archs=x86_64,i386 \
+            --enable-archs=arm64ec,aarch64,i386 \
             --with-wine-tools=/opt/wine64-native \
             --enable-wineandroid_drv=no \
             --enable-win64 \
