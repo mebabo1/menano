@@ -511,7 +511,7 @@ jobs:
           #define ftruncate custom_ftruncate
 
           #undef syscall
-          #define syscall(...) custom_syscall(__VA_ARGS__)
+          #define syscall custom_syscall
 
           #endif
           EOF
