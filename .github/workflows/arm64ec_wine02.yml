@@ -78,7 +78,7 @@ jobs:
           mkdir -p $HOME/termuxfs/aarch64
           cd $HOME/termuxfs/aarch64
           wget https://github.com/GameNative/termux-on-gha/releases/download/build-20260218/termuxfs-x86_64.tar
-          tar -xf termuxfs.tar
+          tar -xf termuxfs-x86_64.tar
           ls -la $HOME/termuxfs/aarch64/
 
       - name: Cache Android NDK
