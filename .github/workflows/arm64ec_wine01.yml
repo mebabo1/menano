@@ -350,9 +350,12 @@ jobs:
                       int val = (int)a[2];
 
                       if (*uaddr != val)
+                      {
+                          errno = EAGAIN;
                           return -1;
+                      }
 
-                      atomic_store_explicit(&f->flag, 0, memory_order_release);
+                      atomic_exchange_explicit(&f->flag, 0, memory_order_acq_rel);
 
                       int spin = 150;  // 튜닝 포인트
 
