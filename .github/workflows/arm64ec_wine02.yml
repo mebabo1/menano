@@ -287,6 +287,17 @@ jobs:
             fi
           fi
 
+          FILE3="dlls/wdscore/wdscore.spec"
+          if [ -f "$FILE3" ]; then
+            if grep -q '@ stub' "$FILE3"; then
+              echo "Cleaning wdscore.spec stubs..."
+              sed -i '/CDynamicArray/d' "$FILE3"
+              echo "✔ wdscore stubs cleaned"
+            else
+              echo "✔ wdscore already cleaned or not found"
+            fi
+          fi
+
           FILE="dlls/ntdll/unix/virtual.c"
           if [ -f "$FILE" ]; then
             if grep -q 'unsigned int vprot, sec_flags;' "$FILE"; then
@@ -348,7 +359,7 @@ jobs:
 
           export PATCH_BASE="https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/path"
 
-          PATCH_FILES="1.patch 3.patch 4.patch 5.patch 6.patch 7.patch"
+          PATCH_FILES="1.patch 2.patch 3.patch 4.patch 5.patch 6.patch 7.patch"
           echo "Applying external patches from $PATCH_BASE..."
           for FILE in $PATCH_FILES; do
             URL="${PATCH_BASE}/${FILE}"
