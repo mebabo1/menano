@@ -421,7 +421,6 @@ jobs:
           export CPPFLAGS="-I$deps/include --sysroot=$TOOLCHAIN/../sysroot"
           
           export LDFLAGS="-L$deps/lib -Wl,-rpath=$RUNTIME_PATH/lib"
-          export LOCPATH="$RUNTIME_PATH/glibc/lib/locale"
 
           export CFLAGS="-O2 -pipe -mtune=generic -Wno-declaration-after-statement -Wno-implicit-function-declaration -Wno-int-conversion"
           export CXXFLAGS="-O2 -pipe"
