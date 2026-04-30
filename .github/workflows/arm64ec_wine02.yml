@@ -375,6 +375,7 @@ jobs:
             --disable-amd_ags_x64 \
             --without-osmesa \
             --disable-opencl \
+            --without-unwind \
             --without-capi \
             --without-coreaudio \
             --without-cups \
