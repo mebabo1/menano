@@ -398,7 +398,12 @@ jobs:
                   unsigned int nr = (unsigned int)a[1];
                   struct timespec *ts = (struct timespec *)a[3];
 
-                  /* 1. EAGAIN check */
+                  if (!waiters || nr == 0)
+                  {
+                      errno = EINVAL;
+                      return -1;
+                  }
+                  
                   for (unsigned int i = 0; i < nr; i++)
                   {
                       int *uaddr = (int *)(uintptr_t)waiters[i].uaddr;
