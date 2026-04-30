@@ -452,8 +452,6 @@ jobs:
               WINE_ARCH="aarch64"
           fi
           echo "=== 1. 표준 디렉토리 구조 생성 ($WINE_ARCH-unix) ==="
-          mkdir -p "$TARGET_PREFIX/bin"
-          mkdir -p "$TARGET_PREFIX/lib/wine/$WINE_ARCH-unix"
           mkdir -p "$TARGET_PREFIX/share/wine/nls"
           mkdir -p "$TARGET_PREFIX/share/wine/fonts"
           # NATIVE NLS 복사
@@ -464,23 +462,23 @@ jobs:
               cp -v "$SOURCE_DIR/fonts"/*.ttf "$SOURCE_DIR/fonts"/*.fon "$TARGET_PREFIX/share/wine/fonts/" 2>/dev/null || true
           fi
           echo "=== 2. 유닉스 라이브러리(.so) 및 ntdll.so 강제 배치 ==="
-          find "$BUILD_DIR" -name "ntdll.so" -exec cp -vL {} "$TARGET_PREFIX/lib/wine/$WINE_ARCH-unix/" \;
-          find "$BUILD_DIR/dlls" -name "*.so" -exec cp -vL {} "$TARGET_PREFIX/lib/wine/$WINE_ARCH-unix/" \;
-          find "$BUILD_DIR/programs" -name "*.so" -exec cp -vL {} "$TARGET_PREFIX/lib/wine/$WINE_ARCH-unix/" \;
+          find "$BUILD_DIR" -name "ntdll.so" -exec cp -vL {} "$TARGET_PREFIX/x86_64/lib/wine/$WINE_ARCH-unix/" \;
+          find "$BUILD_DIR/dlls" -name "*.so" -exec cp -vL {} "$TARGET_PREFIX/x86_64/lib/wine/$WINE_ARCH-unix/" \;
+          find "$BUILD_DIR/programs" -name "*.so" -exec cp -vL {} "$TARGET_PREFIX/x86_64/lib/wine/$WINE_ARCH-unix/" \;
 
           echo "=== 3. 로더 및 실행 파일 복사 ==="
           PROGRAMS="wine wineserver wineboot winecfg regedit"
           for prog in $PROGRAMS; do
               found=$(find "$BUILD_DIR" -type f -name "$prog" -executable | head -1)
-              [ -n "$found" ] && cp -vL "$found" "$TARGET_PREFIX/bin/" || echo "⚠ $prog 찾지 못함"
+              [ -n "$found" ] && cp -vL "$found" "$TARGET_PREFIX/x86_64/bin/" || echo "⚠ $prog 찾지 못함"
           done
 
           echo "=== 4. 심볼릭 링크 재생성 (절대 경로 에러 방어) ==="
           # ntdll.so 링크가 실제로 존재하는지 확인 후 생성
-          if [ -f "$TARGET_PREFIX/lib/wine/$WINE_ARCH-unix/ntdll.so" ]; then
-              cd "$TARGET_PREFIX/bin"
+          if [ -f "$TARGET_PREFIX/x86_64/lib/wine/$WINE_ARCH-unix/ntdll.so" ]; then
+              cd "$TARGET_PREFIX/x86_64/bin"
               # 상대 경로가 확실히 맞도록 해당 디렉토리로 이동 후 링크 생성
-              ln -sf "../lib/wine/$WINE_ARCH-unix/ntdll.so" "ntdll.so"
+              ln -sf "../x86_64/lib/wine/$WINE_ARCH-unix/ntdll.so" "ntdll.so"
               echo "✔ ntdll.so 심볼릭 링크 생성 완료"
           else
               echo "❌ 치명적 오류: ntdll.so 원본 파일이 없습니다!"
@@ -491,8 +489,8 @@ jobs:
           fi
           echo "=== 5. 환경 변수 및 공백 에러 방지 처리 ==="
           echo "=== 최종 구조 검증 ==="
-          ls -l "$TARGET_PREFIX/bin/wine"
-          ls -l "$TARGET_PREFIX/lib/wine/$WINE_ARCH-unix/ntdll.so"
+          ls -l "$TARGET_PREFIX/x86_64/bin/wine"
+          ls -l "$TARGET_PREFIX/x86_64/lib/wine/$WINE_ARCH-unix/ntdll.so"
 
       # ------------------------------------------------------------
       # 13. 验证安装目录内容（可选，便于调试）
