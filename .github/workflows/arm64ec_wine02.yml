@@ -328,11 +328,11 @@ jobs:
             sed -i 's/^[[:space:]]*mallopt( M_PERTURB,/\/\/ mallopt( M_PERTURB,/g' "$FILE_LOADER"
           fi
 
-          FILE_VIRTUAL="dlls/ntdll/unix/virtual.c"
-          if [ -f "$FILE_VIRTUAL" ]; then
-            echo "Patching shm_open for Termux with safe delimiters..."
-            sed -i "s@fd = shm_open( buf, oflag, S_IRWXU | S_IRWXG | S_IRWXO );@char shm_p[256]; snprintf(shm_p, 256, \"/data/data/com.termux/files/usr/tmp/wine_shm_%s\", buf); fd = open(shm_p, oflag, S_IRWXU | S_IRWXG | S_IRWXO);@g" "$FILE_VIRTUAL"
-          fi
+          # FILE_VIRTUAL="dlls/ntdll/unix/virtual.c"
+          # if [ -f "$FILE_VIRTUAL" ]; then
+          #  echo "Patching shm_open for Termux with safe delimiters..."
+          #  sed -i "s@fd = shm_open( buf, oflag, S_IRWXU | S_IRWXG | S_IRWXO );@char shm_p[256]; snprintf(shm_p, 256, \"/data/data/com.termux/files/usr/tmp/wine_shm_%s\", buf); fd = open(shm_p, oflag, S_IRWXU | S_IRWXG | S_IRWXO);@g" "$FILE_VIRTUAL"
+          # fi
 
 
           FILE_PULSE_MK="dlls/winepulse.drv/Makefile.in"
