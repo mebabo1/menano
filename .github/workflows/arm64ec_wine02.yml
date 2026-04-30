@@ -451,7 +451,7 @@ jobs:
             --with-vulkan \
             --with-gstreamer \
             --enable-nls \
-            --without-pulse \
+            --with-pulse \
             --without-ffmpeg \
             --disable-winemenubuilder \
             --disable-amd_ags_x64 \
