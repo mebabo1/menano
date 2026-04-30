@@ -13,7 +13,7 @@ on:
         options:
         - proton
         - staging
-        - winearm64ec
+        - protonec
       wine_version:
         description: 'Wine 版本 (例如 9.22，或 latest)'
         required: false
@@ -125,10 +125,10 @@ jobs:
           cd ${{ env.WINE_SOURCE_DIR }}
 
           case "$WINE_BRANCH" in
-            winearm64ec)
+            protonec)
               echo "Processing protonarm64ec branch"
 
-              git clone -b "proton_11.0" https://github.com/ValveSoftware/wine.git source
+              git clone -b "experimental_10.0" https://github.com/ValveSoftware/wine.git source
               cd source
               git config advice.detachedHead false
               if [ "$WINE_VERSION" != "latest" ]; then
