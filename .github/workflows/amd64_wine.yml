@@ -83,7 +83,7 @@ jobs:
             libcups2-dev \
             libjpeg-dev \
             libpng-dev \
-            libtiff-dev \
+            libtiff-dev libunwind-dev libopenal-dev libmpg123-dev \
             libxml2-dev \
             gettext curl \
             libvulkan-dev \
