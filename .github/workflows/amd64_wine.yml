@@ -179,11 +179,13 @@ jobs:
           cd ${{ env.WINE64_DIR }}
           mkdir -p amd64
           cd amd64
+          export PATH="/opt/${{ env.LLVMMINGW_NAME }}/bin:$PATH"
+          
           ../source/configure \
             --enable-win64 \
             --disable-tests \
             --without-x \
-            --without-gstreamer \
+            --without-vulkan \
             --without-wayland
           make __tooldeps__ -j$(nproc) > /dev/null
           echo "构建 NLS 目录..."
