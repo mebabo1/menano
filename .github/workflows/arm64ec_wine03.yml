@@ -332,6 +332,9 @@ jobs:
           find dlls/ntdll -type f \( -name "*.c" -o -name "*.h" \) \
             -exec sed -i 's|x86_64-windows|aarch64-windows|g' {} +
 
+          if [ ! -f "configure" ]; then
+            ./autogen.sh
+          fi
 
       - name: ARM64 WOW64
         run: |
