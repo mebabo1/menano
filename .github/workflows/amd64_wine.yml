@@ -177,6 +177,8 @@ jobs:
       - name: native wine64 NLS
         run: |
           cd ${{ env.WINE64_DIR }}
+          sed -i '/wineandroid\.drv/d' source/dlls/Makefile.in
+          sed -i '/wineandroid\.drv/d' source/configure.ac 2>/dev/null
           mkdir -p amd64
           cd amd64
           export PATH="/opt/${{ env.LLVMMINGW_NAME }}/bin:$PATH"
