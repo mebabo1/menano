@@ -231,6 +231,13 @@ jobs:
           fi
           echo "复制后 locale.nls 存在，大小: $(wc -c < /opt/wine64-native/nls/locale.nls) 字节"
 
+      - name: vkd3d
+        run: |
+          cd ${{ env.WINE_SOURCE_DIR }}/source
+          wget https://github.com/mebabo1/menano/releases/download/Box/vkd3d.tar.gz
+          rm -rf libs/vkd3d
+          tar xf vkd3d.tar.gz
+          rm -rf vkd3d.tar.gz
 
       - name: Termux
         run: |
