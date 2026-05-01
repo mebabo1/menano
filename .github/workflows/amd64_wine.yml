@@ -170,9 +170,9 @@ jobs:
           mkdir -p ${{ env.WINE64_DIR }}
           cp -r ${{ env.WINE_SOURCE_DIR }}/source ${{ env.WINE64_DIR }}/source
           cd ${{ env.WINE64_DIR }}/source
-          grep -rl 'wineandroid\.drv' dlls tools configure* | xargs sed -i '/wineandroid\.drv/d'
-          sed -i '/TAGS/d' configure
-          sed -i '/etags/d' configure
+          rm -rf dlls/wineandroid.drv
+          sed -i '/wineandroid\.drv/d' configure.ac
+          
           if [ ! -f "configure" ]; then
             ./autogen.sh
           fi
