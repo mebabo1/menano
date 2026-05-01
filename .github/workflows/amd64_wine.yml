@@ -170,6 +170,9 @@ jobs:
           mkdir -p ${{ env.WINE64_DIR }}
           cp -r ${{ env.WINE_SOURCE_DIR }}/source ${{ env.WINE64_DIR }}/source
           cd ${{ env.WINE64_DIR }}/source
+          sed -i '/wineandroid\.drv/d' dlls/Makefile.in
+          sed -i '/wineandroid\.drv/d' configure.ac 2>/dev/null
+
           if [ ! -f "configure" ]; then
             ./autogen.sh
           fi
@@ -177,8 +180,6 @@ jobs:
       - name: native wine64 NLS
         run: |
           cd ${{ env.WINE64_DIR }}
-          sed -i '/wineandroid\.drv/d' source/dlls/Makefile.in
-          sed -i '/wineandroid\.drv/d' source/configure.ac 2>/dev/null
           mkdir -p amd64
           cd amd64
           export PATH="/opt/${{ env.LLVMMINGW_NAME }}/bin:$PATH"
