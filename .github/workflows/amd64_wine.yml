@@ -124,7 +124,7 @@ jobs:
             protonex)
               echo "Processing protonarm64ec branch"
 
-              git clone -b "proton-9.0-x86_64" https://github.com/StevenMXZ/wine.git source
+              git clone -b "proton-9.0-x86_64-ci-test" https://github.com/StevenMXZ/wine.git source
               cd source
               git config advice.detachedHead false
               if [ "$WINE_VERSION" != "latest" ]; then
