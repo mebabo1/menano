@@ -177,13 +177,13 @@ jobs:
       - name: native wine64 NLS
         run: |
           cd ${{ env.WINE64_DIR }}
-          touch source/dlls/wineandroid.drv/build.gradle.in
           mkdir -p amd64
           cd amd64
           export PATH="/opt/${{ env.LLVMMINGW_NAME }}/bin:$PATH"
           
           ../source/configure \
             --enable-win64 \
+            --disable-android \
             --disable-tests \
             --without-x \
             --without-vulkan \
