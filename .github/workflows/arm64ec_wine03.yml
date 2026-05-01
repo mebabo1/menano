@@ -231,40 +231,6 @@ jobs:
           fi
           echo "复制后 locale.nls 存在，大小: $(wc -c < /opt/wine64-native/nls/locale.nls) 字节"
 
-      - name: Create SHM Header in Patch Path
-        run: |
-          cd ${{ env.WINE_SOURCE_DIR }}/source
-          mkdir -p android/shm_utils
-          cat <<EOF > android/shm_utils/shm_utils.h
-          #ifndef __WINE_SERVER_SHM_UTILS_H
-          #define __WINE_SERVER_SHM_UTILS_H
-          #ifdef __ANDROID__
-          #include <fcntl.h>
-          #include <stdio.h>
-          #include <stdlib.h>
-          #include <unistd.h>
-          #include <sys/stat.h>
-
-          static inline int shm_open(const char *name, int oflag, mode_t mode) {
-              char *tmpdir = getenv("TMPDIR") ? getenv("TMPDIR") : "/data/data/com.termux/files/usr/tmp";
-              char *fname;
-              if (asprintf(&fname, "%s/%s", tmpdir, name) == -1) return -1;
-              int fd = open(fname, oflag, mode);
-              free(fname);
-              return fd;
-          }
-
-          static inline int shm_unlink(const char *name) {
-              char *tmpdir = getenv("TMPDIR") ? getenv("TMPDIR") : "/data/data/com.termux/files/usr/tmp";
-              char *fname;
-              if (asprintf(&fname, "%s/%s", tmpdir, name) == -1) return -1;
-              int ret = unlink(fname);
-              free(fname);
-              return ret;
-          }
-          #endif
-          #endif
-          EOF
 
       - name: Termux
         run: |
@@ -275,17 +241,6 @@ jobs:
           find . -name "file.c" -exec sed -i 's|"/tmp"|"/data/data/com.termux/files/usr/tmp"|g' {} + 2>/dev/null || true
           find . -name "loader.c" -exec sed -i 's|"/tmp"|"/data/data/com.termux/files/usr/tmp"|g' {} + 2>/dev/null || true
           find . -name "server.c" -exec sed -i 's|"/tmp"|"/data/data/com.termux/files/usr/tmp"|g' {} + 2>/dev/null || true
-
-          FILE="dlls/atiadlxx/atiadlxx_main.c"
-          if [ -f "$FILE" ]; then
-            if grep -q 'InterlockedOr(&dummy, 0)' "$FILE"; then
-              sed -i 's/LONG dummy/long dummy/g' "$FILE"
-              sed -i 's|InterlockedOr(&dummy, 0)|_InterlockedOr((long volatile *)\&dummy, 0)|g' "$FILE"
-              echo "✔ InterlockedOr patched with explicit casting"
-            else
-              echo "✔ InterlockedOr already patched or not found"
-            fi
-          fi
 
           FILE3="dlls/wdscore/wdscore.spec"
           if [ -f "$FILE3" ]; then
@@ -328,13 +283,6 @@ jobs:
             sed -i 's/^[[:space:]]*mallopt( M_PERTURB,/\/\/ mallopt( M_PERTURB,/g' "$FILE_LOADER"
           fi
 
-          FILE_VIRTUAL="dlls/ntdll/unix/virtual.c"
-          if [ -f "$FILE_VIRTUAL" ]; then
-            echo "Patching shm_open for Termux with safe delimiters..."
-            sed -i "s@fd = shm_open( buf, oflag, S_IRWXU | S_IRWXG | S_IRWXO );@char shm_p[256]; snprintf(shm_p, 256, \"/data/data/com.termux/files/usr/tmp/wine_shm_%s\", buf); fd = open(shm_p, oflag, S_IRWXU | S_IRWXG | S_IRWXO);@g" "$FILE_VIRTUAL"
-          fi
-
-
           FILE_PULSE_MK="dlls/winepulse.drv/Makefile.in"
           if [ -f "$FILE_PULSE_MK" ]; then
             echo "Adding -lpulse to $FILE_PULSE_MK..."
@@ -370,36 +318,6 @@ jobs:
           find dlls/ntdll -type f \( -name "*.c" -o -name "*.h" \) \
             -exec sed -i 's|x86_64-windows|aarch64-windows|g' {} +
 
-
-          export PATCH_BASE="https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/path"
-
-          PATCH_FILES="1.patch 2.patch 3.patch 4.patch 5.patch 6.patch 7.patch 8.patch"
-          echo "Applying external patches from $PATCH_BASE..."
-          for FILE in $PATCH_FILES; do
-            URL="${PATCH_BASE}/${FILE}"
-            PATCH_FILE="$FILE"           
-            echo "--------------------------------------------"
-            echo "Downloading $PATCH_FILE..."
-            wget -q -O "$PATCH_FILE" "$URL"
-            
-            if git apply --check "$PATCH_FILE" > /dev/null 2>&1; then
-                echo "✔ $PATCH_FILE can be applied cleanly"
-                git apply --whitespace=fix "$PATCH_FILE"
-            elif git apply --3way --check "$PATCH_FILE" > /dev/null 2>&1; then
-                echo "⚠ Applying $PATCH_FILE with 3-way merge"
-                git apply --3way --whitespace=fix "$PATCH_FILE"
-            else
-                echo "❌ $PATCH_FILE failed, generating rejects"
-                git apply --reject --whitespace=fix "$PATCH_FILE" || true
-                find . -name "*.rej"
-            fi
-          done
-          echo "--------------------------------------------"
-          echo "✔ All patch processes completed"
-
-          if [ ! -f "configure" ]; then
-            ./autogen.sh
-          fi
 
       - name: ARM64 WOW64
         run: |
