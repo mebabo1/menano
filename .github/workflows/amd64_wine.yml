@@ -170,8 +170,7 @@ jobs:
           mkdir -p ${{ env.WINE64_DIR }}
           cp -r ${{ env.WINE_SOURCE_DIR }}/source ${{ env.WINE64_DIR }}/source
           cd ${{ env.WINE64_DIR }}/source
-          rm -rf dlls/wineandroid.drv
-          sed -i '/wineandroid\.drv/d' configure.ac
+          touch dlls/wineandroid.drv/build.gradle.in
           
           if [ ! -f "configure" ]; then
             ./autogen.sh
