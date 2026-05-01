@@ -186,7 +186,7 @@ jobs:
             --disable-tests \
             --without-x \
             --without-vulkan \
-            --disable-android
+            --disable-android \
             --without-wayland
           make __tooldeps__ -j$(nproc) > /dev/null
           echo "构建 NLS 目录..."
