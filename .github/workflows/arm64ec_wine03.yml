@@ -238,6 +238,9 @@ jobs:
           rm -rf libs/vkd3d
           tar xf vkd3d.tar.gz
           rm -rf vkd3d.tar.gz
+          if [ ! -f "configure" ]; then
+            ./autogen.sh
+          fi
 
       - name: Termux
         run: |
