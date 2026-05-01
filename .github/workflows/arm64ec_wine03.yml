@@ -236,6 +236,7 @@ jobs:
         run: |
           cd ${{ env.WINE_SOURCE_DIR }}/source
           wget https://github.com/mebabo1/menano/releases/download/Box/vkd3d.tar.gz
+          rm -rf libs/vkd3d
           tar xf vkd3d.tar.gz
           rm -rf vkd3d.tar.gz
           
