@@ -243,11 +243,13 @@ jobs:
           grep -rlZ '__ANDROID__' . \
             --exclude='*esync*' \
             --exclude='*fsync*' \
+            --exclude='*virtual*' \
             | xargs -0 sed -i 's/#ifdef __ANDROID__/#if defined(__ANDROID__) || defined(__aarch64__)/g'
 
           grep -rlZ '__ANDROID__' . \
             --exclude='*esync*' \
             --exclude='*fsync*' \
+            --exclude='*virtual*' \
           | xargs -0 sed -i 's/#elif __ANDROID__/#elif defined(__ANDROID__) || defined(__aarch64__)/g'
 
           find . -type f \( -name "*.c" -o -name "*.h" -o -name "*.in" -o -name "*.spec" \) -exec grep -l "/tmp" {} \; 2>/dev/null | xargs sed -i 's|/tmp/|/data/data/com.termux/files/usr/tmp/|g' 2>/dev/null || true
