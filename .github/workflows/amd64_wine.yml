@@ -124,7 +124,7 @@ jobs:
             protonex)
               echo "Processing protonarm64ec branch"
 
-              git clone -b "proton-9.0-x86_64-ci-test" https://github.com/StevenMXZ/wine.git source
+              git clone -b "experimental_10.0" https://github.com/ValveSoftware/wine.git source
               cd source
               git config advice.detachedHead false
               if [ "$WINE_VERSION" != "latest" ]; then
@@ -183,6 +183,7 @@ jobs:
           export PATH="/opt/${{ env.LLVMMINGW_NAME }}/bin:$PATH"
           
           ../source/configure \
+            --disable-android
             --enable-win64 \
             --disable-tests \
             --without-x \
@@ -270,6 +271,7 @@ jobs:
           export LDFLAGS="-L/usr/lib/x86_64-linux-gnu -L/lib/x86_64-linux-gnu"
 
           ../configure \
+            --disable-android
             --enable-win64 \
             --enable-archs=i386,x86_64 \
             --prefix=/tmp/wine-install-wow64 \
