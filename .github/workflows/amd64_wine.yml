@@ -275,7 +275,6 @@ jobs:
           export deps="/data/data/com.termux/files/usr"
           export depsg="/data/data/com.termux/files/usr/glibc"
 
-          export CC=x86_64-w64-mingw32-gcc
           export CC32=i686-w64-mingw32-gcc
 
           export CFLAGS="-march=x86-64-v3 -msse3 -mfpmath=sse -O3 -ftree-vectorize -pipe"
