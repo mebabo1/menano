@@ -82,7 +82,7 @@ jobs:
             libudev-dev \
             libcups2-dev \
             libjpeg-dev \
-            libpng-dev \
+            libpng-dev gcc-mingw-w64 \
             libtiff-dev libunwind-dev libopenal-dev libmpg123-dev \
             libxml2-dev \
             gettext curl \
@@ -171,9 +171,6 @@ jobs:
           cp -r ${{ env.WINE_SOURCE_DIR }}/source ${{ env.WINE64_DIR }}/source
           cd ${{ env.WINE64_DIR }}/source
           
-          rm -rf dlls/wineandroid.drv
-          sed -i '/WINE_CONFIG_MAKEFILE(dlls\/wineandroid\.drv)/d' configure.ac
-
           if [ ! -f "configure" ]; then
             ./autogen.sh
           fi
@@ -235,9 +232,6 @@ jobs:
       - name: Termux
         run: |
           cd ${{ env.WINE_SOURCE_DIR }}/source
-
-          rm -rf dlls/wineandroid.drv
-          sed -i '/WINE_CONFIG_MAKEFILE(dlls\/wineandroid\.drv)/d' configure.ac
           
           find . -type f \( -name "*.c" -o -name "*.h" -o -name "*.in" -o -name "*.spec" \) -exec grep -l "/tmp" {} \; 2>/dev/null | xargs sed -i 's|/tmp/|/data/data/com.termux/files/usr/tmp/|g' 2>/dev/null || true
           find server -type f \( -name "*.c" -o -name "*.h" \) -exec sed -i 's|"/tmp"|"/data/data/com.termux/files/usr/tmp"|g' {} + 2>/dev/null || true
@@ -280,6 +274,9 @@ jobs:
 
           export deps="/data/data/com.termux/files/usr"
           export depsg="/data/data/com.termux/files/usr/glibc"
+
+          export CC=x86_64-w64-mingw32-gcc
+          export CC32=i686-w64-mingw32-gcc
 
           export CFLAGS="-march=x86-64-v3 -msse3 -mfpmath=sse -O3 -ftree-vectorize -pipe"
           export CXXFLAGS="-march=x86-64-v3 -msse3 -mfpmath=sse -O3 -ftree-vectorize -pipe"
