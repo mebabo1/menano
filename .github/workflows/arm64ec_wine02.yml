@@ -128,7 +128,7 @@ jobs:
             protonec)
               echo "Processing protonarm64ec branch"
 
-              git clone -b "experimental_10.0" https://github.com/ValveSoftware/wine.git source
+              git clone https://github.com/brunodev85/wine-9.2-custom.git source
               cd source
               git config advice.detachedHead false
               if [ "$WINE_VERSION" != "latest" ]; then
