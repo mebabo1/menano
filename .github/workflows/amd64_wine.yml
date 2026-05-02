@@ -82,7 +82,7 @@ jobs:
             libudev-dev \
             libcups2-dev \
             libjpeg-dev \
-            libpng-dev gcc-mingw-w64 \
+            libpng-dev \
             libtiff-dev libunwind-dev libopenal-dev libmpg123-dev \
             libxml2-dev \
             gettext curl \
