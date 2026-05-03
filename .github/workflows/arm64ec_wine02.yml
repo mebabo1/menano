@@ -307,42 +307,9 @@ jobs:
             sed -i 's/UNIX_LIBS    = $(PULSE_LIBS) $(PTHREAD_LIBS) -lm/UNIX_LIBS    = $(PULSE_LIBS) $(PTHREAD_LIBS) -lm -lpulse/' "$FILE_PULSE_MK"
           fi
 
-          FILE_LOADER="dlls/ntdll/loader.c"
-          if [ -f "$FILE_LOADER" ]; then
-            echo "Patching $FILE_LOADER..."
-            sed -i 's|xtajit64.dll|libarm64ecfex.dll|' "$FILE_LOADER"
-          fi
-
-          INF="loader/wine.inf.in"
-          if [ -f "$INF" ] && ! grep -q 'libarm64ecfex.dll' "$INF"; then
-              echo "Patching wine.inf for FEX libraries..."
-              sed -i 's/xtajit64\.dll/libarm64ecfex.dll/g' "$INF"
-              sed -i 's/xtajit\.dll/libwow64fex.dll/g' "$INF"    
-              echo "✔ wine.inf integrated patch applied."
-          fi
-
-          FILE_LOADER="dlls/ntdll/loader.c"
-          if [ -f "$FILE_LOADER" ]; then
-            echo "Applying combined patches to loader.c..."
-            if grep -q 'ULONG buffer\[16\];' "$FILE_LOADER"; then
-              echo "  - Increasing loader buffer size to 32"
-              sed -i 's/ULONG buffer\[16\];/ULONG buffer\[32\];/g' "$FILE_LOADER"
-            fi
-            if grep -q 'base = (char \*)nt->OptionalHeader.ImageBase;' "$FILE_LOADER"; then
-              echo "  - Patching ImageBase logic for WOW64 (with UINT_PTR cast)"
-              sed -i 's/base = (char \*)nt->OptionalHeader.ImageBase;/if (nt->OptionalHeader.Magic == IMAGE_NT_OPTIONAL_HDR64_MAGIC) base = (char *)((const IMAGE_NT_HEADERS64 *)nt)->OptionalHeader.ImageBase; else base = (char *)(UINT_PTR)((const IMAGE_NT_HEADERS32 *)nt)->OptionalHeader.ImageBase;/g' "$FILE_LOADER"
-            fi                      
-            echo "✔ All loader.c patches applied."
-          fi
-
-          find . -type f \( -name "*.c" -o -name "*.h" \) \
-            -exec sed -i 's/xtajit64\.dll/libarm64ecfex.dll/g' {} +
-          find . -type f \( -name "*.c" -o -name "*.h" \) \
-            -exec sed -i 's/xtajit\.dll/libwow64fex.dll/g' {} +
-
           export PATCH_BASE="https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/path"
 
-          PATCH_FILES="1.patch 2.patch"
+          PATCH_FILES="1.patch"
           echo "Applying external patches from $PATCH_BASE..."
           for FILE in $PATCH_FILES; do
             URL="${PATCH_BASE}/${FILE}"
