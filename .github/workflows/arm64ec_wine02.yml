@@ -231,41 +231,6 @@ jobs:
           fi
           echo "复制后 locale.nls 存在，大小: $(wc -c < /opt/wine64-native/nls/locale.nls) 字节"
 
-      - name: Create SHM Header in Patch Path
-        run: |
-          cd ${{ env.WINE_SOURCE_DIR }}/source
-          mkdir -p android/shm_utils
-          cat <<EOF > android/shm_utils/shm_utils.h
-          #ifndef __WINE_SERVER_SHM_UTILS_H
-          #define __WINE_SERVER_SHM_UTILS_H
-          #ifdef __ANDROID__
-          #include <fcntl.h>
-          #include <stdio.h>
-          #include <stdlib.h>
-          #include <unistd.h>
-          #include <sys/stat.h>
-
-          static inline int shm_open(const char *name, int oflag, mode_t mode) {
-              char *tmpdir = getenv("TMPDIR") ? getenv("TMPDIR") : "/data/data/com.termux/files/usr/tmp";
-              char *fname;
-              if (asprintf(&fname, "%s/%s", tmpdir, name) == -1) return -1;
-              int fd = open(fname, oflag, mode);
-              free(fname);
-              return fd;
-          }
-
-          static inline int shm_unlink(const char *name) {
-              char *tmpdir = getenv("TMPDIR") ? getenv("TMPDIR") : "/data/data/com.termux/files/usr/tmp";
-              char *fname;
-              if (asprintf(&fname, "%s/%s", tmpdir, name) == -1) return -1;
-              int ret = unlink(fname);
-              free(fname);
-              return ret;
-          }
-          #endif
-          #endif
-          EOF
-
       - name: Termux
         run: |
           cd ${{ env.WINE_SOURCE_DIR }}/source
@@ -374,13 +339,10 @@ jobs:
             -exec sed -i 's/xtajit64\.dll/libarm64ecfex.dll/g' {} +
           find . -type f \( -name "*.c" -o -name "*.h" \) \
             -exec sed -i 's/xtajit\.dll/libwow64fex.dll/g' {} +
-          find dlls/ntdll -type f \( -name "*.c" -o -name "*.h" \) \
-            -exec sed -i 's|x86_64-windows|aarch64-windows|g' {} +
-
 
           export PATCH_BASE="https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/path"
 
-          PATCH_FILES="1.patch 2.patch 3.patch 4.patch 5.patch 6.patch 7.patch 8.patch 9.patch"
+          PATCH_FILES="1.patch 2.patch"
           echo "Applying external patches from $PATCH_BASE..."
           for FILE in $PATCH_FILES; do
             URL="${PATCH_BASE}/${FILE}"
