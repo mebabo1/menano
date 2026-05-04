@@ -465,6 +465,12 @@ jobs:
             sed -i 's/^[[:space:]]*mallopt( M_PERTURB,/\/\/ mallopt( M_PERTURB,/g' "$FILE_LOADER"
           fi
 
+          FILE_LOADER="dlls/ntdll/loader.c"
+          if [ -f "$FILE_LOADER" ]; then
+            echo "Patching $FILE_LOADER..."
+            sed -i 's|xtajit64.dll|libarm64ecfex.dll|' "$FILE_LOADER"
+          fi
+
           INF="loader/wine.inf.in"
           if [ -f "$INF" ] && ! grep -q 'libarm64ecfex.dll' "$INF"; then
               echo "Patching wine.inf for FEX libraries..."
