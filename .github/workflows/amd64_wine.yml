@@ -295,6 +295,7 @@ jobs:
             --with-pulse \
             --disable-win16 \
             --with-gstreamer \
+            --with-pthread \
             --without-ffmpeg \
             --disable-opencl \
             --disable-tests \
