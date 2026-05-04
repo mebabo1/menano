@@ -358,23 +358,23 @@ jobs:
             --enable-archs=arm64ec,aarch64,i386 \
             --with-wine-tools=/opt/wine64-native \
             --disable-win16 \
-            --disable-tests \
             --with-vulkan \
-            --with-gstreamer \
             --enable-nls \
-            --disable-winemenubuilder \
-            --without-osmesa \
             --with-pulse \
+            --disable-win16 \
+            --with-gstreamer \
+            --with-pthread \
             --without-ffmpeg \
             --disable-opencl \
-            --without-capi \
-            --without-coreaudio \
+            --disable-tests \
+            --disable-winemenubuilder \
+            --without-ldap \
             --without-cups \
             --without-dbus \
             --without-gphoto \
             --without-gssapi \
             --without-krb5 \
-            --without-netapi \
+            --without-alsa \
             --without-oss \
             --without-pcap \
             --without-pcsclite \
@@ -383,7 +383,7 @@ jobs:
             --without-usb \
             --without-v4l2 \
             --without-wayland \
-            --without-xinerama \
+            --without-inotify \
             --with-xshm \
             --without-xxf86vm
             
