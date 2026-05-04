@@ -299,15 +299,13 @@ jobs:
             --disable-opencl \
             --disable-tests \
             --disable-winemenubuilder \
-            --without-capi \
-            --without-coreaudio \
+            --without-ldap \
             --without-cups \
             --without-dbus \
             --without-gphoto \
             --without-gssapi \
             --without-krb5 \
             --without-alsa \
-            --without-netapi \
             --without-oss \
             --without-pcap \
             --without-pcsclite \
@@ -316,7 +314,7 @@ jobs:
             --without-usb \
             --without-v4l2 \
             --without-wayland \
-            --without-xinerama \
+            --without-inotify \
             --with-xshm \
             --without-xxf86vm
             
