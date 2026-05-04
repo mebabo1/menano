@@ -168,9 +168,10 @@ jobs:
       - name: configure
         run: |
           set -e
-          mkdir -p ${{ env.WINE64_DIR }}
-          cp -r ${{ env.WINE_SOURCE_DIR }}/source ${{ env.WINE64_DIR }}/source
+          mkdir -p ${{ env.WINE64_DIR }}/source
           cd ${{ env.WINE64_DIR }}/source
+          wget https://github.com/TGP-17/wine/releases/download/wine-tools/tools.zip
+          unzip tools.zip
           if [ ! -f "configure" ]; then
             ./autogen.sh
           fi
