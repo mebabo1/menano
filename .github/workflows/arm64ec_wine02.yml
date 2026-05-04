@@ -313,7 +313,7 @@ jobs:
           export deps="$HOME/termuxfs/aarch64/data/data/com.termux/files/usr"
           export RUNTIME_PATH="/data/data/com.termux/files/usr"
           export TOOLCHAIN="$HOME/Android/Sdk/ndk/27.3.13750724/toolchains/llvm/prebuilt/linux-x86_64/bin"
-          export TARGET=aarch64-linux-android28
+          export TARGET=x86_64-linux-android28
           export CC=$TOOLCHAIN/$TARGET-clang
           export CXX=$TOOLCHAIN/$TARGET-clang++      
           
@@ -349,7 +349,7 @@ jobs:
             --host=$TARGET \
             --prefix=/tmp/wine-install-wow64 \
             --with-mingw=clang \
-            --enable-archs=arm64ec,aarch64,i386 \
+            --enable-archs=x86_64,i386 \
             --with-wine-tools=/opt/wine64-native \
             --enable-wineandroid_drv=no \
             --enable-win64 \
