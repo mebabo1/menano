@@ -128,7 +128,7 @@ jobs:
             winearm64ec)
               echo "Processing protonarm64ec branch"
 
-              git clone -b "proton_11.0" https://github.com/ValveSoftware/wine.git source
+              git clone -b "bleeding-edge" https://github.com/xodiosx/Wine-arm64ce.git source
               cd source
               git config advice.detachedHead false
               if [ "$WINE_VERSION" != "latest" ]; then
@@ -514,36 +514,6 @@ jobs:
             -exec sed -i 's/xtajit\.dll/libwow64fex.dll/g' {} +
           find dlls/ntdll -type f \( -name "*.c" -o -name "*.h" \) \
             -exec sed -i 's|x86_64-windows|aarch64-windows|g' {} +
-
-          export PATCH_BASE="https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/path"
-
-          PATCH_FILES="1.patch 2.patch 3.patch 4.patch 5.patch 6.patch 7.patch 8.patch 9.patch"
-          echo "Applying external patches from $PATCH_BASE..."
-          for FILE in $PATCH_FILES; do
-            URL="${PATCH_BASE}/${FILE}"
-            PATCH_FILE="$FILE"           
-            echo "--------------------------------------------"
-            echo "Downloading $PATCH_FILE..."
-            wget -q -O "$PATCH_FILE" "$URL"
-            
-            if git apply --check "$PATCH_FILE" > /dev/null 2>&1; then
-                echo "✔ $PATCH_FILE can be applied cleanly"
-                git apply --whitespace=fix "$PATCH_FILE"
-            elif git apply --3way --check "$PATCH_FILE" > /dev/null 2>&1; then
-                echo "⚠ Applying $PATCH_FILE with 3-way merge"
-                git apply --3way --whitespace=fix "$PATCH_FILE"
-            else
-                echo "❌ $PATCH_FILE failed, generating rejects"
-                git apply --reject --whitespace=fix "$PATCH_FILE" || true
-                find . -name "*.rej"
-            fi
-          done
-          echo "--------------------------------------------"
-          echo "✔ All patch processes completed"
-
-          if [ ! -f "configure" ]; then
-            ./autogen.sh
-          fi
 
       - name: ARM64 WOW64
         run: |
