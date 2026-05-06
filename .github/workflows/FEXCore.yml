@@ -65,8 +65,6 @@ jobs:
           cmake -G Ninja -Wno-dev \
             -DCMAKE_BUILD_TYPE=Release \
             -DCMAKE_TOOLCHAIN_FILE=../Data/CMake/toolchain_mingw.cmake \
-            -DCMAKE_C_FLAGS="-D__NR_futex_waitv=449" \
-            -DCMAKE_CXX_FLAGS="-D__NR_futex_waitv=449" \
             -DMINGW_TRIPLE="${triple}-w64-mingw32" \
             -DCMAKE_INSTALL_PREFIX=/usr \
             -DCMAKE_INSTALL_LIBDIR=/usr/lib/wine/aarch64-windows \
