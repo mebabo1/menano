@@ -368,7 +368,6 @@ jobs:
             --disable-opencl \
             --disable-tests \
             --disable-winemenubuilder \
-            --without-ldap \
             --without-cups \
             --without-dbus \
             --without-gphoto \
