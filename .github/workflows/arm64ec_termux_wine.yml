@@ -465,6 +465,12 @@ jobs:
             sed -i 's/^[[:space:]]*mallopt( M_PERTURB,/\/\/ mallopt( M_PERTURB,/g' "$FILE_LOADER"
           fi
 
+          FILE_LOADER="dlls/ntdll/loader.c"
+          if [ -f "$FILE_LOADER" ]; then
+            echo "Patching $FILE_LOADER..."
+            sed -i 's|xtajit64.dll|libarm64ecfex.dll|' "$FILE_LOADER"
+          fi
+
           INF="loader/wine.inf.in"
           if [ -f "$INF" ] && ! grep -q 'libarm64ecfex.dll' "$INF"; then
               echo "Patching wine.inf for FEX libraries..."
@@ -511,7 +517,7 @@ jobs:
 
           export PATCH_BASE="https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/path"
 
-          PATCH_FILES="1.patch 2.patch 3.patch 4.patch 5.patch 6.patch 7.patch 8.patch"
+          PATCH_FILES="1.patch 2.patch 3.patch 4.patch 5.patch 6.patch 7.patch 8.patch 9.patch"
           echo "Applying external patches from $PATCH_BASE..."
           for FILE in $PATCH_FILES; do
             URL="${PATCH_BASE}/${FILE}"
