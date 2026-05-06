@@ -129,7 +129,7 @@ jobs:
             winearm64ec)
               echo "Processing protonarm64ec branch"
 
-              git clone -b "wine-arm64ec" https://github.com/WINDROID-EMU/Windroid-Wine.git source
+              git clone -b "wine-10.1" https://github.com/WINDROID-EMU/Windroid-Wine.git source
               cd source
               git config advice.detachedHead false
               if [ "$WINE_VERSION" != "latest" ]; then
