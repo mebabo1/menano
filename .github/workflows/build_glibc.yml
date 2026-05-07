@@ -34,16 +34,14 @@ jobs:
           cd /tmp/src/*/
           mkdir build
           cd build
-          if ! ../configure --prefix=/data/data/com.termux/files/usr/glibc; then
-            echo "构建失败"
-            exit 1
-          fi
-          if ! make -j$(nproc); then
-            echo "编译失败"
-            exit 1
-          fi
-          make install
-          cd data/data/com.termux/files/usr
+          ../configure \
+           --prefix=/data/data/com.termux/files/usr/glibc \
+           --disable-werror \
+           --enable-kernel=4.14
+
+          make -j$(nproc)
+          make install DESTDIR=/tmp/pkg
+          cd /tmp/pkg
           tar \
            --hard-dereference \
            --numeric-owner \
