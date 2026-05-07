@@ -1,0 +1,64 @@
+name: Build Glibc
+
+permissions:
+  contents: write
+  packages: write
+
+on:
+  workflow_dispatch:
+    inputs:
+      inputGlibcVer:
+        description: "输入Glibc版本"
+        required: true
+        default: "glibc-2.41"
+  
+jobs:
+  ubuntu:
+    runs-on: ubuntu-24.04-arm
+    steps:
+      - name: Update System Software
+        run: |
+          sudo apt update
+          sudo apt install build-essential
+      - name: Download Source Code and Build
+        run: |
+          glibc_version=${{ github.event.inputs.inputGlibcVer }}
+          echo "下载的版本为 $glibc_version"
+          if ! wget "https://ftp.gnu.org/gnu/glibc/${glibc_version}.tar.xz"; then
+            echo "文件下载失败"
+            exit 1
+          fi
+          mkdir -p /tmp/src
+          tar xf *.tar.xz -C /tmp/src
+          mkdir -p /tmp/build-glibc/
+          cd /tmp/src/*/
+          mkdir build
+          cd build
+          if ! ../configure --prefix=/tmp/build-glibc/glibc; then
+            echo "构建失败"
+            exit 1
+          fi
+          if ! make -j$(nproc); then
+            echo "编译失败"
+            exit 1
+          fi
+          make install
+          cd /tmp/build-glibc
+          tar -I "xz -T$(nproc)" -cf /tmp/${glibc_version}.tar.xz glibc/
+      
+      - name: package and release
+        uses:  softprops/action-gh-release@v2
+        with:
+          name: ${{ github.event.inputs.inputGlibcVer }}
+          draft: false
+          prerelease: false
+          tag_name: ${{ github.event.inputs.inputGlibcVer }}
+          body: Build Glibc ${{ github.event.inputs.inputGlibcVer }}
+          files: |
+            /tmp/${{ github.event.inputs.inputGlibcVer }}.tar.xz
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+
+
+        
