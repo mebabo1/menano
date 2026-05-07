@@ -149,7 +149,7 @@ jobs:
             proton)
               echo "Processing Proton branch"
 
-              git clone https://github.com/KreitinnSoftware/proton-wine.git source
+              git clone https://github.com/Searchstars/proton-slr-wine-macos.git source
               cd source
               git config advice.detachedHead false
               if [ "$WINE_VERSION" != "latest" ]; then
