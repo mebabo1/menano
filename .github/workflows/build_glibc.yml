@@ -44,7 +44,13 @@ jobs:
           fi
           make install
           cd /tmp/build-glibc
-          tar -I "xz -T$(nproc)" -cf /tmp/${glibc_version}.tar.xz glibc/
+          tar \
+           --hard-dereference \
+           --numeric-owner \
+           --no-same-owner \
+           -I "xz -T$(nproc)" \
+           -cf /tmp/${glibc_version}.tar.xz \
+           glibc/
       
       - name: package and release
         uses:  softprops/action-gh-release@v2
