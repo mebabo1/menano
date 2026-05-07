@@ -128,7 +128,7 @@ jobs:
             winearm64ec)
               echo "Processing protonarm64ec branch"
 
-              git clone -b "wine-10.0" https://github.com/KreitinnSoftware/wine.git source
+              git clone -b "wine-10.1" https://github.com/KreitinnSoftware/wine.git source
               cd source
               git config advice.detachedHead false
               if [ "$WINE_VERSION" != "latest" ]; then
@@ -149,7 +149,7 @@ jobs:
             proton)
               echo "Processing Proton branch"
 
-              git clone https://github.com/airidosas252/wine.git source
+              git clone https://github.com/StevenMXZ/wine.git source
               cd source
               git config advice.detachedHead false
               if [ "$WINE_VERSION" != "latest" ]; then
