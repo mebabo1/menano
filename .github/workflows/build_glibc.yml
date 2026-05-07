@@ -8,7 +8,7 @@ on:
   workflow_dispatch:
     inputs:
       inputGlibcVer:
-        description: "输入Glibc版本"
+        description: "Glibc"
         required: true
         default: "glibc-2.41"
   
