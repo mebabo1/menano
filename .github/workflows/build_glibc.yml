@@ -48,7 +48,7 @@ jobs:
            --no-same-owner \
            -I "xz -T$(nproc)" \
            -cf /usr/${glibc_version}.tar.xz \
-           data/
+           data/data/com.termux/files/usr/
       
       - name: package and release
         uses:  softprops/action-gh-release@v2
