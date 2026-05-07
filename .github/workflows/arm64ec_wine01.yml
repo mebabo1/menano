@@ -153,7 +153,7 @@ jobs:
               PROTON_BRANCH="${{ github.event.inputs.proton_branch || 'proton_10.0' }}"
               PROTON_COMMIT="${{ github.event.inputs.proton_commit || '' }}"
 
-              git clone https://github.com/airidosas252/wine.git source
+              git clone https://github.com/KreitinnSoftware/proton-wine.git source
               cd source
               git config advice.detachedHead false
               if [ "$WINE_VERSION" != "latest" ]; then
@@ -239,7 +239,8 @@ jobs:
       - name: Termux
         run: |
           cd ${{ env.WINE_SOURCE_DIR }}/source
-          find . -type f \( -name "*.c" -o -name "*.h" \) -exec sed -i 's|/data/data/com.termux/files/usr/tmp|/tmp|g' {} +
+          
+          find . -type f \( -name "*.c" -o -name "*.h" \) -exec sed -i 's|/data/data/com.micewine.emu/files/usr/tmp|/tmp|g' {} +
           find . -type f \( -name "*.c" -o -name "*.h" -o -name "*.in" -o -name "*.spec" \) -exec grep -l "/tmp" {} \; 2>/dev/null | xargs sed -i 's|/tmp/|/data/data/com.termux/files/usr/tmp/|g' 2>/dev/null || true
           find server -type f \( -name "*.c" -o -name "*.h" \) -exec sed -i 's|"/tmp"|"/data/data/com.termux/files/usr/tmp"|g' {} + 2>/dev/null || true
           find . -name "file.c" -exec sed -i 's|"/tmp"|"/data/data/com.termux/files/usr/tmp"|g' {} + 2>/dev/null || true
