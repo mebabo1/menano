@@ -138,7 +138,7 @@ jobs:
               cd source
               git config advice.detachedHead false
               if [ "$WINE_VERSION" != "latest" ]; then
-                git checkout "$WINE_VERSION"
+                git checkout "wine-$WINE_VERSION"
               fi
               WINE_VERSION_ACTUAL=$(git describe --tags --abbrev=0 2>/dev/null || echo "$WINE_VERSION")
               ;;
