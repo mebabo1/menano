@@ -149,9 +149,9 @@ jobs:
            -Degl-native-platform=x11 \
            -Dvulkan-beta=true \
            -Dgallium-extra-hud=true \
-           -Dgallium-drivers=freedreno,zink \
+           -Dgallium-drivers=freedreno,zink,swrast \
            -Dmediafoundation-codecs=all \
-           -Dvulkan-drivers=freedreno,zink \
+           -Dvulkan-drivers=freedreno,swrast \
            -Dfreedreno-kmds=kgsl \
            -Dshader-cache=enabled \
            -Dgles1=enabled \
