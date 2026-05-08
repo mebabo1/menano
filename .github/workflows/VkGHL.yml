@@ -51,12 +51,15 @@ jobs:
           rm -rf VulkanTools/layer_factory/VkGHL
           git clone --depth 1 https://github.com/pchome/VkGHL VulkanTools/layer_factory/VkGHL
 
-      # 3. 빌드 시작 (VulkanTools 메인 CMakeLists.txt를 통해 빌드)
       - name: Build VkGHL for ARM64
         run: |
-          cd VulkanTools
-          mkdir build_arm64 && cd build_arm64
+          # 1. VkGHL 소스가 있는 폴더로 직접 이동
+          cd VulkanTools/layer_factory/VkGHL
           
+          # 2. 독립 빌드를 위한 설정
+          mkdir build && cd build
+          
+          # 3. CMake 실행 (상위 VulkanTools 설정 무시, 단독 빌드)
           cmake .. \
             -DCMAKE_PREFIX_PATH=/tmp/vk_deps \
             -DCMAKE_SYSTEM_NAME=Linux \
@@ -64,32 +67,27 @@ jobs:
             -DCMAKE_C_COMPILER=aarch64-linux-gnu-gcc \
             -DCMAKE_CXX_COMPILER=aarch64-linux-gnu-g++ \
             -DCMAKE_BUILD_TYPE=Release \
-            -DBUILD_TESTS=OFF \
-            -DBUILD_LAYERSVT=OFF \
-            -DBUILD_VKTRACE=OFF \
-            -DBUILD_VIA=OFF \
-            -DBUILD_LAYERMGR=OFF \
-            -DBUILD_WSI_WAYLAND_SUPPORT=OFF \
             -DVkLayer_VkGHL_INSTALL_DIR=/data/data/com.termux/files/usr/glibc/lib
           
-          # VkGHL 타겟만 지정해서 빌드 (시간 단축 및 에러 방지)
-          make VkLayer_VkGHL -j$(nproc) || make -j$(nproc)
+          # 4. 컴파일
+          make -j$(nproc)
 
-      # 4. 결과물 수집
       - name: Locate and Prepare Artifacts
         run: |
           mkdir -p output
           
-          # 빌드 폴더 내에서 .so와 .json 검색
-          find VulkanTools/build_arm64 -name "libVkLayer_VkGHL.so" -exec cp {} output/ \;
-          find VulkanTools/layer_factory/VkGHL -name "VkLayer_VkGHL.json" -exec cp {} output/ \;
+          # 빌드된 결과물 위치 지정 (VulkanTools/layer_factory/VkGHL/build/...)
+          echo "🔍 Searching for artifacts..."
+          find VulkanTools/layer_factory/VkGHL/build -name "*.so" -exec cp {} output/ \;
+          find VulkanTools/layer_factory/VkGHL -name "*.json" -exec cp {} output/ \;
           
           echo "📂 Final output contents:"
           ls -l output/
           
-          if [ ! -f output/*.json ]; then
-            echo "❌ Error: Artifacts not found!"
-            find VulkanTools -name "*VkGHL*" # 어디에 있는지 디버깅 출력
+          if [ ! -f output/*.json ] || [ ! -f output/*.so ]; then
+            echo "❌ Error: Artifacts (.so or .json) not found!"
+            # 어디에 생겼는지 확인하기 위해 전체 트리 출력
+            find VulkanTools/layer_factory/VkGHL -type f
             exit 1
           fi
 
