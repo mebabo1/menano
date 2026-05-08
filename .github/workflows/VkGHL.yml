@@ -13,7 +13,7 @@ jobs:
           sudo apt-get install -y \
             build-essential cmake python3 git \
             gcc-aarch64-linux-gnu g++-aarch64-linux-gnu \
-            libvulkan-dev
+            libvulkan-dev vulkan-validationlayers-dev
 
       - name: Build Vulkan Headers (Fix Error 1.4.341)
         run: |
@@ -49,7 +49,7 @@ jobs:
           
           # AQUI ESTÁ O TRUQUE: Adicionamos -DCMAKE_PREFIX_PATH apontando para os headers que compilamos acima
           cmake .. \
-            -DCMAKE_PREFIX_PATH=/tmp/vk_headers \
+            -DCMAKE_PREFIX_PATH="/tmp/vk_headers;/tmp/vulkan_util" \
             -DCMAKE_SYSTEM_NAME=Linux \
             -DCMAKE_SYSTEM_PROCESSOR=aarch64 \
             -DCMAKE_C_COMPILER=aarch64-linux-gnu-gcc \
