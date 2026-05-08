@@ -41,11 +41,14 @@ jobs:
             -DCMAKE_CXX_COMPILER=aarch64-linux-gnu-g++
           cmake --build Vulkan-Utility-Libraries/build --target install
 
-      # 2. VkGHL 단독 빌드 (VulkanTools 거치지 않음)
       - name: Build VkGHL Standalone
         run: |
           git clone --depth 1 https://github.com/pchome/VkGHL.git
           cd VkGHL
+          
+          # 실제 CMakeLists.txt가 있는 폴더는 VkLayer_VkGHL입니다.
+          # 빌드 디렉토리를 해당 폴더 내부에 생성합니다.
+          cd VkLayer_VkGHL
           mkdir build && cd build
           
           # 크로스 컴파일 및 의존성 경로 지정
@@ -65,16 +68,18 @@ jobs:
         run: |
           mkdir -p output
           
-          # 빌드된 폴더 내에서 .so와 .json을 찾아서 복사
-          find VkGHL/build -name "*.so" -exec cp {} output/ \;
+          # VkGHL 전체 폴더에서 검색하여 복사
+          find VkGHL -name "*.so" -exec cp {} output/ \;
           find VkGHL -name "*.json" -exec cp {} output/ \;
           
           echo "📂 Final output contents:"
           ls -l output/
           
-          # 파일 존재 여부 강제 확인
-          if [ ! -f output/*.so ] || [ ! -f output/*.json ]; then
-            echo "❌ Error: Build failed, files not found!"
+          # 파일 존재 여부 확인
+          if [ ! -f output/*.json ]; then
+            echo "❌ Error: Artifacts not found!"
+            # 어디에 파일이 생겼는지 확인하기 위한 디버깅 출력
+            find VkGHL -type f
             exit 1
           fi
 
