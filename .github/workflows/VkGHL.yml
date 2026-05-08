@@ -84,9 +84,26 @@ jobs:
       - name: Locate and Prepare Artifacts
         run: |
           mkdir -p output
+          
+          # 1. 빌드된 .so 파일 찾아서 복사
+          echo "🔍 Searching for .so file..."
           find VulkanTools/build_arm64 -name "libVkLayer_VkGHL.so" -exec cp {} output/ \;
-          cp VulkanTools/layer_factory/VkGHL/VkLayer_VkGHL.json output/
-
+          
+          # 2. JSON 파일 찾아서 복사 (이름이 대소문자 섞여있을 수 있으므로 -iname 사용)
+          echo "🔍 Searching for JSON file..."
+          # 빌드 폴더 내부에서 먼저 찾고, 없으면 소스 폴더에서 찾습니다.
+          find VulkanTools -iname "VkLayer_VkGHL.json" -exec cp {} output/ \;
+          
+          # 3. 파일이 제대로 복사되었는지 확인 (디버깅용)
+          echo "📂 Contents of output directory:"
+          ls -l output/
+          
+          # 4. 만약 파일이 없다면 에러를 내서 중단시키기
+          if [ ! -f output/VkLayer_VkGHL.json ]; then
+            echo "❌ Error: VkLayer_VkGHL.json not found!"
+            exit 1
+          fi
+          
       - uses: actions/upload-artifact@v4
         with:
           name: vkghl-arm64-fixed
