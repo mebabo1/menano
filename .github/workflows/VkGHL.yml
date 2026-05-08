@@ -1,4 +1,4 @@
-name: Build VkGHL (Fix Headers)
+name: Build VkGHL (Fix Headers & Dependencies)
 
 on:
   workflow_dispatch:
@@ -15,7 +15,8 @@ jobs:
             gcc-aarch64-linux-gnu g++-aarch64-linux-gnu \
             libvulkan-dev vulkan-validationlayers-dev
 
-      - name: Build Vulkan Headers (1.4.341)
+      # 1. Vulkan Headers 설치 (모든 의존성의 기초)
+      - name: Build Vulkan Headers
         run: |
           git clone https://github.com/KhronosGroup/Vulkan-Headers.git
           cd Vulkan-Headers
@@ -23,39 +24,44 @@ jobs:
           cmake .. -DCMAKE_INSTALL_PREFIX=/tmp/vk_deps
           make install
 
+      # 2. Valijson 설치 (JSON 검증용 - 추가된 단계)
+      - name: Build Valijson
+        run: |
+          git clone https://github.com/tristanpenman/valijson.git
+          cd valijson
+          mkdir build && cd build
+          cmake .. -DCMAKE_INSTALL_PREFIX=/tmp/vk_deps
+          make install
+
+      # 3. Vulkan Utility Libraries 설치 (VulkanTools 필수 의존성)
       - name: Build Vulkan Utility Libraries
         run: |
           git clone https://github.com/KhronosGroup/Vulkan-Utility-Libraries.git
           cd Vulkan-Utility-Libraries
           mkdir build && cd build
+          # 크로스 컴파일러와 이전에 설치한 Headers 경로를 지정합니다.
           cmake .. \
             -DCMAKE_INSTALL_PREFIX=/tmp/vk_deps \
             -DCMAKE_PREFIX_PATH=/tmp/vk_deps \
+            -DCMAKE_SYSTEM_NAME=Linux \
+            -DCMAKE_SYSTEM_PROCESSOR=aarch64 \
             -DCMAKE_C_COMPILER=aarch64-linux-gnu-gcc \
             -DCMAKE_CXX_COMPILER=aarch64-linux-gnu-g++
           make install
 
       - name: Prepare VulkanTools & VkGHL
         run: |
-          # Clona o VulkanTools (A "Casa")
           git clone https://github.com/LunarG/VulkanTools
           cd VulkanTools
-          
-          # Limpa pastas desnecessárias
-          rm -rf layer_factory/assistant_layer
-          rm -rf layer_factory/demo_layer
-          rm -rf layer_factory/starter_layer
-          
-          # Clona o VkGHL (O "Hóspede")
+          rm -rf layer_factory/assistant_layer layer_factory/demo_layer layer_factory/starter_layer
           git clone https://github.com/pchome/VkGHL layer_factory/VkGHL
 
+      # 4. VkGHL 최종 빌드 (모든 의존성 경로 연결)
       - name: Build VkGHL for ARM64
         run: |
           cd VulkanTools
-          mkdir build_arm64
-          cd build_arm64
+          mkdir build_arm64 && cd build_arm64
           
-          # AQUI ESTÁ O TRUQUE: Adicionamos -DCMAKE_PREFIX_PATH apontando para os headers que compilamos acima
           cmake .. \
             -DCMAKE_PREFIX_PATH=/tmp/vk_deps \
             -DCMAKE_SYSTEM_NAME=Linux \
@@ -76,11 +82,7 @@ jobs:
       - name: Locate and Prepare Artifacts
         run: |
           mkdir -p output
-          
-          # Procura e copia a biblioteca gerada
           find VulkanTools/build_arm64 -name "libVkLayer_VkGHL.so" -exec cp {} output/ \;
-          
-          # Copia o JSON
           cp VulkanTools/layer_factory/VkGHL/VkLayer_VkGHL.json output/
 
       - uses: actions/upload-artifact@v4
