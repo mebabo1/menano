@@ -53,9 +53,15 @@ jobs:
         run: |
           git clone https://github.com/LunarG/VulkanTools
           cd VulkanTools
+          # 불필요한 레이어 제거
           rm -rf layer_factory/assistant_layer layer_factory/demo_layer layer_factory/starter_layer
+          
+          # VkGHL 클론
           git clone https://github.com/pchome/VkGHL layer_factory/VkGHL
-
+          
+          # [중요] CMake가 VkGHL 폴더를 인식하도록 하위 CMakeLists.txt에 추가
+          echo "add_subdirectory(VkGHL)" >> layer_factory/CMakeLists.txt
+          
       - name: Build VkGHL for ARM64
         run: |
           cd VulkanTools
