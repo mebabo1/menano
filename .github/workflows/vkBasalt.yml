@@ -41,5 +41,5 @@ jobs:
         with:
           name: vkbasalt-overlay-arm64
           path: |
-            build-arm64/**/*.so
-            build-arm64/**/*.json
+            build-arm64/src/libvkbasalt.so
+            build-arm64/config/vkBasalt.json
