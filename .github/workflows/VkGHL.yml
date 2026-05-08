@@ -41,15 +41,18 @@ jobs:
             -DCMAKE_CXX_COMPILER=aarch64-linux-gnu-g++
           cmake --build Vulkan-Utility-Libraries/build --target install
 
+      # 2. VkGHL 단독 빌드 (경로 자동 탐색 버전)
       - name: Build VkGHL Standalone
         run: |
           git clone --depth 1 https://github.com/pchome/VkGHL.git
           cd VkGHL
           
-          # 실제 CMakeLists.txt가 있는 폴더는 VkLayer_VkGHL입니다.
-          # 빌드 디렉토리를 해당 폴더 내부에 생성합니다.
-          cd VkLayer_VkGHL
-          mkdir build && cd build
+          # CMakeLists.txt가 있는 디렉토리를 자동으로 찾습니다.
+          TARGET_DIR=$(find . -name "CMakeLists.txt" -printf '%h\n' | head -n 1)
+          echo "📂 Found CMakeLists.txt in: $TARGET_DIR"
+          
+          cd "$TARGET_DIR"
+          mkdir -p build && cd build
           
           # 크로스 컴파일 및 의존성 경로 지정
           cmake .. \
