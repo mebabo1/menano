@@ -39,7 +39,7 @@ jobs:
         packages:
           git curl
           llvm clang clang-tools clang-tidy
-          cmake ninja-build pkg-config
+          cmake ninja-build pkg-config gcc-aarch64-linux-gnu g++-aarch64-linux-gnu
           libvulkan-dev
           mesa-common-dev
           qt6-base-dev qt6-base-dev-tools
@@ -58,12 +58,14 @@ jobs:
         cmake -B build -G Ninja \
           -DCMAKE_BUILD_TYPE=RelWithDebInfo \
           -DCMAKE_INSTALL_PREFIX=./target \
-          -DCMAKE_CXX_COMPILER=clang++ \
+          -DCMAKE_SYSTEM_PROCESSOR=aarch64 \
+          -DCMAKE_C_COMPILER=aarch64-linux-gnu-gcc \
+          -DCMAKE_CXX_COMPILER=aarch64-linux-gnu-g++ \
           -DLSFGVK_BUILD_VK_LAYER=ON \
           -DLSFGVK_BUILD_UI=ON \
           -DLSFGVK_BUILD_CLI=ON \
           -DLSFGVK_INSTALL_XDG_FILES=ON \
-          -DLSFGVK_LAYER_LIBRARY_PATH="../../../lib/liblsfg-vk-layer.so"
+          -DLSFGVK_LAYER_LIBRARY_PATH="/data/data/com.termux/files/usr/glibc/lib/liblsfg-vk-layer.so"
     - name: Build with Ninja
       run: |
         ninja -C build
