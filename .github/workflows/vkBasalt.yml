@@ -24,10 +24,14 @@ jobs:
           
           run: |
             # Força o uso do GCC para o Meson não se perder
+            cd $GITHUB_WORKSPACE
             export CC=gcc
             export CXX=g++
             
-            meson setup --buildtype=release build-arm64
+            meson setup \
+             --buildtype=release \
+             --prefix=/data/data/com.termux/files/usr/glibc \
+             build-arm64
             ninja -C build-arm64
 
       - name: Upload Artifacts
