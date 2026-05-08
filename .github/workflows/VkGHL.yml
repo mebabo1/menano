@@ -61,7 +61,7 @@ jobs:
             -DBUILD_VIA=OFF \
             -DBUILD_LAYERMGR=OFF \
             -DBUILD_VKTRACE_REPLAY=OFF \
-            -DVkLayer_VkGHL_INSTALL_DIR=/usr/lib
+            -DVkLayer_VkGHL_INSTALL_DIR=/data/data/com.termux/files/usr/glibc/lib
           
           make
 
