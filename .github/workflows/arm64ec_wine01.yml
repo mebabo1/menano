@@ -176,6 +176,7 @@ jobs:
           cp -r ${{ env.WINE_SOURCE_DIR }}/source ${{ env.WINE64_DIR }}/source
           cd ${{ env.WINE64_DIR }}/source
           if [ ! -f "configure" ]; then
+            chmod +x autogen.sh
             ./autogen.sh
           fi
 
@@ -322,6 +323,7 @@ jobs:
         run: |
           cd ${{ env.WINE_SOURCE_DIR }}/source
           if [ ! -f "configure" ]; then
+            chmod +x autogen.sh
             ./autogen.sh
           fi
 
