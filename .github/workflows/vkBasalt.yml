@@ -38,7 +38,7 @@ jobs:
             # 2. 결과물을 외부 호스트와 공유된 /workspace 폴더로 복사 (가장 중요)
             mkdir -p /workspace/output
             cp build-arm64/src/libvkbasalt.so /workspace/output/
-            cp config/vkBasalt.json /workspace/output/
+            
 
       - name: Upload Artifacts
         uses: actions/upload-artifact@v4
