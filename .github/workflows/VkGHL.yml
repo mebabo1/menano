@@ -18,7 +18,7 @@ jobs:
       - name: Build Vulkan Headers (Fix Error 1.4.341)
         run: |
           # 1. Baixa os Headers oficiais mais recentes
-          git clone --branch v1.4.341 https://github.com/KhronosGroup/Vulkan-Headers.git
+          git clone --branch v1.3.268 https://github.com/KhronosGroup/Vulkan-Headers.git
           cd Vulkan-Headers
           
           # 2. Prepara a instalação local (para o CMake encontrar)
@@ -30,7 +30,7 @@ jobs:
       - name: Prepare VulkanTools & VkGHL
         run: |
           # Clona o VulkanTools (A "Casa")
-          git clone https://github.com/LunarG/VulkanTools
+          git clone --branch sdk-1.3.261 https://github.com/LunarG/VulkanTools
           cd VulkanTools
           
           # Limpa pastas desnecessárias
