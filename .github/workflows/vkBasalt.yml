@@ -1,0 +1,39 @@
+name: Build vkBasalt ARM64
+
+on:
+  push:
+    branches: [ "master", "main" ]
+  workflow_dispatch:
+
+jobs:
+  build-arm64:
+    runs-on: ubuntu-latest
+    name: Build on Ubuntu 22.04 (ARM64)
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Run on ARM64
+        uses: uraimo/run-on-arch-action@v2
+        with:
+          arch: aarch64
+          distro: ubuntu22.04  # Mudamos para 22.04 (mais estável)
+          install: |
+            apt-get update
+            # Adicionei 'file', 'gcc' e 'g++' para garantir detecção correta
+            apt-get install -y build-essential git meson ninja-build pkg-config libvulkan-dev glslang-tools libx11-dev libx11-xcb-dev libxrandr-dev libxi-dev libxfixes-dev spirv-headers file gcc g++
+          
+          run: |
+            # Força o uso do GCC para o Meson não se perder
+            export CC=gcc
+            export CXX=g++
+            
+            meson setup --buildtype=release build-arm64
+            ninja -C build-arm64
+
+      - name: Upload Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: vkbasalt-overlay-arm64
+          path: |
+            build-arm64/src/libvkbasalt-overlay.so
+            build-arm64/config/vkBasalt-overlay.json
