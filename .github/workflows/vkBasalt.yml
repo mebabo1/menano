@@ -24,7 +24,8 @@ jobs:
           
           run: |
             # Força o uso do GCC para o Meson não se perder
-            cd $GITHUB_WORKSPACE
+            git clone https://github.com/DadSchoorse/vkBasalt.git
+            cd vkBasalt
             export CC=gcc
             export CXX=g++
             
