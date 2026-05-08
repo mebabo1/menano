@@ -30,7 +30,7 @@ jobs:
             meson setup \
              --buildtype=release \
              --prefix=/data/data/com.termux/files/usr/glibc \
-            build-arm64
+             build-arm64
             ninja -C build-arm64
 
       - name: Upload Artifacts
