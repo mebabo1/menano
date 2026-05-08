@@ -28,6 +28,7 @@ jobs:
             cd vkBasalt
             export CC=gcc
             export CXX=g++
+            export CFLAGS="-O2"
             export CXXFLAGS="-O2"
             
             meson setup \
@@ -41,5 +42,5 @@ jobs:
         with:
           name: vkbasalt-overlay-arm64
           path: |
-            build-arm64/src/libvkbasalt.so
-            build-arm64/config/vkBasalt.json
+            src/libvkbasalt.so
+            config/vkBasalt.json
