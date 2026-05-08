@@ -16,31 +16,33 @@ jobs:
         uses: uraimo/run-on-arch-action@v2
         with:
           arch: aarch64
-          distro: ubuntu22.04  # Mudamos para 22.04 (mais estável)
+          distro: ubuntu22.04
+          # 외부 호스트와 파일을 공유하기 위해 컨테이너 내부의 /build를 호스트의 현재 경로와 매핑합니다.
+          dockerRunArgs: |
+            --volume "${PWD}:/workspace"
           install: |
             apt-get update
-            # Adicionei 'file', 'gcc' e 'g++' para garantir detecção correta
             apt-get install -y build-essential git meson ninja-build pkg-config libvulkan-dev glslang-tools libx11-dev libx11-xcb-dev libxrandr-dev libxi-dev libxfixes-dev spirv-headers file gcc g++
           
           run: |
-            # Força o uso do GCC para o Meson não se perder
-            git clone https://github.com/DadSchoorse/vkBasalt.git
+            # 1. 빌드 수행
+            git clone --depth 1 https://github.com/DadSchoorse/vkBasalt.git
             cd vkBasalt
-            export CC=gcc
-            export CXX=g++
-            export CFLAGS="-O2"
-            export CXXFLAGS="-O2"
             
             meson setup \
              --buildtype=release \
              --prefix=/data/data/com.termux/files/usr/glibc \
              build-arm64
-            ninja -C build-arm64 -j1
+            ninja -C build-arm64 -j$(nproc)
+            
+            # 2. 결과물을 외부 호스트와 공유된 /workspace 폴더로 복사 (가장 중요)
+            mkdir -p /workspace/output
+            cp build-arm64/src/libvkbasalt.so /workspace/output/
+            cp config/vkBasalt.json /workspace/output/
 
       - name: Upload Artifacts
         uses: actions/upload-artifact@v4
         with:
           name: vkbasalt-overlay-arm64
-          path: |
-            src/libvkbasalt.so
-            config/vkBasalt.json
+          # 위에서 복사한 output 폴더의 파일들을 업로드합니다.
+          path: output/
