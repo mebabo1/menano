@@ -1,4 +1,4 @@
-name: Build VkGHL (Final Fixed)
+name: Build VkGHL (Fix Headers)
 
 on:
   workflow_dispatch:
@@ -15,83 +15,67 @@ jobs:
             gcc-aarch64-linux-gnu g++-aarch64-linux-gnu \
             libvulkan-dev
 
-      # 1. 모든 의존성을 모아둘 공통 디렉토리 생성
-      - name: Build All Dependencies (Headers, Valijson, Utils)
+      - name: Build Vulkan Headers (Fix Error 1.4.341)
         run: |
-          mkdir -p /tmp/vk_deps
+          # 1. Baixa os Headers oficiais mais recentes
+          git clone https://github.com/KhronosGroup/Vulkan-Headers.git
+          cd Vulkan-Headers
           
-          # [1] Vulkan-Headers
-          git clone --depth 1 https://github.com/KhronosGroup/Vulkan-Headers.git
-          cmake -S Vulkan-Headers -B Vulkan-Headers/build -DCMAKE_INSTALL_PREFIX=/tmp/vk_deps
-          cmake --build Vulkan-Headers/build --target install
+          # 2. Prepara a instalação local (para o CMake encontrar)
+          mkdir build
+          cd build
+          cmake .. -DCMAKE_INSTALL_PREFIX=/tmp/vk_headers
+          make install
 
-          # [2] Valijson (VkGHL 빌드 필수 의존성)
-          git clone --depth 1 https://github.com/tristanpenman/valijson.git
-          cmake -S valijson -B valijson/build -DCMAKE_INSTALL_PREFIX=/tmp/vk_deps
-          cmake --build valijson/build --target install
-
-          # [3] Vulkan-Utility-Libraries (VulkanTools 필수 의존성)
-          git clone --depth 1 https://github.com/KhronosGroup/Vulkan-Utility-Libraries.git
-          cmake -S Vulkan-Utility-Libraries -B Vulkan-Utility-Libraries/build \
-            -DCMAKE_INSTALL_PREFIX=/tmp/vk_deps \
-            -DCMAKE_PREFIX_PATH=/tmp/vk_deps \
-            -DCMAKE_SYSTEM_NAME=Linux \
-            -DCMAKE_SYSTEM_PROCESSOR=aarch64 \
-            -DCMAKE_C_COMPILER=aarch64-linux-gnu-gcc \
-            -DCMAKE_CXX_COMPILER=aarch64-linux-gnu-g++
-          cmake --build Vulkan-Utility-Libraries/build --target install
-
-      # 2. VulkanTools 클론 및 VkGHL 준비
       - name: Prepare VulkanTools & VkGHL
         run: |
-          git clone --depth 1 https://github.com/LunarG/VulkanTools
+          # Clona o VulkanTools (A "Casa")
+          git clone https://github.com/LunarG/VulkanTools
+          cd VulkanTools
           
-          # [핵심] VkGHL은 별도 클론이 아니라 VulkanTools 내부에 이미 있는 경우도 있지만, 
-          # 최신 버전 확인을 위해 공식 VkGHL 소스를 layer_factory에 덮어씌웁니다.
-          rm -rf VulkanTools/layer_factory/VkGHL
-          git clone --depth 1 https://github.com/pchome/VkGHL VulkanTools/layer_factory/VkGHL
+          # Limpa pastas desnecessárias
+          rm -rf layer_factory/assistant_layer
+          rm -rf layer_factory/demo_layer
+          rm -rf layer_factory/starter_layer
+          
+          # Clona o VkGHL (O "Hóspede")
+          git clone https://github.com/pchome/VkGHL layer_factory/VkGHL
 
       - name: Build VkGHL for ARM64
         run: |
-          # 1. VkGHL 소스가 있는 폴더로 직접 이동
-          cd VulkanTools/layer_factory/VkGHL
+          cd VulkanTools
+          mkdir build_arm64
+          cd build_arm64
           
-          # 2. 독립 빌드를 위한 설정
-          mkdir build && cd build
-          
-          # 3. CMake 실행 (상위 VulkanTools 설정 무시, 단독 빌드)
+          # AQUI ESTÁ O TRUQUE: Adicionamos -DCMAKE_PREFIX_PATH apontando para os headers que compilamos acima
           cmake .. \
-            -DCMAKE_PREFIX_PATH=/tmp/vk_deps \
+            -DCMAKE_PREFIX_PATH=/tmp/vk_headers \
             -DCMAKE_SYSTEM_NAME=Linux \
             -DCMAKE_SYSTEM_PROCESSOR=aarch64 \
             -DCMAKE_C_COMPILER=aarch64-linux-gnu-gcc \
             -DCMAKE_CXX_COMPILER=aarch64-linux-gnu-g++ \
             -DCMAKE_BUILD_TYPE=Release \
-            -DVkLayer_VkGHL_INSTALL_DIR=/data/data/com.termux/files/usr/glibc/lib
+            -DBUILD_TESTS=OFF \
+            -DBUILD_LAYERSVT=OFF \
+            -DBUILD_VKTRACE=OFF \
+            -DBUILD_VIA=OFF \
+            -DBUILD_LAYERMGR=OFF \
+            -DBUILD_VKTRACE_REPLAY=OFF \
+            -DVkLayer_VkGHL_INSTALL_DIR=/usr/lib
           
-          # 4. 컴파일
-          make -j$(nproc)
+          make
 
       - name: Locate and Prepare Artifacts
         run: |
           mkdir -p output
           
-          # 빌드된 결과물 위치 지정 (VulkanTools/layer_factory/VkGHL/build/...)
-          echo "🔍 Searching for artifacts..."
-          find VulkanTools/layer_factory/VkGHL/build -name "*.so" -exec cp {} output/ \;
-          find VulkanTools/layer_factory/VkGHL -name "*.json" -exec cp {} output/ \;
+          # Procura e copia a biblioteca gerada
+          find VulkanTools/build_arm64 -name "libVkLayer_VkGHL.so" -exec cp {} output/ \;
           
-          echo "📂 Final output contents:"
-          ls -l output/
-          
-          if [ ! -f output/*.json ] || [ ! -f output/*.so ]; then
-            echo "❌ Error: Artifacts (.so or .json) not found!"
-            # 어디에 생겼는지 확인하기 위해 전체 트리 출력
-            find VulkanTools/layer_factory/VkGHL -type f
-            exit 1
-          fi
+          # Copia o JSON
+          cp VulkanTools/layer_factory/VkGHL/VkLayer_VkGHL.json output/
 
       - uses: actions/upload-artifact@v4
         with:
-          name: vkghl-arm64-final
+          name: vkghl-arm64-fixed
           path: output/
