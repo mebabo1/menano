@@ -57,7 +57,7 @@ jobs:
           
           # AQUI ESTÁ O TRUQUE: Adicionamos -DCMAKE_PREFIX_PATH apontando para os headers que compilamos acima
           cmake .. \
-            -DCMAKE_PREFIX_PATH=/tmp/vk_headers \
+            -DCMAKE_PREFIX_PATH=/tmp/vk_deps \
             -DCMAKE_SYSTEM_NAME=Linux \
             -DCMAKE_SYSTEM_PROCESSOR=aarch64 \
             -DCMAKE_C_COMPILER=aarch64-linux-gnu-gcc \
