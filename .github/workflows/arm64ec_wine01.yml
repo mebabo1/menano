@@ -129,7 +129,7 @@ jobs:
             winearm64ec)
               echo "Processing protonarm64ec branch"
 
-              git clone -b "wow64104" https://github.com/hostei33/wine-tkg.git source
+              git clone -b "wow641010" https://github.com/hostei33/wine-tkg.git source
               cd source
               git config advice.detachedHead false
               if [ "$WINE_VERSION" != "latest" ]; then
