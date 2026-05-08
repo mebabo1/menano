@@ -15,16 +15,24 @@ jobs:
             gcc-aarch64-linux-gnu g++-aarch64-linux-gnu \
             libvulkan-dev vulkan-validationlayers-dev
 
-      - name: Build Vulkan Headers (Fix Error 1.4.341)
+      - name: Build Vulkan Headers (1.4.341)
         run: |
-          # 1. Baixa os Headers oficiais mais recentes
           git clone https://github.com/KhronosGroup/Vulkan-Headers.git
           cd Vulkan-Headers
-          
-          # 2. Prepara a instalação local (para o CMake encontrar)
-          mkdir build
-          cd build
-          cmake .. -DCMAKE_INSTALL_PREFIX=/tmp/vk_headers
+          mkdir build && cd build
+          cmake .. -DCMAKE_INSTALL_PREFIX=/tmp/vk_deps
+          make install
+
+      - name: Build Vulkan Utility Libraries
+        run: |
+          git clone https://github.com/KhronosGroup/Vulkan-Utility-Libraries.git
+          cd Vulkan-Utility-Libraries
+          mkdir build && cd build
+          cmake .. \
+            -DCMAKE_INSTALL_PREFIX=/tmp/vk_deps \
+            -DCMAKE_PREFIX_PATH=/tmp/vk_deps \
+            -DCMAKE_C_COMPILER=aarch64-linux-gnu-gcc \
+            -DCMAKE_CXX_COMPILER=aarch64-linux-gnu-g++
           make install
 
       - name: Prepare VulkanTools & VkGHL
