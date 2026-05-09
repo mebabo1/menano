@@ -12,6 +12,7 @@ jobs:
       with:
         repository: PancakeTAS/lsfg-vk  # <== [핵심] 가져올 원본 소스코드 저장소를 정확히 지정합니다.
         fetch-depth: 0
+        ref: ff1a0f72a7d6d08b84d58b7b4dc5f05c9f904f98
 
     - name: Install build dependencies
       run: |
