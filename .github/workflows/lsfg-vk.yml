@@ -31,6 +31,9 @@ jobs:
 
     - name: Configure lsfg-vk
       run: |
+        export CFLAGS="-O2"
+        export CXXFLAGS="-O2"
+        
         cmake -B build -G Ninja \
           -DCMAKE_BUILD_TYPE=RelWithDebInfo \
           -DCMAKE_INSTALL_PREFIX=./target \
