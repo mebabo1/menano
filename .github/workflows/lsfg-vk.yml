@@ -33,33 +33,29 @@ jobs:
         
     - name: Android Turnip patches
       run: |
-        find . -type f \( -name "*.cpp" -o -name "*.hpp" \) | while read f; do
-          sed -i 's/VK_PRESENT_MODE_MAILBOX_KHR/VK_PRESENT_MODE_FIFO_KHR/g' "$f"
-        done
-
-        find . -type f \( -name "*.cpp" -o -name "*.hpp" \) | while read f; do
-          sed -i 's/minImageCount\s*=\s*5/minImageCount = 3/g' "$f"
-          sed -i 's/imageCount\s*=\s*5/imageCount = 3/g' "$f"
-        done
-
-        find . -type f \( -name "*.cpp" -o -name "*.hpp" \) | while read f; do
-          sed -i 's/VK_EXTERNAL_SEMAPHORE_HANDLE_TYPE_OPAQUE_FD_BIT/VK_EXTERNAL_SEMAPHORE_HANDLE_TYPE_SYNC_FD_BIT/g' "$f"
-          sed -i 's/exportInfo.handleTypes =/exportInfo.handleTypes = 0; \/\/ Patched for Android /g' "$f"
-        done
-
-        VOLK_FILE="framegen/src/thirdparty/volk.c"
-        if [ -f "$VOLK_FILE" ]; then
-          echo "Found volk.c! Applying vkWaitForPresentKHR patch..."
-          sed -i 's/vkWaitForPresentKHR = (PFN_vkWaitForPresentKHR)load(context, "vkWaitForPresentKHR");/vkWaitForPresentKHR = NULL;/g' "$VOLK_FILE"
-          sed -i 's/table->vkWaitForPresentKHR = (PFN_vkWaitForPresentKHR)load(context, "vkWaitForPresentKHR");/table->vkWaitForPresentKHR = NULL;/g' "$VOLK_FILE"
-        else
-          echo "WARNING: volk.c not found! Check submodules."
-        fi
+        echo "Applying Android Turnip compatibility patches..."
+        find . -type f \( -name "*.cpp" -o -name "*.hpp" \) -exec sed -i 's/VK_PRESENT_MODE_MAILBOX_KHR/VK_PRESENT_MODE_FIFO_KHR/g' {} +
+        find . -type f \( -name "*.cpp" -o -name "*.hpp" \) -exec sed -i 's/minImageCount = 5/minImageCount = 3/g' {} +
+        find . -type f \( -name "*.cpp" -o -name "*.hpp" \) -exec sed -i 's/imageCount = 5/imageCount = 3/g' {} +
 
         DEVICE_FILE="framegen/src/core/device.cpp"
+
         if [ -f "$DEVICE_FILE" ]; then
-          sed -i 's/VK_KHR_EXTERNAL_SEMAPHORE_FD_EXTENSION_NAME/VK_ANDROID_EXTERNAL_MEMORY_ANDROID_HARDWARE_BUFFER_EXTENSION_NAME/g' "$DEVICE_FILE"
+          sed -i '/VK_KHR_present_wait/d' "$DEVICE_FILE"
+          sed -i '/VK_KHR_present_id/d' "$DEVICE_FILE"
         fi
+
+        VOLK_FILE="framegen/src/thirdparty/volk.c"
+
+        if [ -f "$VOLK_FILE" ]; then
+          sed -i 's/vkWaitForPresentKHR = (PFN_vkWaitForPresentKHR)load(context, "vkWaitForPresentKHR");/vkWaitForPresentKHR = NULL;/g' "$VOLK_FILE"
+          sed -i 's/table->vkWaitForPresentKHR = (PFN_vkWaitForPresentKHR)load(context, "vkWaitForPresentKHR");/table->vkWaitForPresentKHR = NULL;/g' "$VOLK_FILE"
+        fi
+        
+        find . -type f \( -name "*.cpp" -o -name "*.hpp" \) | while read f; do
+          sed -i 's/VK_EXTERNAL_SEMAPHORE_HANDLE_TYPE_OPAQUE_FD_BIT/0/g' "$f"
+        done
+        echo "Android Turnip patches applied."
         
     - name: Configure lsfg-vk
       run: |
