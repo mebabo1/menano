@@ -30,12 +30,14 @@ jobs:
         sudo rm -rf /usr/include/{vulkan,vk_video}
         sudo mv /tmp/vkh/include/{vulkan,vk_video} /usr/include/
         rm -rf /tmp/vkh
-
+        
     - name: Apply Android Turnip workaround patches
       run: |
-        find . -type f \( -name "*.cpp" -o -name "*.hpp" \) | while read f; do
-        sed -i '/VK_KHR_present_wait/d' "$f"
-        done
+        FILE="framegen/src/core/device.cpp"
+        if [ -f "$FILE" ]; then
+          sed -i 's/"VK_KHR_present_wait",/\/\/ "VK_KHR_present_wait",/g' "$FILE"
+          sed -i 's/"VK_KHR_present_id",/\/\/ "VK_KHR_present_id",/g' "$FILE"
+        fi
 
     - name: Configure lsfg-vk
       run: |
