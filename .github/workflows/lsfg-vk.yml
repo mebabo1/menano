@@ -32,12 +32,9 @@ jobs:
 
     - name: Apply Android Turnip workaround patches
       run: |
-        echo "Applying Turnip semaphore workaround..."
-        FILE="layer/src/frame_generation_swapchain.cpp"
-        if [ -f "$FILE" ]; then
-          sed -i 's/VK_PRESENT_MODE_MAILBOX_KHR/VK_PRESENT_MODE_FIFO_KHR/g' "$FILE"
-        fi
-        echo "Patches applied."
+        find . -type f \( -name "*.cpp" -o -name "*.hpp" \) | while read f; do
+        sed -i '/VK_KHR_present_wait/d' "$f"
+        done
 
     - name: Configure lsfg-vk
       run: |
