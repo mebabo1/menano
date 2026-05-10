@@ -31,38 +31,39 @@ jobs:
         sudo mv /tmp/vkh/include/{vulkan,vk_video} /usr/include/
         rm -rf /tmp/vkh
         
-    - name: Android Turnip patches
+    - name: Final Android Turnip & Wine Sync Patches
       run: |
+        # 1. 스왑체인 안정화 (FIFO 강제 및 이미지 개수 최적화)
+        # 로그에서 Presenter가 4개를 요구하므로, lsfg가 5개를 쓰지 못하도록 3으로 강제 고정합니다.
         find . -type f \( -name "*.cpp" -o -name "*.hpp" \) | while read f; do
           sed -i 's/VK_PRESENT_MODE_MAILBOX_KHR/VK_PRESENT_MODE_FIFO_KHR/g' "$f"
           sed -i 's/minImageCount\s*=\s*5/minImageCount = 3/g' "$f"
           sed -i 's/imageCount\s*=\s*5/imageCount = 3/g' "$f"
         done
-        
-        DEVICE_FILE="framegen/src/core/device.cpp"
 
-        if [ -f "$DEVICE_FILE" ]; then
-          sed -i '/VK_KHR_present_wait/d' "$DEVICE_FILE"
-          sed -i '/VK_KHR_present_id/d' "$DEVICE_FILE"
-        fi
+        # 2. 세마포어 수출(Export) 완전 차단 (에러 0 해결 핵심)
+        # "Unable to export semaphore" 에러를 피하기 위해 세마포어 생성 시 
+        # exportInfo를 pNext에서 아예 제거(nullptr)합니다.
+        find . -type f -name "context.cpp" | while read f; do
+          echo "Force disabling semaphore export in $f"
+          sed -i 's/.pNext = \&exportInfo/.pNext = nullptr/g' "$f"
+          sed -i 's/VK_EXTERNAL_SEMAPHORE_HANDLE_TYPE_OPAQUE_FD_BIT/0/g' "$f"
+          sed -i 's/VK_EXTERNAL_SEMAPHORE_HANDLE_TYPE_SYNC_FD_BIT/0/g' "$f"
+        done
 
+        # 3. volk.c 패치 (드라이버 레벨 Present 대기 차단)
         VOLK_FILE="framegen/src/thirdparty/volk.c"
-
         if [ -f "$VOLK_FILE" ]; then
           sed -i 's/vkWaitForPresentKHR = (PFN_vkWaitForPresentKHR)load(context, "vkWaitForPresentKHR");/vkWaitForPresentKHR = NULL;/g' "$VOLK_FILE"
           sed -i 's/table->vkWaitForPresentKHR = (PFN_vkWaitForPresentKHR)load(context, "vkWaitForPresentKHR");/table->vkWaitForPresentKHR = NULL;/g' "$VOLK_FILE"
         fi
-        
-        HOOKS_FILE="src/hooks.cpp"
 
-        if [ -f "$HOOKS_FILE" ]; then
-          sed -i 's/createInfo.minImageCount = createInfo.minImageCount + 1/createInfo.minImageCount = 3/g' "$HOOKS_FILE"
+        # 4. 확장 기능 리스트 수정
+        DEVICE_FILE="framegen/src/core/device.cpp"
+        if [ -f "$DEVICE_FILE" ]; then
+          # 안드로이드 하드웨어 버퍼 확장을 사용하도록 유도
+          sed -i 's/VK_KHR_EXTERNAL_SEMAPHORE_FD_EXTENSION_NAME/VK_ANDROID_EXTERNAL_MEMORY_ANDROID_HARDWARE_BUFFER_EXTENSION_NAME/g' "$DEVICE_FILE"
         fi
-        
-        find . -type f \( -name "*.cpp" -o -name "*.hpp" \) | while read f; do
-          sed -i 's/VK_EXTERNAL_SEMAPHORE_HANDLE_TYPE_OPAQUE_FD_BIT/VK_EXTERNAL_SEMAPHORE_HANDLE_TYPE_SYNC_FD_BIT/g' "$f"
-        done
-        echo "Android Turnip patches applied."
         
     - name: Configure lsfg-vk
       run: |
