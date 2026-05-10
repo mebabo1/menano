@@ -60,6 +60,19 @@ jobs:
         find . -type f \( -name "*.cpp" -o -name "*.hpp" \) | while read f; do
           sed -i 's/VK_EXTERNAL_SEMAPHORE_HANDLE_TYPE_OPAQUE_FD_BIT/VK_EXTERNAL_SEMAPHORE_HANDLE_TYPE_SYNC_FD_BIT/g' "$f"
         done
+
+        SEMAPHORE_FILE="src/mini/semaphore.cpp"
+        if [ -f "$SEMAPHORE_FILE" ]; then
+          sed -i 's/\.handleTypes = VK_EXTERNAL_SEMAPHORE_HANDLE_TYPE_OPAQUE_FD_BIT/\.handleTypes = 0/g' "$SEMAPHORE_FILE"
+          sed -i 's/\.handleTypes = VK_EXTERNAL_SEMAPHORE_HANDLE_TYPE_SYNC_FD_BIT/\.handleTypes = 0/g' "$SEMAPHORE_FILE"
+          sed -i 's/Layer::ovkGetSemaphoreFdKHR(device, &fdInfo, fd)/VK_SUCCESS/g' "$SEMAPHORE_FILE"
+        fi
+
+        FRAMEGEN_SEMAPHORE_FILE="framegen/src/core/semaphore.cpp"
+        if [ -f "$FRAMEGEN_SEMAPHORE_FILE" ]; then
+          sed -i 's/\.handleTypes = VK_EXTERNAL_SEMAPHORE_HANDLE_TYPE_OPAQUE_FD_BIT/\.handleTypes = 0/g' "$FRAMEGEN_SEMAPHORE_FILE"
+          sed -i 's/\.handleTypes = VK_EXTERNAL_SEMAPHORE_HANDLE_TYPE_SYNC_FD_BIT/\.handleTypes = 0/g' "$FRAMEGEN_SEMAPHORE_FILE"
+        fi
         echo "Android Turnip patches applied."
 
         
