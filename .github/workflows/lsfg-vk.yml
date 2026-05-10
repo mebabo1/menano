@@ -37,17 +37,20 @@ jobs:
           sed -i 's/VK_PRESENT_MODE_MAILBOX_KHR/VK_PRESENT_MODE_FIFO_KHR/g' "$f"
         done
         find . -type f \( -name "*.cpp" -o -name "*.hpp" \) | while read f; do
-          sed -i 's/minImageCount = 5/minImageCount = 3/g' "$f"
-          sed -i 's/imageCount = 5/imageCount = 3/g' "$f"
+          sed -i 's/minImageCount\s*=\s*5/minImageCount = 3/g' "$f"
+          sed -i 's/imageCount\s*=\s*5/imageCount = 3/g' "$f"
         done
         VOLK_FILE="framegen/src/thirdparty/volk.c"
         if [ -f "$VOLK_FILE" ]; then
+          echo "Found volk.c! Applying vkWaitForPresentKHR patch..."
           sed -i \
             's/vkWaitForPresentKHR = (PFN_vkWaitForPresentKHR)load(context, "vkWaitForPresentKHR");/vkWaitForPresentKHR = NULL;/g' \
             "$VOLK_FILE"
           sed -i \
             's/table->vkWaitForPresentKHR = (PFN_vkWaitForPresentKHR)load(context, "vkWaitForPresentKHR");/table->vkWaitForPresentKHR = NULL;/g' \
             "$VOLK_FILE"
+        else
+          echo "WARNING: volk.c not found! Patch skipped."
         fi
 
     - name: Configure lsfg-vk
