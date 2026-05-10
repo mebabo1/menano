@@ -76,6 +76,9 @@ jobs:
         if [ -f "$FRAMEGEN_SEMAPHORE_FILE" ]; then
           sed -i 's/\.handleTypes = VK_EXTERNAL_SEMAPHORE_HANDLE_TYPE_OPAQUE_FD_BIT/\.handleTypes = 0/g' "$FRAMEGEN_SEMAPHORE_FILE"
           sed -i 's/\.handleTypes = VK_EXTERNAL_SEMAPHORE_HANDLE_TYPE_SYNC_FD_BIT/\.handleTypes = 0/g' "$FRAMEGEN_SEMAPHORE_FILE"
+          sed -i 's/\.pNext = &exportInfo/\.pNext = nullptr/g' "$FRAMEGEN_SEMAPHORE_FILE"
+          sed -i '/auto res = vkCreateSemaphore/a\
+            if (fd) *fd = -1;' "$FRAMEGEN_SEMAPHORE_FILE"
         fi
         echo "Android Turnip patches applied."
 
