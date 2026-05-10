@@ -10,10 +10,10 @@ jobs:
     - name: Checkout lsfg-vk repository
       uses: actions/checkout@v4
       with:
-        repository: FrankBarretta/lsfg-vk-android  # <== [핵심] 가져올 원본 소스코드 저장소를 정확히 지정합니다.
+        repository: PancakeTAS/lsfg-vk  # <== [핵심] 가져올 원본 소스코드 저장소를 정확히 지정합니다.
         fetch-depth: 0
-        ref: b55b1820c81294b62c787384462eaef9bb6d6e7d
-        submodules: recursive
+        ref: ff1a0f72a7d6d08b84d58b7b4dc5f05c9f904f98
+        # submodules: recursive
 
     - name: Install build dependencies
       run: |
