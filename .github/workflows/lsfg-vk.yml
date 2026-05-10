@@ -12,7 +12,7 @@ jobs:
       with:
         repository: FrankBarretta/lsfg-vk-android  # <== [핵심] 가져올 원본 소스코드 저장소를 정확히 지정합니다.
         fetch-depth: 0
-        ref: b55b1820c81294b62c787384462eaef9bb6d6e7d
+        ref: overlay-support
         submodules: recursive
 
     - name: Install build dependencies
