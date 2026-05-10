@@ -33,11 +33,12 @@ jobs:
         
     - name: Android Turnip patches
       run: |
-        echo "Applying Android Turnip compatibility patches..."
-        find . -type f \( -name "*.cpp" -o -name "*.hpp" \) -exec sed -i 's/VK_PRESENT_MODE_MAILBOX_KHR/VK_PRESENT_MODE_FIFO_KHR/g' {} +
-        find . -type f \( -name "*.cpp" -o -name "*.hpp" \) -exec sed -i 's/minImageCount = 5/minImageCount = 3/g' {} +
-        find . -type f \( -name "*.cpp" -o -name "*.hpp" \) -exec sed -i 's/imageCount = 5/imageCount = 3/g' {} +
-
+        find . -type f \( -name "*.cpp" -o -name "*.hpp" \) | while read f; do
+          sed -i 's/VK_PRESENT_MODE_MAILBOX_KHR/VK_PRESENT_MODE_FIFO_KHR/g' "$f"
+          sed -i 's/minImageCount\s*=\s*5/minImageCount = 3/g' "$f"
+          sed -i 's/imageCount\s*=\s*5/imageCount = 3/g' "$f"
+        done
+        
         DEVICE_FILE="framegen/src/core/device.cpp"
 
         if [ -f "$DEVICE_FILE" ]; then
