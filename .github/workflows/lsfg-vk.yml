@@ -33,10 +33,21 @@ jobs:
         
     - name: Apply Android Turnip workaround patches
       run: |
-        FILE="framegen/src/core/device.cpp"
-        if [ -f "$FILE" ]; then
-          sed -i 's/"VK_KHR_present_wait",/\/\/ "VK_KHR_present_wait",/g' "$FILE"
-          sed -i 's/"VK_KHR_present_id",/\/\/ "VK_KHR_present_id",/g' "$FILE"
+        find . -type f \( -name "*.cpp" -o -name "*.hpp" \) | while read f; do
+          sed -i 's/VK_PRESENT_MODE_MAILBOX_KHR/VK_PRESENT_MODE_FIFO_KHR/g' "$f"
+        done
+        find . -type f \( -name "*.cpp" -o -name "*.hpp" \) | while read f; do
+          sed -i 's/minImageCount = 5/minImageCount = 3/g' "$f"
+          sed -i 's/imageCount = 5/imageCount = 3/g' "$f"
+        done
+        VOLK_FILE="framegen/src/thirdparty/volk.c"
+        if [ -f "$VOLK_FILE" ]; then
+          sed -i \
+            's/vkWaitForPresentKHR = (PFN_vkWaitForPresentKHR)load(context, "vkWaitForPresentKHR");/vkWaitForPresentKHR = NULL;/g' \
+            "$VOLK_FILE"
+          sed -i \
+            's/table->vkWaitForPresentKHR = (PFN_vkWaitForPresentKHR)load(context, "vkWaitForPresentKHR");/table->vkWaitForPresentKHR = NULL;/g' \
+            "$VOLK_FILE"
         fi
 
     - name: Configure lsfg-vk
