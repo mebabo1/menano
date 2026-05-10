@@ -30,6 +30,12 @@ jobs:
         sudo rm -rf /usr/include/{vulkan,vk_video}
         sudo mv /tmp/vkh/include/{vulkan,vk_video} /usr/include/
         rm -rf /tmp/vkh
+
+    - name: Force Android AHB backend
+      run: |
+        find . -type f \( -name "*.cpp" -o -name "*.hpp" -o -name "*.c" \) | while read f; do
+          sed -i 's/#ifndef __ANDROID__/#if 0/g' "$f"
+        done
         
     - name: Configure lsfg-vk
       run: |
