@@ -36,7 +36,6 @@ jobs:
         export CXXFLAGS="-O2"
         
         cmake -B build -G Ninja \
-          -D__ANDROID__ \
           -DCMAKE_BUILD_TYPE=RelWithDebInfo \
           -DCMAKE_INSTALL_PREFIX=./target \
           -DCMAKE_SYSTEM_PROCESSOR=aarch64 \
