@@ -66,6 +66,10 @@ jobs:
           sed -i 's/\.handleTypes = VK_EXTERNAL_SEMAPHORE_HANDLE_TYPE_OPAQUE_FD_BIT/\.handleTypes = 0/g' "$SEMAPHORE_FILE"
           sed -i 's/\.handleTypes = VK_EXTERNAL_SEMAPHORE_HANDLE_TYPE_SYNC_FD_BIT/\.handleTypes = 0/g' "$SEMAPHORE_FILE"
           sed -i 's/Layer::ovkGetSemaphoreFdKHR(device, &fdInfo, fd)/VK_SUCCESS/g' "$SEMAPHORE_FILE"
+          sed -i '/auto res = Layer::ovkCreateSemaphore/a\
+            if (fd) *fd = -1;' "$SEMAPHORE_FILE"
+          sed -i 's/if (res != VK_SUCCESS || \*fd < 0)/if (false)/g' "$SEMAPHORE_FILE"
+          sed -i 's/\.pNext = &exportInfo/\.pNext = nullptr/g' "$SEMAPHORE_FILE"
         fi
 
         FRAMEGEN_SEMAPHORE_FILE="framegen/src/core/semaphore.cpp"
