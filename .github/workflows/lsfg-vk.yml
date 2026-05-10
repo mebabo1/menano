@@ -30,6 +30,15 @@ jobs:
         sudo mv /tmp/vkh/include/{vulkan,vk_video} /usr/include/
         rm -rf /tmp/vkh
 
+    - name: Apply Android Turnip workaround patches
+      run: |
+        echo "Applying Turnip semaphore workaround..."
+        FILE="layer/src/frame_generation_swapchain.cpp"
+        if [ -f "$FILE" ]; then
+          sed -i 's/VK_PRESENT_MODE_MAILBOX_KHR/VK_PRESENT_MODE_FIFO_KHR/g' "$FILE"
+        fi
+        echo "Patches applied."
+
     - name: Configure lsfg-vk
       run: |
         export CFLAGS="-O2"
