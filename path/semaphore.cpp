@@ -28,7 +28,6 @@ Semaphore::Semaphore(VkDevice device) {
 }
 
 Semaphore::Semaphore(VkDevice device, int* fd) {
-    // 1. SYNC_FD 타입으로 세마포어 생성 시도
     const VkExportSemaphoreCreateInfo exportInfo{
         .sType = VK_STRUCTURE_TYPE_EXPORT_SEMAPHORE_CREATE_INFO,
         .handleTypes = VK_EXTERNAL_SEMAPHORE_HANDLE_TYPE_SYNC_FD_BIT
@@ -41,13 +40,12 @@ Semaphore::Semaphore(VkDevice device, int* fd) {
     VkSemaphore semaphoreHandle{};
     auto res = Layer::ovkCreateSemaphore(device, &desc, nullptr, &semaphoreHandle);
     
-    // 2. 실패 시 일반 세마포어로 폴백
     if (res != VK_SUCCESS) {
+        fprintf(stderr, "lsfg-vk: [CRITICAL] Failed to create SYNC_FD semaphore (res: %d)\n", (int)res);
         const VkSemaphoreCreateInfo fallbackDesc{ .sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO };
         Layer::ovkCreateSemaphore(device, &fallbackDesc, nullptr, &semaphoreHandle);
         if (fd) *fd = -1; 
     } else {
-        // 3. SYNC_FD 추출 시도
         const VkSemaphoreGetFdInfoKHR fdInfo{
             .sType = VK_STRUCTURE_TYPE_SEMAPHORE_GET_FD_INFO_KHR,
             .semaphore = semaphoreHandle,
@@ -55,10 +53,16 @@ Semaphore::Semaphore(VkDevice device, int* fd) {
         };
         res = Layer::ovkGetSemaphoreFdKHR(device, &fdInfo, fd);
         
-        if (res != VK_SUCCESS && fd) *fd = -1;
+        if (res != VK_SUCCESS) {
+            // 이 로그가 찍힌다면 프레임 생성 기능이 제대로 안 될 확률이 99%입니다.
+            fprintf(stderr, "lsfg-vk: [WARNING] vkGetSemaphoreFdKHR failed (res: %d). Frame generation might STALL.\n", (int)res);
+            if (fd) *fd = -1;
+        } else {
+            // 이 로그가 찍혀야 프레임 생성이 성공한 것입니다.
+            fprintf(stderr, "lsfg-vk: [SUCCESS] Semaphore exported to FD: %d\n", *fd);
+        }
     }
 
-    // 4. 스마트 포인터에 저장 (기존 (...) 부분을 이 코드로 교체)
     this->semaphore = std::shared_ptr<VkSemaphore>(
         new VkSemaphore(semaphoreHandle),
         [dev = device](VkSemaphore* h) {
