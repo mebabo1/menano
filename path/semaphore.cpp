@@ -28,10 +28,10 @@ Semaphore::Semaphore(VkDevice device) {
 }
 
 Semaphore::Semaphore(VkDevice device, int* fd) {
-    // 1. SYNC_FD 타입으로 세마포어 생성
+    // 1. SYNC_FD 타입으로 세마포어 생성 시도
     const VkExportSemaphoreCreateInfo exportInfo{
         .sType = VK_STRUCTURE_TYPE_EXPORT_SEMAPHORE_CREATE_INFO,
-        .handleTypes = VK_EXTERNAL_SEMAPHORE_HANDLE_TYPE_SYNC_FD_BIT // 중요!
+        .handleTypes = VK_EXTERNAL_SEMAPHORE_HANDLE_TYPE_SYNC_FD_BIT
     };
     const VkSemaphoreCreateInfo desc{
         .sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO,
@@ -41,11 +41,11 @@ Semaphore::Semaphore(VkDevice device, int* fd) {
     VkSemaphore semaphoreHandle{};
     auto res = Layer::ovkCreateSemaphore(device, &desc, nullptr, &semaphoreHandle);
     
-    // 2. 만약 SYNC_FD 생성이 실패하면 일반 세마포어로 폴백 (기능 유지를 위해)
+    // 2. 실패 시 일반 세마포어로 폴백
     if (res != VK_SUCCESS) {
         const VkSemaphoreCreateInfo fallbackDesc{ .sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO };
         Layer::ovkCreateSemaphore(device, &fallbackDesc, nullptr, &semaphoreHandle);
-        *fd = -1; 
+        if (fd) *fd = -1; 
     } else {
         // 3. SYNC_FD 추출 시도
         const VkSemaphoreGetFdInfoKHR fdInfo{
@@ -55,9 +55,17 @@ Semaphore::Semaphore(VkDevice device, int* fd) {
         };
         res = Layer::ovkGetSemaphoreFdKHR(device, &fdInfo, fd);
         
-        if (res != VK_SUCCESS) *fd = -1;
+        if (res != VK_SUCCESS && fd) *fd = -1;
     }
 
-    // 세마포어 소멸자 등록 (동일)
-    this->semaphore = std::shared_ptr<VkSemaphore>(...);
+    // 4. 스마트 포인터에 저장 (기존 (...) 부분을 이 코드로 교체)
+    this->semaphore = std::shared_ptr<VkSemaphore>(
+        new VkSemaphore(semaphoreHandle),
+        [dev = device](VkSemaphore* h) {
+            if (h) {
+                Layer::ovkDestroySemaphore(dev, *h, nullptr);
+                delete h;
+            }
+        }
+    );
 }
