@@ -10,9 +10,9 @@ jobs:
     - name: Checkout lsfg-vk repository
       uses: actions/checkout@v4
       with:
-        repository: FrankBarretta/lsfg-vk-android  # <== [핵심] 가져올 원본 소스코드 저장소를 정확히 지정합니다.
+        repository: PancakeTAS/lsfg-vk  # <== [핵심] 가져올 원본 소스코드 저장소를 정확히 지정합니다.
         fetch-depth: 0
-        ref: Vortek-Turnip
+        ref: ff1a0f72a7d6d08b84d58b7b4dc5f05c9f904f98
         submodules: recursive
 
     - name: Install build dependencies
@@ -31,11 +31,54 @@ jobs:
         sudo mv /tmp/vkh/include/{vulkan,vk_video} /usr/include/
         rm -rf /tmp/vkh
 
-    - name: Force Android AHB backend
+    - name: Android Turnip patches
       run: |
-        find . -type f \( -name "*.cpp" -o -name "*.hpp" -o -name "*.c" \) | while read f; do
-          sed -i 's/#ifndef __ANDROID__/#if 0/g' "$f"
+        find . -type f \( -name "*.cpp" -o -name "*.hpp" \) | while read f; do
+          sed -i 's/VK_PRESENT_MODE_MAILBOX_KHR/VK_PRESENT_MODE_FIFO_KHR/g' "$f"
         done
+        
+        DEVICE_FILE="framegen/src/core/device.cpp"
+
+        if [ -f "$DEVICE_FILE" ]; then
+          sed -i '/VK_KHR_present_wait/d' "$DEVICE_FILE"
+          sed -i '/VK_KHR_present_id/d' "$DEVICE_FILE"
+        fi
+
+        VOLK_FILE="framegen/src/thirdparty/volk.c"
+
+        if [ -f "$VOLK_FILE" ]; then
+          sed -i 's/vkWaitForPresentKHR = (PFN_vkWaitForPresentKHR)load(context, "vkWaitForPresentKHR");/vkWaitForPresentKHR = NULL;/g' "$VOLK_FILE"
+          sed -i 's/table->vkWaitForPresentKHR = (PFN_vkWaitForPresentKHR)load(context, "vkWaitForPresentKHR");/table->vkWaitForPresentKHR = NULL;/g' "$VOLK_FILE"
+        fi
+        
+        HOOKS_FILE="src/hooks.cpp"
+
+        if [ -f "$HOOKS_FILE" ]; then
+          sed -i 's/createInfo.minImageCount = createInfo.minImageCount + 1/createInfo.minImageCount = 3/g' "$HOOKS_FILE"
+        fi
+        
+        find . -type f \( -name "*.cpp" -o -name "*.hpp" \) | while read f; do
+          sed -i 's/VK_EXTERNAL_SEMAPHORE_HANDLE_TYPE_OPAQUE_FD_BIT/VK_EXTERNAL_SEMAPHORE_HANDLE_TYPE_SYNC_FD_BIT/g' "$f"
+        done
+
+        SEMAPHORE_FILE="src/mini/semaphore.cpp"
+        if [ -f "$SEMAPHORE_FILE" ]; then
+          sed -i 's/\.handleTypes = VK_EXTERNAL_SEMAPHORE_HANDLE_TYPE_OPAQUE_FD_BIT/\.handleTypes = 0/g' "$SEMAPHORE_FILE"
+          sed -i 's/\.handleTypes = VK_EXTERNAL_SEMAPHORE_HANDLE_TYPE_SYNC_FD_BIT/\.handleTypes = 0/g' "$SEMAPHORE_FILE"
+          sed -i 's/Layer::ovkGetSemaphoreFdKHR(device, &fdInfo, fd)/VK_SUCCESS/g' "$SEMAPHORE_FILE"
+          sed -i 's/if (res != VK_SUCCESS || \*fd < 0)/if (false)/g' "$SEMAPHORE_FILE"
+          sed -i 's/\.pNext = &exportInfo/\.pNext = nullptr/g' "$SEMAPHORE_FILE"
+          sed -i '/res = Layer::ovkGetSemaphoreFdKHR/,/throw LSFG::vulkan_error/c\    *fd = -1; res = VK_SUCCESS;' "$SEMAPHORE_FILE"
+        fi
+
+        FRAMEGEN_SEMAPHORE_FILE="framegen/src/core/semaphore.cpp"
+        if [ -f "$FRAMEGEN_SEMAPHORE_FILE" ]; then
+          sed -i 's/\.handleTypes = VK_EXTERNAL_SEMAPHORE_HANDLE_TYPE_OPAQUE_FD_BIT/\.handleTypes = 0/g' "$FRAMEGEN_SEMAPHORE_FILE"
+          sed -i 's/\.handleTypes = VK_EXTERNAL_SEMAPHORE_HANDLE_TYPE_SYNC_FD_BIT/\.handleTypes = 0/g' "$FRAMEGEN_SEMAPHORE_FILE"
+          sed -i 's/\.pNext = &exportInfo/\.pNext = nullptr/g' "$FRAMEGEN_SEMAPHORE_FILE"
+        fi
+        curl -L https://raw.githubusercontent.com/mebabo1/menano/main/path/device.cpp -o framegen/src/core/device.cpp
+        echo "Android Turnip patches applied."
         
     - name: Configure lsfg-vk
       run: |
