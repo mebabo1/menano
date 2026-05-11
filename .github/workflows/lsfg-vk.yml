@@ -31,17 +31,6 @@ jobs:
         sudo mv /tmp/vkh/include/{vulkan,vk_video} /usr/include/
         rm -rf /tmp/vkh
 
-    - name: Fix Fundamental Vulkan Types (VkFlags)
-      run: |
-        find . -type f \( -name "*.cpp" -o -name "*.hpp" \) | while read f; do
-          sed -i '1i #ifndef VK_NO_PROTOTYPES\n#define VK_NO_PROTOTYPES\n#endif\n#include <vulkan/vulkan.h>\n#ifdef __ANDROID__\n#include <android/hardware_buffer.h>\n#endif' "$f"
-        done
-        TARGET_FILE="thirdparty/dxbc/include/util/util_small_vector.h"
-        if [ -f "$TARGET_FILE" ]; then
-          echo "Patching small_vector.h to fix m_ptr error..."
-          sed -i 's/u\.m_ptr/u.ptr/g' "$TARGET_FILE" || true
-        fi
-
     - name: Download Android Native Headers
       run: |
         sudo mkdir -p /usr/include/android
@@ -51,10 +40,7 @@ jobs:
         sudo chmod 644 /usr/include/android/*.h
  
     - name: Configure lsfg-vk
-      run: |
-        export CFLAGS="-O2 -D__ANDROID__ -DVK_NO_PROTOTYPES"
-        export CXXFLAGS="-O2 -D__ANDROID__ -DVK_NO_PROTOTYPES -fpermissive -std=c++17"
-        
+      run: |        
         cmake -B build -G Ninja \
           -DCMAKE_BUILD_TYPE=RelWithDebInfo \
           -DCMAKE_INSTALL_PREFIX=./target \
@@ -65,8 +51,6 @@ jobs:
           -DLSFGVK_BUILD_UI=OFF \
           -DLSFGVK_BUILD_CLI=OFF \
           -DLSFGVK_INSTALL_XDG_FILES=OFF \
-          -DCMAKE_C_FLAGS="-D__ANDROID__ -DVK_NO_PROTOTYPES" \
-          -DCMAKE_CXX_FLAGS="-O2 -D__ANDROID__ -DVK_NO_PROTOTYPES -fpermissive -std=c++17" \
           -DLSFGVK_LAYER_LIBRARY_PATH="/data/data/com.termux/files/usr/glibc/lib/liblsfg-vk-layer.so"
 
     - name: Build with Ninja
