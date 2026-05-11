@@ -31,25 +31,11 @@ jobs:
         sudo mv /tmp/vkh/include/{vulkan,vk_video} /usr/include/
         rm -rf /tmp/vkh
 
-    - name: Android Turnip patches
-      run: |
-        # curl -L https://github.com/mebabo1/menano/blob/main/framegen/public/lsfg_3_1.hpp -o framegen/public/lsfg_3_1.hpp
-        # curl -L https://github.com/mebabo1/menano/blob/main/framegen/public/lsfg_3_1p.hpp -o framegen/public/lsfg_3_1p.hpp
-        # curl -L https://github.com/mebabo1/menano/blob/main/framegen/v3.1_src/lsfg.cpp -o framegen/v3.1_src/lsfg.cpp
-        curl -L https://github.com/mebabo1/menano/blob/main/path/device.cpp -o framegen/src/core/device.cpp
-        # curl -L https://github.com/mebabo1/menano/blob/main/path/image.cpp -o  src/mini/image.cpp
-        # curl -L https://github.com/mebabo1/menano/blob/main/framegen/include/core/image.hpp -o framegen/include/core/image.hpp
-
-    - name: Force Android AHB backend
-      run: |
-        find . -type f \( -name "*.cpp" -o -name "*.hpp" -o -name "*.c" \) | while read f; do
-          sed -i 's/#ifndef __ANDROID__/#if 0/g' "$f"
-        done
  
     - name: Configure lsfg-vk
       run: |
-        export CFLAGS="-O2"
-        export CXXFLAGS="-O2"
+        export CFLAGS="-O2 -D__ANDROID__"   # C 컴파일러에 안드로이드 매크로 주입
+        export CXXFLAGS="-O2 -D__ANDROID__" # C++ 컴파일러에 안드로이드 매크로 주입
         
         cmake -B build -G Ninja \
           -DCMAKE_BUILD_TYPE=RelWithDebInfo \
@@ -61,6 +47,7 @@ jobs:
           -DLSFGVK_BUILD_UI=OFF \
           -DLSFGVK_BUILD_CLI=OFF \
           -DLSFGVK_INSTALL_XDG_FILES=OFF \
+          -DCMAKE_CXX_FLAGS="-D__ANDROID__" \
           -DLSFGVK_LAYER_LIBRARY_PATH="/data/data/com.termux/files/usr/glibc/lib/liblsfg-vk-layer.so"
 
     - name: Build with Ninja
