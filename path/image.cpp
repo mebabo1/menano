@@ -12,9 +12,10 @@ using namespace Mini;
 
 Image::Image(VkDevice device, VkPhysicalDevice physicalDevice,
         VkExtent2D extent, VkFormat format,
-        VkImageUsageFlags usage, VkImageAspectFlags aspectFlags)
+        VkImageUsageFlags usage, VkImageAspectFlags aspectFlags,
+        int* fd) // 인자 추가
         : extent(extent), format(format), aspectFlags(aspectFlags) {
-    // Convert VkFormat to AHardwareBuffer format
+        }
     uint32_t ahbFormat = 0;
     switch (format) {
         case VK_FORMAT_R8G8B8A8_UNORM:        ahbFormat = AHARDWAREBUFFER_FORMAT_R8G8B8A8_UNORM; break;
