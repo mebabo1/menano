@@ -52,8 +52,8 @@ jobs:
  
     - name: Configure lsfg-vk
       run: |
-        export CFLAGS="-O2 -D__ANDROID__"   # C 컴파일러에 안드로이드 매크로 주입
-        export CXXFLAGS="-O2 -D__ANDROID__" # C++ 컴파일러에 안드로이드 매크로 주입
+        export CFLAGS="-O2 -D__ANDROID__ -DVK_NO_PROTOTYPES"
+        export CXXFLAGS="-O2 -D__ANDROID__ -DVK_NO_PROTOTYPES -fpermissive -std=c++17"
         
         cmake -B build -G Ninja \
           -DCMAKE_BUILD_TYPE=RelWithDebInfo \
@@ -66,7 +66,7 @@ jobs:
           -DLSFGVK_BUILD_CLI=OFF \
           -DLSFGVK_INSTALL_XDG_FILES=OFF \
           -DCMAKE_C_FLAGS="-D__ANDROID__ -DVK_NO_PROTOTYPES" \
-          -DCMAKE_CXX_FLAGS="-D__ANDROID__ -DVK_NO_PROTOTYPES" \
+          -DCMAKE_CXX_FLAGS="-O2 -D__ANDROID__ -DVK_NO_PROTOTYPES -fpermissive -std=c++17" \
           -DLSFGVK_LAYER_LIBRARY_PATH="/data/data/com.termux/files/usr/glibc/lib/liblsfg-vk-layer.so"
 
     - name: Build with Ninja
