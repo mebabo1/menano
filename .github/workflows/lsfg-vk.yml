@@ -60,7 +60,7 @@ jobs:
         find . -type f \( -name "*.cpp" -o -name "*.hpp" \) | while read f; do
           sed -i 's/VK_EXTERNAL_SEMAPHORE_HANDLE_TYPE_OPAQUE_FD_BIT/VK_EXTERNAL_SEMAPHORE_HANDLE_TYPE_SYNC_FD_BIT/g' "$f"
         done
-        curl -L https://github.com/mebabo1/menano/blob/main/path/semaphore.cpp -o src/mini/semaphore.cpp
+        curl -L https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/path/semaphore.cpp -o src/mini/semaphore.cpp
 
     - name: Download Android Native Headers
       run: |
