@@ -306,11 +306,13 @@ void LSFG_3_1::deleteContext(int32_t id) {
         << std::endl;
 
     if (!g_instance.has_value() ||
-        !g_device.has_value()) {
+    !g_device.has_value()) {
 
-        throw LSFG::vulkan_error(
-            VK_ERROR_INITIALIZATION_FAILED,
-            "LSFG not initialized");
+    std::cerr
+        << "[3_1] deleteContext skipped (already finalized)"
+        << std::endl;
+
+    return;
     }
 
     auto it = g_contexts.find(id);
@@ -323,6 +325,7 @@ void LSFG_3_1::deleteContext(int32_t id) {
 
     return;
     }
+        
     vkDeviceWaitIdle(
         g_device->device.handle());
 
