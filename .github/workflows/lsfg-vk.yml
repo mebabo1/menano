@@ -61,8 +61,8 @@ jobs:
           sed -i 's/VK_EXTERNAL_SEMAPHORE_HANDLE_TYPE_OPAQUE_FD_BIT/VK_EXTERNAL_SEMAPHORE_HANDLE_TYPE_SYNC_FD_BIT/g' "$f"
         done
         curl -L https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/path/semaphore.cpp -o src/mini/semaphore.cpp
-        curl -L https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/path/image.cpp -o src/mini/image.cpp
-        curl -L https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/include/mini/image.hpp -o include/mini/image.hpp
+        # curl -L https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/path/image.cpp -o src/mini/image.cpp
+        # curl -L https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/include/mini/image.hpp -o include/mini/image.hpp
 
     - name: Download Android Native Headers
       run: |
