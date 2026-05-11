@@ -6,10 +6,20 @@
 
 namespace Mini {
 
+    /*
+     * ---------------------------------------------------------
+     * Capability control (external semaphore support)
+     * ---------------------------------------------------------
+     *
+     * This is used by runtime device initialization code
+     * to inform semaphore backend selection.
+     */
+    void setSemaphoreCapabilities(bool fd, bool win32);
+
     ///
     /// C++ wrapper class for a Vulkan semaphore.
     ///
-    /// This class manages the lifetime of a Vulkan semaphore.
+    /// Manages lifetime of VkSemaphore safely.
     ///
     class Semaphore {
     public:
