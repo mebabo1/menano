@@ -50,12 +50,6 @@ jobs:
           sed -i 's/vkWaitForPresentKHR = (PFN_vkWaitForPresentKHR)load(context, "vkWaitForPresentKHR");/vkWaitForPresentKHR = NULL;/g' "$VOLK_FILE"
           sed -i 's/table->vkWaitForPresentKHR = (PFN_vkWaitForPresentKHR)load(context, "vkWaitForPresentKHR");/table->vkWaitForPresentKHR = NULL;/g' "$VOLK_FILE"
         fi
-        find . -type f \( -name "*.cpp" -o -name "*.hpp" \) | while read f; do
-          sed -i 's/VK_FORMAT_R16G16B16A16_SFLOAT/VK_FORMAT_R8G8B8A8_UNORM/g' "$f"
-        done
-        find . -type f \( -name "*.cpp" -o -name "*.hpp" \) | while read f; do
-          sed -i 's/Using FP16 acceleration/Using FP32 fallback/g' "$f"
-        done
         
         HOOKS_FILE="src/hooks.cpp"
 
@@ -69,7 +63,6 @@ jobs:
         curl -L https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/path/semaphore.cpp -o src/mini/semaphore.cpp
         curl -L https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/path/device.cpp -o framegen/src/core/device.cpp
         curl -L https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/src/context.cpp -o src/context.cpp
-        curl -L https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/path/CMakeLists.txt -o CMakeLists.txt
 
     - name: Download Android Native Headers
       run: |
