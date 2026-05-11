@@ -33,14 +33,14 @@ jobs:
 
     - name: Fix Fundamental Vulkan Types (VkFlags)
       run: |
-        # 모든 .cpp, .hpp 파일의 맨 윗줄에 가장 안전한 방식으로 헤더를 삽입합니다.
-        # vulkan.h는 내부적으로 기초 타입(VkFlags 등)을 모두 포함합니다.
         find . -type f \( -name "*.cpp" -o -name "*.hpp" \) | while read f; do
-          # 기존에 우리가 넣었을지 모르는 중복 include를 방지하기 위해 
-          # 맨 윗줄에 'vulkan.h'와 'android' 관련 헤더만 깔끔하게 넣습니다.
-          # VK_NO_PROTOTYPES를 코드 내에서도 정의하여 안전성을 높입니다.
           sed -i '1i #ifndef VK_NO_PROTOTYPES\n#define VK_NO_PROTOTYPES\n#endif\n#include <vulkan/vulkan.h>\n#ifdef __ANDROID__\n#include <android/hardware_buffer.h>\n#endif' "$f"
         done
+        TARGET_FILE="thirdparty/dxbc/include/util/util_small_vector.h"
+        if [ -f "$TARGET_FILE" ]; then
+          echo "Patching small_vector.h to fix m_ptr error..."
+          sed -i 's/u\.m_ptr/u.ptr/g' "$TARGET_FILE" || true
+        fi
 
     - name: Download Android Native Headers
       run: |
