@@ -93,7 +93,8 @@ Semaphore::Semaphore(VkDevice device, int* fd) {
         semaphoreHandle == VK_NULL_HANDLE) {
 
         std::cerr
-            << "lsfg-vk: external semaphore unsupported, using fallback"
+            << "lsfg-vk: external semaphore unsupported, usingfallback"
+            << res
             << std::endl;
 
         const VkSemaphoreCreateInfo fallbackDesc{
@@ -151,6 +152,9 @@ Semaphore::Semaphore(VkDevice device, int* fd) {
 
             std::cerr
                 << "lsfg-vk: semaphore fd export failed, fallback mode"
+                << res
+                << " fd="
+                << (fd ? *fd : -1)
                 << std::endl;
 
             if (fd)
