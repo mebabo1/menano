@@ -4,10 +4,8 @@
 
 #include <vulkan/vulkan_core.h>
 
-#ifdef __ANDROID__
 #include <android/hardware_buffer.h>
 #include <android/log.h>
-#endif
 
 #include <memory>
 #include <cstdint>
