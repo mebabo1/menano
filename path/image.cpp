@@ -6,9 +6,7 @@
 #include <vulkan/vulkan_core.h>
 #include <vulkan/vulkan_android.h> // 1. 안드로이드 Vulkan 확장 헤더 추가
 
-#ifdef __ANDROID__
 #include <android/hardware_buffer.h> // 2. 안드로이드 하드웨어 버퍼 헤더 추가
-#endif
 
 #include <memory>
 #include <cstdint>
