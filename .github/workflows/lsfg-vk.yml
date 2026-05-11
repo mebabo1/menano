@@ -48,7 +48,8 @@ jobs:
           -DLSFGVK_BUILD_UI=OFF \
           -DLSFGVK_BUILD_CLI=OFF \
           -DLSFGVK_INSTALL_XDG_FILES=OFF \
-          -DCMAKE_CXX_FLAGS="-D__ANDROID__" \
+          -DCMAKE_C_FLAGS="-D__ANDROID__ -I$NDK_PATH/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/include" \
+          -DCMAKE_CXX_FLAGS="-D__ANDROID__ -I$NDK_PATH/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/include" \
           -DLSFGVK_LAYER_LIBRARY_PATH="/data/data/com.termux/files/usr/glibc/lib/liblsfg-vk-layer.so"
 
     - name: Build with Ninja
