@@ -17,9 +17,9 @@ using namespace LSFG::Core;
  * Minimal required extensions (cleaned)
  */
 const std::vector<const char*> requiredExtensions = {
-    VK_KHR_swapchain,
-    VK_KHR_external_memory_fd,
-    VK_KHR_external_semaphore_fd
+    "VK_KHR_swapchain",
+    "VK_KHR_external_memory_fd",
+    "VK_KHR_external_semaphore_fd"
 };
 
 Device::Device(
