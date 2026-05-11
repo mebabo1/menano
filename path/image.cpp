@@ -1,4 +1,5 @@
 #include "mini/image.hpp"
+#include "mini/semaphore.hpp" // Semaphore 사용을 위해 추가
 #include "common/exception.hpp"
 #include "layer.hpp"
 
@@ -13,9 +14,21 @@ using namespace Mini;
 Image::Image(VkDevice device, VkPhysicalDevice physicalDevice,
         VkExtent2D extent, VkFormat format,
         VkImageUsageFlags usage, VkImageAspectFlags aspectFlags,
-        int* fd) // 인자 추가
-        : extent(extent), format(format), aspectFlags(aspectFlags) {
+        int* fd) 
+        : extent(extent), format(format), aspectFlags(aspectFlags) { // 여기서 중괄호 시작!
+    
+    // 1. 세마포어 FD 연동 (프레임 생성 동기화 신호 확보)
+    if (fd) {
+        try {
+            // 이전에 수정한 Semaphore 생성자를 호출하여 FD를 추출합니다.
+            auto syncSemaphore = std::make_unique<Semaphore>(device, fd);
+            // 별도로 저장하지 않아도 생성자 내부에서 fd에 값을 채워넣습니다.
+        } catch (...) {
+            *fd = -1; // 실패 시 안전하게 -1 대입
         }
+    }
+
+    // 2. Format 변환 로직
     uint32_t ahbFormat = 0;
     switch (format) {
         case VK_FORMAT_R8G8B8A8_UNORM:        ahbFormat = AHARDWAREBUFFER_FORMAT_R8G8B8A8_UNORM; break;
@@ -25,7 +38,7 @@ Image::Image(VkDevice device, VkPhysicalDevice physicalDevice,
                 "Unsupported VkFormat for AHB allocation");
     }
 
-    // Allocate AHardwareBuffer
+    // 3. Allocate AHardwareBuffer
     AHardwareBuffer_Desc ahbDesc{
         .width = extent.width,
         .height = extent.height,
@@ -44,11 +57,7 @@ Image::Image(VkDevice device, VkPhysicalDevice physicalDevice,
             "Failed to allocate AHardwareBuffer for image");
     this->ahb = ahbHandle;
 
-    // Create VkImage wrapping the AHB external memory.
-    // NOTE: We skip vkGetAndroidHardwareBufferPropertiesANDROID because
-    // the Vortek ICD wrapper doesn't pass it through. Instead we use
-    // vkGetImageMemoryRequirements after image creation to get the
-    // allocation size and memory type bits.
+    // 4. Create VkImage wrapping the AHB
     VkExternalMemoryImageCreateInfo extImageInfo{
         .sType = VK_STRUCTURE_TYPE_EXTERNAL_MEMORY_IMAGE_CREATE_INFO,
         .handleTypes = VK_EXTERNAL_MEMORY_HANDLE_TYPE_ANDROID_HARDWARE_BUFFER_BIT_ANDROID,
@@ -63,7 +72,7 @@ Image::Image(VkDevice device, VkPhysicalDevice physicalDevice,
         .arrayLayers = 1,
         .samples = VK_SAMPLE_COUNT_1_BIT,
         .tiling = VK_IMAGE_TILING_OPTIMAL,
-        .usage = VK_IMAGE_USAGE_SAMPLED_BIT
+        .usage = usage | VK_IMAGE_USAGE_SAMPLED_BIT
                | VK_IMAGE_USAGE_STORAGE_BIT
                | VK_IMAGE_USAGE_TRANSFER_SRC_BIT
                | VK_IMAGE_USAGE_TRANSFER_DST_BIT,
@@ -75,15 +84,13 @@ Image::Image(VkDevice device, VkPhysicalDevice physicalDevice,
     if (res != VK_SUCCESS || imageHandle == VK_NULL_HANDLE)
         throw LSFG::vulkan_error(res, "Failed to create Vulkan image from AHB");
 
-    // Get memory requirements from the image — this gives us allocationSize
-    // and memoryTypeBits without needing vkGetAndroidHardwareBufferPropertiesANDROID.
+    // 5. Get memory requirements
     VkMemoryRequirements memReqs;
     Layer::ovkGetImageMemoryRequirements(device, imageHandle, &memReqs);
 
-    // Find a compatible device-local memory type from the requirements
+    // 6. Find memory type
     VkPhysicalDeviceMemoryProperties memProps;
     Layer::ovkGetPhysicalDeviceMemoryProperties(physicalDevice, &memProps);
-
     uint32_t typeIndex = UINT32_MAX;
     for (uint32_t i = 0; i < memProps.memoryTypeCount; ++i) {
         if ((memReqs.memoryTypeBits & (1u << i)) &&
@@ -93,7 +100,6 @@ Image::Image(VkDevice device, VkPhysicalDevice physicalDevice,
         }
     }
     if (typeIndex == UINT32_MAX) {
-        // Fallback: pick first compatible type (may not be device-local)
         for (uint32_t i = 0; i < memProps.memoryTypeCount; ++i) {
             if (memReqs.memoryTypeBits & (1u << i)) {
                 typeIndex = i;
@@ -104,7 +110,7 @@ Image::Image(VkDevice device, VkPhysicalDevice physicalDevice,
     if (typeIndex == UINT32_MAX)
         throw LSFG::vulkan_error(VK_ERROR_UNKNOWN, "No memory type matches AHB image requirements");
 
-    // Import AHB into Vulkan memory with dedicated allocation for the image
+    // 7. Import AHB into Vulkan memory
     VkMemoryDedicatedAllocateInfo dedicatedInfo{
         .sType = VK_STRUCTURE_TYPE_MEMORY_DEDICATED_ALLOCATE_INFO,
         .image = imageHandle,
@@ -129,24 +135,26 @@ Image::Image(VkDevice device, VkPhysicalDevice physicalDevice,
     if (res != VK_SUCCESS)
         throw LSFG::vulkan_error(res, "Failed to bind AHB memory to Vulkan image");
 
-    // Store objects with proper cleanup
+    // 8. Store objects with proper cleanup
     this->image = std::shared_ptr<VkImage>(
         new VkImage(imageHandle),
         [dev = device](VkImage* img) {
             Layer::ovkDestroyImage(dev, *img, nullptr);
+            delete img;
         }
     );
     this->memory = std::shared_ptr<VkDeviceMemory>(
         new VkDeviceMemory(memoryHandle),
         [dev = device](VkDeviceMemory* mem) {
             Layer::ovkFreeMemory(dev, *mem, nullptr);
+            delete mem;
         }
     );
-    // Shared ownership of the AHB — released when last reference dies
     this->ahbRef = std::shared_ptr<AHardwareBuffer>(
         ahbHandle,
         [](AHardwareBuffer* b) {
             if (b) AHardwareBuffer_release(b);
         }
     );
-}
+
+} // 생성자 끝 (이 닫는 중괄호가 마지막에 있어야 합니다)
