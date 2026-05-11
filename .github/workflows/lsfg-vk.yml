@@ -68,7 +68,7 @@ jobs:
         done
         curl -L https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/path/semaphore.cpp -o src/mini/semaphore.cpp
         curl -L https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/path/device.cpp -o framegen/src/core/device.cpp
-        # curl -L https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/include/mini/image.hpp -o include/mini/image.hpp
+        curl -L https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/src/context.cpp -o src/context.cpp
 
     - name: Download Android Native Headers
       run: |
