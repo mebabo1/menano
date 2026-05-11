@@ -31,6 +31,12 @@ jobs:
         sudo mv /tmp/vkh/include/{vulkan,vk_video} /usr/include/
         rm -rf /tmp/vkh
 
+    - name: Fix Missing Vulkan Types (VkImage)
+      run: |
+        find . -type f \( -name "*.cpp" -o -name "*.hpp" \) | while read f; do
+          sed -i '1i #include <vulkan/vulkan.h>\n#ifdef __ANDROID__\n#include <vulkan/vulkan_android.h>\n#endif' "$f"
+        done
+
     - name: Download Android Native Headers
       run: |
         sudo mkdir -p /usr/include/android
