@@ -33,12 +33,12 @@ jobs:
 
     - name: Android Turnip patches
       run: |
-        curl -L https://github.com/mebabo1/menano/blob/main/framegen/public/lsfg_3_1.hpp -o framegen/public/lsfg_3_1.hpp
-        curl -L https://github.com/mebabo1/menano/blob/main/framegen/public/lsfg_3_1p.hpp -o framegen/public/lsfg_3_1p.hpp
-        curl -L https://github.com/mebabo1/menano/blob/main/framegen/v3.1_src/lsfg.cpp -o framegen/v3.1_src/lsfg.cpp
+        # curl -L https://github.com/mebabo1/menano/blob/main/framegen/public/lsfg_3_1.hpp -o framegen/public/lsfg_3_1.hpp
+        # curl -L https://github.com/mebabo1/menano/blob/main/framegen/public/lsfg_3_1p.hpp -o framegen/public/lsfg_3_1p.hpp
+        # curl -L https://github.com/mebabo1/menano/blob/main/framegen/v3.1_src/lsfg.cpp -o framegen/v3.1_src/lsfg.cpp
         curl -L https://github.com/mebabo1/menano/blob/main/path/device.cpp -o framegen/src/core/device.cpp
-        curl -L https://github.com/mebabo1/menano/blob/main/path/image.cpp -o  src/mini/image.cpp
-        curl -L https://github.com/mebabo1/menano/blob/main/framegen/include/core/image.hpp -o framegen/include/core/image.hpp
+        # curl -L https://github.com/mebabo1/menano/blob/main/path/image.cpp -o  src/mini/image.cpp
+        # curl -L https://github.com/mebabo1/menano/blob/main/framegen/include/core/image.hpp -o framegen/include/core/image.hpp
 
     - name: Force Android AHB backend
       run: |
