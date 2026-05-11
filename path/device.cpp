@@ -14,47 +14,31 @@
 using namespace LSFG::Core;
 
 /*
- * Android / Termux safe extension set
- *
- * Keep: VK_KHR_EXTERNAL_MEMORY_FD_EXTENSION_NAME, VK_KHR_EXTERNAL_SEMAPHORE_FD_EXTENSION_NAME
- * - external fd memory
- * - external fd semaphore
- * - sync2
- * - timeline semaphore support
- *
- * Remove:
- * - robustness2 dependency
- * - AHB dependency
+ * Minimal required extensions (cleaned)
  */
 const std::vector<const char*> requiredExtensions = {
-    "VK_KHR_external_memory",
-    "VK_KHR_external_memory_fd",
-
-    "VK_KHR_external_semaphore",
-    "VK_KHR_external_semaphore_fd",
-
-    "VK_EXT_robustness2"
+    VK_KHR_swapchain,
+    VK_KHR_external_memory_fd,
+    VK_KHR_external_semaphore_fd
 };
 
 Device::Device(
-        const Instance& instance,
-        uint64_t deviceUUID,
-        bool forceDisableFp16) {
+    const Instance& instance,
+    uint64_t deviceUUID,
+    bool forceDisableFp16)
+{
+    /* -----------------------------------------------------
+     * 1. Enumerate physical devices
+     * ----------------------------------------------------- */
+    uint32_t deviceCount = 0;
 
-    /*
-     * Enumerate physical devices
-     */
-    uint32_t deviceCount{};
-
-    auto res = vkEnumeratePhysicalDevices(
+    VkResult res = vkEnumeratePhysicalDevices(
         instance.handle(),
         &deviceCount,
         nullptr);
 
     if (res != VK_SUCCESS || deviceCount == 0) {
-        throw LSFG::vulkan_error(
-            res,
-            "Failed to enumerate physical devices");
+        throw LSFG::vulkan_error(res, "No Vulkan devices found");
     }
 
     std::vector<VkPhysicalDevice> devices(deviceCount);
@@ -65,278 +49,220 @@ Device::Device(
         devices.data());
 
     if (res != VK_SUCCESS) {
-        throw LSFG::vulkan_error(
-            res,
-            "Failed to get physical devices");
+        throw LSFG::vulkan_error(res, "Failed to enumerate devices");
     }
 
-    /*
-     * Select device by UUID
-     */
+    /* -----------------------------------------------------
+     * 2. Select device
+     * ----------------------------------------------------- */
     std::optional<VkPhysicalDevice> physicalDevice;
 
-    for (const auto& device : devices) {
-        VkPhysicalDeviceProperties properties{};
-        vkGetPhysicalDeviceProperties(device, &properties);
+    for (auto device : devices) {
+        VkPhysicalDeviceProperties props{};
+        vkGetPhysicalDeviceProperties(device, &props);
 
-        const uint64_t uuid =
-            (static_cast<uint64_t>(properties.vendorID) << 32)
-            | properties.deviceID;
+        uint64_t uuid =
+            (uint64_t(props.vendorID) << 32) | props.deviceID;
 
-        std::cerr
-            << "Detected GPU vendor="
-            << properties.vendorID
-            << " device="
-            << properties.deviceID
-            << std::endl;
+        std::cerr << "GPU vendor=" << props.vendorID
+                  << " device=" << props.deviceID << std::endl;
 
-        if (deviceUUID == uuid) {
+        if (uuid == deviceUUID) {
             physicalDevice = device;
-
-            std::cerr
-                << "Matched target GPU"
-                << std::endl;
-
+            std::cerr << "Matched target GPU" << std::endl;
             break;
         }
     }
 
-    /*
-     * Fallback to first GPU
-     * (important for Wine/Turnip edge cases)
-     */
     if (!physicalDevice && !devices.empty()) {
-        std::cerr
-            << "Falling back to first Vulkan GPU"
-            << std::endl;
-
+        std::cerr << "Fallback to first GPU" << std::endl;
         physicalDevice = devices[0];
     }
 
     if (!physicalDevice) {
         throw LSFG::vulkan_error(
             VK_ERROR_INITIALIZATION_FAILED,
-            "Could not find physical device");
+            "No valid GPU found");
     }
 
-    /*
-     * Queue family selection
-     *
-     * Prefer graphics+compute unified queue.
-     * Turnip behaves better with unified queues.
-     */
-    uint32_t familyCount{};
+    /* -----------------------------------------------------
+     * 3. Queue family selection
+     * ----------------------------------------------------- */
+    uint32_t familyCount = 0;
 
     vkGetPhysicalDeviceQueueFamilyProperties(
         *physicalDevice,
         &familyCount,
         nullptr);
 
-    std::vector<VkQueueFamilyProperties>
-        queueFamilies(familyCount);
+    std::vector<VkQueueFamilyProperties> families(familyCount);
 
     vkGetPhysicalDeviceQueueFamilyProperties(
         *physicalDevice,
         &familyCount,
-        queueFamilies.data());
+        families.data());
 
-    std::optional<uint32_t> computeFamilyIdx;
+    std::optional<uint32_t> queueFamily;
 
-    /*
-     * Prefer graphics+compute queue
-     */
-    for (uint32_t i = 0; i < familyCount; ++i) {
-        const auto flags = queueFamilies[i].queueFlags;
+    for (uint32_t i = 0; i < familyCount; i++) {
+        auto flags = families[i].queueFlags;
 
         if ((flags & VK_QUEUE_GRAPHICS_BIT) &&
             (flags & VK_QUEUE_COMPUTE_BIT)) {
-
-            computeFamilyIdx = i;
+            queueFamily = i;
             break;
         }
     }
 
-    /*
-     * Fallback to compute-only queue
-     */
-    if (!computeFamilyIdx) {
-        for (uint32_t i = 0; i < familyCount; ++i) {
-            if (queueFamilies[i].queueFlags &
-                VK_QUEUE_COMPUTE_BIT) {
-
-                computeFamilyIdx = i;
+    if (!queueFamily) {
+        for (uint32_t i = 0; i < familyCount; i++) {
+            if (families[i].queueFlags & VK_QUEUE_COMPUTE_BIT) {
+                queueFamily = i;
                 break;
             }
         }
     }
 
-    if (!computeFamilyIdx) {
+    if (!queueFamily) {
         throw LSFG::vulkan_error(
             VK_ERROR_INITIALIZATION_FAILED,
-            "No compute queue family found");
+            "No compute queue found");
     }
 
-    std::cerr
-        << "Selected queue family = "
-        << *computeFamilyIdx
-        << std::endl;
+    std::cerr << "Queue family = " << *queueFamily << std::endl;
 
-    /*
-     * Probe Vulkan 1.2 features
-     */
-    VkPhysicalDeviceVulkan12Features
-        supported12Features{
-            .sType =
-                VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES
-        };
-
-    VkPhysicalDeviceFeatures2 supportedFeatures{
-        .sType =
-            VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2,
-        .pNext = &supported12Features
+    /* -----------------------------------------------------
+     * 4. Feature query
+     * ----------------------------------------------------- */
+    VkPhysicalDeviceVulkan12Features features12{
+        .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES
     };
 
-    vkGetPhysicalDeviceFeatures2(
-        *physicalDevice,
-        &supportedFeatures);
+    VkPhysicalDeviceFeatures2 features2{
+        .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2,
+        .pNext = &features12
+    };
 
-    /*
-     * FP16 support
-     */
-    this->supportsFP16 =
+    vkGetPhysicalDeviceFeatures2(*physicalDevice, &features2);
+
+    bool fp16 =
         !forceDisableFp16 &&
-        supported12Features.shaderFloat16;
+        features12.shaderFloat16;
 
-    if (this->supportsFP16) {
-        std::cerr
-            << "lsfg-vk: Using FP16 acceleration"
-            << std::endl;
-    } else {
-        std::cerr
-            << "lsfg-vk: Using FP32 path"
-            << std::endl;
-    }
+    this->supportsFP16 = fp16;
 
-    /*
-     * Queue creation
-     */
-    const float queuePriority = 1.0f;
+    std::cerr << (fp16 ?
+        "FP16 enabled" :
+        "FP32 fallback") << std::endl;
 
-    const VkDeviceQueueCreateInfo
-        computeQueueDesc{
-            .sType =
-                VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO,
-            .queueFamilyIndex = *computeFamilyIdx,
-            .queueCount = 1,
-            .pQueuePriorities = &queuePriority
-        };
+    /* -----------------------------------------------------
+     * 5. External semaphore capability query (IMPORTANT FIX)
+     * ----------------------------------------------------- */
+    VkPhysicalDeviceExternalSemaphoreInfo semInfo{
+        .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_EXTERNAL_SEMAPHORE_INFO,
+        .handleType = VK_EXTERNAL_SEMAPHORE_HANDLE_TYPE_OPAQUE_FD_BIT
+    };
 
-    /*
-     * Vulkan 1.3 features
-     *
-     * Keep synchronization2 enabled.
-     */
-    VkPhysicalDeviceVulkan13Features
-        features13{
-            .sType =
-                VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_3_FEATURES,
-            .synchronization2 = VK_TRUE
-        };
+    VkExternalSemaphoreProperties semProps{
+        .sType = VK_STRUCTURE_TYPE_EXTERNAL_SEMAPHORE_PROPERTIES
+    };
 
-    /*
-     * Vulkan 1.2 features
-     */
-    const VkPhysicalDeviceVulkan12Features
-        features12{
-            .sType =
-                VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES,
-            .pNext = &features13,
+    vkGetPhysicalDeviceExternalSemaphoreProperties(
+        *physicalDevice,
+        &semInfo,
+        &semProps);
 
-            .shaderFloat16 =
-                this->supportsFP16,
+    bool supportsFdSemaphore =
+        semProps.externalSemaphoreFeatures &
+        VK_EXTERNAL_SEMAPHORE_FEATURE_EXPORTABLE_BIT;
 
-            .timelineSemaphore =
-                VK_TRUE,
+    /* -----------------------------------------------------
+     * 6. Capability register (global state for Mini layer)
+     * ----------------------------------------------------- */
+    Mini::setSemaphoreCapabilities(
+        supportsFdSemaphore,
+        false /* win32 ignored on Android */);
 
-            .vulkanMemoryModel =
-                VK_TRUE
-        };
+    /* -----------------------------------------------------
+     * 7. Queue create
+     * ----------------------------------------------------- */
+    float priority = 1.0f;
 
-    /*
-     * Device creation
-     */
-    const VkDeviceCreateInfo
-        deviceCreateInfo{
-            .sType =
-                VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO,
+    VkDeviceQueueCreateInfo queueInfo{
+        .sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO,
+        .queueFamilyIndex = *queueFamily,
+        .queueCount = 1,
+        .pQueuePriorities = &priority
+    };
 
-            .pNext = &features12,
+    /* -----------------------------------------------------
+     * 8. Device features chain
+     * ----------------------------------------------------- */
+    VkPhysicalDeviceVulkan13Features features13{
+        .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_3_FEATURES,
+        .synchronization2 = VK_TRUE
+    };
 
-            .queueCreateInfoCount = 1,
-            .pQueueCreateInfos =
-                &computeQueueDesc,
+    features12.pNext = &features13;
+    features12.timelineSemaphore = VK_TRUE;
+    features12.vulkanMemoryModel = VK_TRUE;
+    features12.shaderFloat16 = fp16;
 
-            .enabledExtensionCount =
-                static_cast<uint32_t>(
-                    requiredExtensions.size()),
+    /* -----------------------------------------------------
+     * 9. Device create
+     * ----------------------------------------------------- */
+    VkDeviceCreateInfo createInfo{
+        .sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO,
+        .pNext = &features12,
+        .queueCreateInfoCount = 1,
+        .pQueueCreateInfos = &queueInfo,
+        .enabledExtensionCount =
+            static_cast<uint32_t>(requiredExtensions.size()),
+        .ppEnabledExtensionNames = requiredExtensions.data()
+    };
 
-            .ppEnabledExtensionNames =
-                requiredExtensions.data()
-        };
-
-    VkDevice deviceHandle{};
+    VkDevice deviceHandle = VK_NULL_HANDLE;
 
     res = vkCreateDevice(
         *physicalDevice,
-        &deviceCreateInfo,
+        &createInfo,
         nullptr,
         &deviceHandle);
 
-    std::cerr
-        << "vkCreateDevice result = "
-        << res
-        << std::endl;
+    std::cerr << "vkCreateDevice = " << res << std::endl;
 
-    /*
-     * IMPORTANT:
-     * use logical OR (||)
-     * NOT bitwise OR (|)
-     */
-    if (res != VK_SUCCESS ||
-        deviceHandle == VK_NULL_HANDLE) {
-
+    if (res != VK_SUCCESS || deviceHandle == VK_NULL_HANDLE) {
         throw LSFG::vulkan_error(
             res,
-            "Failed to create logical device");
+            "Device creation failed");
     }
 
-    /*
-     * Load Vulkan device symbols
-     */
+    /* -----------------------------------------------------
+     * 10. Load volk
+     * ----------------------------------------------------- */
     volkLoadDevice(deviceHandle);
 
-    /*
-     * Get compute queue
-     */
-    VkQueue queueHandle{};
-
+    /* -----------------------------------------------------
+     * 11. Get queue
+     * ----------------------------------------------------- */
+    VkQueue queue;
     vkGetDeviceQueue(
         deviceHandle,
-        *computeFamilyIdx,
+        *queueFamily,
         0,
-        &queueHandle);
+        &queue);
 
-    /*
-     * Store handles
-     */
-    this->computeQueue = queueHandle;
-    this->computeFamilyIdx = *computeFamilyIdx;
+    /* -----------------------------------------------------
+     * 12. store
+     * ----------------------------------------------------- */
+    this->computeQueue = queue;
+    this->computeFamilyIdx = *queueFamily;
     this->physicalDevice = *physicalDevice;
 
     this->device = std::shared_ptr<VkDevice>(
         new VkDevice(deviceHandle),
-        [](VkDevice* device) {
-            vkDestroyDevice(*device, nullptr);
+        [](VkDevice* dev) {
+            vkDestroyDevice(*dev, nullptr);
         }
     );
 }
