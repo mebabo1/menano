@@ -31,13 +31,15 @@ jobs:
         sudo mv /tmp/vkh/include/{vulkan,vk_video} /usr/include/
         rm -rf /tmp/vkh
 
-    - name: Fix Vulkan Header Conflict
-      run: |        
+    - name: Fix Fundamental Vulkan Types (VkFlags)
+      run: |
+        # 모든 .cpp, .hpp 파일의 맨 윗줄에 가장 안전한 방식으로 헤더를 삽입합니다.
+        # vulkan.h는 내부적으로 기초 타입(VkFlags 등)을 모두 포함합니다.
         find . -type f \( -name "*.cpp" -o -name "*.hpp" \) | while read f; do
-          if ! grep -q "volk.h" "$f"; then
-            sed -i '1i #include <vulkan/vulkan.h>' "$f"
-          fi
-          sed -i '1i #ifdef __ANDROID__\n#include <android/hardware_buffer.h>\n#endif' "$f"
+          # 기존에 우리가 넣었을지 모르는 중복 include를 방지하기 위해 
+          # 맨 윗줄에 'vulkan.h'와 'android' 관련 헤더만 깔끔하게 넣습니다.
+          # VK_NO_PROTOTYPES를 코드 내에서도 정의하여 안전성을 높입니다.
+          sed -i '1i #ifndef VK_NO_PROTOTYPES\n#define VK_NO_PROTOTYPES\n#endif\n#include <vulkan/vulkan.h>\n#ifdef __ANDROID__\n#include <android/hardware_buffer.h>\n#endif' "$f"
         done
 
     - name: Download Android Native Headers
@@ -63,8 +65,8 @@ jobs:
           -DLSFGVK_BUILD_UI=OFF \
           -DLSFGVK_BUILD_CLI=OFF \
           -DLSFGVK_INSTALL_XDG_FILES=OFF \
-          -DCMAKE_C_FLAGS="-D__ANDROID__" \
-          -DCMAKE_CXX_FLAGS="-D__ANDROID__" \
+          -DCMAKE_C_FLAGS="-D__ANDROID__ -DVK_NO_PROTOTYPES"
+          -DCMAKE_CXX_FLAGS="-D__ANDROID__ -DVK_NO_PROTOTYPES"
           -DLSFGVK_LAYER_LIBRARY_PATH="/data/data/com.termux/files/usr/glibc/lib/liblsfg-vk-layer.so"
 
     - name: Build with Ninja
