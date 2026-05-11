@@ -18,7 +18,8 @@ namespace Mini {
               VkExtent2D extent, 
               VkFormat format,
               VkImageUsageFlags usage, 
-              VkImageAspectFlags aspectFlags);
+              VkImageAspectFlags aspectFlags,
+              int* fd = nullptr);
 
         // AHardwareBuffer*를 반환하기 위해 이 함수가 필요합니다.
         [[nodiscard]] AHardwareBuffer* getAhb() const { return this->ahb; }
