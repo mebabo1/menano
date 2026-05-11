@@ -317,11 +317,12 @@ void LSFG_3_1::deleteContext(int32_t id) {
 
     if (it == g_contexts.end()) {
 
-        throw LSFG::vulkan_error(
-            VK_ERROR_DEVICE_LOST,
-            "No such context");
-    }
+    std::cerr
+        << "[3_1] deleteContext skipped (missing context)"
+        << std::endl;
 
+    return;
+    }
     vkDeviceWaitIdle(
         g_device->device.handle());
 
