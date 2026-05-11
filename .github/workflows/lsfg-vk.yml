@@ -77,7 +77,7 @@ jobs:
           sed -i 's/\.handleTypes = VK_EXTERNAL_SEMAPHORE_HANDLE_TYPE_SYNC_FD_BIT/\.handleTypes = 0/g' "$FRAMEGEN_SEMAPHORE_FILE"
           sed -i 's/\.pNext = &exportInfo/\.pNext = nullptr/g' "$FRAMEGEN_SEMAPHORE_FILE"
         fi
-        curl -L https://raw.githubusercontent.com/mebabo1/menano/main/path/device.cpp -o framegen/src/core/device.cpp
+        curl -L https://github.com/mebabo1/menano/blob/main/path/device.cpp -o framegen/src/core/device.cpp
         echo "Android Turnip patches applied."
 
     - name: Force Android AHB backend
