@@ -1,9 +1,14 @@
 #include "mini/image.hpp"
-#include "mini/semaphore.hpp" // Semaphore 사용을 위해 추가
+#include "mini/semaphore.hpp"
 #include "common/exception.hpp"
 #include "layer.hpp"
 
 #include <vulkan/vulkan_core.h>
+#include <vulkan/vulkan_android.h> // 1. 안드로이드 Vulkan 확장 헤더 추가
+
+#ifdef __ANDROID__
+#include <android/hardware_buffer.h> // 2. 안드로이드 하드웨어 버퍼 헤더 추가
+#endif
 
 #include <memory>
 #include <cstdint>
