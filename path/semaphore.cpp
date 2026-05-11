@@ -12,15 +12,18 @@ using namespace Mini;
 /*
  * NOTE:
  * Semaphore creation must be backend-aware.
- * Do NOT assume FD support on all drivers (Turnip/Mesa/Android hybrid).
+ * Do NOT assume FD/Win32 support on all drivers.
  */
 
+/* --------------------------------------------------------- */
+/* Capability state (global per process)                     */
+/* --------------------------------------------------------- */
 static bool supportsFdSemaphore = false;
 static bool supportsWin32Semaphore = false;
 
-/*
- * Optional: call this during device init phase
- */
+/* --------------------------------------------------------- */
+/* Capability setter (MUST be declared in header)            */
+/* --------------------------------------------------------- */
 void Mini::setSemaphoreCapabilities(bool fd, bool win32) {
     supportsFdSemaphore = fd;
     supportsWin32Semaphore = win32;
@@ -37,7 +40,7 @@ Semaphore::Semaphore(VkDevice device) {
 
     VkSemaphore semaphoreHandle{};
 
-    auto res = Layer::ovkCreateSemaphore(
+    VkResult res = Layer::ovkCreateSemaphore(
         device,
         &desc,
         nullptr,
@@ -58,17 +61,16 @@ Semaphore::Semaphore(VkDevice device) {
 }
 
 /* --------------------------------------------------------- */
-/* External semaphore (export capable)                       */
-/* fd output is optional                                     */
+/* External semaphore (FD / Win32 / fallback)                */
 /* --------------------------------------------------------- */
 Semaphore::Semaphore(VkDevice device, int* fd) {
 
-    VkSemaphore semaphoreHandle{};
+    VkSemaphore semaphoreHandle = VK_NULL_HANDLE;
     VkResult res = VK_ERROR_INITIALIZATION_FAILED;
 
     /*
      * ---------------------------------------------------------
-     * 1. Try Win32 external semaphore (Turnip/Mesa often supports)
+     * 1. Win32 external semaphore (if supported)
      * ---------------------------------------------------------
      */
     if (supportsWin32Semaphore) {
@@ -92,7 +94,7 @@ Semaphore::Semaphore(VkDevice device, int* fd) {
 
     /*
      * ---------------------------------------------------------
-     * 2. Try FD semaphore (Linux / partial Android support)
+     * 2. FD external semaphore (Linux / Mesa / Turnip partial)
      * ---------------------------------------------------------
      */
     if (res != VK_SUCCESS && supportsFdSemaphore) {
@@ -116,13 +118,13 @@ Semaphore::Semaphore(VkDevice device, int* fd) {
 
     /*
      * ---------------------------------------------------------
-     * 3. Fallback: internal semaphore only
+     * 3. Fallback internal semaphore
      * ---------------------------------------------------------
      */
     if (res != VK_SUCCESS || semaphoreHandle == VK_NULL_HANDLE) {
 
         std::cerr
-            << "lsfg-vk: external semaphore unsupported, using fallback (internal)"
+            << "lsfg-vk: external semaphore unsupported, using internal fallback"
             << std::endl;
 
         const VkSemaphoreCreateInfo fallbackDesc{
@@ -148,7 +150,7 @@ Semaphore::Semaphore(VkDevice device, int* fd) {
 
     /*
      * ---------------------------------------------------------
-     * 4. Export handle (if possible)
+     * 4. Export FD (only if supported)
      * ---------------------------------------------------------
      */
     if (fd && supportsFdSemaphore && semaphoreHandle != VK_NULL_HANDLE) {
@@ -164,7 +166,7 @@ Semaphore::Semaphore(VkDevice device, int* fd) {
         if (res != VK_SUCCESS || !fd || *fd < 0) {
 
             std::cerr
-                << "lsfg-vk: semaphore fd export failed, fallback sync"
+                << "lsfg-vk: semaphore fd export failed, falling back to internal sync"
                 << std::endl;
 
             if (fd) {
