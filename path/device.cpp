@@ -16,7 +16,7 @@ using namespace LSFG::Core;
 /*
  * Android / Termux safe extension set
  *
- * Keep:
+ * Keep: VK_KHR_EXTERNAL_MEMORY_FD_EXTENSION_NAME, VK_KHR_EXTERNAL_SEMAPHORE_FD_EXTENSION_NAME
  * - external fd memory
  * - external fd semaphore
  * - sync2
@@ -27,8 +27,13 @@ using namespace LSFG::Core;
  * - AHB dependency
  */
 const std::vector<const char*> requiredExtensions = {
-    VK_KHR_EXTERNAL_MEMORY_FD_EXTENSION_NAME,
-    VK_KHR_EXTERNAL_SEMAPHORE_FD_EXTENSION_NAME
+    "VK_KHR_external_memory",
+    "VK_KHR_external_memory_fd",
+
+    "VK_KHR_external_semaphore",
+    "VK_KHR_external_semaphore_fd",
+
+    "VK_EXT_robustness2"
 };
 
 Device::Device(
