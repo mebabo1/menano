@@ -24,6 +24,7 @@
 #include <string>
 #include <unordered_map>
 #include <vector>
+#include <unistd.h>
 
 using namespace LSFG;
 using namespace LSFG_3_1;
@@ -34,9 +35,7 @@ using namespace LSFG_3_1;
  * Do NOT use anonymous namespace statics here.
  *
  * Wine + Termux + Vulkan implicit layer loading
- * can duplicate translation-unit local statics.
- *
- * Use global statics instead.
+ * may duplicate translation-unit local statics.
  */
 
 static std::optional<Core::Instance> g_instance;
@@ -57,15 +56,37 @@ void LSFG_3_1::initialize(
             const std::string&, bool)>& loader) {
 
     std::cerr
-        << "initialize instance addr = "
+        << "[3_1] initialize pid="
+        << getpid()
+        << " addr="
         << &g_instance
         << std::endl;
 
-    if (g_instance.has_value() || g_device.has_value()) {
+    /*
+     * safer check
+     */
+    if (g_instance.has_value() &&
+        g_device.has_value()) {
+
         std::cerr
-            << "LSFG already initialized"
+            << "[3_1] already initialized"
             << std::endl;
+
         return;
+    }
+
+    /*
+     * recover half-init state
+     */
+    if (g_instance.has_value() !=
+        g_device.has_value()) {
+
+        std::cerr
+            << "[3_1] recovering half-init state"
+            << std::endl;
+
+        g_device.reset();
+        g_instance.reset();
     }
 
     g_instance.emplace();
@@ -77,7 +98,7 @@ void LSFG_3_1::initialize(
         .isHdr = isHdr
     });
 
-    g_contexts = std::unordered_map<int32_t, Context>();
+    g_contexts.clear();
 
     g_device->commandPool =
         Core::CommandPool(g_device->device);
@@ -100,22 +121,26 @@ void LSFG_3_1::initialize(
             std::time(nullptr)));
 
     std::cerr
-        << "LSFG initialize complete"
+        << "[3_1] initialize complete"
         << std::endl;
 }
 
 #ifdef LSFGVK_EXCESS_DEBUG
 void LSFG_3_1::initializeRenderDoc() {
+
     if (g_renderdoc.has_value())
         return;
 
     if (void* mod =
-            dlopen("librenderdoc.so",
-                   RTLD_NOW | RTLD_NOLOAD)) {
+            dlopen(
+                "librenderdoc.so",
+                RTLD_NOW | RTLD_NOLOAD)) {
 
         auto rdocGetAPI =
             reinterpret_cast<pRENDERDOC_GetAPI>(
-                dlsym(mod, "RENDERDOC_GetAPI"));
+                dlsym(
+                    mod,
+                    "RENDERDOC_GetAPI"));
 
         RENDERDOC_API_1_6_0* rdoc{};
 
@@ -127,6 +152,7 @@ void LSFG_3_1::initializeRenderDoc() {
     }
 
     if (!g_renderdoc.has_value()) {
+
         throw LSFG::vulkan_error(
             VK_ERROR_INITIALIZATION_FAILED,
             "RenderDoc API not found");
@@ -142,12 +168,28 @@ int32_t LSFG_3_1::createContext(
         VkFormat format) {
 
     std::cerr
-        << "createContext instance addr = "
+        << "[3_1] createContext pid="
+        << getpid()
+        << " addr="
         << &g_instance
         << std::endl;
 
     if (!g_instance.has_value() ||
         !g_device.has_value()) {
+
+        std::cerr
+            << "[3_1] createContext failed"
+            << std::endl;
+
+        std::cerr
+            << "[3_1] g_instance="
+            << g_instance.has_value()
+            << std::endl;
+
+        std::cerr
+            << "[3_1] g_device="
+            << g_device.has_value()
+            << std::endl;
 
         throw LSFG::vulkan_error(
             VK_ERROR_INITIALIZATION_FAILED,
@@ -167,7 +209,7 @@ int32_t LSFG_3_1::createContext(
             format));
 
     std::cerr
-        << "LSFG context created id = "
+        << "[3_1] context created id="
         << id
         << std::endl;
 
@@ -180,7 +222,9 @@ void LSFG_3_1::presentContext(
         const std::vector<int>& outSem) {
 
     std::cerr
-        << "presentContext instance addr = "
+        << "[3_1] presentContext pid="
+        << getpid()
+        << " addr="
         << &g_instance
         << std::endl;
 
@@ -188,12 +232,16 @@ void LSFG_3_1::presentContext(
         !g_device.has_value()) {
 
         std::cerr
-            << "g_instance.has_value() = "
+            << "[3_1] presentContext failed"
+            << std::endl;
+
+        std::cerr
+            << "[3_1] g_instance="
             << g_instance.has_value()
             << std::endl;
 
         std::cerr
-            << "g_device.has_value() = "
+            << "[3_1] g_device="
             << g_device.has_value()
             << std::endl;
 
@@ -205,9 +253,15 @@ void LSFG_3_1::presentContext(
     auto it = g_contexts.find(id);
 
     if (it == g_contexts.end()) {
+
         std::cerr
-            << "Context not found: "
+            << "[3_1] context missing id="
             << id
+            << std::endl;
+
+        std::cerr
+            << "[3_1] total contexts="
+            << g_contexts.size()
             << std::endl;
 
         throw LSFG::vulkan_error(
@@ -217,6 +271,7 @@ void LSFG_3_1::presentContext(
 
 #ifdef LSFGVK_EXCESS_DEBUG
     if (g_renderdoc.has_value()) {
+
         (*g_renderdoc)->StartFrameCapture(
             RENDERDOC_DEVICEPOINTER_FROM_VKINSTANCE(
                 g_instance->handle()),
@@ -231,6 +286,7 @@ void LSFG_3_1::presentContext(
 
 #ifdef LSFGVK_EXCESS_DEBUG
     if (g_renderdoc.has_value()) {
+
         vkDeviceWaitIdle(
             g_device->device.handle());
 
@@ -243,6 +299,12 @@ void LSFG_3_1::presentContext(
 }
 
 void LSFG_3_1::deleteContext(int32_t id) {
+
+    std::cerr
+        << "[3_1] deleteContext id="
+        << id
+        << std::endl;
+
     if (!g_instance.has_value() ||
         !g_device.has_value()) {
 
@@ -254,6 +316,7 @@ void LSFG_3_1::deleteContext(int32_t id) {
     auto it = g_contexts.find(id);
 
     if (it == g_contexts.end()) {
+
         throw LSFG::vulkan_error(
             VK_ERROR_DEVICE_LOST,
             "No such context");
@@ -266,12 +329,18 @@ void LSFG_3_1::deleteContext(int32_t id) {
 }
 
 void LSFG_3_1::finalize() {
+
     std::cerr
-        << "LSFG finalize called"
+        << "[3_1] finalize"
         << std::endl;
 
     if (!g_instance.has_value() ||
         !g_device.has_value()) {
+
+        std::cerr
+            << "[3_1] already finalized"
+            << std::endl;
+
         return;
     }
 
@@ -282,4 +351,8 @@ void LSFG_3_1::finalize() {
 
     g_device.reset();
     g_instance.reset();
+
+    std::cerr
+        << "[3_1] finalize complete"
+        << std::endl;
 }
