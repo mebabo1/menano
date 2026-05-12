@@ -106,6 +106,9 @@ LsContext::LsContext(
         Extract::getShader
     );
 
+    /* =========================
+     * CONTEXT (NO FD DEPENDENCY)
+     * ========================= */
     lsfgCtxId = std::shared_ptr<int32_t>(
         new int32_t(
             createCtx(
@@ -184,13 +187,14 @@ VkResult LsContext::present(
         }
     );
 
-    VkSemaphore preCopySignal = pass.preCopySemaphores.at(1).handle();
-
     /* =========================
-     * INTERNAL / EXTERNAL MODE
-     * ========================= */
-    bool externalSync = (preCopyFd >= 0);
-
+     * LSFG EXECUTION (FIXED)
+     * =========================
+     * 핵심 변경:
+     * - fd는 더 이상 LSFG mode 결정에 사용하지 않음
+     * - internal/external 구분 제거
+     * - LSFG는 항상 동일 경로 실행
+     */
     std::vector<int> renderFds(conf.multiplier - 1);
 
     for (size_t i = 0; i < conf.multiplier - 1; ++i) {
@@ -198,27 +202,11 @@ VkResult LsContext::present(
             Mini::Semaphore(info.device, &renderFds.at(i));
     }
 
-    /* =========================
-     * LSFG EXECUTION (ALWAYS ON)
-     * ========================= */
-    if (externalSync) {
-
-        LSFG_3_1::presentContext(
-            *lsfgCtxId,
-            preCopyFd,
-            renderFds
-        );
-
-    } else {
-
-        std::cerr << "lsfg-vk: INTERNAL LSFG MODE (no fd sync)" << std::endl;
-
-        LSFG_3_1::presentContext(
-            *lsfgCtxId,
-            -1,
-            renderFds
-        );
-    }
+    LSFG_3_1::presentContext(
+        *lsfgCtxId,
+        preCopyFd,   // 유지 (compat only)
+        renderFds
+    );
 
     /* =========================
      * PRESENT LOOP
