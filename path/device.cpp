@@ -2,7 +2,6 @@
 #include <volk.h>
 #include <vulkan/vulkan_core.h>
 
-#include "mini/semaphore.hpp"
 #include "core/device.hpp"
 #include "core/instance.hpp"
 #include "common/exception.hpp"
@@ -15,7 +14,7 @@
 using namespace LSFG::Core;
 
 /*
- * Minimal required extensions (cleaned)
+ * Minimal required extensions (clean & correct)
  */
 const std::vector<const char*> requiredExtensions = {
     "VK_KHR_swapchain",
@@ -54,7 +53,7 @@ Device::Device(
     }
 
     /* -----------------------------------------------------
-     * 2. Select device
+     * 2. Select physical device
      * ----------------------------------------------------- */
     std::optional<VkPhysicalDevice> physicalDevice;
 
@@ -127,10 +126,10 @@ Device::Device(
     if (!queueFamily) {
         throw LSFG::vulkan_error(
             VK_ERROR_INITIALIZATION_FAILED,
-            "No compute queue found");
+            "No compute queue family found");
     }
 
-    std::cerr << "Queue family = " << *queueFamily << std::endl;
+    std::cerr << "Selected queue family = " << *queueFamily << std::endl;
 
     /* -----------------------------------------------------
      * 4. Feature query
@@ -157,7 +156,7 @@ Device::Device(
         "FP32 fallback") << std::endl;
 
     /* -----------------------------------------------------
-     * 5. External semaphore capability query (IMPORTANT FIX)
+     * 5. External semaphore capability query (IMPORTANT)
      * ----------------------------------------------------- */
     VkPhysicalDeviceExternalSemaphoreInfo semInfo{
         .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_EXTERNAL_SEMAPHORE_INFO,
@@ -178,11 +177,9 @@ Device::Device(
         VK_EXTERNAL_SEMAPHORE_FEATURE_EXPORTABLE_BIT;
 
     /* -----------------------------------------------------
-     * 6. Capability register (global state for Mini layer)
+     * 6. (IMPORTANT) Do NOT depend on Mini here
      * ----------------------------------------------------- */
-    Mini::setSemaphoreCapabilities(
-        supportsFdSemaphore,
-        false /* win32 ignored on Android */);
+    // capability is now local to device init only
 
     /* -----------------------------------------------------
      * 7. Queue create
@@ -197,7 +194,7 @@ Device::Device(
     };
 
     /* -----------------------------------------------------
-     * 8. Device features chain
+     * 8. Vulkan features chain
      * ----------------------------------------------------- */
     VkPhysicalDeviceVulkan13Features features13{
         .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_3_FEATURES,
@@ -233,9 +230,7 @@ Device::Device(
     std::cerr << "vkCreateDevice = " << res << std::endl;
 
     if (res != VK_SUCCESS || deviceHandle == VK_NULL_HANDLE) {
-        throw LSFG::vulkan_error(
-            res,
-            "Device creation failed");
+        throw LSFG::vulkan_error(res, "Device creation failed");
     }
 
     /* -----------------------------------------------------
@@ -246,7 +241,7 @@ Device::Device(
     /* -----------------------------------------------------
      * 11. Get queue
      * ----------------------------------------------------- */
-    VkQueue queue;
+    VkQueue queue{};
     vkGetDeviceQueue(
         deviceHandle,
         *queueFamily,
@@ -254,7 +249,7 @@ Device::Device(
         &queue);
 
     /* -----------------------------------------------------
-     * 12. store
+     * 12. Store
      * ----------------------------------------------------- */
     this->computeQueue = queue;
     this->computeFamilyIdx = *queueFamily;
