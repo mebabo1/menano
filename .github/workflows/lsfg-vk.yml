@@ -63,8 +63,8 @@ jobs:
         curl -L https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/include/mini/semaphore.hpp -o include/mini/semaphore.hpp
         curl -L https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/path/semaphore.cpp -o src/mini/semaphore.cpp
         curl -L https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/path/device.cpp -o framegen/src/core/device.cpp
-        curl -L https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/include/utils/utils.hpp -o include/utils/utils.hpp
-        curl -L https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/src/utils/utils.cpp -o src/utils/utils.cpp
+        # curl -L https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/include/utils/utils.hpp -o include/utils/utils.hpp
+        # curl -L https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/src/utils/utils.cpp -o src/utils/utils.cpp
         curl -L https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/include/context.hpp -o include/context.hpp
         curl -L https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/src/context.cpp -o src/context.cpp
         curl -L https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/framegen/v3.1_src/lsfg.cpp -o framegen/v3.1_src/lsfg.cpp
