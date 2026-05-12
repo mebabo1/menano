@@ -24,10 +24,8 @@
 #include <fcntl.h>
 #include <unistd.h>
 
-LsContext::LsContext(const Hooks::DeviceInfo& info,
-                     VkSwapchainKHR swapchain,
-                     VkExtent2D extent,
-                     const std::vector<VkImage>& swapchainImages)
+LsContext::LsContext(const Hooks::DeviceInfo& info, VkSwapchainKHR swapchain,
+    VkExtent2D extent, const std::vector<VkImage>& swapchainImages)
     : swapchain(swapchain),
       swapchainImages(swapchainImages),
       extent(extent) {
@@ -35,14 +33,14 @@ LsContext::LsContext(const Hooks::DeviceInfo& info,
     if (!Config::currentConf.has_value())
         throw std::runtime_error("No configuration set");
 
-    auto& conf = *Config::currentConf;
     auto& globalConf = Config::globalConf;
+    auto& conf = *Config::currentConf;
 
     const VkFormat format = conf.hdr
         ? VK_FORMAT_R8G8B8A8_UNORM
         : VK_FORMAT_R16G16B16A16_SFLOAT;
 
-    std::array<int, 2> fds{ -1, -1 };
+    std::array<int, 2> fds{};
 
     frame_0 = Mini::Image(info.device, info.physicalDevice, extent, format,
         VK_IMAGE_USAGE_TRANSFER_DST_BIT |
@@ -92,27 +90,17 @@ LsContext::LsContext(const Hooks::DeviceInfo& info,
 
     ipcMode = IPCMode::FD;
 
-    int ctx = create(
-        fds[0],
-        fds[1],
-        outFds,
-        extent,
-        format
-    );
+    int ctx = create(fds[0], fds[1], outFds, extent, format);
 
     // =========================
-    // SHM FALLBACK
+    // SHM fallback
     // =========================
     if (ctx < 0) {
 
         ipcMode = IPCMode::SHM;
-
         shmFrameSize = extent.width * extent.height * 4;
 
         std::string base = "/data/data/com.termux/files/usr/tmp/lsfg_";
-
-        shmInputs.clear();
-        shmOutputs.clear();
 
         for (int i = 0; i < conf.multiplier - 1; i++) {
 
@@ -122,24 +110,14 @@ LsContext::LsContext(const Hooks::DeviceInfo& info,
             int shmIn = shm_open(inName.c_str(), O_CREAT | O_RDWR, 0666);
             int shmOut = shm_open(outName.c_str(), O_CREAT | O_RDWR, 0666);
 
-            if (shmIn < 0 || shmOut < 0)
-                throw std::runtime_error("shm_open failed");
+            ftruncate(shmIn, shmFrameSize);
+            ftruncate(shmOut, shmFrameSize);
 
-            if (ftruncate(shmIn, shmFrameSize) != 0 ||
-                ftruncate(shmOut, shmFrameSize) != 0)
-                throw std::runtime_error("ftruncate failed");
+            shmInputs.push_back(mmap(nullptr, shmFrameSize,
+                PROT_READ | PROT_WRITE, MAP_SHARED, shmIn, 0));
 
-            void* inPtr = mmap(nullptr, shmFrameSize,
-                PROT_READ | PROT_WRITE, MAP_SHARED, shmIn, 0);
-
-            void* outPtr = mmap(nullptr, shmFrameSize,
-                PROT_READ | PROT_WRITE, MAP_SHARED, shmOut, 0);
-
-            if (inPtr == MAP_FAILED || outPtr == MAP_FAILED)
-                throw std::runtime_error("mmap failed");
-
-            shmInputs.push_back(inPtr);
-            shmOutputs.push_back(outPtr);
+            shmOutputs.push_back(mmap(nullptr, shmFrameSize,
+                PROT_READ | PROT_WRITE, MAP_SHARED, shmOut, 0));
         }
 
         ctx = create(0, 0, {}, extent, format);
@@ -147,18 +125,13 @@ LsContext::LsContext(const Hooks::DeviceInfo& info,
 
     lsfgCtxId = std::shared_ptr<int32_t>(
         new int32_t(ctx),
-        [destroy](const int32_t* id) {
-            destroy(*id);
-        }
-    );
+        [destroy](const int32_t* id) { destroy(*id); });
 
     unsetenv("DISABLE_LSFG");
 
     cmdPool = Mini::CommandPool(info.device, info.queue.first);
 
-    for (size_t i = 0; i < 8; i++) {
-        auto& pass = passInfos[i];
-
+    for (auto& pass : passInfos) {
         pass.renderSemaphores.resize(conf.multiplier - 1);
         pass.acquireSemaphores.resize(conf.multiplier - 1);
         pass.postCopyBufs.resize(conf.multiplier - 1);
