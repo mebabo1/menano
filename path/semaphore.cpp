@@ -2,44 +2,79 @@
 #include "common/exception.hpp"
 #include "layer.hpp"
 
-#include <vulkan/vulkan_core.h>
-#include <memory>
 #include <iostream>
 
 using namespace Mini;
 
-/*
- * Internal-only semaphore model
- * - No external semaphore
- * - No FD / Win32 export
- * - Vulkan-only sync
- */
+/* ---------------------------------------------------------
+ * Capability ignored (kept for compatibility only)
+ * --------------------------------------------------------- */
+void Mini::setSemaphoreCapabilities(bool, bool) {
+    // no-op in internal-only mode
+}
 
-Semaphore::Semaphore(VkDevice device)
-{
-    VkSemaphoreCreateInfo info{};
-    info.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
+/* ---------------------------------------------------------
+ * Internal semaphore
+ * --------------------------------------------------------- */
+Semaphore::Semaphore(VkDevice device) {
+
+    VkSemaphoreCreateInfo desc{
+        .sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO
+    };
 
     VkSemaphore handle = VK_NULL_HANDLE;
 
     VkResult res = Layer::ovkCreateSemaphore(
         device,
-        &info,
+        &desc,
         nullptr,
         &handle);
 
     if (res != VK_SUCCESS || handle == VK_NULL_HANDLE) {
-        throw LSFG::vulkan_error(
-            res,
-            "Failed to create internal semaphore");
+        throw LSFG::vulkan_error(res, "Failed to create semaphore");
     }
 
-    this->semaphore = std::shared_ptr<VkSemaphore>(
+    semaphore = std::shared_ptr<VkSemaphore>(
         new VkSemaphore(handle),
         [dev = device](VkSemaphore* s) {
             Layer::ovkDestroySemaphore(dev, *s, nullptr);
         }
     );
+}
 
-    std::cerr << "lsfg-vk: internal semaphore created" << std::endl;
+/* ---------------------------------------------------------
+ * External constructor kept for ABI, but DISABLED
+ * --------------------------------------------------------- */
+Semaphore::Semaphore(VkDevice device, int* fd) {
+
+    (void)fd;
+
+    VkSemaphoreCreateInfo desc{
+        .sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO
+    };
+
+    VkSemaphore handle = VK_NULL_HANDLE;
+
+    VkResult res = Layer::ovkCreateSemaphore(
+        device,
+        &desc,
+        nullptr,
+        &handle);
+
+    if (res != VK_SUCCESS || handle == VK_NULL_HANDLE) {
+        throw LSFG::vulkan_error(res, "Failed to create internal semaphore");
+    }
+
+    if (fd) {
+        *fd = -1;
+    }
+
+    std::cerr << "Internal-only framegen mode enabled" << std::endl;
+
+    semaphore = std::shared_ptr<VkSemaphore>(
+        new VkSemaphore(handle),
+        [dev = device](VkSemaphore* s) {
+            Layer::ovkDestroySemaphore(dev, *s, nullptr);
+        }
+    );
 }
