@@ -56,9 +56,9 @@ private:
     bool fdFailed{false};
     bool lsfgInitialized{false};
 
-    std::vector<void*> shmInputs;
-    std::vector<void*> shmOutputs;
-    ShmBuffer shm[2];
+    // ✔ 단일 구조로 통합
+    std::vector<ShmBuffer> shmInputs;
+    std::vector<ShmBuffer> shmOutputs;
 
     // =====================================================
     // VULKAN CORE STATE
@@ -70,6 +70,9 @@ private:
     VkSwapchainKHR swapchain{};
     std::vector<VkImage> swapchainImages{};
     VkExtent2D extent{};
+
+    // ✔ FIX: missing in cpp scope bug prevention
+    VkFormat format{};
 
     // =====================================================
     // LSFG CONTEXT
@@ -99,9 +102,4 @@ private:
     };
 
     std::array<RenderPassInfo, 8> passInfos;
-
-    // =====================================================
-    // INTERNAL HELPERS
-    // =====================================================
-    void uploadShmToGPU(void* src, Mini::Image& dst);
 };
