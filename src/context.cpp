@@ -231,19 +231,18 @@ VkResult LsContext::present(
     } else {
 
         // =========================
-        // SHM → GPU BRIDGE
+        // SHM → GPU BRIDGE (FIXED)
         // =========================
-
-        std::vector<uint8_t> cpu(shmFrameSize);
-
-        memcpy(cpu.data(), shmOutputs[0], shmFrameSize);
 
         Utils::uploadBufferToImage(
             info.device,
-            cpu.data(),
+            cmdPool,
+            info.queue.second,
+            shmOutputs[0],
             frameIdx % 2 == 0 ? frame_0.handle() : frame_1.handle(),
             extent.width,
-            extent.height
+            extent.height,
+            format
         );
 
         LSFG_3_1::presentContext(*lsfgCtxId, preCopySemaphoreFd, renderFds);
