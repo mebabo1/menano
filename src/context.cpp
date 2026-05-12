@@ -27,7 +27,7 @@ LsContext::LsContext(
     : swapchain(swapchain),
       swapchainImages(swapchainImages),
       extent(extent),
-      internalOnlyMode(false)   // ⭐ 핵심 추가
+      lsfgEnabled(true)   // ⭐ 핵심: internalOnlyMode 대신 명확하게
 {
     if (!Config::currentConf.has_value())
         throw std::runtime_error("No configuration set");
@@ -39,16 +39,14 @@ LsContext::LsContext(
         ? VK_FORMAT_R8G8B8A8_UNORM
         : VK_FORMAT_R16G16B16A16_SFLOAT;
 
-    /* ---------------------------
-     * LSFG INPUT IMAGES
-     * --------------------------- */
+    /* =========================
+     * INPUT FRAMES
+     * ========================= */
     std::array<int, 2> fds{};
 
     frame_0 = Mini::Image(
-        info.device,
-        info.physicalDevice,
-        extent,
-        format,
+        info.device, info.physicalDevice,
+        extent, format,
         VK_IMAGE_USAGE_TRANSFER_DST_BIT |
         VK_IMAGE_USAGE_SAMPLED_BIT |
         VK_IMAGE_USAGE_STORAGE_BIT,
@@ -57,10 +55,8 @@ LsContext::LsContext(
     );
 
     frame_1 = Mini::Image(
-        info.device,
-        info.physicalDevice,
-        extent,
-        format,
+        info.device, info.physicalDevice,
+        extent, format,
         VK_IMAGE_USAGE_TRANSFER_DST_BIT |
         VK_IMAGE_USAGE_SAMPLED_BIT |
         VK_IMAGE_USAGE_STORAGE_BIT,
@@ -68,17 +64,15 @@ LsContext::LsContext(
         &fds.at(1)
     );
 
-    /* ---------------------------
-     * LSFG OUTPUT IMAGES
-     * --------------------------- */
+    /* =========================
+     * OUTPUT FRAMES
+     * ========================= */
     std::vector<int> outFds(conf.multiplier - 1);
 
     for (size_t i = 0; i < conf.multiplier - 1; ++i) {
         out_n.emplace_back(
-            info.device,
-            info.physicalDevice,
-            extent,
-            format,
+            info.device, info.physicalDevice,
+            extent, format,
             VK_IMAGE_USAGE_TRANSFER_SRC_BIT |
             VK_IMAGE_USAGE_SAMPLED_BIT |
             VK_IMAGE_USAGE_STORAGE_BIT,
@@ -87,9 +81,9 @@ LsContext::LsContext(
         );
     }
 
-    /* ---------------------------
+    /* =========================
      * LSFG INIT
-     * --------------------------- */
+     * ========================= */
     auto* lsfgInitialize = LSFG_3_1::initialize;
     auto* lsfgCreateContext = LSFG_3_1::createContext;
     auto* lsfgDeleteContext = LSFG_3_1::deleteContext;
@@ -128,14 +122,12 @@ LsContext::LsContext(
 
     unsetenv("DISABLE_LSFG");
 
-    /* ---------------------------
+    /* =========================
      * COMMAND POOL
-     * --------------------------- */
+     * ========================= */
     cmdPool = Mini::CommandPool(info.device, info.queue.first);
 
-    for (size_t i = 0; i < 8; i++) {
-        auto& pass = passInfos.at(i);
-
+    for (auto& pass : passInfos) {
         pass.renderSemaphores.resize(conf.multiplier - 1);
         pass.acquireSemaphores.resize(conf.multiplier - 1);
         pass.postCopyBufs.resize(conf.multiplier - 1);
@@ -154,15 +146,12 @@ VkResult LsContext::present(
     const std::vector<VkSemaphore>& gameRenderSemaphores,
     uint32_t presentIdx)
 {
-    if (!Config::currentConf.has_value())
-        throw std::runtime_error("No configuration set");
-
     auto& conf = *Config::currentConf;
     auto& pass = passInfos.at(frameIdx % 8);
 
-    /* =====================================================
+    /* =========================
      * PRE COPY
-     * ===================================================== */
+     * ========================= */
     int preCopyFd = -1;
 
     pass.preCopySemaphores.at(0) =
@@ -197,9 +186,14 @@ VkResult LsContext::present(
         }
     );
 
-    /* =====================================================
-     * LSFG MODE SELECTION (⭐ 핵심)
-     * ===================================================== */
+    /* =========================
+     * LSFG CHECK (핵심)
+     * ========================= */
+
+    if (preCopyFd < 0) {
+        lsfgEnabled = false;
+    }
+
     std::vector<int> renderFds(conf.multiplier - 1);
 
     for (size_t i = 0; i < conf.multiplier - 1; ++i) {
@@ -207,34 +201,26 @@ VkResult LsContext::present(
             Mini::Semaphore(info.device, &renderFds.at(i));
     }
 
-    if (preCopyFd < 0) {
-        internalOnlyMode = true;
-    }
-
-    if (!internalOnlyMode) {
+    if (lsfgEnabled) {
         if (conf.performance) {
-            LSFG_3_1P::presentContext(
-                *lsfgCtxId,
-                preCopyFd,
-                renderFds
-            );
+            LSFG_3_1P::presentContext(*lsfgCtxId, preCopyFd, renderFds);
         } else {
-            LSFG_3_1::presentContext(
-                *lsfgCtxId,
-                preCopyFd,
-                renderFds
-            );
+            LSFG_3_1::presentContext(*lsfgCtxId, preCopyFd, renderFds);
         }
-    } else {
-        std::cerr << "lsfg-vk: internal-only fallback active" << std::endl;
-
-        // internal mode path (no fd dependency)
-        // LSFG must accept internal sync pipeline
     }
 
-    /* =====================================================
-     * PRESENT LOOP
-     * ===================================================== */
+    /* =========================
+     * FALLBACK PATH (중요)
+     * =========================
+     * LSFG 실패 시 반드시 원본 출력
+     */
+    if (!lsfgEnabled) {
+        std::cerr << "lsfg-vk: fallback direct present (no framegen)" << std::endl;
+    }
+
+    /* =========================
+     * PRESENT GENERATED FRAMES
+     * ========================= */
     for (size_t i = 0; i < conf.multiplier - 1; i++) {
 
         pass.acquireSemaphores.at(i) =
