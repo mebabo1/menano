@@ -138,7 +138,8 @@ LsContext::LsContext(const Hooks::DeviceInfo& info, VkSwapchainKHR swapchain,
         pass.postCopySemaphores.resize(conf.multiplier - 1);
         pass.prevPostCopySemaphores.resize(conf.multiplier - 1);
     }
-    }
+ }
+
 VkResult LsContext::present(
     const Hooks::DeviceInfo& info,
     const void* pNext,
