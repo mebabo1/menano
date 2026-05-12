@@ -17,36 +17,13 @@
 #include <memory>
 #include <string>
 #include <array>
+#include <iostream>
 
 #include <sys/mman.h>
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <unistd.h>
 #include <cstring>
-
-#include <linux/memfd.h>
-#include <sys/syscall.h>
-
-#include <iostream>
-
-static int createSharedFd(size_t size) {
-
-    int fd = syscall(
-        SYS_memfd_create,
-        "lsfg_gpu_fallback",
-        MFD_CLOEXEC
-    );
-
-    if (fd < 0)
-        return -1;
-
-    if (ftruncate(fd, size) < 0) {
-        close(fd);
-        return -1;
-    }
-
-    return fd;
-}
 
 LsContext::LsContext(
         const Hooks::DeviceInfo& info,
@@ -63,70 +40,33 @@ LsContext::LsContext(
     auto& globalConf = Config::globalConf;
     auto& conf = *Config::currentConf;
 
-    const VkFormat format = conf.hdr
-        ? VK_FORMAT_R16G16B16A16_SFLOAT
-        : VK_FORMAT_R8G8B8A8_UNORM;
+    const VkFormat format =
+        conf.hdr
+            ? VK_FORMAT_R8G8B8A8_UNORM
+            : VK_FORMAT_R16G16B16A16_SFLOAT;
 
     /*
-     * create fallback shared fds
+     * external memory fds
      */
-
-    size_t shmSize =
-        extent.width *
-        extent.height *
-        4;
-
     std::array<int, 2> fds{
-        createSharedFd(shmSize),
-        createSharedFd(shmSize)
+        -1,
+        -1
     };
 
-    std::vector<int> outFds(
+    std::vector<int> outFdsRuntime(
         conf.multiplier - 1,
         -1
     );
 
-    for (size_t i = 0; i < outFds.size(); ++i) {
-        outFds[i] = createSharedFd(shmSize);
-    }
-
-    bool fdValid =
-        (fds[0] >= 0) &&
-        (fds[1] >= 0);
-
-    for (auto fd : outFds)
-        fdValid &= (fd >= 0);
-
-    bool useShmFallback = !fdValid;
-
-    std::cerr
-        << "frame fd0 = "
-        << fds[0]
-        << std::endl;
-
-    std::cerr
-        << "frame fd1 = "
-        << fds[1]
-        << std::endl;
-
-    if (useShmFallback) {
-
-        std::cerr
-            << "lsfg-vk: shared fd fallback failed"
-            << std::endl;
-    }
-
     /*
-     * create input frames
+     * create shared images
      */
-
     this->frame_0 = Mini::Image(
         info.device,
         info.physicalDevice,
         extent,
         format,
         VK_IMAGE_USAGE_TRANSFER_DST_BIT |
-        VK_IMAGE_USAGE_TRANSFER_SRC_BIT |
         VK_IMAGE_USAGE_SAMPLED_BIT |
         VK_IMAGE_USAGE_STORAGE_BIT,
         VK_IMAGE_ASPECT_COLOR_BIT,
@@ -139,18 +79,11 @@ LsContext::LsContext(
         extent,
         format,
         VK_IMAGE_USAGE_TRANSFER_DST_BIT |
-        VK_IMAGE_USAGE_TRANSFER_SRC_BIT |
         VK_IMAGE_USAGE_SAMPLED_BIT |
         VK_IMAGE_USAGE_STORAGE_BIT,
         VK_IMAGE_ASPECT_COLOR_BIT,
         &fds.at(1)
     );
-
-    /*
-     * create generated output images
-     */
-
-    std::vector<int> outFdsRuntime = outFds;
 
     for (size_t i = 0; i < (conf.multiplier - 1); ++i) {
 
@@ -160,17 +93,124 @@ LsContext::LsContext(
             extent,
             format,
             VK_IMAGE_USAGE_TRANSFER_SRC_BIT |
-            VK_IMAGE_USAGE_TRANSFER_DST_BIT |
             VK_IMAGE_USAGE_SAMPLED_BIT |
             VK_IMAGE_USAGE_STORAGE_BIT,
             VK_IMAGE_ASPECT_COLOR_BIT,
             &outFdsRuntime.at(i)
         );
+    }
+
+    std::cerr
+        << "frame fd0 = "
+        << fds.at(0)
+        << std::endl;
+
+    std::cerr
+        << "frame fd1 = "
+        << fds.at(1)
+        << std::endl;
+
+    for (size_t i = 0; i < outFdsRuntime.size(); ++i) {
 
         std::cerr
-            << "out fd[" << i << "] = "
+            << "out fd["
+            << i
+            << "] = "
             << outFdsRuntime.at(i)
             << std::endl;
+    }
+
+    /*
+     * validate fd export
+     */
+    bool fdValid =
+        (fds.at(0) >= 0) &&
+        (fds.at(1) >= 0);
+
+    for (auto fd : outFdsRuntime) {
+
+        if (fd < 0) {
+            fdValid = false;
+            break;
+        }
+    }
+
+    useShmFallback = !fdValid;
+
+    std::cerr
+        << "useShmFallback = "
+        << useShmFallback
+        << std::endl;
+
+    /*
+     * shm fallback
+     */
+    size_t shmSize =
+        extent.width *
+        extent.height *
+        4;
+
+    if (useShmFallback) {
+
+        std::cerr
+            << "creating shm fallback"
+            << std::endl;
+
+        for (int i = 0; i < 2; ++i) {
+
+            std::string name =
+                "/lsfg_shm_" +
+                std::to_string(i);
+
+            shm[i].fd =
+                shm_open(
+                    name.c_str(),
+                    O_CREAT | O_RDWR,
+                    0666
+                );
+
+            if (shm[i].fd < 0) {
+
+                throw std::runtime_error(
+                    "shm_open failed");
+            }
+
+            ftruncate(
+                shm[i].fd,
+                shmSize
+            );
+
+            shm[i].size = shmSize;
+
+            shm[i].ptr =
+                mmap(
+                    nullptr,
+                    shmSize,
+                    PROT_READ | PROT_WRITE,
+                    MAP_SHARED,
+                    shm[i].fd,
+                    0
+                );
+
+            if (shm[i].ptr == MAP_FAILED) {
+
+                throw std::runtime_error(
+                    "mmap failed");
+            }
+
+            /*
+             * use shm fd as fake export fd
+             */
+            fds.at(i) = shm[i].fd;
+        }
+
+        for (size_t i = 0;
+             i < outFdsRuntime.size();
+             ++i) {
+
+            outFdsRuntime.at(i) =
+                dup(shm[0].fd);
+        }
     }
 
     auto* lsfgInitialize =
@@ -194,7 +234,11 @@ LsContext::LsContext(
             LSFG_3_1P::deleteContext;
     }
 
-    setenv("DISABLE_LSFG", "1", 1);
+    setenv(
+        "DISABLE_LSFG",
+        "1",
+        1
+    );
 
     lsfgInitialize(
         Utils::getDeviceUUID(
@@ -206,17 +250,11 @@ LsContext::LsContext(
         Extract::getShader
     );
 
-    int fd0 =
-        fdValid ? fds.at(0) : -1;
-
-    int fd1 =
-        fdValid ? fds.at(1) : -1;
-
     std::cerr
         << "createContext fd0="
-        << fd0
+        << fds.at(0)
         << " fd1="
-        << fd1
+        << fds.at(1)
         << std::endl;
 
     for (auto fd : outFdsRuntime) {
@@ -231,16 +269,15 @@ LsContext::LsContext(
         std::shared_ptr<int32_t>(
             new int32_t(
                 lsfgCreateContext(
-                    fd0,
-                    fd1,
+                    fds.at(0),
+                    fds.at(1),
                     outFdsRuntime,
                     extent,
                     format
                 )
             ),
-            [lsfgDeleteContext =
-                lsfgDeleteContext](
-                    const int32_t* id) {
+            [lsfgDeleteContext]
+            (const int32_t* id) {
 
                 lsfgDeleteContext(*id);
             }
@@ -254,7 +291,7 @@ LsContext::LsContext(
             info.queue.first
         );
 
-    for (size_t i = 0; i < 8; i++) {
+    for (size_t i = 0; i < 8; ++i) {
 
         auto& pass =
             this->passInfos.at(i);
@@ -274,4 +311,59 @@ LsContext::LsContext(
         pass.prevPostCopySemaphores.resize(
             conf.multiplier - 1);
     }
-        }
+}
+
+void LsContext::uploadShmToGPU(
+        const Hooks::DeviceInfo& info,
+        void* src,
+        Mini::Image& dst) {
+
+    if (!src)
+        return;
+
+    size_t bufferSize =
+        extent.width *
+        extent.height *
+        4;
+
+    Mini::Buffer stagingBuffer(
+        info.device,
+        info.physicalDevice,
+        bufferSize,
+        VK_BUFFER_USAGE_TRANSFER_SRC_BIT
+    );
+
+    void* mapped =
+        stagingBuffer.map();
+
+    memcpy(
+        mapped,
+        src,
+        bufferSize
+    );
+
+    stagingBuffer.unmap();
+
+    Mini::CommandBuffer cmd(
+        info.device,
+        this->cmdPool
+    );
+
+    cmd.begin();
+
+    Utils::copyBufferToImage(
+        cmd.handle(),
+        stagingBuffer.handle(),
+        dst.handle(),
+        extent.width,
+        extent.height
+    );
+
+    cmd.end();
+
+    cmd.submit(
+        info.queue.second,
+        {},
+        {}
+    );
+}
