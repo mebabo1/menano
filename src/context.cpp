@@ -45,7 +45,7 @@ LsContext::LsContext(
         : VK_FORMAT_R16G16B16A16_SFLOAT;
 
     // =========================
-    // INPUT IMAGES
+    // INPUT IMAGES (FD)
     // =========================
     std::array<int, 2> fds{};
 
@@ -108,6 +108,7 @@ LsContext::LsContext(
     );
 
     ipcMode = IPCMode::FD;
+    fdFailed = false;
 
     int ctx = create(fds[0], fds[1], outFds, extent, format);
 
@@ -117,6 +118,8 @@ LsContext::LsContext(
     if (ctx < 0) {
 
         ipcMode = IPCMode::SHM;
+        fdFailed = true;
+
         shmFrameSize = extent.width * extent.height * 4;
 
         std::string base = "/data/data/com.termux/files/usr/tmp/lsfg_";
@@ -170,12 +173,17 @@ LsContext::LsContext(
     }
 }
 
+// =======================================================
+// PRESENT
+// =======================================================
+
 VkResult LsContext::present(
     const Hooks::DeviceInfo& info,
     const void* pNext,
     VkQueue queue,
     const std::vector<VkSemaphore>& gameRenderSemaphores,
-    uint32_t presentIdx)
+    uint32_t presentIdx
+)
 {
     auto& conf = *Config::currentConf;
     auto& pass = passInfos[frameIdx % 8];
@@ -208,11 +216,9 @@ VkResult LsContext::present(
 
     pass.preCopyBuf.end();
 
-    std::vector<VkSemaphore> preWaits = gameRenderSemaphores;
-
     pass.preCopyBuf.submit(
         info.queue.second,
-        preWaits,
+        gameRenderSemaphores,
         {
             pass.preCopySemaphores[0].handle(),
             pass.preCopySemaphores[1].handle()
@@ -220,7 +226,7 @@ VkResult LsContext::present(
     );
 
     // =========================
-    // LSFG CALL
+    // LSFG CALL (FD ALWAYS)
     // =========================
     std::vector<int> renderFds(conf.multiplier - 1);
 
@@ -229,25 +235,34 @@ VkResult LsContext::present(
             Mini::Semaphore(info.device, &renderFds[i]);
     }
 
-    if (ipcMode == IPCMode::FD) {
+    if (!fdFailed && ipcMode == IPCMode::FD) {
+
         LSFG_3_1::presentContext(*lsfgCtxId, preCopySemaphoreFd, renderFds);
+
     } else {
 
         // =========================
-        // SHM PATH (FIXED)
+        // SHM → GPU BRIDGE
         // =========================
+
         std::vector<uint8_t> cpu(shmFrameSize);
 
-        // GPU → CPU readback (fallback-safe copy)
         memcpy(cpu.data(), shmOutputs[0], shmFrameSize);
 
-        memcpy(shmInputs[0], cpu.data(), shmFrameSize);
+        Utils::uploadBufferToImage(
+            info.device,
+            cpu.data(),
+            frameIdx % 2 == 0 ? frame_0.handle() : frame_1.handle(),
+            extent.width,
+            extent.height
+        );
 
-        LSFG_3_1::presentContext(*lsfgCtxId, 0, renderFds);
+        // IMPORTANT: still use FD sync path
+        LSFG_3_1::presentContext(*lsfgCtxId, preCopySemaphoreFd, renderFds);
     }
 
     // =========================
-    // PRESENT
+    // PRESENT OUTPUT
     // =========================
     pass.acquireSemaphores[0] = Mini::Semaphore(info.device);
 
