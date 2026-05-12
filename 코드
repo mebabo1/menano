@@ -1,3 +1,5 @@
+    - name: Android Turnip patches
+      run: |
         find . -type f \( -name "*.cpp" -o -name "*.hpp" \) | while read f; do
           sed -i 's/VK_PRESENT_MODE_MAILBOX_KHR/VK_PRESENT_MODE_FIFO_KHR/g' "$f"
         done
