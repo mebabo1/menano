@@ -234,7 +234,7 @@ VkResult LsContext::present(
     const void* pNext,
     VkQueue queue,
     const std::vector<VkSemaphore>& gameRenderSemaphores,
-    uint32_t /*unused_presentIdx*/)
+    uint32_t presentIdx)
 {
     if (!Config::currentConf.has_value())
         throw std::runtime_error("No configuration set");
@@ -243,17 +243,17 @@ VkResult LsContext::present(
     auto& pass = this->passInfos.at(this->frameIdx % 8);
 
     /*
-     * 1. Acquire swapchain image
+     * 1. acquire swapchain
      */
-    pass.acquireSem = Mini::Semaphore(info.device);
+    pass.acquireSemaphores.at(0) = Mini::Semaphore(info.device);
 
     uint32_t imageIdx = 0;
 
-    VkResult res = Layer::ovkAcquireNextImageKHR(
+    auto res = Layer::ovkAcquireNextImageKHR(
         info.device,
         this->swapchain,
         UINT64_MAX,
-        pass.acquireSem.handle(),
+        pass.acquireSemaphores.at(0).handle(),
         VK_NULL_HANDLE,
         &imageIdx
     );
@@ -262,10 +262,8 @@ VkResult LsContext::present(
         throw LSFG::vulkan_error(res, "Acquire failed");
 
     /*
-     * 2. Copy swapchain -> LSFG input frame
+     * 2. copy swapchain -> LSFG input
      */
-    pass.preCopySem = Mini::Semaphore(info.device);
-
     int preFd = -1;
 
     pass.preCopyBuf = Mini::CommandBuffer(info.device, this->cmdPool);
@@ -287,23 +285,28 @@ VkResult LsContext::present(
 
     pass.preCopyBuf.end();
 
+    /*
+     * FIX: semaphore submit format (pointer vector)
+     */
+    std::vector<VkSemaphore*> waitSemaphores;
+    std::vector<VkSemaphore*> signalSemaphores;
+
+    for (auto& s : gameRenderSemaphores)
+        waitSemaphores.push_back((VkSemaphore*)&s);
+
+    VkSemaphore preCopySignal = Mini::Semaphore(info.device).handle();
+    signalSemaphores.push_back(&preCopySignal);
+
     pass.preCopyBuf.submit(
         info.queue.second,
-        gameRenderSemaphores,
-        { pass.preCopySem.handle() }
+        waitSemaphores,
+        signalSemaphores
     );
 
     /*
-     * 3. LSFG execution (single pass)
+     * 3. LSFG
      */
     std::vector<int> outFds(conf.multiplier - 1);
-
-    std::vector<VkSemaphore> renderSemaphores(conf.multiplier - 1);
-
-    for (size_t i = 0; i < conf.multiplier - 1; i++) {
-        renderSemaphores[i] =
-            Mini::Semaphore(info.device, &outFds[i]);
-    }
 
     LSFG_3_1::presentContext(
         *this->lsfgCtxId,
@@ -312,16 +315,15 @@ VkResult LsContext::present(
     );
 
     /*
-     * 4. Copy LSFG output -> swapchain image
-     * (단일 output만 present로 사용)
+     * 4. output copy → swapchain
      */
-    pass.postCopySem = Mini::Semaphore(info.device);
-    pass.postCopyBuf = Mini::CommandBuffer(info.device, this->cmdPool);
+    pass.postCopyBufs.at(0) =
+        Mini::CommandBuffer(info.device, this->cmdPool);
 
-    pass.postCopyBuf.begin();
+    pass.postCopyBufs.at(0).begin();
 
     Utils::copyImage(
-        pass.postCopyBuf.handle(),
+        pass.postCopyBufs.at(0).handle(),
         this->out_n.at(0).handle(),
         this->swapchainImages.at(imageIdx),
         this->extent.width,
@@ -332,34 +334,35 @@ VkResult LsContext::present(
         true
     );
 
-    pass.postCopyBuf.end();
+    pass.postCopyBufs.at(0).end();
 
-    pass.postCopyBuf.submit(
+    VkSemaphore postSignal = Mini::Semaphore(info.device).handle();
+
+    std::vector<VkSemaphore*> postWait;
+    std::vector<VkSemaphore*> postSignalVec;
+
+    postWait.push_back(&preCopySignal);
+    postSignalVec.push_back(&postSignal);
+
+    pass.postCopyBufs.at(0).submit(
         info.queue.second,
-        renderSemaphores,
-        { pass.postCopySem.handle() }
+        postWait,
+        postSignalVec
     );
 
     /*
-     * 5. Present (ONLY ONE)
+     * 5. present (FIXED)
      */
-    VkSemaphore waitSem = pass.postCopySem.handle();
+    VkSemaphore wait = postSignal;
 
     VkPresentInfoKHR presentInfo{};
     presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
     presentInfo.waitSemaphoreCount = 1;
-    presentInfo.pWaitSemaphores = &waitSem;
+    presentInfo.pWaitSemaphores = &wait;
     presentInfo.swapchainCount = 1;
     presentInfo.pSwapchains = &this->swapchain;
     presentInfo.pImageIndices = &imageIdx;
     presentInfo.pNext = pNext;
 
-    res = Layer::ovkQueuePresentKHR(queue, &presentInfo);
-
-    if (res != VK_SUCCESS && res != VK_SUBOPTIMAL_KHR)
-        throw LSFG::vulkan_error(res, "Present failed");
-
-    this->frameIdx++;
-
-    return res;
+    return Layer::ovkQueuePresentKHR(queue, &presentInfo);
 }
