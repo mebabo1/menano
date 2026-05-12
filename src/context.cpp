@@ -19,18 +19,13 @@
 #include <array>
 #include <iostream>
 
-#include <sys/mman.h>
-#include <sys/stat.h>
-#include <fcntl.h>
-#include <unistd.h>
-#include <cstring>
-
 LsContext::LsContext(
         const Hooks::DeviceInfo& info,
         VkSwapchainKHR swapchain,
         VkExtent2D extent,
         const std::vector<VkImage>& swapchainImages)
-        : swapchain(swapchain),
+        : info(info),
+          swapchain(swapchain),
           swapchainImages(swapchainImages),
           extent(extent) {
 
@@ -40,26 +35,30 @@ LsContext::LsContext(
     auto& globalConf = Config::globalConf;
     auto& conf = *Config::currentConf;
 
+    /*
+     * correct format selection
+     */
     const VkFormat format =
         conf.hdr
-            ? VK_FORMAT_R8G8B8A8_UNORM
-            : VK_FORMAT_R16G16B16A16_SFLOAT;
+            ? VK_FORMAT_R16G16B16A16_SFLOAT
+            : VK_FORMAT_R8G8B8A8_UNORM;
 
     /*
      * external memory fds
+     * these are exported by Mini::Image internally
      */
     std::array<int, 2> fds{
         -1,
         -1
     };
 
-    std::vector<int> outFdsRuntime(
+    std::vector<int> outFds(
         conf.multiplier - 1,
         -1
     );
 
     /*
-     * create shared images
+     * create input frames
      */
     this->frame_0 = Mini::Image(
         info.device,
@@ -67,6 +66,7 @@ LsContext::LsContext(
         extent,
         format,
         VK_IMAGE_USAGE_TRANSFER_DST_BIT |
+        VK_IMAGE_USAGE_TRANSFER_SRC_BIT |
         VK_IMAGE_USAGE_SAMPLED_BIT |
         VK_IMAGE_USAGE_STORAGE_BIT,
         VK_IMAGE_ASPECT_COLOR_BIT,
@@ -79,26 +79,12 @@ LsContext::LsContext(
         extent,
         format,
         VK_IMAGE_USAGE_TRANSFER_DST_BIT |
+        VK_IMAGE_USAGE_TRANSFER_SRC_BIT |
         VK_IMAGE_USAGE_SAMPLED_BIT |
         VK_IMAGE_USAGE_STORAGE_BIT,
         VK_IMAGE_ASPECT_COLOR_BIT,
         &fds.at(1)
     );
-
-    for (size_t i = 0; i < (conf.multiplier - 1); ++i) {
-
-        this->out_n.emplace_back(
-            info.device,
-            info.physicalDevice,
-            extent,
-            format,
-            VK_IMAGE_USAGE_TRANSFER_SRC_BIT |
-            VK_IMAGE_USAGE_SAMPLED_BIT |
-            VK_IMAGE_USAGE_STORAGE_BIT,
-            VK_IMAGE_ASPECT_COLOR_BIT,
-            &outFdsRuntime.at(i)
-        );
-    }
 
     std::cerr
         << "frame fd0 = "
@@ -110,107 +96,49 @@ LsContext::LsContext(
         << fds.at(1)
         << std::endl;
 
-    for (size_t i = 0; i < outFdsRuntime.size(); ++i) {
+    /*
+     * create generated output images
+     */
+    for (size_t i = 0; i < (conf.multiplier - 1); ++i) {
+
+        this->out_n.emplace_back(
+            info.device,
+            info.physicalDevice,
+            extent,
+            format,
+            VK_IMAGE_USAGE_TRANSFER_SRC_BIT |
+            VK_IMAGE_USAGE_TRANSFER_DST_BIT |
+            VK_IMAGE_USAGE_SAMPLED_BIT |
+            VK_IMAGE_USAGE_STORAGE_BIT,
+            VK_IMAGE_ASPECT_COLOR_BIT,
+            &outFds.at(i)
+        );
 
         std::cerr
-            << "out fd["
-            << i
-            << "] = "
-            << outFdsRuntime.at(i)
+            << "out fd[" << i << "] = "
+            << outFds.at(i)
             << std::endl;
     }
 
     /*
-     * validate fd export
+     * validate exported fds
      */
     bool fdValid =
         (fds.at(0) >= 0) &&
         (fds.at(1) >= 0);
 
-    for (auto fd : outFdsRuntime) {
+    for (auto fd : outFds)
+        fdValid &= (fd >= 0);
 
-        if (fd < 0) {
-            fdValid = false;
-            break;
-        }
-    }
-
-    useShmFallback = !fdValid;
-
-    std::cerr
-        << "useShmFallback = "
-        << useShmFallback
-        << std::endl;
-
-    /*
-     * shm fallback
-     */
-    size_t shmSize =
-        extent.width *
-        extent.height *
-        4;
-
-    if (useShmFallback) {
+    if (!fdValid) {
 
         std::cerr
-            << "creating shm fallback"
+            << "lsfg-vk: external memory export failed"
             << std::endl;
 
-        for (int i = 0; i < 2; ++i) {
-
-            std::string name =
-                "/lsfg_shm_" +
-                std::to_string(i);
-
-            shm[i].fd =
-                shm_open(
-                    name.c_str(),
-                    O_CREAT | O_RDWR,
-                    0666
-                );
-
-            if (shm[i].fd < 0) {
-
-                throw std::runtime_error(
-                    "shm_open failed");
-            }
-
-            ftruncate(
-                shm[i].fd,
-                shmSize
-            );
-
-            shm[i].size = shmSize;
-
-            shm[i].ptr =
-                mmap(
-                    nullptr,
-                    shmSize,
-                    PROT_READ | PROT_WRITE,
-                    MAP_SHARED,
-                    shm[i].fd,
-                    0
-                );
-
-            if (shm[i].ptr == MAP_FAILED) {
-
-                throw std::runtime_error(
-                    "mmap failed");
-            }
-
-            /*
-             * use shm fd as fake export fd
-             */
-            fds.at(i) = shm[i].fd;
-        }
-
-        for (size_t i = 0;
-             i < outFdsRuntime.size();
-             ++i) {
-
-            outFdsRuntime.at(i) =
-                dup(shm[0].fd);
-        }
+        throw std::runtime_error(
+            "External Vulkan memory export unavailable"
+        );
     }
 
     auto* lsfgInitialize =
@@ -234,15 +162,12 @@ LsContext::LsContext(
             LSFG_3_1P::deleteContext;
     }
 
-    setenv(
-        "DISABLE_LSFG",
-        "1",
-        1
-    );
+    setenv("DISABLE_LSFG", "1", 1);
 
     lsfgInitialize(
         Utils::getDeviceUUID(
-            info.physicalDevice),
+            info.physicalDevice
+        ),
         conf.hdr,
         1.0F / conf.flowScale,
         conf.multiplier - 1,
@@ -257,7 +182,7 @@ LsContext::LsContext(
         << fds.at(1)
         << std::endl;
 
-    for (auto fd : outFdsRuntime) {
+    for (auto fd : outFds) {
 
         std::cerr
             << "createContext outfd="
@@ -271,14 +196,14 @@ LsContext::LsContext(
                 lsfgCreateContext(
                     fds.at(0),
                     fds.at(1),
-                    outFdsRuntime,
+                    outFds,
                     extent,
                     format
                 )
             ),
-            [lsfgDeleteContext]
-            (const int32_t* id) {
-
+            [lsfgDeleteContext](
+                const int32_t* id
+            ) {
                 lsfgDeleteContext(*id);
             }
         );
@@ -291,79 +216,32 @@ LsContext::LsContext(
             info.queue.first
         );
 
-    for (size_t i = 0; i < 8; ++i) {
+    /*
+     * allocate frame resources
+     */
+    for (size_t i = 0; i < 8; i++) {
 
         auto& pass =
             this->passInfos.at(i);
 
         pass.renderSemaphores.resize(
-            conf.multiplier - 1);
+            conf.multiplier - 1
+        );
 
         pass.acquireSemaphores.resize(
-            conf.multiplier - 1);
+            conf.multiplier - 1
+        );
 
         pass.postCopyBufs.resize(
-            conf.multiplier - 1);
+            conf.multiplier - 1
+        );
 
         pass.postCopySemaphores.resize(
-            conf.multiplier - 1);
+            conf.multiplier - 1
+        );
 
         pass.prevPostCopySemaphores.resize(
-            conf.multiplier - 1);
+            conf.multiplier - 1
+        );
     }
-}
-
-void LsContext::uploadShmToGPU(
-        const Hooks::DeviceInfo& info,
-        void* src,
-        Mini::Image& dst) {
-
-    if (!src)
-        return;
-
-    size_t bufferSize =
-        extent.width *
-        extent.height *
-        4;
-
-    Mini::Buffer stagingBuffer(
-        info.device,
-        info.physicalDevice,
-        bufferSize,
-        VK_BUFFER_USAGE_TRANSFER_SRC_BIT
-    );
-
-    void* mapped =
-        stagingBuffer.map();
-
-    memcpy(
-        mapped,
-        src,
-        bufferSize
-    );
-
-    stagingBuffer.unmap();
-
-    Mini::CommandBuffer cmd(
-        info.device,
-        this->cmdPool
-    );
-
-    cmd.begin();
-
-    Utils::copyBufferToImage(
-        cmd.handle(),
-        stagingBuffer.handle(),
-        dst.handle(),
-        extent.width,
-        extent.height
-    );
-
-    cmd.end();
-
-    cmd.submit(
-        info.queue.second,
-        {},
-        {}
-    );
-}
+        }
