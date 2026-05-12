@@ -166,6 +166,7 @@ jobs:
            -Dllvm=enabled \
            -Dshared-llvm=enabled \
            -Dvulkan-beta=true \
+           -Dvulkan-use-external-memory=true
            -Dvideo-codecs=all
 
         # 检查配置状态
