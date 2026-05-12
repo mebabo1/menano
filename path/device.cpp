@@ -2,10 +2,10 @@
 #include <volk.h>
 #include <vulkan/vulkan_core.h>
 
+#include "mini/semaphore.hpp"
 #include "core/device.hpp"
 #include "core/instance.hpp"
 #include "common/exception.hpp"
-#include "mini/semaphore.hpp"
 
 #include <cstdint>
 #include <memory>
