@@ -156,7 +156,7 @@ Device::Device(
         "FP32 fallback") << std::endl;
 
     /* -----------------------------------------------------
-     * 5. External semaphore capability query (IMPORTANT)
+     * 5. External semaphore capability query (DEBUG ENHANCED)
      * ----------------------------------------------------- */
     VkPhysicalDeviceExternalSemaphoreInfo semInfo{
         .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_EXTERNAL_SEMAPHORE_INFO,
@@ -172,17 +172,35 @@ Device::Device(
         &semInfo,
         &semProps);
 
+    std::cerr << "---- External Semaphore Capability ----" << std::endl;
+    std::cerr << "exportable: "
+              << ((semProps.externalSemaphoreFeatures &
+                   VK_EXTERNAL_SEMAPHORE_FEATURE_EXPORTABLE_BIT) ? "YES" : "NO")
+              << std::endl;
+
+    std::cerr << "importable: "
+              << ((semProps.externalSemaphoreFeatures &
+                   VK_EXTERNAL_SEMAPHORE_FEATURE_IMPORTABLE_BIT) ? "YES" : "NO")
+              << std::endl;
+
+    std::cerr << "exportable fd type supported: "
+              << ((semProps.exportFromImportedHandleTypes &
+                   VK_EXTERNAL_SEMAPHORE_HANDLE_TYPE_OPAQUE_FD_BIT) ? "YES" : "NO")
+              << std::endl;
+
+    std::cerr << "importable fd type supported: "
+              << ((semProps.compatibleHandleTypes &
+                   VK_EXTERNAL_SEMAPHORE_HANDLE_TYPE_OPAQUE_FD_BIT) ? "YES" : "NO")
+              << std::endl;
+
     bool supportsFdSemaphore =
-        semProps.externalSemaphoreFeatures &
-        VK_EXTERNAL_SEMAPHORE_FEATURE_EXPORTABLE_BIT;
+        (semProps.externalSemaphoreFeatures &
+         VK_EXTERNAL_SEMAPHORE_FEATURE_EXPORTABLE_BIT) &&
+        (semProps.externalSemaphoreFeatures &
+         VK_EXTERNAL_SEMAPHORE_FEATURE_IMPORTABLE_BIT);
 
     /* -----------------------------------------------------
-     * 6. (IMPORTANT) Do NOT depend on Mini here
-     * ----------------------------------------------------- */
-    // capability is now local to device init only
-
-    /* -----------------------------------------------------
-     * 7. Queue create
+     * 6. Queue create
      * ----------------------------------------------------- */
     float priority = 1.0f;
 
@@ -194,7 +212,7 @@ Device::Device(
     };
 
     /* -----------------------------------------------------
-     * 8. Vulkan features chain
+     * 7. Vulkan features chain
      * ----------------------------------------------------- */
     VkPhysicalDeviceVulkan13Features features13{
         .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_3_FEATURES,
@@ -207,7 +225,7 @@ Device::Device(
     features12.shaderFloat16 = fp16;
 
     /* -----------------------------------------------------
-     * 9. Device create
+     * 8. Device create
      * ----------------------------------------------------- */
     VkDeviceCreateInfo createInfo{
         .sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO,
@@ -233,24 +251,11 @@ Device::Device(
         throw LSFG::vulkan_error(res, "Device creation failed");
     }
 
-    /* -----------------------------------------------------
-     * 10. Load volk
-     * ----------------------------------------------------- */
     volkLoadDevice(deviceHandle);
 
-    /* -----------------------------------------------------
-     * 11. Get queue
-     * ----------------------------------------------------- */
     VkQueue queue{};
-    vkGetDeviceQueue(
-        deviceHandle,
-        *queueFamily,
-        0,
-        &queue);
+    vkGetDeviceQueue(deviceHandle, *queueFamily, 0, &queue);
 
-    /* -----------------------------------------------------
-     * 12. Store
-     * ----------------------------------------------------- */
     this->computeQueue = queue;
     this->computeFamilyIdx = *queueFamily;
     this->physicalDevice = *physicalDevice;
