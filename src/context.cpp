@@ -340,7 +340,194 @@ VkResult LsContext::present(
         );
     }
 
+    for (size_t i = 0;
+         i < (conf.multiplier - 1);
+         i++) {
+
+        pass.acquireSemaphores.at(i) =
+            Mini::Semaphore(
+                info.device
+            );
+
+        uint32_t imageIdx{};
+
+        auto res =
+            Layer::ovkAcquireNextImageKHR(
+                info.device,
+                this->swapchain,
+                UINT64_MAX,
+                pass.acquireSemaphores
+                    .at(i)
+                    .handle(),
+                VK_NULL_HANDLE,
+                &imageIdx
+            );
+
+        if (res != VK_SUCCESS &&
+            res != VK_SUBOPTIMAL_KHR) {
+
+            throw LSFG::vulkan_error(
+                res,
+                "Acquire failed"
+            );
+        }
+
+        pass.postCopySemaphores.at(i) =
+            Mini::Semaphore(
+                info.device
+            );
+
+        pass.prevPostCopySemaphores.at(i) =
+            Mini::Semaphore(
+                info.device
+            );
+
+        pass.postCopyBufs.at(i) =
+            Mini::CommandBuffer(
+                info.device,
+                this->cmdPool
+            );
+
+        pass.postCopyBufs.at(i).begin();
+
+        Utils::copyImage(
+            pass.postCopyBufs.at(i)
+                .handle(),
+            this->out_n.at(i)
+                .handle(),
+            this->swapchainImages.at(
+                imageIdx
+            ),
+            this->extent.width,
+            this->extent.height,
+            VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
+            VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
+            false,
+            true
+        );
+
+        pass.postCopyBufs.at(i).end();
+
+        pass.postCopyBufs.at(i).submit(
+            info.queue.second,
+            {
+                pass.acquireSemaphores
+                    .at(i)
+                    .handle(),
+
+                pass.renderSemaphores
+                    .at(i)
+                    .handle()
+            },
+            {
+                pass.postCopySemaphores
+                    .at(i)
+                    .handle(),
+
+                pass.prevPostCopySemaphores
+                    .at(i)
+                    .handle()
+            }
+        );
+
+        std::vector<VkSemaphore>
+            waitSemaphores{
+
+            pass.postCopySemaphores
+                .at(i)
+                .handle()
+        };
+
+        if (i != 0) {
+
+            waitSemaphores.emplace_back(
+                pass.prevPostCopySemaphores
+                    .at(i - 1)
+                    .handle()
+            );
+        }
+
+        VkPresentInfoKHR presentInfo{
+            .sType =
+                VK_STRUCTURE_TYPE_PRESENT_INFO_KHR,
+
+            .pNext =
+                i == 0
+                    ? pNext
+                    : nullptr,
+
+            .waitSemaphoreCount =
+                static_cast<uint32_t>(
+                    waitSemaphores.size()
+                ),
+
+            .pWaitSemaphores =
+                waitSemaphores.data(),
+
+            .swapchainCount = 1,
+
+            .pSwapchains =
+                &this->swapchain,
+
+            .pImageIndices =
+                &imageIdx,
+        };
+
+        res =
+            Layer::ovkQueuePresentKHR(
+                queue,
+                &presentInfo
+            );
+
+        if (res != VK_SUCCESS &&
+            res != VK_SUBOPTIMAL_KHR) {
+
+            throw LSFG::vulkan_error(
+                res,
+                "Present failed"
+            );
+        }
+    }
+
+    VkSemaphore lastSemaphore =
+        pass.prevPostCopySemaphores.at(
+            conf.multiplier - 2
+        ).handle();
+
+    VkPresentInfoKHR finalPresentInfo{
+        .sType =
+            VK_STRUCTURE_TYPE_PRESENT_INFO_KHR,
+
+        .waitSemaphoreCount = 1,
+
+        .pWaitSemaphores =
+            &lastSemaphore,
+
+        .swapchainCount = 1,
+
+        .pSwapchains =
+            &this->swapchain,
+
+        .pImageIndices =
+            &presentIdx,
+    };
+
+    auto res =
+        Layer::ovkQueuePresentKHR(
+            queue,
+            &finalPresentInfo
+        );
+
+    if (res != VK_SUCCESS &&
+        res != VK_SUBOPTIMAL_KHR) {
+
+        throw LSFG::vulkan_error(
+            res,
+            "Final present failed"
+        );
+    }
+
     this->frameIdx++;
 
-    return VK_SUCCESS;
+    return res;
 }
