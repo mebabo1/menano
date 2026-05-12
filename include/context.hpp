@@ -28,6 +28,11 @@ public:
     ~LsContext() = default;
 
 private:
+    enum class IPCMode {
+        FD,
+        SHM
+    };
+
     VkSwapchainKHR swapchain;
     std::vector<VkImage> swapchainImages;
     VkExtent2D extent;
@@ -40,7 +45,14 @@ private:
     Mini::CommandPool cmdPool;
     uint64_t frameIdx{0};
 
+    VkDevice device{};
+    VkPhysicalDevice physicalDevice{};
+    VkQueue queue{};
+
     bool useShmFallback{false};
+    IPCMode ipcMode{IPCMode::FD};
+
+    size_t shmFrameSize{0};
 
     struct ShmBuffer {
         int fd = -1;
