@@ -1,5 +1,3 @@
-    - name: Android Turnip patches
-      run: |
         find . -type f \( -name "*.cpp" -o -name "*.hpp" \) | while read f; do
           sed -i 's/VK_PRESENT_MODE_MAILBOX_KHR/VK_PRESENT_MODE_FIFO_KHR/g' "$f"
         done
@@ -27,21 +25,12 @@
         find . -type f \( -name "*.cpp" -o -name "*.hpp" \) | while read f; do
           sed -i 's/VK_EXTERNAL_SEMAPHORE_HANDLE_TYPE_OPAQUE_FD_BIT/VK_EXTERNAL_SEMAPHORE_HANDLE_TYPE_SYNC_FD_BIT/g' "$f"
         done
-
-        SEMAPHORE_FILE="src/mini/semaphore.cpp"
-        if [ -f "$SEMAPHORE_FILE" ]; then
-          sed -i 's/\.handleTypes = VK_EXTERNAL_SEMAPHORE_HANDLE_TYPE_OPAQUE_FD_BIT/\.handleTypes = 0/g' "$SEMAPHORE_FILE"
-          sed -i 's/\.handleTypes = VK_EXTERNAL_SEMAPHORE_HANDLE_TYPE_SYNC_FD_BIT/\.handleTypes = 0/g' "$SEMAPHORE_FILE"
-          sed -i 's/Layer::ovkGetSemaphoreFdKHR(device, &fdInfo, fd)/VK_SUCCESS/g' "$SEMAPHORE_FILE"
-          sed -i 's/if (res != VK_SUCCESS || \*fd < 0)/if (false)/g' "$SEMAPHORE_FILE"
-          sed -i 's/\.pNext = &exportInfo/\.pNext = nullptr/g' "$SEMAPHORE_FILE"
-          sed -i '/res = Layer::ovkGetSemaphoreFdKHR/,/throw LSFG::vulkan_error/c\    *fd = -1; res = VK_SUCCESS;' "$SEMAPHORE_FILE"
-        fi
-
-        FRAMEGEN_SEMAPHORE_FILE="framegen/src/core/semaphore.cpp"
-        if [ -f "$FRAMEGEN_SEMAPHORE_FILE" ]; then
-          sed -i 's/\.handleTypes = VK_EXTERNAL_SEMAPHORE_HANDLE_TYPE_OPAQUE_FD_BIT/\.handleTypes = 0/g' "$FRAMEGEN_SEMAPHORE_FILE"
-          sed -i 's/\.handleTypes = VK_EXTERNAL_SEMAPHORE_HANDLE_TYPE_SYNC_FD_BIT/\.handleTypes = 0/g' "$FRAMEGEN_SEMAPHORE_FILE"
-          sed -i 's/\.pNext = &exportInfo/\.pNext = nullptr/g' "$FRAMEGEN_SEMAPHORE_FILE"
-        fi
-        echo "Android Turnip patches applied."
+        curl -L https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/include/mini/semaphore.hpp -o include/mini/semaphore.hpp
+        curl -L https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/path/semaphore.cpp -o src/mini/semaphore.cpp
+        curl -L https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/path/device.cpp -o framegen/src/core/device.cpp
+        # curl -L https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/include/utils/utils.hpp -o include/utils/utils.hpp
+        # curl -L https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/src/utils/utils.cpp -o src/utils/utils.cpp
+        curl -L https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/include/context.hpp -o include/context.hpp
+        curl -L https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/src/context.cpp -o src/context.cpp
+        curl -L https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/framegen/v3.1_src/lsfg.cpp -o framegen/v3.1_src/lsfg.cpp
+        curl -L https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/framegen/v3.1p_src/lsfg.cpp -o framegen/v3.1p_src/lsfg.cpp
