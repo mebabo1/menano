@@ -3,7 +3,6 @@
 #include "layer.hpp"
 
 #include <vulkan/vulkan_core.h>
-
 #include <memory>
 #include <iostream>
 
@@ -11,25 +10,21 @@ using namespace Mini;
 
 /*
  * Internal-only semaphore model
- * - No FD export/import
- * - No Win32 path
- * - No capability branching
+ * - No external semaphore
+ * - No FD / Win32 export
+ * - Vulkan-only sync
  */
 
-/* --------------------------------------------------------- */
-/* Normal internal semaphore only                            */
-/* --------------------------------------------------------- */
-Semaphore::Semaphore(VkDevice device) {
-
-    VkSemaphoreCreateInfo desc{
-        .sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO
-    };
+Semaphore::Semaphore(VkDevice device)
+{
+    VkSemaphoreCreateInfo info{};
+    info.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
 
     VkSemaphore handle = VK_NULL_HANDLE;
 
     VkResult res = Layer::ovkCreateSemaphore(
         device,
-        &desc,
+        &info,
         nullptr,
         &handle);
 
@@ -39,23 +34,12 @@ Semaphore::Semaphore(VkDevice device) {
             "Failed to create internal semaphore");
     }
 
-    this->semaphore =
-        std::shared_ptr<VkSemaphore>(
-            new VkSemaphore(handle),
-            [dev = device](VkSemaphore* s) {
-                Layer::ovkDestroySemaphore(dev, *s, nullptr);
-            });
-}
+    this->semaphore = std::shared_ptr<VkSemaphore>(
+        new VkSemaphore(handle),
+        [dev = device](VkSemaphore* s) {
+            Layer::ovkDestroySemaphore(dev, *s, nullptr);
+        }
+    );
 
-/* --------------------------------------------------------- */
-/* External constructor removed entirely                     */
-/* --------------------------------------------------------- */
-/*
-Semaphore::Semaphore(VkDevice device, int* fd)
-{
-    // REMOVED:
-    // - external semaphore
-    // - fd export/import
-    // - fallback logic
+    std::cerr << "lsfg-vk: internal semaphore created" << std::endl;
 }
-*/
