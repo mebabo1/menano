@@ -242,16 +242,18 @@ VkResult LsContext::present(
     auto& conf = *Config::currentConf;
     auto& pass = this->passInfos.at(this->frameIdx % 8);
 
-    std::cerr << "[TRACE] present frame=" << this->frameIdx << std::endl;
+    std::cerr << "[TRACE] frame=" << this->frameIdx << std::endl;
 
     /*
+     * =====================================================
      * 1. Acquire swapchain image
+     * =====================================================
      */
     pass.acquireSemaphores.at(0) = Mini::Semaphore(info.device);
 
     uint32_t imageIdx = 0;
 
-    auto res = Layer::ovkAcquireNextImageKHR(
+    VkResult res = Layer::ovkAcquireNextImageKHR(
         info.device,
         this->swapchain,
         UINT64_MAX,
@@ -264,17 +266,22 @@ VkResult LsContext::present(
         throw LSFG::vulkan_error(res, "Acquire failed");
 
     /*
-     * 2. Copy swapchain → LSFG input
+     * =====================================================
+     * 2. Copy swapchain → LSFG input image
+     * =====================================================
      */
+    Frame& srcFrame =
+        (this->frameIdx % 2 == 0)
+            ? this->frame_0
+            : this->frame_1;
+
     pass.preCopyBuf = Mini::CommandBuffer(info.device, this->cmdPool);
     pass.preCopyBuf.begin();
 
     Utils::copyImage(
         pass.preCopyBuf.handle(),
         this->swapchainImages.at(imageIdx),
-        (this->frameIdx % 2 == 0)
-            ? this->frame_0.handle()
-            : this->frame_1.handle(),
+        srcFrame.image.handle(),
         this->extent.width,
         this->extent.height,
         VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
@@ -286,7 +293,9 @@ VkResult LsContext::present(
     pass.preCopyBuf.end();
 
     /*
-     * 3. Synchronization (Vulkan semaphores)
+     * =====================================================
+     * 3. Sync (GPU → LSFG input ready)
+     * =====================================================
      */
     std::vector<VkSemaphore> preWaitSemaphores = gameRenderSemaphores;
 
@@ -308,24 +317,22 @@ VkResult LsContext::present(
     );
 
     /*
-     * 4. LSFG execution (IMPORTANT FIX)
-     *
-     * fd must come from real exported memory
+     * =====================================================
+     * 4. LSFG execution (FD BASED INPUT/OUTPUT)
+     * =====================================================
      */
-    int inputFd = (this->frameIdx % 2 == 0)
-        ? this->frame_0.fd()
-        : this->frame_1.fd();
-
     std::vector<int> outFds(conf.multiplier - 1, -1);
 
     LSFG_3_1::presentContext(
         *this->lsfgCtxId,
-        inputFd,
+        srcFrame.fd,
         outFds
     );
 
     /*
+     * =====================================================
      * 5. Copy LSFG output → swapchain
+     * =====================================================
      */
     pass.postCopyBufs.at(0) =
         Mini::CommandBuffer(info.device, this->cmdPool);
@@ -347,7 +354,9 @@ VkResult LsContext::present(
     pass.postCopyBufs.at(0).end();
 
     /*
+     * =====================================================
      * 6. Output sync
+     * =====================================================
      */
     VkSemaphore postSignal =
         Mini::Semaphore(info.device).handle();
@@ -359,7 +368,9 @@ VkResult LsContext::present(
     );
 
     /*
-     * 7. Present (FINAL SYNC POINT)
+     * =====================================================
+     * 7. Present
+     * =====================================================
      */
     VkPresentInfoKHR presentInfo{};
     presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
@@ -370,9 +381,15 @@ VkResult LsContext::present(
     presentInfo.pImageIndices = &imageIdx;
     presentInfo.pNext = pNext;
 
-    auto result = Layer::ovkQueuePresentKHR(queue, &presentInfo);
+    VkResult finalRes =
+        Layer::ovkQueuePresentKHR(queue, &presentInfo);
 
+    /*
+     * =====================================================
+     * 8. Frame update
+     * =====================================================
+     */
     this->frameIdx++;
 
-    return result;
+    return finalRes;
 }
