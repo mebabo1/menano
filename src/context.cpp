@@ -139,3 +139,153 @@ LsContext::LsContext(const Hooks::DeviceInfo& info, VkSwapchainKHR swapchain,
         pass.prevPostCopySemaphores.resize(conf.multiplier - 1);
     }
     }
+VkResult LsContext::present(
+    const Hooks::DeviceInfo& info,
+    const void* pNext,
+    VkQueue queue,
+    const std::vector<VkSemaphore>& gameRenderSemaphores,
+    uint32_t presentIdx) {
+
+    if (!Config::currentConf.has_value())
+        throw std::runtime_error("No configuration set");
+
+    auto& conf = *Config::currentConf;
+    auto& pass = passInfos[frameIdx % 8];
+
+    int preCopySemaphoreFd{};
+
+    pass.preCopySemaphores[0] =
+        Mini::Semaphore(info.device, &preCopySemaphoreFd);
+
+    pass.preCopySemaphores[1] =
+        Mini::Semaphore(info.device);
+
+    pass.preCopyBuf = Mini::CommandBuffer(info.device, cmdPool);
+    pass.preCopyBuf.begin();
+
+    Utils::copyImage(
+        pass.preCopyBuf.handle(),
+        swapchainImages[presentIdx],
+        frameIdx % 2 == 0 ? frame_0.handle() : frame_1.handle(),
+        extent.width,
+        extent.height,
+        VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
+        VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
+        true,
+        false
+    );
+
+    pass.preCopyBuf.end();
+
+    std::vector<VkSemaphore> preWaits = gameRenderSemaphores;
+
+    if (frameIdx > 0) {
+        preWaits.push_back(
+            passInfos[(frameIdx - 1) % 8]
+                .preCopySemaphores[1]
+                .handle()
+        );
+    }
+
+    pass.preCopyBuf.submit(
+        info.queue.second,
+        preWaits,
+        {
+            pass.preCopySemaphores[0].handle(),
+            pass.preCopySemaphores[1].handle()
+        }
+    );
+
+    std::vector<int> renderFds(conf.multiplier - 1);
+
+    for (size_t i = 0; i < conf.multiplier - 1; i++) {
+        pass.renderSemaphores[i] =
+            Mini::Semaphore(info.device, &renderFds[i]);
+    }
+
+    // =========================
+    // LSFG CALL
+    // =========================
+    if (ipcMode == IPCMode::FD) {
+
+        LSFG_3_1::presentContext(*lsfgCtxId, preCopySemaphoreFd, renderFds);
+
+    } else {
+
+        std::vector<uint8_t> cpu(shmFrameSize);
+
+        Utils::readbackImage(
+            info.device,
+            frameIdx % 2 == 0 ? frame_0.handle() : frame_1.handle(),
+            cpu.data(),
+            extent.width,
+            extent.height
+        );
+
+        memcpy(shmInputs[0], cpu.data(), shmFrameSize);
+
+        LSFG_3_1::presentContext(*lsfgCtxId, 0, renderFds);
+    }
+
+    // =========================
+    // PRESENT LOOP
+    // =========================
+    for (size_t i = 0; i < conf.multiplier - 1; i++) {
+
+        pass.acquireSemaphores[i] = Mini::Semaphore(info.device);
+
+        uint32_t imageIdx{};
+
+        auto res = Layer::ovkAcquireNextImageKHR(
+            info.device,
+            swapchain,
+            UINT64_MAX,
+            pass.acquireSemaphores[i].handle(),
+            VK_NULL_HANDLE,
+            &imageIdx
+        );
+
+        pass.postCopyBufs[i] = Mini::CommandBuffer(info.device, cmdPool);
+        pass.postCopyBufs[i].begin();
+
+        Utils::copyImage(
+            pass.postCopyBufs[i].handle(),
+            out_n[i].handle(),
+            swapchainImages[imageIdx],
+            extent.width,
+            extent.height,
+            VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
+            VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
+            false,
+            true
+        );
+
+        pass.postCopyBufs[i].end();
+
+        pass.postCopyBufs[i].submit(
+            info.queue.second,
+            {
+                pass.acquireSemaphores[i].handle(),
+                pass.renderSemaphores[i].handle()
+            },
+            {
+                pass.postCopySemaphores[i].handle(),
+                pass.prevPostCopySemaphores[i].handle()
+            }
+        );
+
+        VkPresentInfoKHR pi{
+            .sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR,
+            .waitSemaphoreCount = 1,
+            .pWaitSemaphores = &pass.postCopySemaphores[i].handle(),
+            .swapchainCount = 1,
+            .pSwapchains = &swapchain,
+            .pImageIndices = &imageIdx,
+        };
+
+        Layer::ovkQueuePresentKHR(queue, &pi);
+    }
+
+    frameIdx++;
+    return VK_SUCCESS;
+}
