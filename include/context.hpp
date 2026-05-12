@@ -14,79 +14,67 @@
 #include <vector>
 
 ///
-/// This class is the frame generation context.
-/// One instance per swapchain.
+/// This class is the frame generation context. There should be one instance per swapchain.
 ///
 class LsContext {
 public:
-    LsContext(
-        const Hooks::DeviceInfo& info,
-        VkSwapchainKHR swapchain,
-        VkExtent2D extent,
-        const std::vector<VkImage>& swapchainImages
-    );
+    ///
+    /// Create the swapchain context.
+    ///
+    /// @param info The device information to use.
+    /// @param swapchain The Vulkan swapchain to use.
+    /// @param extent The extent of the swapchain images.
+    /// @param swapchainImages The swapchain images to use.
+    ///
+    /// @throws LSFG::vulkan_error if any Vulkan call fails.
+    ///
+    LsContext(const Hooks::DeviceInfo& info, VkSwapchainKHR swapchain,
+        VkExtent2D extent, const std::vector<VkImage>& swapchainImages);
 
-    VkResult present(
-        const Hooks::DeviceInfo& info,
-        const void* pNext,
-        VkQueue queue,
-        const std::vector<VkSemaphore>& gameRenderSemaphores,
-        uint32_t presentIdx
-    );
+    ///
+    /// Custom present logic.
+    ///
+    /// @param info The device information to use.
+    /// @param pNext Unknown pointer set in the present info structure.
+    /// @param queue The Vulkan queue to present the frame on.
+    /// @param gameRenderSemaphores The semaphores to wait on before presenting.
+    /// @param presentIdx The index of the swapchain image to present.
+    /// @return The result of the Vulkan present operation, which can be VK_SUCCESS or VK_SUBOPTIMAL_KHR.
+    ///
+    /// @throws LSFG::vulkan_error if any Vulkan call fails.
+    ///
+    VkResult present(const Hooks::DeviceInfo& info, const void* pNext, VkQueue queue,
+        const std::vector<VkSemaphore>& gameRenderSemaphores, uint32_t presentIdx);
 
+    // Non-copyable, trivially moveable and destructible
     LsContext(const LsContext&) = delete;
     LsContext& operator=(const LsContext&) = delete;
     LsContext(LsContext&&) = default;
     LsContext& operator=(LsContext&&) = default;
     ~LsContext() = default;
-
 private:
-    /* =====================================================
-     * MODE FLAGS
-     * ===================================================== */
-    bool internalOnlyMode{false};   // LSFG external sync 실패 시 fallback
-    bool lsfgEnabled{true};         // LSFG 정상 동작 여부
-
-    /* =====================================================
-     * SWAPCHAIN
-     * ===================================================== */
     VkSwapchainKHR swapchain;
     std::vector<VkImage> swapchainImages;
     VkExtent2D extent;
 
-    /* =====================================================
-     * LSFG CONTEXT
-     * ===================================================== */
-    std::shared_ptr<int32_t> lsfgCtxId;
+    std::shared_ptr<int32_t> lsfgCtxId; // lsfg context id
+    Mini::Image frame_0, frame_1; // frames shared with lsfg. write to frame_0 when fc % 2 == 0
+    std::vector<Mini::Image> out_n; // output images shared with lsfg, indexed by framegen id
 
-    /* =====================================================
-     * FRAME BUFFERS
-     * ===================================================== */
-    Mini::Image frame_0;
-    Mini::Image frame_1;
-    std::vector<Mini::Image> out_n;
-
-    /* =====================================================
-     * COMMAND SYSTEM
-     * ===================================================== */
     Mini::CommandPool cmdPool;
     uint64_t frameIdx{0};
 
-    /* =====================================================
-     * PER-FRAME DATA
-     * ===================================================== */
     struct RenderPassInfo {
-        Mini::CommandBuffer preCopyBuf;
+        Mini::CommandBuffer preCopyBuf; // copy from swapchain image to frame_0/frame_1
+        std::array<Mini::Semaphore, 2> preCopySemaphores; // signal when preCopyBuf is done
 
-        std::array<Mini::Semaphore, 2> preCopySemaphores;
+        std::vector<Mini::Semaphore> renderSemaphores; // signal when lsfg is done with frame n
 
-        std::vector<Mini::Semaphore> renderSemaphores;
-        std::vector<Mini::Semaphore> acquireSemaphores;
+        std::vector<Mini::Semaphore> acquireSemaphores; // signal for swapchain image n
 
-        std::vector<Mini::CommandBuffer> postCopyBufs;
-        std::vector<Mini::Semaphore> postCopySemaphores;
-        std::vector<Mini::Semaphore> prevPostCopySemaphores;
-    };
-
-    std::array<RenderPassInfo, 8> passInfos;
+        std::vector<Mini::CommandBuffer> postCopyBufs; // copy from out_n to swapchain image
+        std::vector<Mini::Semaphore> postCopySemaphores; // signal when postCopyBuf is done
+        std::vector<Mini::Semaphore> prevPostCopySemaphores; // signal for previous postCopyBuf
+    }; // data for a single render pass
+    std::array<RenderPassInfo, 8> passInfos; // allocate 8 because why not
 };
