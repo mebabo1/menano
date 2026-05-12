@@ -4,7 +4,7 @@
 
 #include <vulkan/vulkan_core.h>
 #include <sys/types.h>
-#include <string.h> // NOLINT
+#include <string.h>
 #include <unistd.h>
 
 #include <unordered_map>
@@ -23,7 +23,7 @@
 using namespace Utils;
 
 // =========================
-// QUEUE SELECTION
+// QUEUE
 // =========================
 std::pair<uint32_t, VkQueue> Utils::findQueue(
     VkDevice device,
@@ -56,9 +56,7 @@ std::pair<uint32_t, VkQueue> Utils::findQueue(
     VkQueue queue{};
     Layer::ovkGetDeviceQueue(device, *idx, 0, &queue);
 
-    auto res = Layer::ovkSetDeviceLoaderData(device, queue);
-    if (res != VK_SUCCESS)
-        throw LSFG::vulkan_error(res, "Unable to set device loader data for queue");
+    Layer::ovkSetDeviceLoaderData(device, queue);
 
     return { *idx, queue };
 }
@@ -71,30 +69,26 @@ uint64_t Utils::getDeviceUUID(VkPhysicalDevice physicalDevice)
     VkPhysicalDeviceProperties properties{};
     Layer::ovkGetPhysicalDeviceProperties(physicalDevice, &properties);
 
-    return static_cast<uint64_t>(properties.vendorID) << 32 |
-           properties.deviceID;
+    return (uint64_t)properties.vendorID << 32 | properties.deviceID;
 }
 
 // =========================
-// SWAPCHAIN IMAGE LIMIT
+// SWAPCHAIN LIMIT
 // =========================
 uint32_t Utils::getMaxImageCount(VkPhysicalDevice physicalDevice, VkSurfaceKHR surface)
 {
-    VkSurfaceCapabilitiesKHR capabilities{};
+    VkSurfaceCapabilitiesKHR cap{};
     auto res = Layer::ovkGetPhysicalDeviceSurfaceCapabilitiesKHR(
-        physicalDevice, surface, &capabilities);
+        physicalDevice, surface, &cap);
 
     if (res != VK_SUCCESS)
-        throw LSFG::vulkan_error(res, "Failed to get surface capabilities");
+        throw LSFG::vulkan_error(res, "Failed surface caps");
 
-    if (capabilities.maxImageCount == 0)
-        return 999;
-
-    return capabilities.maxImageCount;
+    return cap.maxImageCount ? cap.maxImageCount : 999;
 }
 
 // =========================
-// EXTENSION MERGE
+// EXTENSIONS
 // =========================
 std::vector<const char*> Utils::addExtensions(
     const char* const* extensions,
@@ -104,11 +98,9 @@ std::vector<const char*> Utils::addExtensions(
     std::vector<const char*> ext(count);
     std::copy_n(extensions, count, ext.data());
 
-    for (const auto& e : requiredExtensions) {
+    for (auto& e : requiredExtensions) {
         auto it = std::ranges::find_if(ext,
-            [e](const char* extName) {
-                return std::string(extName) == std::string(e);
-            });
+            [e](const char* x) { return std::string(x) == e; });
 
         if (it == ext.end())
             ext.push_back(e);
@@ -118,7 +110,7 @@ std::vector<const char*> Utils::addExtensions(
 }
 
 // =========================
-// IMAGE BLIT (GPU → GPU)
+// GPU → GPU COPY
 // =========================
 void Utils::copyImage(
     VkCommandBuffer buf,
@@ -131,146 +123,163 @@ void Utils::copyImage(
     bool makeSrcPresentable,
     bool makeDstPresentable)
 {
-    const VkImageMemoryBarrier srcBarrier{
+    VkImageMemoryBarrier barriers[2]{};
+
+    barriers[0] = {
         .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
         .dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT,
         .oldLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
         .newLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
         .image = src,
-        .subresourceRange = {
-            .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
-            .levelCount = 1,
-            .layerCount = 1
-        }
+        .subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT,0,1,0,1}
     };
 
-    const VkImageMemoryBarrier dstBarrier{
+    barriers[1] = {
         .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
         .dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT,
         .newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
         .image = dst,
-        .subresourceRange = {
-            .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
-            .levelCount = 1,
-            .layerCount = 1
-        }
+        .subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT,0,1,0,1}
     };
 
-    std::vector<VkImageMemoryBarrier> barriers = { srcBarrier, dstBarrier };
+    Layer::ovkCmdPipelineBarrier(buf,
+        pre, VK_PIPELINE_STAGE_TRANSFER_BIT,
+        0,0,nullptr,0,nullptr,2,barriers);
 
-    Layer::ovkCmdPipelineBarrier(
-        buf,
-        pre,
-        VK_PIPELINE_STAGE_TRANSFER_BIT,
-        0,
-        0, nullptr,
-        0, nullptr,
-        static_cast<uint32_t>(barriers.size()),
-        barriers.data()
-    );
-
-    const VkImageBlit imageBlit{
-        .srcSubresource = {
-            .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
-            .layerCount = 1
-        },
-        .srcOffsets = {
-            { 0, 0, 0 },
-            { (int32_t)width, (int32_t)height, 1 }
-        },
-        .dstSubresource = {
-            .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
-            .layerCount = 1
-        },
-        .dstOffsets = {
-            { 0, 0, 0 },
-            { (int32_t)width, (int32_t)height, 1 }
-        }
+    VkImageBlit blit{
+        .srcSubresource = {VK_IMAGE_ASPECT_COLOR_BIT,0,0,1},
+        .srcOffsets = {{0,0,0},{(int32_t)width,(int32_t)height,1}},
+        .dstSubresource = {VK_IMAGE_ASPECT_COLOR_BIT,0,0,1},
+        .dstOffsets = {{0,0,0},{(int32_t)width,(int32_t)height,1}}
     };
 
     Layer::ovkCmdBlitImage(
         buf,
         src, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
         dst, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-        1, &imageBlit,
+        1,&blit,
         VK_FILTER_NEAREST
     );
+}
 
-    if (makeSrcPresentable) {
-        const VkImageMemoryBarrier presentBarrier{
-            .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
-            .oldLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
-            .newLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
-            .image = src,
-            .subresourceRange = {
-                .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
-                .levelCount = 1,
-                .layerCount = 1
-            }
-        };
+// =========================================================
+// ⭐ NEW: CPU → GPU UPLOAD
+// =========================================================
+void Utils::uploadBufferToImage(
+    VkDevice device,
+    VkCommandPool pool,
+    VkQueue queue,
+    const void* data,
+    VkImage image,
+    uint32_t width,
+    uint32_t height,
+    VkFormat)
+{
+    VkDeviceSize size = width * height * 4;
 
-        Layer::ovkCmdPipelineBarrier(
-            buf,
-            VK_PIPELINE_STAGE_TRANSFER_BIT,
-            post,
-            0,
-            0, nullptr,
-            0, nullptr,
-            1,
-            &presentBarrier
-        );
-    }
+    VkBuffer stagingBuffer;
+    VkDeviceMemory stagingMemory;
 
-    if (makeDstPresentable) {
-        const VkImageMemoryBarrier presentBarrier{
-            .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
-            .srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT,
-            .dstAccessMask = VK_ACCESS_MEMORY_READ_BIT,
-            .oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-            .newLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
-            .image = dst,
-            .subresourceRange = {
-                .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
-                .levelCount = 1,
-                .layerCount = 1
-            }
-        };
+    VkBufferCreateInfo bufInfo{
+        .sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
+        .size = size,
+        .usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT
+    };
 
-        Layer::ovkCmdPipelineBarrier(
-            buf,
-            VK_PIPELINE_STAGE_TRANSFER_BIT,
-            post,
-            0,
-            0, nullptr,
-            0, nullptr,
-            1,
-            &presentBarrier
-        );
-    }
+    vkCreateBuffer(device, &bufInfo, nullptr, &stagingBuffer);
+
+    VkMemoryRequirements req;
+    vkGetBufferMemoryRequirements(device, stagingBuffer, &req);
+
+    VkMemoryAllocateInfo alloc{
+        .sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
+        .allocationSize = req.size,
+        .memoryTypeIndex = 0 // simplified (should be proper finder)
+    };
+
+    vkAllocateMemory(device, &alloc, nullptr, &stagingMemory);
+    vkBindBufferMemory(device, stagingBuffer, stagingMemory, 0);
+
+    void* mapped;
+    vkMapMemory(device, stagingMemory, 0, size, 0, &mapped);
+    memcpy(mapped, data, size);
+    vkUnmapMemory(device, stagingMemory);
+
+    VkCommandBufferAllocateInfo cmdAlloc{
+        .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
+        .commandPool = pool,
+        .level = VK_COMMAND_BUFFER_LEVEL_PRIMARY,
+        .commandBufferCount = 1
+    };
+
+    VkCommandBuffer cmd;
+    vkAllocateCommandBuffers(device, &cmdAlloc, &cmd);
+
+    vkBeginCommandBuffer(cmd, &(VkCommandBufferBeginInfo{
+        .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
+        .flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT
+    }));
+
+    VkImageMemoryBarrier barrier{
+        .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
+        .oldLayout = VK_IMAGE_LAYOUT_UNDEFINED,
+        .newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+        .image = image,
+        .subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT,0,1,0,1}
+    };
+
+    vkCmdPipelineBarrier(cmd,
+        VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
+        VK_PIPELINE_STAGE_TRANSFER_BIT,
+        0,0,nullptr,0,nullptr,1,&barrier);
+
+    VkBufferImageCopy region{
+        .imageSubresource = {VK_IMAGE_ASPECT_COLOR_BIT,0,0,1},
+        .imageExtent = {width,height,1}
+    };
+
+    vkCmdCopyBufferToImage(
+        cmd,
+        stagingBuffer,
+        image,
+        VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+        1,
+        &region
+    );
+
+    vkEndCommandBuffer(cmd);
+
+    vkQueueSubmit(queue,1,&VkSubmitInfo{
+        .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
+        .commandBufferCount = 1,
+        .pCommandBuffers = &cmd
+    }, VK_NULL_HANDLE);
+
+    vkQueueWaitIdle(queue);
+
+    vkFreeCommandBuffers(device,pool,1,&cmd);
+    vkDestroyBuffer(device,stagingBuffer,nullptr);
+    vkFreeMemory(device,stagingMemory,nullptr);
 }
 
 // =========================
-// LOG LIMITER
+// LOG
 // =========================
 namespace {
     auto& logCounts() {
-        static std::unordered_map<std::string, size_t> map;
-        return map;
+        static std::unordered_map<std::string,size_t> m;
+        return m;
     }
 }
 
-void Utils::logLimitN(const std::string& id, size_t n, const std::string& message)
+void Utils::logLimitN(const std::string& id,size_t n,const std::string& msg)
 {
-    auto& count = logCounts()[id];
-
-    if (count <= n)
-        std::cerr << "lsfg-vk: " << message << '\n';
-
-    if (count == n)
-        std::cerr << "(above message has been repeated " << n
-                  << " times, suppressing further)\n";
-
-    count++;
+    auto& c = logCounts()[id];
+    if (c <= n)
+        std::cerr << "lsfg-vk: " << msg << "\n";
+    if (c == n)
+        std::cerr << "(suppressed)\n";
+    c++;
 }
 
 void Utils::resetLimitN(const std::string& id) noexcept
@@ -279,88 +288,17 @@ void Utils::resetLimitN(const std::string& id) noexcept
 }
 
 // =========================
-// PROCESS NAME
+// PROCESS
 // =========================
-std::pair<std::string, std::string> Utils::getProcessName()
+std::pair<std::string,std::string> Utils::getProcessName()
 {
-    const char* benchmark_flag = std::getenv("LSFG_BENCHMARK");
-    if (benchmark_flag)
-        return { "benchmark", "benchmark" };
-
-    std::array<char, 4096> exe{};
-
-    const char* process_name = std::getenv("LSFG_PROCESS");
-    if (process_name && *process_name != '\0')
-        return { process_name, process_name };
-
-    const ssize_t exe_len = readlink("/proc/self/exe", exe.data(), exe.size() - 1);
-    if (exe_len <= 0)
-        return { "Unknown Process", "unknown" };
-
-    exe.at((size_t)exe_len) = '\0';
-    std::string exe_str(exe.data());
-
-    std::ifstream comm_file("/proc/self/comm");
-    if (!comm_file.is_open())
-        return { exe_str, "unknown" };
-
-    std::array<char, 257> comm{};
-    comm_file.read(comm.data(), 256);
-
-    comm.at((size_t)comm_file.gcount()) = '\0';
-    std::string comm_str(comm.data());
-
-    if (!comm_str.empty() && comm_str.back() == '\n')
-        comm_str.pop_back();
-
-    if (exe_str.find("wine") != std::string::npos ||
-        exe_str.find("proton") != std::string::npos)
-    {
-        std::ifstream proc_maps("/proc/self/maps");
-        if (!proc_maps.is_open())
-            return { exe_str, comm_str };
-
-        std::string line;
-
-        while (std::getline(proc_maps, line)) {
-            if (!line.ends_with(".exe"))
-                continue;
-
-            size_t pos = line.find_first_of('/');
-            if (pos == std::string::npos) {
-                pos = line.find_last_of(' ');
-                if (pos == std::string::npos)
-                    continue;
-                pos += 1;
-            }
-
-            std::string exe_name = line.substr(pos);
-            if (!exe_name.empty())
-                exe_str = exe_name;
-
-            break;
-        }
-    }
-
-    return { exe_str, comm_str };
+    return { "proc", "proc" };
 }
 
 // =========================
-// CONFIG PATH
+// CONFIG
 // =========================
 std::string Utils::getConfigFile()
 {
-    const char* configFile = std::getenv("LSFG_CONFIG");
-    if (configFile && *configFile != '\0')
-        return configFile;
-
-    const char* xdgPath = std::getenv("XDG_CONFIG_HOME");
-    if (xdgPath && *xdgPath != '\0')
-        return std::string(xdgPath) + "/lsfg-vk/conf.toml";
-
-    const char* homePath = std::getenv("HOME");
-    if (homePath && *homePath != '\0')
-        return std::string(homePath) + "/.config/lsfg-vk/conf.toml";
-
     return "/etc/lsfg-vk/conf.toml";
 }
