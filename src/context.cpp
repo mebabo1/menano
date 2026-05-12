@@ -245,3 +245,332 @@ LsContext::LsContext(
         );
     }
         }
+VkResult LsContext::present(
+        const Hooks::DeviceInfo& info,
+        const void* pNext,
+        VkQueue queue,
+        const std::vector<VkSemaphore>& gameRenderSemaphores,
+        uint32_t presentIdx) {
+
+    if (!Config::currentConf.has_value())
+        throw std::runtime_error("No configuration set");
+
+    auto& conf = *Config::currentConf;
+
+    auto& pass =
+        this->passInfos.at(
+            this->frameIdx % 8
+        );
+
+    int preCopySemaphoreFd{};
+
+    /*
+     * semaphore for lsfg
+     */
+    pass.preCopySemaphores.at(0) =
+        Mini::Semaphore(
+            info.device,
+            &preCopySemaphoreFd
+        );
+
+    /*
+     * internal sync semaphore
+     */
+    pass.preCopySemaphores.at(1) =
+        Mini::Semaphore(
+            info.device
+        );
+
+    /*
+     * copy swapchain -> frame_X
+     */
+    pass.preCopyBuf =
+        Mini::CommandBuffer(
+            info.device,
+            this->cmdPool
+        );
+
+    pass.preCopyBuf.begin();
+
+    Utils::copyImage(
+        pass.preCopyBuf.handle(),
+        this->swapchainImages.at(
+            presentIdx
+        ),
+        this->frameIdx % 2 == 0
+            ? this->frame_0.handle()
+            : this->frame_1.handle(),
+        this->extent.width,
+        this->extent.height,
+        VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
+        VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
+        true,
+        false
+    );
+
+    pass.preCopyBuf.end();
+
+    std::vector<VkSemaphore> preWaits =
+        gameRenderSemaphores;
+
+    /*
+     * previous frame ordering
+     */
+    if (this->frameIdx > 0) {
+
+        preWaits.emplace_back(
+            this->passInfos.at(
+                (this->frameIdx - 1) % 8
+            ).preCopySemaphores.at(1)
+             .handle()
+        );
+    }
+
+    pass.preCopyBuf.submit(
+        info.queue.second,
+        preWaits,
+        {
+            pass.preCopySemaphores.at(0).handle(),
+            pass.preCopySemaphores.at(1).handle()
+        }
+    );
+
+    /*
+     * semaphores signaled by lsfg
+     */
+    std::vector<int> renderSemaphoreFds(
+        conf.multiplier - 1
+    );
+
+    for (size_t i = 0;
+         i < (conf.multiplier - 1);
+         ++i) {
+
+        pass.renderSemaphores.at(i) =
+            Mini::Semaphore(
+                info.device,
+                &renderSemaphoreFds.at(i)
+            );
+    }
+
+    /*
+     * run lsfg
+     */
+    if (conf.performance) {
+
+        LSFG_3_1P::presentContext(
+            *this->lsfgCtxId,
+            preCopySemaphoreFd,
+            renderSemaphoreFds
+        );
+
+    } else {
+
+        LSFG_3_1::presentContext(
+            *this->lsfgCtxId,
+            preCopySemaphoreFd,
+            renderSemaphoreFds
+        );
+    }
+
+    /*
+     * generated frame presents
+     */
+    for (size_t i = 0;
+         i < (conf.multiplier - 1);
+         i++) {
+
+        pass.acquireSemaphores.at(i) =
+            Mini::Semaphore(
+                info.device
+            );
+
+        uint32_t imageIdx{};
+
+        auto res =
+            Layer::ovkAcquireNextImageKHR(
+                info.device,
+                this->swapchain,
+                UINT64_MAX,
+                pass.acquireSemaphores
+                    .at(i)
+                    .handle(),
+                VK_NULL_HANDLE,
+                &imageIdx
+            );
+
+        if (res != VK_SUCCESS &&
+            res != VK_SUBOPTIMAL_KHR) {
+
+            throw LSFG::vulkan_error(
+                res,
+                "Acquire failed"
+            );
+        }
+
+        pass.postCopySemaphores.at(i) =
+            Mini::Semaphore(
+                info.device
+            );
+
+        pass.prevPostCopySemaphores.at(i) =
+            Mini::Semaphore(
+                info.device
+            );
+
+        pass.postCopyBufs.at(i) =
+            Mini::CommandBuffer(
+                info.device,
+                this->cmdPool
+            );
+
+        pass.postCopyBufs.at(i).begin();
+
+        /*
+         * copy generated frame
+         * out_n -> swapchain
+         */
+        Utils::copyImage(
+            pass.postCopyBufs.at(i)
+                .handle(),
+            this->out_n.at(i)
+                .handle(),
+            this->swapchainImages.at(
+                imageIdx
+            ),
+            this->extent.width,
+            this->extent.height,
+            VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
+            VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
+            false,
+            true
+        );
+
+        pass.postCopyBufs.at(i).end();
+
+        pass.postCopyBufs.at(i).submit(
+            info.queue.second,
+            {
+                pass.acquireSemaphores
+                    .at(i)
+                    .handle(),
+
+                pass.renderSemaphores
+                    .at(i)
+                    .handle()
+            },
+            {
+                pass.postCopySemaphores
+                    .at(i)
+                    .handle(),
+
+                pass.prevPostCopySemaphores
+                    .at(i)
+                    .handle()
+            }
+        );
+
+        std::vector<VkSemaphore>
+            waitSemaphores{
+
+            pass.postCopySemaphores
+                .at(i)
+                .handle()
+        };
+
+        if (i != 0) {
+
+            waitSemaphores.emplace_back(
+                pass.prevPostCopySemaphores
+                    .at(i - 1)
+                    .handle()
+            );
+        }
+
+        VkPresentInfoKHR presentInfo{
+            .sType =
+                VK_STRUCTURE_TYPE_PRESENT_INFO_KHR,
+
+            .pNext =
+                i == 0
+                    ? pNext
+                    : nullptr,
+
+            .waitSemaphoreCount =
+                static_cast<uint32_t>(
+                    waitSemaphores.size()
+                ),
+
+            .pWaitSemaphores =
+                waitSemaphores.data(),
+
+            .swapchainCount = 1,
+
+            .pSwapchains =
+                &this->swapchain,
+
+            .pImageIndices =
+                &imageIdx,
+        };
+
+        res =
+            Layer::ovkQueuePresentKHR(
+                queue,
+                &presentInfo
+            );
+
+        if (res != VK_SUCCESS &&
+            res != VK_SUBOPTIMAL_KHR) {
+
+            throw LSFG::vulkan_error(
+                res,
+                "Present failed"
+            );
+        }
+    }
+
+    /*
+     * final original frame present
+     */
+    VkSemaphore lastSemaphore =
+        pass.prevPostCopySemaphores.at(
+            conf.multiplier - 2
+        ).handle();
+
+    VkPresentInfoKHR finalPresentInfo{
+        .sType =
+            VK_STRUCTURE_TYPE_PRESENT_INFO_KHR,
+
+        .waitSemaphoreCount = 1,
+
+        .pWaitSemaphores =
+            &lastSemaphore,
+
+        .swapchainCount = 1,
+
+        .pSwapchains =
+            &this->swapchain,
+
+        .pImageIndices =
+            &presentIdx,
+    };
+
+    auto res =
+        Layer::ovkQueuePresentKHR(
+            queue,
+            &finalPresentInfo
+        );
+
+    if (res != VK_SUCCESS &&
+        res != VK_SUBOPTIMAL_KHR) {
+
+        throw LSFG::vulkan_error(
+            res,
+            "Final present failed"
+        );
+    }
+
+    this->frameIdx++;
+
+    return res;
+}
