@@ -25,153 +25,6 @@
 #include <unistd.h>
 
 // =======================================================
-// LOCAL HELPER (Utils 대체)
-// =======================================================
-
-static void uploadBufferToImage(
-    VkDevice device,
-    VkPhysicalDevice physicalDevice,
-    VkQueue queue,
-    VkCommandPool cmdPool,
-    const void* data,
-    VkImage image,
-    uint32_t width,
-    uint32_t height
-) {
-    VkDeviceSize size = width * height * 4;
-
-    VkBuffer stagingBuffer;
-    VkDeviceMemory stagingMemory;
-
-    VkBufferCreateInfo bufferInfo{
-        .sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
-        .size = size,
-        .usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-        .sharingMode = VK_SHARING_MODE_EXCLUSIVE
-    };
-
-    vkCreateBuffer(device, &bufferInfo, nullptr, &stagingBuffer);
-
-    VkMemoryRequirements memReq;
-    vkGetBufferMemoryRequirements(device, stagingBuffer, &memReq);
-
-    VkPhysicalDeviceMemoryProperties memProps;
-    vkGetPhysicalDeviceMemoryProperties(physicalDevice, &memProps);
-
-    VkMemoryAllocateInfo allocInfo{
-        .sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
-        .allocationSize = memReq.size,
-        .memoryTypeIndex = 0
-    };
-
-    for (uint32_t i = 0; i < memProps.memoryTypeCount; i++) {
-        if ((memReq.memoryTypeBits & (1 << i)) &&
-            (memProps.memoryTypes[i].propertyFlags &
-             VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT)) {
-            allocInfo.memoryTypeIndex = i;
-            break;
-        }
-    }
-
-    vkAllocateMemory(device, &allocInfo, nullptr, &stagingMemory);
-    vkBindBufferMemory(device, stagingBuffer, stagingMemory, 0);
-
-    void* mapped;
-    vkMapMemory(device, stagingMemory, 0, size, 0, &mapped);
-    memcpy(mapped, data, size);
-    vkUnmapMemory(device, stagingMemory);
-
-    VkCommandBufferAllocateInfo allocCmd{
-        .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
-        .commandPool = cmdPool,
-        .level = VK_COMMAND_BUFFER_LEVEL_PRIMARY,
-        .commandBufferCount = 1
-    };
-
-    VkCommandBuffer cmd;
-    vkAllocateCommandBuffers(device, &allocCmd, &cmd);
-
-    VkCommandBufferBeginInfo begin{
-        .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
-        .flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT
-    };
-
-    vkBeginCommandBuffer(cmd, &begin);
-
-    VkImageMemoryBarrier toTransfer{
-        .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
-        .oldLayout = VK_IMAGE_LAYOUT_UNDEFINED,
-        .newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-        .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-        .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-        .image = image,
-        .subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1},
-        .dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT
-    };
-
-    vkCmdPipelineBarrier(
-        cmd,
-        VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
-        VK_PIPELINE_STAGE_TRANSFER_BIT,
-        0,
-        0, nullptr,
-        0, nullptr,
-        1, &toTransfer
-    );
-
-    VkBufferImageCopy region{};
-    region.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-    region.imageSubresource.layerCount = 1;
-    region.imageExtent = {width, height, 1};
-
-    vkCmdCopyBufferToImage(
-        cmd,
-        stagingBuffer,
-        image,
-        VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-        1,
-        &region
-    );
-
-    VkImageMemoryBarrier toShader{
-        .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
-        .oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-        .newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-        .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-        .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-        .image = image,
-        .subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1},
-        .srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT,
-        .dstAccessMask = VK_ACCESS_SHADER_READ_BIT
-    };
-
-    vkCmdPipelineBarrier(
-        cmd,
-        VK_PIPELINE_STAGE_TRANSFER_BIT,
-        VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
-        0,
-        0, nullptr,
-        0, nullptr,
-        1, &toShader
-    );
-
-    vkEndCommandBuffer(cmd);
-
-    VkSubmitInfo submit{
-        .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
-        .commandBufferCount = 1,
-        .pCommandBuffers = &cmd
-    };
-
-    vkQueueSubmit(queue, 1, &submit, VK_NULL_HANDLE);
-    vkQueueWaitIdle(queue);
-
-    vkFreeCommandBuffers(device, cmdPool, 1, &cmd);
-    vkDestroyBuffer(device, stagingBuffer, nullptr);
-    vkFreeMemory(device, stagingMemory, nullptr);
-}
-
-// =======================================================
 // CONSTRUCTOR
 // =======================================================
 
@@ -198,6 +51,9 @@ LsContext::LsContext(
         ? VK_FORMAT_R8G8B8A8_UNORM
         : VK_FORMAT_R16G16B16A16_SFLOAT;
 
+    // =========================
+    // INPUT (FD SURFACES)
+    // =========================
     std::array<int, 2> fds{};
 
     frame_0 = Mini::Image(info.device, info.physicalDevice, extent, format,
@@ -214,6 +70,9 @@ LsContext::LsContext(
         VK_IMAGE_ASPECT_COLOR_BIT,
         &fds[1]);
 
+    // =========================
+    // OUTPUT
+    // =========================
     std::vector<int> outFds(conf.multiplier - 1);
 
     for (size_t i = 0; i < conf.multiplier - 1; i++) {
@@ -225,6 +84,9 @@ LsContext::LsContext(
             &outFds[i]);
     }
 
+    // =========================
+    // LSFG INIT
+    // =========================
     auto* init    = conf.performance ? LSFG_3_1P::initialize : LSFG_3_1::initialize;
     auto* create  = conf.performance ? LSFG_3_1P::createContext : LSFG_3_1::createContext;
     auto* destroy = conf.performance ? LSFG_3_1P::deleteContext : LSFG_3_1::deleteContext;
@@ -245,7 +107,11 @@ LsContext::LsContext(
 
     int ctx = create(fds[0], fds[1], outFds, extent, format);
 
+    // =========================
+    // SHM FALLBACK
+    // =========================
     if (ctx < 0) {
+
         ipcMode = IPCMode::SHM;
         fdFailed = true;
 
@@ -254,10 +120,11 @@ LsContext::LsContext(
         std::string base = "/data/data/com.termux/files/usr/tmp/lsfg_";
 
         for (int i = 0; i < conf.multiplier - 1; i++) {
+
             std::string inName  = base + "in_"  + std::to_string(i);
             std::string outName = base + "out_" + std::to_string(i);
 
-            int shmIn  = shm_open(inName.c_str(), O_CREAT | O_RDWR, 0666);
+            int shmIn  = shm_open(inName.c_str(),  O_CREAT | O_RDWR, 0666);
             int shmOut = shm_open(outName.c_str(), O_CREAT | O_RDWR, 0666);
 
             ftruncate(shmIn, shmFrameSize);
@@ -283,6 +150,14 @@ LsContext::LsContext(
     unsetenv("DISABLE_LSFG");
 
     cmdPool = Mini::CommandPool(info.device, info.queue.first);
+
+    for (auto& pass : passInfos) {
+        pass.renderSemaphores.resize(conf.multiplier - 1);
+        pass.acquireSemaphores.resize(conf.multiplier - 1);
+        pass.postCopyBufs.resize(conf.multiplier - 1);
+        pass.postCopySemaphores.resize(conf.multiplier - 1);
+        pass.prevPostCopySemaphores.resize(conf.multiplier - 1);
+    }
 }
 
 // =======================================================
@@ -300,10 +175,16 @@ VkResult LsContext::present(
     auto& conf = *Config::currentConf;
     auto& pass = passInfos[frameIdx % 8];
 
+    // =========================
+    // PRE COPY
+    // =========================
     int preCopySemaphoreFd{};
 
     pass.preCopySemaphores[0] =
         Mini::Semaphore(info.device, &preCopySemaphoreFd);
+
+    pass.preCopySemaphores[1] =
+        Mini::Semaphore(info.device);
 
     pass.preCopyBuf = Mini::CommandBuffer(info.device, cmdPool);
     pass.preCopyBuf.begin();
@@ -325,9 +206,15 @@ VkResult LsContext::present(
     pass.preCopyBuf.submit(
         info.queue.second,
         gameRenderSemaphores,
-        { pass.preCopySemaphores[0].handle() }
+        {
+            pass.preCopySemaphores[0].handle(),
+            pass.preCopySemaphores[1].handle()
+        }
     );
 
+    // =========================
+    // LSFG CALL
+    // =========================
     std::vector<int> renderFds(conf.multiplier - 1);
 
     for (size_t i = 0; i < conf.multiplier - 1; i++) {
@@ -338,16 +225,21 @@ VkResult LsContext::present(
     bool useFdPath = (!fdFailed && ipcMode == IPCMode::FD && lsfgCtxId);
 
     if (useFdPath) {
+
         LSFG_3_1::presentContext(*lsfgCtxId, preCopySemaphoreFd, renderFds);
+
     } else {
+
+        // =========================
+        // SHM → GPU BRIDGE
+        // =========================
+
         std::vector<uint8_t> cpu(shmFrameSize);
+
         memcpy(cpu.data(), shmOutputs[0], shmFrameSize);
 
-        uploadBufferToImage(
+        Utils::uploadBufferToImage(
             info.device,
-            info.physicalDevice,
-            info.queue.second,
-            cmdPool.handle(),
             cpu.data(),
             frameIdx % 2 == 0 ? frame_0.handle() : frame_1.handle(),
             extent.width,
@@ -356,6 +248,66 @@ VkResult LsContext::present(
 
         LSFG_3_1::presentContext(*lsfgCtxId, preCopySemaphoreFd, renderFds);
     }
+
+    // =========================
+    // PRESENT
+    // =========================
+    pass.acquireSemaphores[0] = Mini::Semaphore(info.device);
+
+    uint32_t imageIdx{};
+
+    Layer::ovkAcquireNextImageKHR(
+        info.device,
+        swapchain,
+        UINT64_MAX,
+        pass.acquireSemaphores[0].handle(),
+        VK_NULL_HANDLE,
+        &imageIdx
+    );
+
+    pass.postCopyBufs[0] = Mini::CommandBuffer(info.device, cmdPool);
+    pass.postCopyBufs[0].begin();
+
+    Utils::copyImage(
+        pass.postCopyBufs[0].handle(),
+        out_n[0].handle(),
+        swapchainImages[imageIdx],
+        extent.width,
+        extent.height,
+        VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
+        VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
+        false,
+        true
+    );
+
+    pass.postCopyBufs[0].end();
+
+    pass.postCopySemaphores[0] = Mini::Semaphore(info.device);
+
+    pass.postCopyBufs[0].submit(
+        info.queue.second,
+        {
+            pass.acquireSemaphores[0].handle(),
+            pass.renderSemaphores[0].handle()
+        },
+        {
+            pass.postCopySemaphores[0].handle()
+        }
+    );
+
+    VkSemaphore waitSem = pass.postCopySemaphores[0].handle();
+
+    VkPresentInfoKHR pi{
+        .sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR,
+        .pNext = pNext,
+        .waitSemaphoreCount = 1,
+        .pWaitSemaphores = &waitSem,
+        .swapchainCount = 1,
+        .pSwapchains = &swapchain,
+        .pImageIndices = &imageIdx,
+    };
+
+    Layer::ovkQueuePresentKHR(queue, &pi);
 
     frameIdx++;
     return VK_SUCCESS;
