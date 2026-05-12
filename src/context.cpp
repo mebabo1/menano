@@ -243,6 +243,13 @@ VkResult LsContext::present(
     auto& pass = this->passInfos.at(this->frameIdx % 8);
 
     /*
+     * DEBUG: state check
+     */
+    std::cerr << "[TRACE] present ENTER "
+              << "frame=" << this->frameIdx
+              << std::endl;
+
+    /*
      * 1. Acquire swapchain image
      */
     pass.acquireSemaphores.at(0) = Mini::Semaphore(info.device);
@@ -264,8 +271,6 @@ VkResult LsContext::present(
     /*
      * 2. Copy swapchain → LSFG input
      */
-    int preFd = -1;
-
     pass.preCopyBuf = Mini::CommandBuffer(info.device, this->cmdPool);
     pass.preCopyBuf.begin();
 
@@ -286,7 +291,7 @@ VkResult LsContext::present(
     pass.preCopyBuf.end();
 
     /*
-     * FIX: semaphore type MUST be VkSemaphore (NOT pointers)
+     * FIXED: correct semaphore usage (NO pointers)
      */
     std::vector<VkSemaphore> preWaitSemaphores;
     std::vector<VkSemaphore> preSignalSemaphores;
@@ -307,8 +312,12 @@ VkResult LsContext::present(
 
     /*
      * 3. LSFG execution
+     *
+     * NOTE: fd sync is currently placeholder (-1)
      */
-    std::vector<int> outFds(conf.multiplier - 1);
+    std::vector<int> outFds(conf.multiplier - 1, -1);
+
+    int preFd = -1;
 
     LSFG_3_1::presentContext(
         *this->lsfgCtxId,
@@ -339,7 +348,7 @@ VkResult LsContext::present(
     pass.postCopyBufs.at(0).end();
 
     /*
-     * FIX: correct semaphore usage
+     * FIXED: correct semaphore chain
      */
     VkSemaphore postSignal =
         Mini::Semaphore(info.device).handle();
@@ -372,7 +381,8 @@ VkResult LsContext::present(
     presentInfo.pImageIndices = &imageIdx;
     presentInfo.pNext = pNext;
 
-    auto result = Layer::ovkQueuePresentKHR(queue, &presentInfo);
+    auto result =
+        Layer::ovkQueuePresentKHR(queue, &presentInfo);
 
     this->frameIdx++;
 
