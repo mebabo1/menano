@@ -13,6 +13,8 @@
 #include <memory>
 #include <vector>
 
+private:
+    bool internalOnlyMode = false;
 ///
 /// This class is the frame generation context. There should be one instance per swapchain.
 ///
