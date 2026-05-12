@@ -15,11 +15,16 @@
 
 class LsContext {
 public:
-    LsContext(const Hooks::DeviceInfo& info, VkSwapchainKHR swapchain,
-        VkExtent2D extent, const std::vector<VkImage>& swapchainImages);
+    LsContext(const Hooks::DeviceInfo& info,
+              VkSwapchainKHR swapchain,
+              VkExtent2D extent,
+              const std::vector<VkImage>& swapchainImages);
 
-    VkResult present(const Hooks::DeviceInfo& info, const void* pNext, VkQueue queue,
-        const std::vector<VkSemaphore>& gameRenderSemaphores, uint32_t presentIdx);
+    VkResult present(const Hooks::DeviceInfo& info,
+                     const void* pNext,
+                     VkQueue queue,
+                     const std::vector<VkSemaphore>& gameRenderSemaphores,
+                     uint32_t presentIdx);
 
     LsContext(const LsContext&) = delete;
     LsContext& operator=(const LsContext&) = delete;
@@ -28,17 +33,59 @@ public:
     ~LsContext() = default;
 
 private:
+    // =====================================================
+    // IPC MODE
+    // =====================================================
     enum class IPCMode {
         FD,
         SHM
     };
 
+    IPCMode ipcMode{IPCMode::FD};
+
+    // =====================================================
+    // SHM BUFFER
+    // =====================================================
     struct ShmBuffer {
         int fd = -1;
         void* ptr = nullptr;
         size_t size = 0;
     };
 
+    size_t shmFrameSize{0};
+    bool fdFailed{false};
+    bool lsfgInitialized{false};
+
+    std::vector<void*> shmInputs;
+    std::vector<void*> shmOutputs;
+    ShmBuffer shm[2];
+
+    // =====================================================
+    // VULKAN CORE STATE
+    // =====================================================
+    VkDevice device{};
+    VkPhysicalDevice physicalDevice{};
+    VkQueue queue{};
+
+    VkSwapchainKHR swapchain{};
+    std::vector<VkImage> swapchainImages{};
+    VkExtent2D extent{};
+
+    // =====================================================
+    // LSFG CONTEXT
+    // =====================================================
+    std::shared_ptr<int32_t> lsfgCtxId;
+
+    Mini::Image frame_0;
+    Mini::Image frame_1;
+    std::vector<Mini::Image> out_n;
+
+    Mini::CommandPool cmdPool;
+    uint64_t frameIdx{0};
+
+    // =====================================================
+    // RENDER PASSES
+    // =====================================================
     struct RenderPassInfo {
         Mini::CommandBuffer preCopyBuf;
         std::array<Mini::Semaphore, 2> preCopySemaphores;
@@ -51,37 +98,10 @@ private:
         std::vector<Mini::Semaphore> prevPostCopySemaphores;
     };
 
-private:
-    VkSwapchainKHR swapchain;
-    std::vector<VkImage> swapchainImages;
-    VkExtent2D extent;
-
-    std::shared_ptr<int32_t> lsfgCtxId;
-
-    Mini::Image frame_0, frame_1;
-    std::vector<Mini::Image> out_n;
-
-    Mini::CommandPool cmdPool;
-    uint64_t frameIdx{0};
-
-    VkDevice device{};
-    VkPhysicalDevice physicalDevice{};
-    VkQueue queue{};
-
-    bool useShmFallback{false};
-    IPCMode ipcMode{IPCMode::FD};
-
-    size_t shmFrameSize{0};
-
-    ShmBuffer shm[2];
-
-    bool fdAvailable{false};
-    bool lsfgInitialized{false};
-
-    std::vector<void*> shmInputs;
-    std::vector<void*> shmOutputs;
-
-    void uploadShmToGPU(void* src, Mini::Image& dst);
-
     std::array<RenderPassInfo, 8> passInfos;
+
+    // =====================================================
+    // INTERNAL HELPERS
+    // =====================================================
+    void uploadShmToGPU(void* src, Mini::Image& dst);
 };
