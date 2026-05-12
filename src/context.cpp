@@ -27,7 +27,7 @@ LsContext::LsContext(
     : swapchain(swapchain),
       swapchainImages(swapchainImages),
       extent(extent),
-      lsfgEnabled(true)   // ⭐ 핵심: internalOnlyMode 대신 명확하게
+      lsfgEnabled(true)
 {
     if (!Config::currentConf.has_value())
         throw std::runtime_error("No configuration set");
@@ -40,7 +40,7 @@ LsContext::LsContext(
         : VK_FORMAT_R16G16B16A16_SFLOAT;
 
     /* =========================
-     * INPUT FRAMES
+     * INPUT IMAGES
      * ========================= */
     std::array<int, 2> fds{};
 
@@ -65,7 +65,7 @@ LsContext::LsContext(
     );
 
     /* =========================
-     * OUTPUT FRAMES
+     * OUTPUT IMAGES
      * ========================= */
     std::vector<int> outFds(conf.multiplier - 1);
 
@@ -187,13 +187,38 @@ VkResult LsContext::present(
     );
 
     /* =========================
-     * LSFG CHECK (핵심)
+     * LSFG ENABLE CHECK
      * ========================= */
-
     if (preCopyFd < 0) {
         lsfgEnabled = false;
     }
 
+    /* =====================================================
+     * ⭐ FALLBACK PATH (핵심 수정)
+     * ===================================================== */
+    if (!lsfgEnabled) {
+
+        std::cerr << "lsfg-vk: fallback active (direct present)" << std::endl;
+
+        VkPresentInfoKHR fallbackPresent{
+            .sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR,
+            .pNext = pNext,
+            .waitSemaphoreCount = 1,
+            .pWaitSemaphores = &pass.preCopySemaphores.at(1).handle(),
+            .swapchainCount = 1,
+            .pSwapchains = &swapchain,
+            .pImageIndices = &presentIdx
+        };
+
+        auto res = Layer::ovkQueuePresentKHR(queue, &fallbackPresent);
+
+        frameIdx++;
+        return res;
+    }
+
+    /* =========================
+     * LSFG PATH
+     * ========================= */
     std::vector<int> renderFds(conf.multiplier - 1);
 
     for (size_t i = 0; i < conf.multiplier - 1; ++i) {
@@ -201,21 +226,10 @@ VkResult LsContext::present(
             Mini::Semaphore(info.device, &renderFds.at(i));
     }
 
-    if (lsfgEnabled) {
-        if (conf.performance) {
-            LSFG_3_1P::presentContext(*lsfgCtxId, preCopyFd, renderFds);
-        } else {
-            LSFG_3_1::presentContext(*lsfgCtxId, preCopyFd, renderFds);
-        }
-    }
-
-    /* =========================
-     * FALLBACK PATH (중요)
-     * =========================
-     * LSFG 실패 시 반드시 원본 출력
-     */
-    if (!lsfgEnabled) {
-        std::cerr << "lsfg-vk: fallback direct present (no framegen)" << std::endl;
+    if (conf.performance) {
+        LSFG_3_1P::presentContext(*lsfgCtxId, preCopyFd, renderFds);
+    } else {
+        LSFG_3_1::presentContext(*lsfgCtxId, preCopyFd, renderFds);
     }
 
     /* =========================
