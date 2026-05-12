@@ -219,31 +219,32 @@ LsContext::LsContext(
     /*
      * allocate frame resources
      */
-    for (size_t i = 0; i < 8; i++) {
+for (size_t i = 0; i < 8; i++) {
 
-        auto& pass =
-            this->passInfos.at(i);
+    auto& pass =
+        this->passInfos.at(i);
 
-        pass.renderSemaphores.resize(
-            conf.multiplier - 1
-        );
+    pass.renderSemaphores.resize(
+        conf.multiplier - 1
+    );
 
-        pass.acquireSemaphores.resize(
-            conf.multiplier - 1
-        );
+    pass.acquireSemaphores.resize(
+        conf.multiplier - 1
+    );
 
-        pass.postCopyBufs.resize(
-            conf.multiplier - 1
-        );
+    pass.postCopyBufs.resize(
+        conf.multiplier - 1
+    );
 
-        pass.postCopySemaphores.resize(
-            conf.multiplier - 1
-        );
+    pass.postCopySemaphores.resize(
+        conf.multiplier - 1
+    );
 
-        pass.prevPostCopySemaphores.resize(
-            conf.multiplier - 1
-        );
-    }
+    pass.prevPostCopySemaphores.resize(
+        conf.multiplier - 1
+    );
+}
+}
 
 VkResult LsContext::present(
         const Hooks::DeviceInfo& info,
