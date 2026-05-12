@@ -24,17 +24,19 @@
 #include <fcntl.h>
 #include <unistd.h>
 
-LsContext::LsContext(const Hooks::DeviceInfo& info, VkSwapchainKHR swapchain,
-        VkExtent2D extent, const std::vector<VkImage>& swapchainImages)
-        : swapchain(swapchain),
-          swapchainImages(swapchainImages),
-          extent(extent) {
+LsContext::LsContext(const Hooks::DeviceInfo& info,
+                     VkSwapchainKHR swapchain,
+                     VkExtent2D extent,
+                     const std::vector<VkImage>& swapchainImages)
+    : swapchain(swapchain),
+      swapchainImages(swapchainImages),
+      extent(extent) {
 
     if (!Config::currentConf.has_value())
         throw std::runtime_error("No configuration set");
 
-    auto& globalConf = Config::globalConf;
     auto& conf = *Config::currentConf;
+    auto& globalConf = Config::globalConf;
 
     const VkFormat format = conf.hdr
         ? VK_FORMAT_R8G8B8A8_UNORM
@@ -42,35 +44,29 @@ LsContext::LsContext(const Hooks::DeviceInfo& info, VkSwapchainKHR swapchain,
 
     std::array<int, 2> fds{ -1, -1 };
 
-    frame_0 = Mini::Image(
-        info.device, info.physicalDevice, extent, format,
+    frame_0 = Mini::Image(info.device, info.physicalDevice, extent, format,
         VK_IMAGE_USAGE_TRANSFER_DST_BIT |
         VK_IMAGE_USAGE_SAMPLED_BIT |
         VK_IMAGE_USAGE_STORAGE_BIT,
         VK_IMAGE_ASPECT_COLOR_BIT,
-        &fds[0]
-    );
+        &fds[0]);
 
-    frame_1 = Mini::Image(
-        info.device, info.physicalDevice, extent, format,
+    frame_1 = Mini::Image(info.device, info.physicalDevice, extent, format,
         VK_IMAGE_USAGE_TRANSFER_DST_BIT |
         VK_IMAGE_USAGE_SAMPLED_BIT |
         VK_IMAGE_USAGE_STORAGE_BIT,
         VK_IMAGE_ASPECT_COLOR_BIT,
-        &fds[1]
-    );
+        &fds[1]);
 
     std::vector<int> outFds(conf.multiplier - 1);
 
     for (size_t i = 0; i < conf.multiplier - 1; i++) {
-        out_n.emplace_back(
-            info.device, info.physicalDevice, extent, format,
+        out_n.emplace_back(info.device, info.physicalDevice, extent, format,
             VK_IMAGE_USAGE_TRANSFER_SRC_BIT |
             VK_IMAGE_USAGE_SAMPLED_BIT |
             VK_IMAGE_USAGE_STORAGE_BIT,
             VK_IMAGE_ASPECT_COLOR_BIT,
-            &outFds[i]
-        );
+            &outFds[i]);
     }
 
     auto* init = LSFG_3_1::initialize;
@@ -104,6 +100,9 @@ LsContext::LsContext(const Hooks::DeviceInfo& info, VkSwapchainKHR swapchain,
         format
     );
 
+    // =========================
+    // SHM FALLBACK
+    // =========================
     if (ctx < 0) {
 
         ipcMode = IPCMode::SHM;
@@ -166,4 +165,4 @@ LsContext::LsContext(const Hooks::DeviceInfo& info, VkSwapchainKHR swapchain,
         pass.postCopySemaphores.resize(conf.multiplier - 1);
         pass.prevPostCopySemaphores.resize(conf.multiplier - 1);
     }
-        }
+    }
