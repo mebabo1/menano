@@ -19,15 +19,20 @@
 #include <array>
 #include <iostream>
 
+enum class LsfgMode {
+    ExternalFd,
+    InternalVk
+};
+
 LsContext::LsContext(
-        const Hooks::DeviceInfo& info,
-        VkSwapchainKHR swapchain,
-        VkExtent2D extent,
-        const std::vector<VkImage>& swapchainImages)
-        : info(info),
-          swapchain(swapchain),
-          swapchainImages(swapchainImages),
-          extent(extent) {
+    const Hooks::DeviceInfo& info,
+    VkSwapchainKHR swapchain,
+    VkExtent2D extent,
+    const std::vector<VkImage>& swapchainImages)
+    : info(info),
+      swapchain(swapchain),
+      swapchainImages(swapchainImages),
+      extent(extent) {
 
     if (!Config::currentConf.has_value())
         throw std::runtime_error("No configuration set");
@@ -35,24 +40,16 @@ LsContext::LsContext(
     auto& globalConf = Config::globalConf;
     auto& conf = *Config::currentConf;
 
-    const VkFormat format =
+    VkFormat format =
         conf.hdr
             ? VK_FORMAT_R16G16B16A16_SFLOAT
             : VK_FORMAT_R8G8B8A8_UNORM;
 
-    std::array<int, 2> fds{
-        -1,
-        -1
-    };
+    std::array<int, 2> fds{-1, -1};
+    std::vector<int> outFds(conf.multiplier - 1, -1);
 
-    std::vector<int> outFds(
-        conf.multiplier - 1,
-        -1
-    );
+    bool fdSupported = true;
 
-    /*
-     * create input frames
-     */
     this->frame_0 = Mini::Image(
         info.device,
         info.physicalDevice,
@@ -63,7 +60,7 @@ LsContext::LsContext(
         VK_IMAGE_USAGE_SAMPLED_BIT |
         VK_IMAGE_USAGE_STORAGE_BIT,
         VK_IMAGE_ASPECT_COLOR_BIT,
-        &fds.at(0)
+        fdSupported ? &fds[0] : nullptr
     );
 
     this->frame_1 = Mini::Image(
@@ -76,24 +73,10 @@ LsContext::LsContext(
         VK_IMAGE_USAGE_SAMPLED_BIT |
         VK_IMAGE_USAGE_STORAGE_BIT,
         VK_IMAGE_ASPECT_COLOR_BIT,
-        &fds.at(1)
+        fdSupported ? &fds[1] : nullptr
     );
 
-    std::cerr
-        << "frame fd0 = "
-        << fds.at(0)
-        << std::endl;
-
-    std::cerr
-        << "frame fd1 = "
-        << fds.at(1)
-        << std::endl;
-
-    /*
-     * create generated output images
-     */
-    for (size_t i = 0; i < (conf.multiplier - 1); ++i) {
-
+    for (size_t i = 0; i < conf.multiplier - 1; i++) {
         this->out_n.emplace_back(
             info.device,
             info.physicalDevice,
@@ -104,63 +87,34 @@ LsContext::LsContext(
             VK_IMAGE_USAGE_SAMPLED_BIT |
             VK_IMAGE_USAGE_STORAGE_BIT,
             VK_IMAGE_ASPECT_COLOR_BIT,
-            &outFds.at(i)
+            fdSupported ? &outFds[i] : nullptr
         );
-
-        std::cerr
-            << "out fd[" << i << "] = "
-            << outFds.at(i)
-            << std::endl;
     }
 
-    /*
-     * validate exported fds
-     */
     bool fdValid =
-        (fds.at(0) >= 0) &&
-        (fds.at(1) >= 0);
+        (fds[0] >= 0 && fds[1] >= 0);
 
     for (auto fd : outFds)
         fdValid &= (fd >= 0);
 
-    if (!fdValid) {
+    this->mode = fdValid
+        ? LsfgMode::ExternalFd
+        : LsfgMode::InternalVk;
 
-        std::cerr
-            << "lsfg-vk: external memory export failed"
-            << std::endl;
-
-        throw std::runtime_error(
-            "External Vulkan memory export unavailable"
-        );
-    }
-
-    auto* lsfgInitialize =
-        LSFG_3_1::initialize;
-
-    auto* lsfgCreateContext =
-        LSFG_3_1::createContext;
-
-    auto* lsfgDeleteContext =
-        LSFG_3_1::deleteContext;
+    auto* init = LSFG_3_1::initialize;
+    auto* create = LSFG_3_1::createContext;
+    auto* destroy = LSFG_3_1::deleteContext;
 
     if (conf.performance) {
-
-        lsfgInitialize =
-            LSFG_3_1P::initialize;
-
-        lsfgCreateContext =
-            LSFG_3_1P::createContext;
-
-        lsfgDeleteContext =
-            LSFG_3_1P::deleteContext;
+        init = LSFG_3_1P::initialize;
+        create = LSFG_3_1P::createContext;
+        destroy = LSFG_3_1P::deleteContext;
     }
 
     setenv("DISABLE_LSFG", "1", 1);
 
-    lsfgInitialize(
-        Utils::getDeviceUUID(
-            info.physicalDevice
-        ),
+    init(
+        Utils::getDeviceUUID(info.physicalDevice),
         conf.hdr,
         1.0F / conf.flowScale,
         conf.multiplier - 1,
@@ -168,122 +122,78 @@ LsContext::LsContext(
         Extract::getShader
     );
 
-    this->lsfgCtxId =
-        std::shared_ptr<int32_t>(
-            new int32_t(
-                lsfgCreateContext(
-                    fds.at(0),
-                    fds.at(1),
-                    outFds,
-                    extent,
-                    format
-                )
-            ),
-            [lsfgDeleteContext](
-                const int32_t* id
-            ) {
-                lsfgDeleteContext(*id);
-            }
-        );
+    if (mode == LsfgMode::ExternalFd) {
+
+        this->lsfgCtxId =
+            std::shared_ptr<int32_t>(
+                new int32_t(
+                    create(
+                        fds[0],
+                        fds[1],
+                        outFds,
+                        extent,
+                        format
+                    )
+                ),
+                [destroy](const int32_t* id) {
+                    destroy(*id);
+                }
+            );
+
+    } else {
+
+        this->lsfgCtxId =
+            std::shared_ptr<int32_t>(
+                new int32_t(
+                    LSFG_3_1::createContextVk(
+                        frame_0.handle(),
+                        frame_1.handle(),
+                        out_n_handles,
+                        extent,
+                        format
+                    )
+                ),
+                [destroy](const int32_t* id) {
+                    destroy(*id);
+                }
+            );
+    }
 
     unsetenv("DISABLE_LSFG");
 
     this->cmdPool =
-        Mini::CommandPool(
-            info.device,
-            info.queue.first
-        );
-
-    /*
-     * allocate frame resources
-     */
-    for (size_t i = 0; i < 8; i++) {
-
-        auto& pass =
-            this->passInfos.at(i);
-
-        pass.renderSemaphores.resize(
-            conf.multiplier - 1
-        );
-
-        pass.acquireSemaphores.resize(
-            conf.multiplier - 1
-        );
-
-        pass.postCopyBufs.resize(
-            conf.multiplier - 1
-        );
-
-        pass.postCopySemaphores.resize(
-            conf.multiplier - 1
-        );
-
-        pass.prevPostCopySemaphores.resize(
-            conf.multiplier - 1
-        );
-    }
+        Mini::CommandPool(info.device, info.queue.first);
 }
 
-/*
- * IMPORTANT:
- * constructor ends ABOVE
- * present() starts BELOW
- */
 VkResult LsContext::present(
     const Hooks::DeviceInfo& info,
     const void* pNext,
     VkQueue queue,
     const std::vector<VkSemaphore>& gameRenderSemaphores,
-    uint32_t presentIdx)
-{
-    if (!Config::currentConf.has_value())
-        throw std::runtime_error("No configuration set");
+    uint32_t presentIdx) {
 
     auto& conf = *Config::currentConf;
-    auto& pass = this->passInfos.at(this->frameIdx % 8);
+    auto& pass = this->passInfos[this->frameIdx % 8];
 
-    std::cerr << "[TRACE] frame=" << this->frameIdx << std::endl;
+    int preCopyFd{};
 
-    /*
-     * =====================================================
-     * 1. Acquire swapchain image
-     * =====================================================
-     */
-    pass.acquireSemaphores.at(0) = Mini::Semaphore(info.device);
+    pass.preCopySemaphores[0] =
+        Mini::Semaphore(info.device, &preCopyFd);
 
-    uint32_t imageIdx = 0;
+    pass.preCopySemaphores[1] =
+        Mini::Semaphore(info.device);
 
-    VkResult res = Layer::ovkAcquireNextImageKHR(
-        info.device,
-        this->swapchain,
-        UINT64_MAX,
-        pass.acquireSemaphores.at(0).handle(),
-        VK_NULL_HANDLE,
-        &imageIdx
-    );
+    pass.preCopyBuf =
+        Mini::CommandBuffer(info.device, this->cmdPool);
 
-    if (res != VK_SUCCESS && res != VK_SUBOPTIMAL_KHR)
-        throw LSFG::vulkan_error(res, "Acquire failed");
-
-    /*
-     * =====================================================
-     * 2. Copy swapchain → LSFG input image
-     * =====================================================
-     */
-    Frame& srcFrame =
-        (this->frameIdx % 2 == 0)
-            ? this->frame_0
-            : this->frame_1;
-
-    pass.preCopyBuf = Mini::CommandBuffer(info.device, this->cmdPool);
     pass.preCopyBuf.begin();
 
     Utils::copyImage(
         pass.preCopyBuf.handle(),
-        this->swapchainImages.at(imageIdx),
-        srcFrame.image.handle(),
-        this->extent.width,
-        this->extent.height,
+        this->swapchainImages[presentIdx],
+        (frameIdx % 2 == 0) ? frame_0.handle() : frame_1.handle(),
+        extent.width,
+        extent.height,
         VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
         VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
         true,
@@ -292,104 +202,98 @@ VkResult LsContext::present(
 
     pass.preCopyBuf.end();
 
-    /*
-     * =====================================================
-     * 3. Sync (GPU → LSFG input ready)
-     * =====================================================
-     */
-    std::vector<VkSemaphore> preWaitSemaphores = gameRenderSemaphores;
-
-    if (this->frameIdx > 0) {
-        preWaitSemaphores.push_back(
-            this->passInfos.at((this->frameIdx - 1) % 8)
-                .preCopySemaphores.at(1)
-                .handle()
-        );
-    }
-
-    VkSemaphore preCopySignal =
-        Mini::Semaphore(info.device).handle();
-
     pass.preCopyBuf.submit(
         info.queue.second,
-        preWaitSemaphores,
-        { preCopySignal }
+        gameRenderSemaphores,
+        {
+            pass.preCopySemaphores[0].handle(),
+            pass.preCopySemaphores[1].handle()
+        }
     );
 
-    /*
-     * =====================================================
-     * 4. LSFG execution (FD BASED INPUT/OUTPUT)
-     * =====================================================
-     */
-    std::vector<int> outFds(conf.multiplier - 1, -1);
+    std::vector<int> renderFds(conf.multiplier - 1);
 
-    LSFG_3_1::presentContext(
-        *this->lsfgCtxId,
-        srcFrame.fd,
-        outFds
-    );
+    for (size_t i = 0; i < conf.multiplier - 1; i++) {
+        pass.renderSemaphores[i] =
+            Mini::Semaphore(info.device, &renderFds[i]);
+    }
 
-    /*
-     * =====================================================
-     * 5. Copy LSFG output → swapchain
-     * =====================================================
-     */
-    pass.postCopyBufs.at(0) =
-        Mini::CommandBuffer(info.device, this->cmdPool);
+    if (mode == LsfgMode::ExternalFd) {
 
-    pass.postCopyBufs.at(0).begin();
+        LSFG_3_1::presentContext(
+            *lsfgCtxId,
+            preCopyFd,
+            renderFds
+        );
 
-    Utils::copyImage(
-        pass.postCopyBufs.at(0).handle(),
-        this->out_n.at(0).handle(),
-        this->swapchainImages.at(imageIdx),
-        this->extent.width,
-        this->extent.height,
-        VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
-        VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
-        false,
-        true
-    );
+        for (size_t i = 0; i < conf.multiplier - 1; i++) {
 
-    pass.postCopyBufs.at(0).end();
+            pass.acquireSemaphores[i] =
+                Mini::Semaphore(info.device);
 
-    /*
-     * =====================================================
-     * 6. Output sync
-     * =====================================================
-     */
-    VkSemaphore postSignal =
-        Mini::Semaphore(info.device).handle();
+            uint32_t imageIdx{};
 
-    pass.postCopyBufs.at(0).submit(
-        info.queue.second,
-        { preCopySignal },
-        { postSignal }
-    );
+            Layer::ovkAcquireNextImageKHR(
+                info.device,
+                swapchain,
+                UINT64_MAX,
+                pass.acquireSemaphores[i].handle(),
+                VK_NULL_HANDLE,
+                &imageIdx
+            );
 
-    /*
-     * =====================================================
-     * 7. Present
-     * =====================================================
-     */
-    VkPresentInfoKHR presentInfo{};
-    presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
-    presentInfo.waitSemaphoreCount = 1;
-    presentInfo.pWaitSemaphores = &postSignal;
-    presentInfo.swapchainCount = 1;
-    presentInfo.pSwapchains = &this->swapchain;
-    presentInfo.pImageIndices = &imageIdx;
-    presentInfo.pNext = pNext;
+            Utils::copyImage(
+                pass.postCopyBufs[i].handle(),
+                out_n[i].handle(),
+                swapchainImages[imageIdx],
+                extent.width,
+                extent.height,
+                VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
+                VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
+                false,
+                true
+            );
 
-    VkResult finalRes =
-        Layer::ovkQueuePresentKHR(queue, &presentInfo);
+            Layer::ovkQueuePresentKHR(queue, nullptr);
+        }
 
-    /*
-     * =====================================================
-     * 8. Frame update
-     * =====================================================
-     */
+    } else {
+
+        LSFG_3_1::presentContextVk(
+            *lsfgCtxId,
+            pass.preCopySemaphores[0].handle(),
+            pass.renderSemaphores,
+            frame_0.handle(),
+            frame_1.handle(),
+            out_n
+        );
+
+        uint32_t imageIdx{};
+
+        Layer::ovkAcquireNextImageKHR(
+            info.device,
+            swapchain,
+            UINT64_MAX,
+            pass.preCopySemaphores[1].handle(),
+            VK_NULL_HANDLE,
+            &imageIdx
+        );
+
+        Utils::copyImage(
+            pass.postCopyBufs[0].handle(),
+            out_n[0].handle(),
+            swapchainImages[imageIdx],
+            extent.width,
+            extent.height,
+            VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
+            VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
+            false,
+            true
+        );
+
+        Layer::ovkQueuePresentKHR(queue, nullptr);
+    }
+
     this->frameIdx++;
-
-    return finalRes;
+    return VK_SUCCESS;
 }
