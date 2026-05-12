@@ -5,6 +5,7 @@
 #include "core/device.hpp"
 #include "core/instance.hpp"
 #include "common/exception.hpp"
+#include "include/mini/semaphore.hpp"
 
 #include <cstdint>
 #include <memory>
