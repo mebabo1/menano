@@ -24,8 +24,10 @@
 #include <fcntl.h>
 #include <unistd.h>
 
-LsContext::LsContext(const Hooks::DeviceInfo& info, VkSwapchainKHR swapchain,
-    VkExtent2D extent, const std::vector<VkImage>& swapchainImages)
+LsContext::LsContext(const Hooks::DeviceInfo& info,
+    VkSwapchainKHR swapchain,
+    VkExtent2D extent,
+    const std::vector<VkImage>& swapchainImages)
     : swapchain(swapchain),
       swapchainImages(swapchainImages),
       extent(extent) {
@@ -42,29 +44,35 @@ LsContext::LsContext(const Hooks::DeviceInfo& info, VkSwapchainKHR swapchain,
 
     std::array<int, 2> fds{};
 
-    frame_0 = Mini::Image(info.device, info.physicalDevice, extent, format,
+    frame_0 = Mini::Image(
+        info.device, info.physicalDevice, extent, format,
         VK_IMAGE_USAGE_TRANSFER_DST_BIT |
         VK_IMAGE_USAGE_SAMPLED_BIT |
         VK_IMAGE_USAGE_STORAGE_BIT,
         VK_IMAGE_ASPECT_COLOR_BIT,
-        &fds[0]);
+        &fds[0]
+    );
 
-    frame_1 = Mini::Image(info.device, info.physicalDevice, extent, format,
+    frame_1 = Mini::Image(
+        info.device, info.physicalDevice, extent, format,
         VK_IMAGE_USAGE_TRANSFER_DST_BIT |
         VK_IMAGE_USAGE_SAMPLED_BIT |
         VK_IMAGE_USAGE_STORAGE_BIT,
         VK_IMAGE_ASPECT_COLOR_BIT,
-        &fds[1]);
+        &fds[1]
+    );
 
     std::vector<int> outFds(conf.multiplier - 1);
 
     for (size_t i = 0; i < conf.multiplier - 1; i++) {
-        out_n.emplace_back(info.device, info.physicalDevice, extent, format,
+        out_n.emplace_back(
+            info.device, info.physicalDevice, extent, format,
             VK_IMAGE_USAGE_TRANSFER_SRC_BIT |
             VK_IMAGE_USAGE_SAMPLED_BIT |
             VK_IMAGE_USAGE_STORAGE_BIT,
             VK_IMAGE_ASPECT_COLOR_BIT,
-            &outFds[i]);
+            &outFds[i]
+        );
     }
 
     auto* init = LSFG_3_1::initialize;
@@ -110,8 +118,11 @@ LsContext::LsContext(const Hooks::DeviceInfo& info, VkSwapchainKHR swapchain,
             int shmIn = shm_open(inName.c_str(), O_CREAT | O_RDWR, 0666);
             int shmOut = shm_open(outName.c_str(), O_CREAT | O_RDWR, 0666);
 
-            ftruncate(shmIn, shmFrameSize);
-            ftruncate(shmOut, shmFrameSize);
+            if (ftruncate(shmIn, shmFrameSize) != 0)
+                throw std::runtime_error("ftruncate shmIn failed");
+
+            if (ftruncate(shmOut, shmFrameSize) != 0)
+                throw std::runtime_error("ftruncate shmOut failed");
 
             shmInputs.push_back(mmap(nullptr, shmFrameSize,
                 PROT_READ | PROT_WRITE, MAP_SHARED, shmIn, 0));
@@ -125,7 +136,10 @@ LsContext::LsContext(const Hooks::DeviceInfo& info, VkSwapchainKHR swapchain,
 
     lsfgCtxId = std::shared_ptr<int32_t>(
         new int32_t(ctx),
-        [destroy](const int32_t* id) { destroy(*id); });
+        [destroy](const int32_t* id) {
+            destroy(*id);
+        }
+    );
 
     unsetenv("DISABLE_LSFG");
 
@@ -138,7 +152,7 @@ LsContext::LsContext(const Hooks::DeviceInfo& info, VkSwapchainKHR swapchain,
         pass.postCopySemaphores.resize(conf.multiplier - 1);
         pass.prevPostCopySemaphores.resize(conf.multiplier - 1);
     }
- }
+}
 
 VkResult LsContext::present(
     const Hooks::DeviceInfo& info,
@@ -204,36 +218,16 @@ VkResult LsContext::present(
             Mini::Semaphore(info.device, &renderFds[i]);
     }
 
-    // =========================
-    // LSFG CALL
-    // =========================
     if (ipcMode == IPCMode::FD) {
-
         LSFG_3_1::presentContext(*lsfgCtxId, preCopySemaphoreFd, renderFds);
-
     } else {
-
-        std::vector<uint8_t> cpu(shmFrameSize);
-
-        Utils::readbackImage(
-            info.device,
-            frameIdx % 2 == 0 ? frame_0.handle() : frame_1.handle(),
-            cpu.data(),
-            extent.width,
-            extent.height
-        );
-
-        memcpy(shmInputs[0], cpu.data(), shmFrameSize);
-
         LSFG_3_1::presentContext(*lsfgCtxId, 0, renderFds);
     }
 
-    // =========================
-    // PRESENT LOOP
-    // =========================
     for (size_t i = 0; i < conf.multiplier - 1; i++) {
 
-        pass.acquireSemaphores[i] = Mini::Semaphore(info.device);
+        pass.acquireSemaphores[i] =
+            Mini::Semaphore(info.device);
 
         uint32_t imageIdx{};
 
@@ -245,6 +239,9 @@ VkResult LsContext::present(
             VK_NULL_HANDLE,
             &imageIdx
         );
+
+        pass.postCopySemaphores[i] = Mini::Semaphore(info.device);
+        pass.prevPostCopySemaphores[i] = Mini::Semaphore(info.device);
 
         pass.postCopyBufs[i] = Mini::CommandBuffer(info.device, cmdPool);
         pass.postCopyBufs[i].begin();
@@ -275,10 +272,13 @@ VkResult LsContext::present(
             }
         );
 
+        VkSemaphore waitSem = pass.postCopySemaphores[i].handle();
+
         VkPresentInfoKHR pi{
             .sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR,
+            .pNext = i == 0 ? pNext : nullptr,
             .waitSemaphoreCount = 1,
-            .pWaitSemaphores = &pass.postCopySemaphores[i].handle(),
+            .pWaitSemaphores = &waitSem,
             .swapchainCount = 1,
             .pSwapchains = &swapchain,
             .pImageIndices = &imageIdx,
