@@ -1,60 +1,32 @@
 #pragma once
 
 #include <vulkan/vulkan_core.h>
-
 #include <memory>
 
 namespace Mini {
 
-    /*
-     * ---------------------------------------------------------
-     * Capability control (external semaphore support)
-     * ---------------------------------------------------------
-     *
-     * This is used by runtime device initialization code
-     * to inform semaphore backend selection.
-     */
-    void setSemaphoreCapabilities(bool fd, bool win32);
+void setSemaphoreCapabilities(bool fd, bool win32);
 
-    ///
-    /// C++ wrapper class for a Vulkan semaphore.
-    ///
-    /// Manages lifetime of VkSemaphore safely.
-    ///
-    class Semaphore {
-    public:
-        Semaphore() noexcept = default;
+class Semaphore {
+public:
+    Semaphore() noexcept = default;
 
-        ///
-        /// Create the semaphore.
-        ///
-        /// @param device Vulkan device
-        ///
-        /// @throws LSFG::vulkan_error if object creation fails.
-        ///
-        Semaphore(VkDevice device);
+    // internal-only constructor
+    Semaphore(VkDevice device);
 
-        ///
-        /// Import a semaphore.
-        ///
-        /// @param device Vulkan device
-        /// @param fd File descriptor to import the semaphore from.
-        ///
-        /// @throws LSFG::vulkan_error if object creation fails.
-        ///
-        Semaphore(VkDevice device, int* fd);
+    // KEEP for ABI compatibility (but internally ignored)
+    Semaphore(VkDevice device, int* fd);
 
-        /// Get the Vulkan handle.
-        [[nodiscard]] auto handle() const { return *this->semaphore; }
+    [[nodiscard]] VkSemaphore handle() const { return *semaphore; }
 
-        // Trivially copyable, moveable and destructible
-        Semaphore(const Semaphore&) noexcept = default;
-        Semaphore& operator=(const Semaphore&) noexcept = default;
-        Semaphore(Semaphore&&) noexcept = default;
-        Semaphore& operator=(Semaphore&&) noexcept = default;
-        ~Semaphore() = default;
-    private:
-        std::shared_ptr<VkSemaphore> semaphore;
-    };
+    Semaphore(const Semaphore&) noexcept = default;
+    Semaphore& operator=(const Semaphore&) noexcept = default;
+    Semaphore(Semaphore&&) noexcept = default;
+    Semaphore& operator=(Semaphore&&) noexcept = default;
+    ~Semaphore() = default;
+
+private:
+    std::shared_ptr<VkSemaphore> semaphore;
+};
 
 }
