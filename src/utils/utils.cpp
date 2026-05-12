@@ -22,18 +22,26 @@
 
 using namespace Utils;
 
-std::pair<uint32_t, VkQueue> Utils::findQueue(VkDevice device, VkPhysicalDevice physicalDevice,
-        VkDeviceCreateInfo* desc, VkQueueFlags flags) {
+// =========================
+// QUEUE SELECTION
+// =========================
+std::pair<uint32_t, VkQueue> Utils::findQueue(
+    VkDevice device,
+    VkPhysicalDevice physicalDevice,
+    VkDeviceCreateInfo* desc,
+    VkQueueFlags flags)
+{
     std::vector<VkDeviceQueueCreateInfo> enabledQueues(desc->queueCreateInfoCount);
     std::copy_n(desc->pQueueCreateInfos, enabledQueues.size(), enabledQueues.data());
 
     uint32_t familyCount{};
     Layer::ovkGetPhysicalDeviceQueueFamilyProperties(physicalDevice, &familyCount, nullptr);
+
     std::vector<VkQueueFamilyProperties> families(familyCount);
-    Layer::ovkGetPhysicalDeviceQueueFamilyProperties(physicalDevice, &familyCount,
-        families.data());
+    Layer::ovkGetPhysicalDeviceQueueFamilyProperties(physicalDevice, &familyCount, families.data());
 
     std::optional<uint32_t> idx;
+
     for (const auto& queueInfo : enabledQueues) {
         if ((queueInfo.queueFamilyIndex < families.size()) &&
             (families[queueInfo.queueFamilyIndex].queueFlags & flags)) {
@@ -41,6 +49,7 @@ std::pair<uint32_t, VkQueue> Utils::findQueue(VkDevice device, VkPhysicalDevice 
             break;
         }
     }
+
     if (!idx.has_value())
         throw LSFG::vulkan_error(VK_ERROR_INITIALIZATION_FAILED, "No suitable queue found");
 
@@ -54,26 +63,44 @@ std::pair<uint32_t, VkQueue> Utils::findQueue(VkDevice device, VkPhysicalDevice 
     return { *idx, queue };
 }
 
-uint64_t Utils::getDeviceUUID(VkPhysicalDevice physicalDevice) {
+// =========================
+// DEVICE UUID
+// =========================
+uint64_t Utils::getDeviceUUID(VkPhysicalDevice physicalDevice)
+{
     VkPhysicalDeviceProperties properties{};
     Layer::ovkGetPhysicalDeviceProperties(physicalDevice, &properties);
 
-    return static_cast<uint64_t>(properties.vendorID) << 32 | properties.deviceID;
+    return static_cast<uint64_t>(properties.vendorID) << 32 |
+           properties.deviceID;
 }
 
-uint32_t Utils::getMaxImageCount(VkPhysicalDevice physicalDevice, VkSurfaceKHR surface) {
+// =========================
+// SWAPCHAIN IMAGE LIMIT
+// =========================
+uint32_t Utils::getMaxImageCount(VkPhysicalDevice physicalDevice, VkSurfaceKHR surface)
+{
     VkSurfaceCapabilitiesKHR capabilities{};
-    auto res = Layer::ovkGetPhysicalDeviceSurfaceCapabilitiesKHR(physicalDevice,
-        surface, &capabilities);
+    auto res = Layer::ovkGetPhysicalDeviceSurfaceCapabilitiesKHR(
+        physicalDevice, surface, &capabilities);
+
     if (res != VK_SUCCESS)
         throw LSFG::vulkan_error(res, "Failed to get surface capabilities");
+
     if (capabilities.maxImageCount == 0)
-        return 999; // :3
+        return 999;
+
     return capabilities.maxImageCount;
 }
 
-std::vector<const char*> Utils::addExtensions(const char* const* extensions, size_t count,
-        const std::vector<const char*>& requiredExtensions) {
+// =========================
+// EXTENSION MERGE
+// =========================
+std::vector<const char*> Utils::addExtensions(
+    const char* const* extensions,
+    size_t count,
+    const std::vector<const char*>& requiredExtensions)
+{
     std::vector<const char*> ext(count);
     std::copy_n(extensions, count, ext.data());
 
@@ -82,6 +109,7 @@ std::vector<const char*> Utils::addExtensions(const char* const* extensions, siz
             [e](const char* extName) {
                 return std::string(extName) == std::string(e);
             });
+
         if (it == ext.end())
             ext.push_back(e);
     }
@@ -89,11 +117,20 @@ std::vector<const char*> Utils::addExtensions(const char* const* extensions, siz
     return ext;
 }
 
-void Utils::copyImage(VkCommandBuffer buf,
-        VkImage src, VkImage dst,
-        uint32_t width, uint32_t height,
-        VkPipelineStageFlags pre, VkPipelineStageFlags post,
-        bool makeSrcPresentable, bool makeDstPresentable) {
+// =========================
+// IMAGE BLIT (GPU → GPU)
+// =========================
+void Utils::copyImage(
+    VkCommandBuffer buf,
+    VkImage src,
+    VkImage dst,
+    uint32_t width,
+    uint32_t height,
+    VkPipelineStageFlags pre,
+    VkPipelineStageFlags post,
+    bool makeSrcPresentable,
+    bool makeDstPresentable)
+{
     const VkImageMemoryBarrier srcBarrier{
         .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
         .dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT,
@@ -106,6 +143,7 @@ void Utils::copyImage(VkCommandBuffer buf,
             .layerCount = 1
         }
     };
+
     const VkImageMemoryBarrier dstBarrier{
         .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
         .dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT,
@@ -117,11 +155,19 @@ void Utils::copyImage(VkCommandBuffer buf,
             .layerCount = 1
         }
     };
-    const std::vector<VkImageMemoryBarrier> barriers = { srcBarrier, dstBarrier };
-    Layer::ovkCmdPipelineBarrier(buf,
-        pre, VK_PIPELINE_STAGE_TRANSFER_BIT, 0,
-        0, nullptr, 0, nullptr,
-        static_cast<uint32_t>(barriers.size()), barriers.data());
+
+    std::vector<VkImageMemoryBarrier> barriers = { srcBarrier, dstBarrier };
+
+    Layer::ovkCmdPipelineBarrier(
+        buf,
+        pre,
+        VK_PIPELINE_STAGE_TRANSFER_BIT,
+        0,
+        0, nullptr,
+        0, nullptr,
+        static_cast<uint32_t>(barriers.size()),
+        barriers.data()
+    );
 
     const VkImageBlit imageBlit{
         .srcSubresource = {
@@ -130,7 +176,7 @@ void Utils::copyImage(VkCommandBuffer buf,
         },
         .srcOffsets = {
             { 0, 0, 0 },
-            { static_cast<int32_t>(width), static_cast<int32_t>(height), 1 }
+            { (int32_t)width, (int32_t)height, 1 }
         },
         .dstSubresource = {
             .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
@@ -138,9 +184,10 @@ void Utils::copyImage(VkCommandBuffer buf,
         },
         .dstOffsets = {
             { 0, 0, 0 },
-            { static_cast<int32_t>(width), static_cast<int32_t>(height), 1 }
+            { (int32_t)width, (int32_t)height, 1 }
         }
     };
+
     Layer::ovkCmdBlitImage(
         buf,
         src, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
@@ -161,10 +208,17 @@ void Utils::copyImage(VkCommandBuffer buf,
                 .layerCount = 1
             }
         };
-        Layer::ovkCmdPipelineBarrier(buf,
-            VK_PIPELINE_STAGE_TRANSFER_BIT, post, 0,
-            0, nullptr, 0, nullptr,
-            1, &presentBarrier);
+
+        Layer::ovkCmdPipelineBarrier(
+            buf,
+            VK_PIPELINE_STAGE_TRANSFER_BIT,
+            post,
+            0,
+            0, nullptr,
+            0, nullptr,
+            1,
+            &presentBarrier
+        );
     }
 
     if (makeDstPresentable) {
@@ -181,13 +235,23 @@ void Utils::copyImage(VkCommandBuffer buf,
                 .layerCount = 1
             }
         };
-        Layer::ovkCmdPipelineBarrier(buf,
-            VK_PIPELINE_STAGE_TRANSFER_BIT, post, 0,
-            0, nullptr, 0, nullptr,
-            1, &presentBarrier);
+
+        Layer::ovkCmdPipelineBarrier(
+            buf,
+            VK_PIPELINE_STAGE_TRANSFER_BIT,
+            post,
+            0,
+            0, nullptr,
+            0, nullptr,
+            1,
+            &presentBarrier
+        );
     }
 }
 
+// =========================
+// LOG LIMITER
+// =========================
 namespace {
     auto& logCounts() {
         static std::unordered_map<std::string, size_t> map;
@@ -195,58 +259,69 @@ namespace {
     }
 }
 
-void Utils::logLimitN(const std::string& id, size_t n, const std::string& message) {
+void Utils::logLimitN(const std::string& id, size_t n, const std::string& message)
+{
     auto& count = logCounts()[id];
+
     if (count <= n)
         std::cerr << "lsfg-vk: " << message << '\n';
+
     if (count == n)
-        std::cerr << "(above message has been repeated " << n << " times, suppressing further)\n";
+        std::cerr << "(above message has been repeated " << n
+                  << " times, suppressing further)\n";
+
     count++;
 }
 
-void Utils::resetLimitN(const std::string& id) noexcept {
+void Utils::resetLimitN(const std::string& id) noexcept
+{
     logCounts().erase(id);
 }
 
-std::pair<std::string, std::string> Utils::getProcessName() {
-    // check benchmark flag
+// =========================
+// PROCESS NAME
+// =========================
+std::pair<std::string, std::string> Utils::getProcessName()
+{
     const char* benchmark_flag = std::getenv("LSFG_BENCHMARK");
     if (benchmark_flag)
         return { "benchmark", "benchmark" };
+
     std::array<char, 4096> exe{};
 
-    // then check override
     const char* process_name = std::getenv("LSFG_PROCESS");
     if (process_name && *process_name != '\0')
         return { process_name, process_name };
 
-    // find executed binary
     const ssize_t exe_len = readlink("/proc/self/exe", exe.data(), exe.size() - 1);
     if (exe_len <= 0)
         return { "Unknown Process", "unknown" };
-    exe.at(static_cast<size_t>(exe_len)) = '\0';
+
+    exe.at((size_t)exe_len) = '\0';
     std::string exe_str(exe.data());
 
-    // find command name as well
     std::ifstream comm_file("/proc/self/comm");
     if (!comm_file.is_open())
-        return { std::string(exe.data()), "unknown" };
+        return { exe_str, "unknown" };
+
     std::array<char, 257> comm{};
     comm_file.read(comm.data(), 256);
-    comm.at(static_cast<size_t>(comm_file.gcount())) = '\0';
+
+    comm.at((size_t)comm_file.gcount()) = '\0';
     std::string comm_str(comm.data());
-    if (comm_str.back() == '\n')
+
+    if (!comm_str.empty() && comm_str.back() == '\n')
         comm_str.pop_back();
 
-    // replace binary with exe for wine apps
-    if (exe_str.find("wine") != std::string::npos
-        || exe_str.find("proton") != std::string::npos) {
-
+    if (exe_str.find("wine") != std::string::npos ||
+        exe_str.find("proton") != std::string::npos)
+    {
         std::ifstream proc_maps("/proc/self/maps");
         if (!proc_maps.is_open())
-            return{ exe_str, comm_str };
+            return { exe_str, comm_str };
 
         std::string line;
+
         while (std::getline(proc_maps, line)) {
             if (!line.ends_with(".exe"))
                 continue;
@@ -256,30 +331,36 @@ std::pair<std::string, std::string> Utils::getProcessName() {
                 pos = line.find_last_of(' ');
                 if (pos == std::string::npos)
                     continue;
-                pos += 1; // skip space
+                pos += 1;
             }
 
-            const std::string exe_name = line.substr(pos);
-            if (exe_name.empty())
-                continue;
+            std::string exe_name = line.substr(pos);
+            if (!exe_name.empty())
+                exe_str = exe_name;
 
-            exe_str = exe_name;
             break;
         }
     }
 
-    return{ exe_str, comm_str };
+    return { exe_str, comm_str };
 }
 
-std::string Utils::getConfigFile() {
+// =========================
+// CONFIG PATH
+// =========================
+std::string Utils::getConfigFile()
+{
     const char* configFile = std::getenv("LSFG_CONFIG");
     if (configFile && *configFile != '\0')
-        return{configFile};
+        return configFile;
+
     const char* xdgPath = std::getenv("XDG_CONFIG_HOME");
     if (xdgPath && *xdgPath != '\0')
         return std::string(xdgPath) + "/lsfg-vk/conf.toml";
+
     const char* homePath = std::getenv("HOME");
     if (homePath && *homePath != '\0')
         return std::string(homePath) + "/.config/lsfg-vk/conf.toml";
+
     return "/etc/lsfg-vk/conf.toml";
 }
