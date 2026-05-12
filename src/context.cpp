@@ -243,7 +243,7 @@ VkResult LsContext::present(
     auto& pass = this->passInfos.at(this->frameIdx % 8);
 
     /*
-     * 1. acquire swapchain
+     * 1. Acquire swapchain image
      */
     pass.acquireSemaphores.at(0) = Mini::Semaphore(info.device);
 
@@ -262,7 +262,7 @@ VkResult LsContext::present(
         throw LSFG::vulkan_error(res, "Acquire failed");
 
     /*
-     * 2. copy swapchain -> LSFG input
+     * 2. Copy swapchain → LSFG input
      */
     int preFd = -1;
 
@@ -286,25 +286,27 @@ VkResult LsContext::present(
     pass.preCopyBuf.end();
 
     /*
-     * FIX: semaphore submit format (pointer vector)
+     * FIX: semaphore type MUST be VkSemaphore (NOT pointers)
      */
-    std::vector<VkSemaphore*> waitSemaphores;
-    std::vector<VkSemaphore*> signalSemaphores;
+    std::vector<VkSemaphore> preWaitSemaphores;
+    std::vector<VkSemaphore> preSignalSemaphores;
 
     for (auto& s : gameRenderSemaphores)
-        waitSemaphores.push_back((VkSemaphore*)&s);
+        preWaitSemaphores.push_back(s);
 
-    VkSemaphore preCopySignal = Mini::Semaphore(info.device).handle();
-    signalSemaphores.push_back(&preCopySignal);
+    VkSemaphore preCopySignal =
+        Mini::Semaphore(info.device).handle();
+
+    preSignalSemaphores.push_back(preCopySignal);
 
     pass.preCopyBuf.submit(
         info.queue.second,
-        waitSemaphores,
-        signalSemaphores
+        preWaitSemaphores,
+        preSignalSemaphores
     );
 
     /*
-     * 3. LSFG
+     * 3. LSFG execution
      */
     std::vector<int> outFds(conf.multiplier - 1);
 
@@ -315,7 +317,7 @@ VkResult LsContext::present(
     );
 
     /*
-     * 4. output copy → swapchain
+     * 4. Copy LSFG output → swapchain
      */
     pass.postCopyBufs.at(0) =
         Mini::CommandBuffer(info.device, this->cmdPool);
@@ -336,22 +338,28 @@ VkResult LsContext::present(
 
     pass.postCopyBufs.at(0).end();
 
-    VkSemaphore postSignal = Mini::Semaphore(info.device).handle();
+    /*
+     * FIX: correct semaphore usage
+     */
+    VkSemaphore postSignal =
+        Mini::Semaphore(info.device).handle();
 
-    std::vector<VkSemaphore*> postWait;
-    std::vector<VkSemaphore*> postSignalVec;
+    std::vector<VkSemaphore> postWaitSemaphores = {
+        preCopySignal
+    };
 
-    postWait.push_back(&preCopySignal);
-    postSignalVec.push_back(&postSignal);
+    std::vector<VkSemaphore> postSignalSemaphores = {
+        postSignal
+    };
 
     pass.postCopyBufs.at(0).submit(
         info.queue.second,
-        postWait,
-        postSignalVec
+        postWaitSemaphores,
+        postSignalSemaphores
     );
 
     /*
-     * 5. present (FIXED)
+     * 5. Present
      */
     VkSemaphore wait = postSignal;
 
@@ -364,5 +372,9 @@ VkResult LsContext::present(
     presentInfo.pImageIndices = &imageIdx;
     presentInfo.pNext = pNext;
 
-    return Layer::ovkQueuePresentKHR(queue, &presentInfo);
+    auto result = Layer::ovkQueuePresentKHR(queue, &presentInfo);
+
+    this->frameIdx++;
+
+    return result;
 }
