@@ -26,8 +26,7 @@ LsContext::LsContext(
     const std::vector<VkImage>& swapchainImages)
     : swapchain(swapchain),
       swapchainImages(swapchainImages),
-      extent(extent),
-      lsfgEnabled(true)
+      extent(extent)
 {
     if (!Config::currentConf.has_value())
         throw std::runtime_error("No configuration set");
@@ -35,59 +34,70 @@ LsContext::LsContext(
     auto& globalConf = Config::globalConf;
     auto& conf = *Config::currentConf;
 
-    const VkFormat format = conf.hdr
+    VkFormat format = conf.hdr
         ? VK_FORMAT_R8G8B8A8_UNORM
         : VK_FORMAT_R16G16B16A16_SFLOAT;
 
     /* =========================
-     * INPUT
+     * INPUT FRAMES
      * ========================= */
     std::array<int, 2> fds{};
 
-    frame_0 = Mini::Image(info.device, info.physicalDevice, extent, format,
+    frame_0 = Mini::Image(
+        info.device, info.physicalDevice,
+        extent, format,
         VK_IMAGE_USAGE_TRANSFER_DST_BIT |
         VK_IMAGE_USAGE_SAMPLED_BIT |
         VK_IMAGE_USAGE_STORAGE_BIT,
         VK_IMAGE_ASPECT_COLOR_BIT,
-        &fds.at(0));
+        &fds.at(0)
+    );
 
-    frame_1 = Mini::Image(info.device, info.physicalDevice, extent, format,
+    frame_1 = Mini::Image(
+        info.device, info.physicalDevice,
+        extent, format,
         VK_IMAGE_USAGE_TRANSFER_DST_BIT |
         VK_IMAGE_USAGE_SAMPLED_BIT |
         VK_IMAGE_USAGE_STORAGE_BIT,
         VK_IMAGE_ASPECT_COLOR_BIT,
-        &fds.at(1));
+        &fds.at(1)
+    );
 
     /* =========================
-     * OUTPUT
+     * OUTPUT FRAMES
      * ========================= */
     std::vector<int> outFds(conf.multiplier - 1);
 
     for (size_t i = 0; i < conf.multiplier - 1; ++i) {
-        out_n.emplace_back(info.device, info.physicalDevice, extent, format,
+        out_n.emplace_back(
+            info.device, info.physicalDevice,
+            extent, format,
             VK_IMAGE_USAGE_TRANSFER_SRC_BIT |
             VK_IMAGE_USAGE_SAMPLED_BIT |
             VK_IMAGE_USAGE_STORAGE_BIT,
             VK_IMAGE_ASPECT_COLOR_BIT,
-            &outFds.at(i));
+            &outFds.at(i)
+        );
     }
 
     /* =========================
      * LSFG INIT
      * ========================= */
-    auto* lsfgInitialize = LSFG_3_1::initialize;
-    auto* lsfgCreateContext = LSFG_3_1::createContext;
-    auto* lsfgDeleteContext = LSFG_3_1::deleteContext;
+    auto* init = conf.performance
+        ? LSFG_3_1P::initialize
+        : LSFG_3_1::initialize;
 
-    if (conf.performance) {
-        lsfgInitialize = LSFG_3_1P::initialize;
-        lsfgCreateContext = LSFG_3_1P::createContext;
-        lsfgDeleteContext = LSFG_3_1P::deleteContext;
-    }
+    auto* createCtx = conf.performance
+        ? LSFG_3_1P::createContext
+        : LSFG_3_1::createContext;
+
+    auto* destroyCtx = conf.performance
+        ? LSFG_3_1P::deleteContext
+        : LSFG_3_1::deleteContext;
 
     setenv("DISABLE_LSFG", "1", 1);
 
-    lsfgInitialize(
+    init(
         Utils::getDeviceUUID(info.physicalDevice),
         conf.hdr,
         1.0F / conf.flowScale,
@@ -97,23 +107,22 @@ LsContext::LsContext(
     );
 
     lsfgCtxId = std::shared_ptr<int32_t>(
-        new int32_t(lsfgCreateContext(
-            fds.at(0),
-            fds.at(1),
-            outFds,
-            extent,
-            format
-        )),
-        [lsfgDeleteContext](const int32_t* id) {
-            lsfgDeleteContext(*id);
+        new int32_t(
+            createCtx(
+                fds.at(0),
+                fds.at(1),
+                outFds,
+                extent,
+                format
+            )
+        ),
+        [destroyCtx](const int32_t* id) {
+            destroyCtx(*id);
         }
     );
 
     unsetenv("DISABLE_LSFG");
 
-    /* =========================
-     * COMMAND POOL
-     * ========================= */
     cmdPool = Mini::CommandPool(info.device, info.queue.first);
 
     for (auto& pass : passInfos) {
@@ -166,8 +175,7 @@ VkResult LsContext::present(
 
     pass.preCopyBuf.end();
 
-    /* 🔥 FIX: stable semaphore variable */
-    VkSemaphore preCopyWait = pass.preCopySemaphores.at(1).handle();
+    VkSemaphore preCopySignal = pass.preCopySemaphores.at(1).handle();
 
     pass.preCopyBuf.submit(
         info.queue.second,
@@ -179,33 +187,12 @@ VkResult LsContext::present(
     );
 
     /* =========================
-     * FALLBACK CHECK
-     * ========================= */
-    if (preCopyFd < 0)
-        lsfgEnabled = false;
-
-    if (!lsfgEnabled) {
-        std::cerr << "lsfg-vk: fallback active" << std::endl;
-
-        VkPresentInfoKHR fallback{
-            .sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR,
-            .pNext = pNext,
-            .waitSemaphoreCount = 1,
-            .pWaitSemaphores = &preCopyWait,
-            .swapchainCount = 1,
-            .pSwapchains = &swapchain,
-            .pImageIndices = &presentIdx
-        };
-
-        auto res = Layer::ovkQueuePresentKHR(queue, &fallback);
-
-        frameIdx++;
-        return res;
-    }
-
-    /* =========================
-     * LSFG PATH
-     * ========================= */
+     * LSFG ALWAYS RUN
+     * =========================
+     * 핵심 변경:
+     * fd 실패 = LSFG OFF ❌
+     * fd 실패 = internal sync mode ⭕
+     */
     std::vector<int> renderFds(conf.multiplier - 1);
 
     for (size_t i = 0; i < conf.multiplier - 1; ++i) {
@@ -213,10 +200,14 @@ VkResult LsContext::present(
             Mini::Semaphore(info.device, &renderFds.at(i));
     }
 
-    if (conf.performance)
-        LSFG_3_1P::presentContext(*lsfgCtxId, preCopyFd, renderFds);
-    else
-        LSFG_3_1::presentContext(*lsfgCtxId, preCopyFd, renderFds);
+    LSFG_3_1::presentContext(*lsfgCtxId, preCopyFd, renderFds);
+
+    /* =========================
+     * FALLBACK ONLY FOR PRESENT
+     * ========================= */
+    if (preCopyFd < 0) {
+        std::cerr << "lsfg-vk: internal sync mode (no external fd)" << std::endl;
+    }
 
     /* =========================
      * PRESENT LOOP
@@ -228,7 +219,7 @@ VkResult LsContext::present(
 
         uint32_t imageIdx{};
 
-        auto res = Layer::ovkAcquireNextImageKHR(
+        Layer::ovkAcquireNextImageKHR(
             info.device,
             swapchain,
             UINT64_MAX,
@@ -236,9 +227,6 @@ VkResult LsContext::present(
             VK_NULL_HANDLE,
             &imageIdx
         );
-
-        if (res != VK_SUCCESS && res != VK_SUBOPTIMAL_KHR)
-            throw LSFG::vulkan_error(res, "Acquire failed");
 
         pass.postCopySemaphores.at(i) =
             Mini::Semaphore(info.device);
@@ -296,10 +284,7 @@ VkResult LsContext::present(
             .pImageIndices = &imageIdx
         };
 
-        res = Layer::ovkQueuePresentKHR(queue, &presentInfo);
-
-        if (res != VK_SUCCESS && res != VK_SUBOPTIMAL_KHR)
-            throw LSFG::vulkan_error(res, "Present failed");
+        Layer::ovkQueuePresentKHR(queue, &presentInfo);
     }
 
     frameIdx++;
