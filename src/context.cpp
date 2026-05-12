@@ -244,7 +244,7 @@ LsContext::LsContext(
             conf.multiplier - 1
         );
     }
-        }
+
 VkResult LsContext::present(
         const Hooks::DeviceInfo& info,
         const void* pNext,
