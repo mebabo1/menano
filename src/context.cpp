@@ -225,8 +225,6 @@ for (size_t i = 0; i < 8; i++) {
     auto& pass =
         this->passInfos.at(i);
 
-    pass.preCopySemaphores.resize(2);
-
     pass.renderSemaphores.resize(
         conf.multiplier - 1
     );
@@ -248,6 +246,7 @@ for (size_t i = 0; i < 8; i++) {
     );
 }
 
+}
 VkResult LsContext::present(
         const Hooks::DeviceInfo& info,
         const void* pNext,
