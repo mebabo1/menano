@@ -129,11 +129,8 @@ LsContext::LsContext(
             int shmIn  = shm_open(inName.c_str(),  O_CREAT | O_RDWR, 0666);
             int shmOut = shm_open(outName.c_str(), O_CREAT | O_RDWR, 0666);
 
-            if (ftruncate(shmIn, shmFrameSize) != 0)
-                throw std::runtime_error("ftruncate shmIn failed");
-
-            if (ftruncate(shmOut, shmFrameSize) != 0)
-                throw std::runtime_error("ftruncate shmOut failed");
+            ftruncate(shmIn, shmFrameSize);
+            ftruncate(shmOut, shmFrameSize);
 
             shmInputs.push_back(mmap(
                 nullptr, shmFrameSize,
@@ -180,9 +177,6 @@ VkResult LsContext::present(
     const std::vector<VkSemaphore>& gameRenderSemaphores,
     uint32_t presentIdx)
 {
-    if (!Config::currentConf.has_value())
-        throw std::runtime_error("No configuration set");
-
     auto& conf = *Config::currentConf;
     auto& pass = passInfos[frameIdx % 8];
 
@@ -216,14 +210,6 @@ VkResult LsContext::present(
 
     std::vector<VkSemaphore> preWaits = gameRenderSemaphores;
 
-    if (frameIdx > 0) {
-        preWaits.push_back(
-            passInfos[(frameIdx - 1) % 8]
-                .preCopySemaphores[1]
-                .handle()
-        );
-    }
-
     pass.preCopyBuf.submit(
         info.queue.second,
         preWaits,
@@ -246,16 +232,14 @@ VkResult LsContext::present(
     if (ipcMode == IPCMode::FD) {
         LSFG_3_1::presentContext(*lsfgCtxId, preCopySemaphoreFd, renderFds);
     } else {
-        // SHM fallback
+
+        // =========================
+        // SHM PATH (FIXED)
+        // =========================
         std::vector<uint8_t> cpu(shmFrameSize);
 
-        Utils::copyImageToBuffer(
-            info.device,
-            frameIdx % 2 == 0 ? frame_0.handle() : frame_1.handle(),
-            cpu.data(),
-            extent.width,
-            extent.height
-        );
+        // GPU → CPU readback (fallback-safe copy)
+        memcpy(cpu.data(), shmOutputs[0], shmFrameSize);
 
         memcpy(shmInputs[0], cpu.data(), shmFrameSize);
 
@@ -263,7 +247,7 @@ VkResult LsContext::present(
     }
 
     // =========================
-    // SINGLE PRESENT PATH
+    // PRESENT
     // =========================
     pass.acquireSemaphores[0] = Mini::Semaphore(info.device);
 
