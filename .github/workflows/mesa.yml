@@ -162,6 +162,7 @@ jobs:
            -Dglx=dri \
            -Degl=enabled \
            -Dglvnd=enabled \
+           -Dlibdrm=enabled
            -Dmicrosoft-clc=disabled \
            -Dllvm=enabled \
            -Dshared-llvm=enabled \
