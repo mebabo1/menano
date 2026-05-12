@@ -24,6 +24,10 @@
 #include <fcntl.h>
 #include <unistd.h>
 
+// =======================================================
+// CONSTRUCTOR
+// =======================================================
+
 LsContext::LsContext(
     const Hooks::DeviceInfo& info,
     VkSwapchainKHR swapchain,
@@ -32,7 +36,10 @@ LsContext::LsContext(
 )
 : swapchain(swapchain),
   swapchainImages(swapchainImages),
-  extent(extent)
+  extent(extent),
+  device(info.device),
+  physicalDevice(info.physicalDevice),
+  queue(info.queue.second)
 {
     if (!Config::currentConf.has_value())
         throw std::runtime_error("No configuration set");
@@ -40,61 +47,49 @@ LsContext::LsContext(
     auto& globalConf = Config::globalConf;
     auto& conf = *Config::currentConf;
 
-    const VkFormat format = conf.hdr
+    VkFormat format = conf.hdr
         ? VK_FORMAT_R8G8B8A8_UNORM
         : VK_FORMAT_R16G16B16A16_SFLOAT;
 
     // =========================
-    // INPUT IMAGES (FD)
+    // INPUT (FD SURFACES)
     // =========================
     std::array<int, 2> fds{};
 
-    frame_0 = Mini::Image(
-        info.device, info.physicalDevice, extent, format,
+    frame_0 = Mini::Image(info.device, info.physicalDevice, extent, format,
         VK_IMAGE_USAGE_TRANSFER_DST_BIT |
         VK_IMAGE_USAGE_SAMPLED_BIT |
         VK_IMAGE_USAGE_STORAGE_BIT,
         VK_IMAGE_ASPECT_COLOR_BIT,
-        &fds[0]
-    );
+        &fds[0]);
 
-    frame_1 = Mini::Image(
-        info.device, info.physicalDevice, extent, format,
+    frame_1 = Mini::Image(info.device, info.physicalDevice, extent, format,
         VK_IMAGE_USAGE_TRANSFER_DST_BIT |
         VK_IMAGE_USAGE_SAMPLED_BIT |
         VK_IMAGE_USAGE_STORAGE_BIT,
         VK_IMAGE_ASPECT_COLOR_BIT,
-        &fds[1]
-    );
+        &fds[1]);
 
     // =========================
-    // OUTPUT IMAGES
+    // OUTPUT
     // =========================
     std::vector<int> outFds(conf.multiplier - 1);
 
     for (size_t i = 0; i < conf.multiplier - 1; i++) {
-        out_n.emplace_back(
-            info.device, info.physicalDevice, extent, format,
+        out_n.emplace_back(info.device, info.physicalDevice, extent, format,
             VK_IMAGE_USAGE_TRANSFER_SRC_BIT |
             VK_IMAGE_USAGE_SAMPLED_BIT |
             VK_IMAGE_USAGE_STORAGE_BIT,
             VK_IMAGE_ASPECT_COLOR_BIT,
-            &outFds[i]
-        );
+            &outFds[i]);
     }
 
     // =========================
     // LSFG INIT
     // =========================
-    auto* init    = LSFG_3_1::initialize;
-    auto* create  = LSFG_3_1::createContext;
-    auto* destroy = LSFG_3_1::deleteContext;
-
-    if (conf.performance) {
-        init   = LSFG_3_1P::initialize;
-        create = LSFG_3_1P::createContext;
-        destroy= LSFG_3_1P::deleteContext;
-    }
+    auto* init    = conf.performance ? LSFG_3_1P::initialize : LSFG_3_1::initialize;
+    auto* create  = conf.performance ? LSFG_3_1P::createContext : LSFG_3_1::createContext;
+    auto* destroy = conf.performance ? LSFG_3_1P::deleteContext : LSFG_3_1::deleteContext;
 
     setenv("DISABLE_LSFG", "1", 1);
 
@@ -135,19 +130,11 @@ LsContext::LsContext(
             ftruncate(shmIn, shmFrameSize);
             ftruncate(shmOut, shmFrameSize);
 
-            shmInputs.push_back(mmap(
-                nullptr, shmFrameSize,
-                PROT_READ | PROT_WRITE,
-                MAP_SHARED,
-                shmIn, 0
-            ));
+            shmInputs.push_back(mmap(nullptr, shmFrameSize,
+                PROT_READ | PROT_WRITE, MAP_SHARED, shmIn, 0));
 
-            shmOutputs.push_back(mmap(
-                nullptr, shmFrameSize,
-                PROT_READ | PROT_WRITE,
-                MAP_SHARED,
-                shmOut, 0
-            ));
+            shmOutputs.push_back(mmap(nullptr, shmFrameSize,
+                PROT_READ | PROT_WRITE, MAP_SHARED, shmOut, 0));
         }
 
         ctx = create(0, 0, {}, extent, format);
@@ -226,7 +213,7 @@ VkResult LsContext::present(
     );
 
     // =========================
-    // LSFG CALL (FD ALWAYS)
+    // LSFG CALL
     // =========================
     std::vector<int> renderFds(conf.multiplier - 1);
 
@@ -235,7 +222,9 @@ VkResult LsContext::present(
             Mini::Semaphore(info.device, &renderFds[i]);
     }
 
-    if (!fdFailed && ipcMode == IPCMode::FD) {
+    bool useFdPath = (!fdFailed && ipcMode == IPCMode::FD && lsfgCtxId);
+
+    if (useFdPath) {
 
         LSFG_3_1::presentContext(*lsfgCtxId, preCopySemaphoreFd, renderFds);
 
@@ -257,12 +246,11 @@ VkResult LsContext::present(
             extent.height
         );
 
-        // IMPORTANT: still use FD sync path
         LSFG_3_1::presentContext(*lsfgCtxId, preCopySemaphoreFd, renderFds);
     }
 
     // =========================
-    // PRESENT OUTPUT
+    // PRESENT
     // =========================
     pass.acquireSemaphores[0] = Mini::Semaphore(info.device);
 
