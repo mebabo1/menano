@@ -249,7 +249,7 @@ VkResult LsContext::present(
         // SHM fallback
         std::vector<uint8_t> cpu(shmFrameSize);
 
-        Utils::readbackImage(
+        Utils::copyImageToBuffer(
             info.device,
             frameIdx % 2 == 0 ? frame_0.handle() : frame_1.handle(),
             cpu.data(),
