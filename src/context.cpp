@@ -15,7 +15,6 @@
 #include <cstdlib>
 #include <vector>
 #include <memory>
-#include <string>
 #include <array>
 #include <iostream>
 
@@ -39,9 +38,9 @@ LsContext::LsContext(
         : VK_FORMAT_R16G16B16A16_SFLOAT;
 
     /* =========================
-     * INPUT FRAMES
+     * FRAME STORAGE (NO FD DEPENDENCY)
      * ========================= */
-    std::array<int, 2> fds{};
+    std::array<int, 2> fds{ -1, -1 };
 
     frame_0 = Mini::Image(
         info.device, info.physicalDevice,
@@ -66,7 +65,7 @@ LsContext::LsContext(
     /* =========================
      * OUTPUT FRAMES
      * ========================= */
-    std::vector<int> outFds(conf.multiplier - 1);
+    std::vector<int> outFds(conf.multiplier - 1, -1);
 
     for (size_t i = 0; i < conf.multiplier - 1; ++i) {
         out_n.emplace_back(
@@ -81,7 +80,7 @@ LsContext::LsContext(
     }
 
     /* =========================
-     * LSFG INIT
+     * LSFG INIT (NO EXTERNAL SYNC ASSUMPTION)
      * ========================= */
     auto* init = conf.performance
         ? LSFG_3_1P::initialize
@@ -95,8 +94,6 @@ LsContext::LsContext(
         ? LSFG_3_1P::deleteContext
         : LSFG_3_1::deleteContext;
 
-    setenv("DISABLE_LSFG", "1", 1);
-
     init(
         Utils::getDeviceUUID(info.physicalDevice),
         conf.hdr,
@@ -107,7 +104,7 @@ LsContext::LsContext(
     );
 
     /* =========================
-     * CONTEXT (NO FD DEPENDENCY)
+     * CONTEXT CREATION (INDEPENDENT OF FD)
      * ========================= */
     lsfgCtxId = std::shared_ptr<int32_t>(
         new int32_t(
@@ -123,8 +120,6 @@ LsContext::LsContext(
             destroyCtx(*id);
         }
     );
-
-    unsetenv("DISABLE_LSFG");
 
     cmdPool = Mini::CommandPool(info.device, info.queue.first);
 
@@ -188,23 +183,24 @@ VkResult LsContext::present(
     );
 
     /* =========================
-     * LSFG EXECUTION (FIXED)
-     * =========================
-     * 핵심 변경:
-     * - fd는 더 이상 LSFG mode 결정에 사용하지 않음
-     * - internal/external 구분 제거
-     * - LSFG는 항상 동일 경로 실행
-     */
-    std::vector<int> renderFds(conf.multiplier - 1);
+     * LSFG EXECUTION (NO MODE COUPLING TO FD)
+     * ========================= */
+
+    std::vector<int> renderFds(conf.multiplier - 1, -1);
 
     for (size_t i = 0; i < conf.multiplier - 1; ++i) {
         pass.renderSemaphores.at(i) =
             Mini::Semaphore(info.device, &renderFds.at(i));
     }
 
+    /*
+     * 핵심 변경:
+     * - fd는 LSFG mode 결정에 사용하지 않음
+     * - LSFG는 항상 동일 context 경로 사용
+     */
     LSFG_3_1::presentContext(
         *lsfgCtxId,
-        preCopyFd,   // 유지 (compat only)
+        preCopyFd,     // optional only
         renderFds
     );
 
