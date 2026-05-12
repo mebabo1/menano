@@ -50,9 +50,6 @@ LsContext::LsContext(
         -1
     );
 
-    /*
-     * create input frames
-     */
     this->frame_0 = Mini::Image(
         info.device,
         info.physicalDevice,
@@ -89,9 +86,6 @@ LsContext::LsContext(
         << fds.at(1)
         << std::endl;
 
-    /*
-     * create generated output images
-     */
     for (size_t i = 0; i < (conf.multiplier - 1); ++i) {
 
         this->out_n.emplace_back(
@@ -113,9 +107,6 @@ LsContext::LsContext(
             << std::endl;
     }
 
-    /*
-     * validate exported fds
-     */
     bool fdValid =
         (fds.at(0) >= 0) &&
         (fds.at(1) >= 0);
@@ -194,9 +185,6 @@ LsContext::LsContext(
             info.queue.first
         );
 
-    /*
-     * allocate frame resources
-     */
     for (size_t i = 0; i < 8; i++) {
 
         auto& pass =
@@ -224,12 +212,6 @@ LsContext::LsContext(
     }
 }
 
-/*
- * IMPORTANT:
- * constructor ends ABOVE
- * present() starts BELOW
- */
-
 VkResult LsContext::present(
         const Hooks::DeviceInfo& info,
         const void* pNext,
@@ -247,12 +229,9 @@ VkResult LsContext::present(
             this->frameIdx % 8
         );
 
-    int preCopySemaphoreFd{};
-
     pass.preCopySemaphores.at(0) =
         Mini::Semaphore(
-            info.device,
-            &preCopySemaphoreFd
+            info.device
         );
 
     pass.preCopySemaphores.at(1) =
@@ -308,37 +287,26 @@ VkResult LsContext::present(
         }
     );
 
-    std::vector<int> renderSemaphoreFds(
-        conf.multiplier - 1
-    );
-
-    for (size_t i = 0;
-         i < (conf.multiplier - 1);
-         ++i) {
-
-        pass.renderSemaphores.at(i) =
-            Mini::Semaphore(
-                info.device,
-                &renderSemaphoreFds.at(i)
-            );
-    }
+    vkQueueWaitIdle(queue);
 
     if (conf.performance) {
 
         LSFG_3_1P::presentContext(
             *this->lsfgCtxId,
-            preCopySemaphoreFd,
-            renderSemaphoreFds
+            -1,
+            {}
         );
 
     } else {
 
         LSFG_3_1::presentContext(
             *this->lsfgCtxId,
-            preCopySemaphoreFd,
-            renderSemaphoreFds
+            -1,
+            {}
         );
     }
+
+    vkQueueWaitIdle(queue);
 
     for (size_t i = 0;
          i < (conf.multiplier - 1);
@@ -412,10 +380,6 @@ VkResult LsContext::present(
             info.queue.second,
             {
                 pass.acquireSemaphores
-                    .at(i)
-                    .handle(),
-
-                pass.renderSemaphores
                     .at(i)
                     .handle()
             },
