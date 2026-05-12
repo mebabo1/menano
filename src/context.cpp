@@ -40,45 +40,36 @@ LsContext::LsContext(
         : VK_FORMAT_R16G16B16A16_SFLOAT;
 
     /* =========================
-     * INPUT IMAGES
+     * INPUT
      * ========================= */
     std::array<int, 2> fds{};
 
-    frame_0 = Mini::Image(
-        info.device, info.physicalDevice,
-        extent, format,
+    frame_0 = Mini::Image(info.device, info.physicalDevice, extent, format,
         VK_IMAGE_USAGE_TRANSFER_DST_BIT |
         VK_IMAGE_USAGE_SAMPLED_BIT |
         VK_IMAGE_USAGE_STORAGE_BIT,
         VK_IMAGE_ASPECT_COLOR_BIT,
-        &fds.at(0)
-    );
+        &fds.at(0));
 
-    frame_1 = Mini::Image(
-        info.device, info.physicalDevice,
-        extent, format,
+    frame_1 = Mini::Image(info.device, info.physicalDevice, extent, format,
         VK_IMAGE_USAGE_TRANSFER_DST_BIT |
         VK_IMAGE_USAGE_SAMPLED_BIT |
         VK_IMAGE_USAGE_STORAGE_BIT,
         VK_IMAGE_ASPECT_COLOR_BIT,
-        &fds.at(1)
-    );
+        &fds.at(1));
 
     /* =========================
-     * OUTPUT IMAGES
+     * OUTPUT
      * ========================= */
     std::vector<int> outFds(conf.multiplier - 1);
 
     for (size_t i = 0; i < conf.multiplier - 1; ++i) {
-        out_n.emplace_back(
-            info.device, info.physicalDevice,
-            extent, format,
+        out_n.emplace_back(info.device, info.physicalDevice, extent, format,
             VK_IMAGE_USAGE_TRANSFER_SRC_BIT |
             VK_IMAGE_USAGE_SAMPLED_BIT |
             VK_IMAGE_USAGE_STORAGE_BIT,
             VK_IMAGE_ASPECT_COLOR_BIT,
-            &outFds.at(i)
-        );
+            &outFds.at(i));
     }
 
     /* =========================
@@ -106,15 +97,13 @@ LsContext::LsContext(
     );
 
     lsfgCtxId = std::shared_ptr<int32_t>(
-        new int32_t(
-            lsfgCreateContext(
-                fds.at(0),
-                fds.at(1),
-                outFds,
-                extent,
-                format
-            )
-        ),
+        new int32_t(lsfgCreateContext(
+            fds.at(0),
+            fds.at(1),
+            outFds,
+            extent,
+            format
+        )),
         [lsfgDeleteContext](const int32_t* id) {
             lsfgDeleteContext(*id);
         }
@@ -177,6 +166,9 @@ VkResult LsContext::present(
 
     pass.preCopyBuf.end();
 
+    /* 🔥 FIX: stable semaphore variable */
+    VkSemaphore preCopyWait = pass.preCopySemaphores.at(1).handle();
+
     pass.preCopyBuf.submit(
         info.queue.second,
         gameRenderSemaphores,
@@ -187,30 +179,25 @@ VkResult LsContext::present(
     );
 
     /* =========================
-     * LSFG ENABLE CHECK
+     * FALLBACK CHECK
      * ========================= */
-    if (preCopyFd < 0) {
+    if (preCopyFd < 0)
         lsfgEnabled = false;
-    }
 
-    /* =====================================================
-     * ⭐ FALLBACK PATH (핵심 수정)
-     * ===================================================== */
     if (!lsfgEnabled) {
+        std::cerr << "lsfg-vk: fallback active" << std::endl;
 
-        std::cerr << "lsfg-vk: fallback active (direct present)" << std::endl;
-
-        VkPresentInfoKHR fallbackPresent{
+        VkPresentInfoKHR fallback{
             .sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR,
             .pNext = pNext,
             .waitSemaphoreCount = 1,
-            .pWaitSemaphores = &pass.preCopySemaphores.at(1).handle(),
+            .pWaitSemaphores = &preCopyWait,
             .swapchainCount = 1,
             .pSwapchains = &swapchain,
             .pImageIndices = &presentIdx
         };
 
-        auto res = Layer::ovkQueuePresentKHR(queue, &fallbackPresent);
+        auto res = Layer::ovkQueuePresentKHR(queue, &fallback);
 
         frameIdx++;
         return res;
@@ -226,14 +213,13 @@ VkResult LsContext::present(
             Mini::Semaphore(info.device, &renderFds.at(i));
     }
 
-    if (conf.performance) {
+    if (conf.performance)
         LSFG_3_1P::presentContext(*lsfgCtxId, preCopyFd, renderFds);
-    } else {
+    else
         LSFG_3_1::presentContext(*lsfgCtxId, preCopyFd, renderFds);
-    }
 
     /* =========================
-     * PRESENT GENERATED FRAMES
+     * PRESENT LOOP
      * ========================= */
     for (size_t i = 0; i < conf.multiplier - 1; i++) {
 
