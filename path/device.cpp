@@ -14,12 +14,12 @@
 using namespace LSFG::Core;
 
 /*
- * Minimal required extensions (clean & correct)
+ * INTERNAL-ONLY FRAMEGEN
+ * → swapchain + internal Vulkan sync only
+ * → no FD / no external semaphore
  */
 const std::vector<const char*> requiredExtensions = {
-    "VK_KHR_swapchain",
-    "VK_KHR_external_memory_fd",
-    "VK_KHR_external_semaphore_fd"
+    "VK_KHR_swapchain"
 };
 
 Device::Device(
@@ -105,7 +105,7 @@ Device::Device(
     std::optional<uint32_t> queueFamily;
 
     for (uint32_t i = 0; i < familyCount; i++) {
-        auto flags = families[i].queueFlags;
+        const auto flags = families[i].queueFlags;
 
         if ((flags & VK_QUEUE_GRAPHICS_BIT) &&
             (flags & VK_QUEUE_COMPUTE_BIT)) {
@@ -156,48 +156,9 @@ Device::Device(
         "FP32 fallback") << std::endl;
 
     /* -----------------------------------------------------
-     * 5. External semaphore capability query (DEBUG ENHANCED)
+     * 5. IMPORTANT: NO external semaphore probing
      * ----------------------------------------------------- */
-    VkPhysicalDeviceExternalSemaphoreInfo semInfo{
-        .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_EXTERNAL_SEMAPHORE_INFO,
-        .handleType = VK_EXTERNAL_SEMAPHORE_HANDLE_TYPE_OPAQUE_FD_BIT
-    };
-
-    VkExternalSemaphoreProperties semProps{
-        .sType = VK_STRUCTURE_TYPE_EXTERNAL_SEMAPHORE_PROPERTIES
-    };
-
-    vkGetPhysicalDeviceExternalSemaphoreProperties(
-        *physicalDevice,
-        &semInfo,
-        &semProps);
-
-    std::cerr << "---- External Semaphore Capability ----" << std::endl;
-    std::cerr << "exportable: "
-              << ((semProps.externalSemaphoreFeatures &
-                   VK_EXTERNAL_SEMAPHORE_FEATURE_EXPORTABLE_BIT) ? "YES" : "NO")
-              << std::endl;
-
-    std::cerr << "importable: "
-              << ((semProps.externalSemaphoreFeatures &
-                   VK_EXTERNAL_SEMAPHORE_FEATURE_IMPORTABLE_BIT) ? "YES" : "NO")
-              << std::endl;
-
-    std::cerr << "exportable fd type supported: "
-              << ((semProps.exportFromImportedHandleTypes &
-                   VK_EXTERNAL_SEMAPHORE_HANDLE_TYPE_OPAQUE_FD_BIT) ? "YES" : "NO")
-              << std::endl;
-
-    std::cerr << "importable fd type supported: "
-              << ((semProps.compatibleHandleTypes &
-                   VK_EXTERNAL_SEMAPHORE_HANDLE_TYPE_OPAQUE_FD_BIT) ? "YES" : "NO")
-              << std::endl;
-
-    bool supportsFdSemaphore =
-        (semProps.externalSemaphoreFeatures &
-         VK_EXTERNAL_SEMAPHORE_FEATURE_EXPORTABLE_BIT) &&
-        (semProps.externalSemaphoreFeatures &
-         VK_EXTERNAL_SEMAPHORE_FEATURE_IMPORTABLE_BIT);
+    std::cerr << "Internal-only framegen mode enabled" << std::endl;
 
     /* -----------------------------------------------------
      * 6. Queue create
@@ -212,7 +173,7 @@ Device::Device(
     };
 
     /* -----------------------------------------------------
-     * 7. Vulkan features chain
+     * 7. Vulkan 1.3 features
      * ----------------------------------------------------- */
     VkPhysicalDeviceVulkan13Features features13{
         .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_3_FEATURES,
@@ -251,11 +212,20 @@ Device::Device(
         throw LSFG::vulkan_error(res, "Device creation failed");
     }
 
+    /* -----------------------------------------------------
+     * 9. Load volk
+     * ----------------------------------------------------- */
     volkLoadDevice(deviceHandle);
 
+    /* -----------------------------------------------------
+     * 10. Get queue
+     * ----------------------------------------------------- */
     VkQueue queue{};
     vkGetDeviceQueue(deviceHandle, *queueFamily, 0, &queue);
 
+    /* -----------------------------------------------------
+     * 11. Store
+     * ----------------------------------------------------- */
     this->computeQueue = queue;
     this->computeFamilyIdx = *queueFamily;
     this->physicalDevice = *physicalDevice;
