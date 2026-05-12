@@ -17,8 +17,8 @@
 #include <memory>
 #include <string>
 #include <array>
-
 #include <cstring>
+
 #include <sys/mman.h>
 #include <sys/stat.h>
 #include <fcntl.h>
@@ -40,7 +40,7 @@ LsContext::LsContext(const Hooks::DeviceInfo& info, VkSwapchainKHR swapchain,
         ? VK_FORMAT_R8G8B8A8_UNORM
         : VK_FORMAT_R16G16B16A16_SFLOAT;
 
-    std::array<int, 2> fds{};
+    std::array<int, 2> fds{ -1, -1 };
 
     frame_0 = Mini::Image(
         info.device, info.physicalDevice, extent, format,
@@ -112,6 +112,9 @@ LsContext::LsContext(const Hooks::DeviceInfo& info, VkSwapchainKHR swapchain,
 
         std::string base = "/data/data/com.termux/files/usr/tmp/lsfg_";
 
+        shmInputs.clear();
+        shmOutputs.clear();
+
         for (int i = 0; i < conf.multiplier - 1; i++) {
 
             std::string inName = base + "in_" + std::to_string(i);
@@ -120,17 +123,21 @@ LsContext::LsContext(const Hooks::DeviceInfo& info, VkSwapchainKHR swapchain,
             int shmIn = shm_open(inName.c_str(), O_CREAT | O_RDWR, 0666);
             int shmOut = shm_open(outName.c_str(), O_CREAT | O_RDWR, 0666);
 
-            if (ftruncate(shmIn, shmFrameSize) != 0)
-                throw std::runtime_error("ftruncate shmIn failed");
+            if (shmIn < 0 || shmOut < 0)
+                throw std::runtime_error("shm_open failed");
 
-            if (ftruncate(shmOut, shmFrameSize) != 0)
-                throw std::runtime_error("ftruncate shmOut failed");
+            if (ftruncate(shmIn, shmFrameSize) != 0 ||
+                ftruncate(shmOut, shmFrameSize) != 0)
+                throw std::runtime_error("ftruncate failed");
 
             void* inPtr = mmap(nullptr, shmFrameSize,
                 PROT_READ | PROT_WRITE, MAP_SHARED, shmIn, 0);
 
             void* outPtr = mmap(nullptr, shmFrameSize,
                 PROT_READ | PROT_WRITE, MAP_SHARED, shmOut, 0);
+
+            if (inPtr == MAP_FAILED || outPtr == MAP_FAILED)
+                throw std::runtime_error("mmap failed");
 
             shmInputs.push_back(inPtr);
             shmOutputs.push_back(outPtr);
