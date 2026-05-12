@@ -33,6 +33,25 @@ private:
         SHM
     };
 
+    struct ShmBuffer {
+        int fd = -1;
+        void* ptr = nullptr;
+        size_t size = 0;
+    };
+
+    struct RenderPassInfo {
+        Mini::CommandBuffer preCopyBuf;
+        std::array<Mini::Semaphore, 2> preCopySemaphores;
+
+        std::vector<Mini::Semaphore> renderSemaphores;
+        std::vector<Mini::Semaphore> acquireSemaphores;
+
+        std::vector<Mini::CommandBuffer> postCopyBufs;
+        std::vector<Mini::Semaphore> postCopySemaphores;
+        std::vector<Mini::Semaphore> prevPostCopySemaphores;
+    };
+
+private:
     VkSwapchainKHR swapchain;
     std::vector<VkImage> swapchainImages;
     VkExtent2D extent;
@@ -54,27 +73,14 @@ private:
 
     size_t shmFrameSize{0};
 
-    struct ShmBuffer {
-        int fd = -1;
-        void* ptr = nullptr;
-        size_t size = 0;
-    };
-
     ShmBuffer shm[2];
 
+    std::vector<void*> shmInputs;
+    std::vector<void*> shmOutputs;
+
+    bool lsfgInitialized{false};
+
     void uploadShmToGPU(void* src, Mini::Image& dst);
-
-    struct RenderPassInfo {
-        Mini::CommandBuffer preCopyBuf;
-        std::array<Mini::Semaphore, 2> preCopySemaphores;
-
-        std::vector<Mini::Semaphore> renderSemaphores;
-        std::vector<Mini::Semaphore> acquireSemaphores;
-
-        std::vector<Mini::CommandBuffer> postCopyBufs;
-        std::vector<Mini::Semaphore> postCopySemaphores;
-        std::vector<Mini::Semaphore> prevPostCopySemaphores;
-    };
 
     std::array<RenderPassInfo, 8> passInfos;
 };
