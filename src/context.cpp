@@ -175,8 +175,6 @@ VkResult LsContext::present(
 
     pass.preCopyBuf.end();
 
-    VkSemaphore preCopySignal = pass.preCopySemaphores.at(1).handle();
-
     pass.preCopyBuf.submit(
         info.queue.second,
         gameRenderSemaphores,
@@ -186,13 +184,13 @@ VkResult LsContext::present(
         }
     );
 
+    VkSemaphore preCopySignal = pass.preCopySemaphores.at(1).handle();
+
     /* =========================
-     * LSFG ALWAYS RUN
-     * =========================
-     * 핵심 변경:
-     * fd 실패 = LSFG OFF ❌
-     * fd 실패 = internal sync mode ⭕
-     */
+     * INTERNAL / EXTERNAL MODE
+     * ========================= */
+    bool externalSync = (preCopyFd >= 0);
+
     std::vector<int> renderFds(conf.multiplier - 1);
 
     for (size_t i = 0; i < conf.multiplier - 1; ++i) {
@@ -200,13 +198,26 @@ VkResult LsContext::present(
             Mini::Semaphore(info.device, &renderFds.at(i));
     }
 
-    LSFG_3_1::presentContext(*lsfgCtxId, preCopyFd, renderFds);
-
     /* =========================
-     * FALLBACK ONLY FOR PRESENT
+     * LSFG EXECUTION (ALWAYS ON)
      * ========================= */
-    if (preCopyFd < 0) {
-        std::cerr << "lsfg-vk: internal sync mode (no external fd)" << std::endl;
+    if (externalSync) {
+
+        LSFG_3_1::presentContext(
+            *lsfgCtxId,
+            preCopyFd,
+            renderFds
+        );
+
+    } else {
+
+        std::cerr << "lsfg-vk: INTERNAL LSFG MODE (no fd sync)" << std::endl;
+
+        LSFG_3_1::presentContext(
+            *lsfgCtxId,
+            -1,
+            renderFds
+        );
     }
 
     /* =========================
