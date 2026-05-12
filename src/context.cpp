@@ -27,6 +27,8 @@
 #include <linux/memfd.h>
 #include <sys/syscall.h>
 
+#include <iostream>
+
 static int createSharedFd(size_t size) {
 
     int fd = syscall(
@@ -53,8 +55,7 @@ LsContext::LsContext(
         const std::vector<VkImage>& swapchainImages)
         : swapchain(swapchain),
           swapchainImages(swapchainImages),
-          extent(extent),
-          info(info) {
+          extent(extent) {
 
     if (!Config::currentConf.has_value())
         throw std::runtime_error("No configuration set");
@@ -66,14 +67,14 @@ LsContext::LsContext(
         ? VK_FORMAT_R16G16B16A16_SFLOAT
         : VK_FORMAT_R8G8B8A8_UNORM;
 
+    /*
+     * create fallback shared fds
+     */
+
     size_t shmSize =
         extent.width *
         extent.height *
         4;
-
-    /*
-     * create fallback shared fds
-     */
 
     std::array<int, 2> fds{
         createSharedFd(shmSize),
@@ -96,7 +97,7 @@ LsContext::LsContext(
     for (auto fd : outFds)
         fdValid &= (fd >= 0);
 
-    useShmFallback = !fdValid;
+    bool useShmFallback = !fdValid;
 
     std::cerr
         << "frame fd0 = "
@@ -108,34 +109,11 @@ LsContext::LsContext(
         << fds[1]
         << std::endl;
 
-    if (!fdValid) {
+    if (useShmFallback) {
 
         std::cerr
             << "lsfg-vk: shared fd fallback failed"
             << std::endl;
-
-        for (int i = 0; i < 2; i++) {
-
-            shm[i].fd =
-                shm_open(
-                    "/lsfg_shm",
-                    O_CREAT | O_RDWR,
-                    0666
-                );
-
-            ftruncate(shm[i].fd, shmSize);
-
-            shm[i].size = shmSize;
-
-            shm[i].ptr = mmap(
-                nullptr,
-                shmSize,
-                PROT_READ | PROT_WRITE,
-                MAP_SHARED,
-                shm[i].fd,
-                0
-            );
-        }
     }
 
     /*
