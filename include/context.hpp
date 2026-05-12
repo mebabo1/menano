@@ -75,10 +75,11 @@ private:
 
     ShmBuffer shm[2];
 
+    bool fdAvailable{false};
+    bool lsfgInitialized{false};
+
     std::vector<void*> shmInputs;
     std::vector<void*> shmOutputs;
-
-    bool lsfgInitialized{false};
 
     void uploadShmToGPU(void* src, Mini::Image& dst);
 
