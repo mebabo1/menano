@@ -38,7 +38,7 @@ LsContext::LsContext(
     const VkFormat format =
         conf.hdr
             ? VK_FORMAT_R16G16B16A16_SFLOAT
-            : VK_FORMAT_R8G8B8A8_UNORM;
+            : VK_FORMAT_B8G8R8A8_UNORM;
 
     std::array<int, 2> fds{
         -1,
@@ -115,10 +115,6 @@ LsContext::LsContext(
         fdValid &= (fd >= 0);
 
     if (!fdValid) {
-
-        std::cerr
-            << "lsfg-vk: external memory export failed"
-            << std::endl;
 
         throw std::runtime_error(
             "External Vulkan memory export unavailable"
@@ -209,6 +205,8 @@ LsContext::LsContext(
         pass.prevPostCopySemaphores.resize(
             conf.multiplier - 1
         );
+
+        pass.preCopySemaphores.resize(2);
     }
 }
 
@@ -229,9 +227,12 @@ VkResult LsContext::present(
             this->frameIdx % 8
         );
 
+    int preCopySemaphoreFd{-1};
+
     pass.preCopySemaphores.at(0) =
         Mini::Semaphore(
-            info.device
+            info.device,
+            &preCopySemaphoreFd
         );
 
     pass.preCopySemaphores.at(1) =
@@ -257,8 +258,8 @@ VkResult LsContext::present(
             : this->frame_1.handle(),
         this->extent.width,
         this->extent.height,
-        VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
-        VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
+        VK_PIPELINE_STAGE_TRANSFER_BIT,
+        VK_PIPELINE_STAGE_TRANSFER_BIT,
         true,
         false
     );
@@ -287,26 +288,48 @@ VkResult LsContext::present(
         }
     );
 
-    vkQueueWaitIdle(queue);
+    if (preCopySemaphoreFd < 0) {
+
+        vkQueueWaitIdle(queue);
+    }
+
+    std::vector<int> renderSemaphoreFds(
+        conf.multiplier - 1,
+        -1
+    );
+
+    for (size_t i = 0;
+         i < (conf.multiplier - 1);
+         ++i) {
+
+        pass.renderSemaphores.at(i) =
+            Mini::Semaphore(
+                info.device,
+                &renderSemaphoreFds.at(i)
+            );
+    }
 
     if (conf.performance) {
 
         LSFG_3_1P::presentContext(
             *this->lsfgCtxId,
-            -1,
-            {}
+            preCopySemaphoreFd,
+            renderSemaphoreFds
         );
 
     } else {
 
         LSFG_3_1::presentContext(
             *this->lsfgCtxId,
-            -1,
-            {}
+            preCopySemaphoreFd,
+            renderSemaphoreFds
         );
     }
 
-    vkQueueWaitIdle(queue);
+    if (renderSemaphoreFds.at(0) < 0) {
+
+        vkQueueWaitIdle(queue);
+    }
 
     for (size_t i = 0;
          i < (conf.multiplier - 1);
@@ -368,21 +391,32 @@ VkResult LsContext::present(
             ),
             this->extent.width,
             this->extent.height,
-            VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
-            VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
+            VK_PIPELINE_STAGE_TRANSFER_BIT,
+            VK_PIPELINE_STAGE_TRANSFER_BIT,
             false,
             true
         );
 
         pass.postCopyBufs.at(i).end();
 
-        pass.postCopyBufs.at(i).submit(
-            info.queue.second,
-            {
-                pass.acquireSemaphores
+        std::vector<VkSemaphore> submitWaits{
+            pass.acquireSemaphores
+                .at(i)
+                .handle()
+        };
+
+        if (renderSemaphoreFds.at(i) >= 0) {
+
+            submitWaits.emplace_back(
+                pass.renderSemaphores
                     .at(i)
                     .handle()
-            },
+            );
+        }
+
+        pass.postCopyBufs.at(i).submit(
+            info.queue.second,
+            submitWaits,
             {
                 pass.postCopySemaphores
                     .at(i)
