@@ -55,7 +55,7 @@ Root::Root() {
     const auto& profile = findProfile(this->config.get(), ls::identify());
 
     if (!profile.has_value()) {
-        std::cerr << "lsfg-vk: profile NOT found -> exit ctor early\n";
+        std::cerr << "lsfg-vk: profile NOT found\n";
         return;
     }
 
@@ -63,21 +63,20 @@ Root::Root() {
 
     this->active_profile = profile->second;
 
-    std::cerr << "lsfg-vk: using profile name = '"
-              << this->active_profile->name << "'\n";
+    std::cerr << "lsfg-vk: using profile = " << this->active_profile->name << "\n";
 
     switch (profile->first) {
         case ls::IdentType::OVERRIDE:
-            std::cerr << "lsfg-vk: ident = OVERRIDE\n";
+            std::cerr << "lsfg-vk: ident OVERRIDE\n";
             break;
         case ls::IdentType::EXECUTABLE:
-            std::cerr << "lsfg-vk: ident = EXECUTABLE\n";
+            std::cerr << "lsfg-vk: ident EXECUTABLE\n";
             break;
         case ls::IdentType::WINE_EXECUTABLE:
-            std::cerr << "lsfg-vk: ident = WINE_EXECUTABLE\n";
+            std::cerr << "lsfg-vk: ident WINE_EXECUTABLE\n";
             break;
         case ls::IdentType::PROCESS_NAME:
-            std::cerr << "lsfg-vk: ident = PROCESS_NAME\n";
+            std::cerr << "lsfg-vk: ident PROCESS_NAME\n";
             break;
     }
 
@@ -85,24 +84,20 @@ Root::Root() {
 }
 
 bool Root::update() {
-    std::cerr << "lsfg-vk: update() enter\n";
+    std::cerr << "lsfg-vk: update enter\n";
 
     if (!this->config.update()) {
-        std::cerr << "lsfg-vk: config.update FAILED\n";
+        std::cerr << "lsfg-vk: config update FAIL\n";
         return false;
     }
 
     const auto& profile = findProfile(this->config.get(), ls::identify());
 
-    if (profile.has_value()) {
-        std::cerr << "lsfg-vk: update profile FOUND\n";
-        this->active_profile = profile->second;
-    } else {
-        std::cerr << "lsfg-vk: update profile NOT FOUND\n";
-        this->active_profile = std::nullopt;
-    }
+    this->active_profile = profile.has_value()
+        ? profile->second
+        : std::nullopt;
 
-    std::cerr << "lsfg-vk: update() exit\n";
+    std::cerr << "lsfg-vk: update exit\n";
     return true;
 }
 
@@ -110,15 +105,12 @@ void Root::modifyInstanceCreateInfo(
     VkInstanceCreateInfo& createInfo,
     const std::function<void(void)>& finish
 ) const {
-    std::cerr << "lsfg-vk: modifyInstanceCreateInfo enter\n";
+    std::cerr << "lsfg-vk: instance modify\n";
 
     if (!this->active_profile.has_value()) {
-        std::cerr << "lsfg-vk: no active profile -> skip instance patch\n";
         finish();
         return;
     }
-
-    std::cerr << "lsfg-vk: injecting instance extensions\n";
 
     auto extensions = add_extensions(
         createInfo.ppEnabledExtensionNames,
@@ -133,26 +125,19 @@ void Root::modifyInstanceCreateInfo(
     createInfo.enabledExtensionCount = (uint32_t)extensions.size();
     createInfo.ppEnabledExtensionNames = extensions.data();
 
-    std::cerr << "lsfg-vk: instance extensions injected = "
-              << extensions.size() << "\n";
-
     finish();
-    std::cerr << "lsfg-vk: modifyInstanceCreateInfo exit\n";
 }
 
 void Root::modifyDeviceCreateInfo(
     VkDeviceCreateInfo& createInfo,
     const std::function<void(void)>& finish
 ) const {
-    std::cerr << "lsfg-vk: modifyDeviceCreateInfo enter\n";
+    std::cerr << "lsfg-vk: device modify enter\n";
 
     if (!this->active_profile.has_value()) {
-        std::cerr << "lsfg-vk: no active profile -> skip device patch\n";
         finish();
         return;
     }
-
-    std::cerr << "lsfg-vk: injecting device extensions\n";
 
     auto extensions = add_extensions(
         createInfo.ppEnabledExtensionNames,
@@ -167,50 +152,25 @@ void Root::modifyDeviceCreateInfo(
     createInfo.enabledExtensionCount = (uint32_t)extensions.size();
     createInfo.ppEnabledExtensionNames = extensions.data();
 
-    std::cerr << "lsfg-vk: device extensions injected = "
-              << extensions.size() << "\n";
+    bool found = false;
 
-    bool isFeatureEnabled = false;
+    auto* p = reinterpret_cast<VkBaseInStructure*>(createInfo.pNext);
 
-    auto* featureInfo =
-        reinterpret_cast<VkBaseInStructure*>(const_cast<void*>(createInfo.pNext));
+    while (p) {
+        std::cerr << "lsfg-vk: feature sType=" << p->sType << "\n";
 
-    std::cerr << "lsfg-vk: walking feature chain\n";
-
-    while (featureInfo) {
-        std::cerr << "lsfg-vk: feature sType = " << featureInfo->sType << "\n";
-
-        if (featureInfo->sType == VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES) {
-            auto* features = reinterpret_cast<VkPhysicalDeviceVulkan12Features*>(featureInfo);
-            features->timelineSemaphore = VK_TRUE;
-            isFeatureEnabled = true;
-        } else if (featureInfo->sType ==
-                   VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_TIMELINE_SEMAPHORE_FEATURES) {
-            auto* features =
-                reinterpret_cast<VkPhysicalDeviceTimelineSemaphoreFeatures*>(featureInfo);
-            features->timelineSemaphore = VK_TRUE;
-            isFeatureEnabled = true;
+        if (p->sType == VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES) {
+            auto* f = reinterpret_cast<VkPhysicalDeviceVulkan12Features*>(p);
+            f->timelineSemaphore = VK_TRUE;
+            found = true;
         }
 
-        featureInfo = const_cast<VkBaseInStructure*>(featureInfo->pNext);
+        p = (VkBaseInStructure*)p->pNext;
     }
 
-    std::cerr << "lsfg-vk: timeline feature enabled = "
-              << (isFeatureEnabled ? "YES" : "NO") << "\n";
-
-    VkPhysicalDeviceTimelineSemaphoreFeatures timelineFeatures{
-        .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_TIMELINE_SEMAPHORE_FEATURES,
-        .pNext = const_cast<void*>(createInfo.pNext),
-        .timelineSemaphore = VK_TRUE
-    };
-
-    if (!isFeatureEnabled) {
-        std::cerr << "lsfg-vk: forcing timeline feature struct\n";
-        createInfo.pNext = &timelineFeatures;
-    }
+    std::cerr << "lsfg-vk: timeline found=" << found << "\n";
 
     finish();
-    std::cerr << "lsfg-vk: modifyDeviceCreateInfo exit\n";
 }
 
 void Root::modifySwapchainCreateInfo(
@@ -218,15 +178,7 @@ void Root::modifySwapchainCreateInfo(
     VkSwapchainCreateInfoKHR& createInfo,
     const std::function<void(void)>& finish
 ) const {
-    std::cerr << "lsfg-vk: modifySwapchainCreateInfo enter\n";
-
-    if (!this->active_profile.has_value()) {
-        std::cerr << "lsfg-vk: no profile -> skip swapchain patch\n";
-        finish();
-        return;
-    }
-
-    std::cerr << "lsfg-vk: querying surface caps\n";
+    std::cerr << "lsfg-vk: swapchain modify\n";
 
     VkSurfaceCapabilitiesKHR caps{};
     auto res = vk.fi().GetPhysicalDeviceSurfaceCapabilitiesKHR(
@@ -235,17 +187,16 @@ void Root::modifySwapchainCreateInfo(
         &caps
     );
 
-    if (res != VK_SUCCESS) {
-        std::cerr << "lsfg-vk: surface caps FAILED\n";
-        throw ls::vulkan_error(res, "vkGetPhysicalDeviceSurfaceCapabilitiesKHR() failed");
-    }
+    if (res != VK_SUCCESS)
+        throw ls::vulkan_error(res, "surface caps fail");
 
-    std::cerr << "lsfg-vk: surface caps OK\n";
-
-    context_ModifySwapchainCreateInfo(*this->active_profile, caps.maxImageCount, createInfo);
+    context_ModifySwapchainCreateInfo(
+        *this->active_profile,
+        caps.maxImageCount,
+        createInfo
+    );
 
     finish();
-    std::cerr << "lsfg-vk: modifySwapchainCreateInfo exit\n";
 }
 
 void Root::createSwapchainContext(
@@ -253,78 +204,60 @@ void Root::createSwapchainContext(
     VkSwapchainKHR swapchain,
     const SwapchainInfo& info
 ) {
-    std::cerr << "lsfg-vk: createSwapchainContext ENTER\n";
+    std::cerr << "lsfg-vk: swapchain context enter\n";
 
-    if (!this->active_profile.has_value()) {
-        std::cerr << "lsfg-vk: NO ACTIVE PROFILE -> crash path\n";
-        throw ls::error("attempted to create swapchain context while layer is inactive");
-    }
+    if (!this->active_profile.has_value())
+        throw ls::error("inactive profile");
 
     const auto& profile = *this->active_profile;
 
-    std::cerr << "lsfg-vk: swapchain context profile OK\n";
-
     if (!this->backend.has_value()) {
-        std::cerr << "lsfg-vk: backend not created -> creating\n";
+        std::cerr << "lsfg-vk: backend init\n";
 
         const auto& global = this->config.get().global();
 
         setenv("DISABLE_LSFGVK", "1", 1);
 
         try {
-            std::string dll{};
+            std::string dll =
+                global.dll.has_value() ? *global.dll : ls::findShaderDll();
 
-            if (global.dll.has_value())
-                dll = *global.dll;
-            else
-                dll = ls::findShaderDll();
-
-            std::cerr << "lsfg-vk: shader dll = " << dll << "\n";
+            std::cerr << "lsfg-vk: dll=" << dll << "\n";
 
             this->backend.emplace(
                 [gpu = profile.gpu](
-                    const std::string& deviceName,
+                    const std::string& name,
                     std::pair<const std::string&, const std::string&> ids,
                     const std::optional<std::string>& pci
                 ) {
-                    std::cerr << "lsfg-vk: probing device\n"
-                              << " name=" << deviceName << "\n"
-                              << " ids=" << ids.first << ":" << ids.second << "\n"
-                              << " pci=" << (pci ? *pci : "none") << "\n";
+                    std::cerr << "lsfg-vk: probe " << name << "\n";
 
                     if (!gpu)
                         return true;
 
-                    return (deviceName == *gpu) ||
-                           (ids.first + ":" + ids.second == *gpu) ||
-                           (pci && *pci == *gpu);
+                    return (name == *gpu);
                 },
                 dll,
                 global.allow_fp16
             );
 
-            std::cerr << "lsfg-vk: backend created OK\n";
-
-        } catch (const std::exception& e) {
+        } catch (...) {
             unsetenv("DISABLE_LSFGVK");
-            std::cerr << "lsfg-vk: backend creation FAILED\n";
-            throw ls::error("failed to create backend instance", e);
+            throw;
         }
 
         unsetenv("DISABLE_LSFGVK");
     }
-
-    std::cerr << "lsfg-vk: emplacing swapchain\n";
 
     this->swapchains.emplace(
         swapchain,
         Swapchain(vk, this->backend.mut(), profile, info)
     );
 
-    std::cerr << "lsfg-vk: createSwapchainContext EXIT\n";
+    std::cerr << "lsfg-vk: swapchain context exit\n";
 }
 
 void Root::removeSwapchainContext(VkSwapchainKHR swapchain) {
-    std::cerr << "lsfg-vk: removeSwapchainContext\n";
+    std::cerr << "lsfg-vk: swapchain remove\n";
     this->swapchains.erase(swapchain);
 }
