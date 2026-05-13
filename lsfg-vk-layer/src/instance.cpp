@@ -194,6 +194,11 @@ void Root::createSwapchainContext(const vk::Vulkan& vk,
                     std::pair<const std::string&, const std::string&> ids,
                     const std::optional<std::string>& pci
                 ) {
+                    std::cerr
+                        << "lsfg-vk: probing device\n"
+                        << "  name: " << deviceName << "\n"
+                        << "  ids: " << ids.first << ":" << ids.second << "\n"
+                        << "  pci: " << (pci ? *pci : "none") << "\n";
                     if (!gpu)
                         return true;
 
