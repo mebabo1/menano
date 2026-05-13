@@ -203,8 +203,8 @@ void Root::modifyDeviceCreateInfo(
     bool foundTimeline = false;
 
     auto* featureInfo =
-        reinterpret_cast<VkBaseInStructure*>(
-            const_cast<void*>(createInfo.pNext));
+        const_cast<VkBaseInStructure*>(
+            featureInfo->pNext);
 
     uint32_t index = 0;
 
