@@ -1,0 +1,79 @@
+name: Build LSFG-VK-AFMF
+
+on:
+  push:
+    branches: [ main, master, develop, foundation ]
+  pull_request:
+    branches: [ main, master, develop, foundation ]
+  workflow_dispatch:
+
+jobs:
+  build-linux:
+    runs-on: ubuntu-22.04
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        submodules: recursive
+    
+    - name: Install dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y \
+          build-essential \
+          cmake \
+          ninja-build \
+          clang \
+          clang-tidy \
+          libvulkan-dev \
+          vulkan-tools \
+          vulkan-validationlayers-dev \
+          pkg-config \
+          git
+    
+    - name: Setup Build Directory
+      run: |
+        mkdir -p build
+        cd build
+    
+    - name: Configure CMake
+      run: |
+        cd build
+        cmake .. \
+          -G Ninja \
+          -DCMAKE_BUILD_TYPE=RelWithDebInfo \
+          -DCMAKE_CXX_COMPILER=aarch64-linux-gnu-g++ \
+          -DCMAKE_C_COMPILER=clang
+    
+    - name: Build
+      run: |
+        cd build
+        ninja -v
+    
+    - name: Check build artifacts
+      run: |
+        ls -la build/
+        file build/liblsfg-vk-afmf.so || echo "Library not found in expected location"
+        find build -name "*.so" -type f || echo "No shared libraries found"
+    
+    - name: Upload build artifacts
+      uses: actions/upload-artifact@v4
+      if: success()
+      with:
+        name: lsfg-vk-afmf-linux-x86_64
+        path: |
+          build/liblsfg-vk-afmf.so
+          build/compile_commands.json
+        retention-days: 7
+    
+    - name: Upload build logs on failure
+      uses: actions/upload-artifact@v4
+      if: failure()
+      with:
+        name: build-logs-failure
+        path: |
+          build/CMakeFiles/CMakeOutput.log
+          build/CMakeFiles/CMakeError.log
+          build/**/*.log
+        retention-days: 3
