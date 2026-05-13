@@ -14,6 +14,7 @@
 #include <functional>
 #include <iostream>
 #include <optional>
+#include <ranges>
 #include <string>
 #include <utility>
 #include <vector>
@@ -204,6 +205,10 @@ void Root::modifyDeviceCreateInfo(
         return;
     }
 
+    // -------------------------------------------------
+    // Extension storage must persist
+    // -------------------------------------------------
+
     this->deviceExtensionsStorage =
         add_extensions(
             createInfo.ppEnabledExtensionNames,
@@ -229,12 +234,15 @@ void Root::modifyDeviceCreateInfo(
         "extension count = "
         << createInfo.enabledExtensionCount);
 
+    // -------------------------------------------------
+    // Search pNext chain
+    // -------------------------------------------------
+
     bool foundTimeline = false;
 
-    const VkBaseInStructure* featureInfo =
-        reinterpret_cast<
-            const VkBaseInStructure*>(
-                createInfo.pNext);
+    VkBaseInStructure* featureInfo =
+        reinterpret_cast<VkBaseInStructure*>(
+            const_cast<void*>(createInfo.pNext));
 
     uint32_t index = 0;
 
@@ -254,9 +262,7 @@ void Root::modifyDeviceCreateInfo(
                 auto* features =
                     reinterpret_cast<
                         VkPhysicalDeviceVulkan12Features*>(
-                            const_cast<
-                                VkBaseInStructure*>(
-                                    featureInfo));
+                            featureInfo);
 
                 features->timelineSemaphore =
                     VK_TRUE;
@@ -274,9 +280,7 @@ void Root::modifyDeviceCreateInfo(
                 auto* features =
                     reinterpret_cast<
                         VkPhysicalDeviceTimelineSemaphoreFeatures*>(
-                            const_cast<
-                                VkBaseInStructure*>(
-                                    featureInfo));
+                            featureInfo);
 
                 features->timelineSemaphore =
                     VK_TRUE;
@@ -294,20 +298,38 @@ void Root::modifyDeviceCreateInfo(
         }
 
         featureInfo =
-            reinterpret_cast<
-                const VkBaseInStructure*>(
-                    featureInfo->pNext);
+            reinterpret_cast<VkBaseInStructure*>(
+                const_cast<void*>(featureInfo->pNext));
 
         index++;
     }
 
+    // -------------------------------------------------
+    // Inject persistent feature structure if missing
+    // -------------------------------------------------
+
     if (!foundTimeline) {
 
         LOG("Device",
-            "timeline semaphore feature NOT found");
+            "Timeline semaphore feature missing");
+
+        this->timelineSemaphoreFeaturesStorage.emplace(
+            VkPhysicalDeviceTimelineSemaphoreFeatures{
+                .sType =
+                    VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_TIMELINE_SEMAPHORE_FEATURES,
+
+                .pNext =
+                    const_cast<void*>(createInfo.pNext),
+
+                .timelineSemaphore =
+                    VK_TRUE
+            });
+
+        createInfo.pNext =
+            &(*this->timelineSemaphoreFeaturesStorage);
 
         LOG("Device",
-            "Skipping pNext injection for Wine safety");
+            "Injected persistent timeline semaphore feature");
     }
 
     finish();
