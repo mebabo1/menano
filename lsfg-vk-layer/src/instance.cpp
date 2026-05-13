@@ -29,7 +29,18 @@ namespace {
 #define LOG(tag, msg) \
     std::cerr << "[LSFG][" << tag << "] " << msg << std::endl
 
-/// helper function to add required extensions
+// =====================================================
+// SAFE EXTENSION STORAGE
+// prevents dangling ppEnabledExtensionNames
+// =====================================================
+
+thread_local std::vector<const char*> g_instanceExtensions;
+thread_local std::vector<const char*> g_deviceExtensions;
+
+// =====================================================
+// helper
+// =====================================================
+
 std::vector<const char*> add_extensions(
     const char* const* existingExtensions,
     size_t count,
@@ -40,18 +51,22 @@ std::vector<const char*> add_extensions(
     extensions.reserve(count + requiredExtensions.size());
 
     for (size_t i = 0; i < count; i++) {
-        if (existingExtensions[i]) {
-            extensions.push_back(existingExtensions[i]);
-        }
+
+        if (!existingExtensions[i])
+            continue;
+
+        extensions.push_back(existingExtensions[i]);
     }
 
     for (const auto& requiredExtension : requiredExtensions) {
 
         auto it = std::ranges::find_if(
             extensions,
-            [requiredExtension](const char* extension) {
+            [requiredExtension](const char* extension)
+            {
                 return extension
-                    && std::string(extension) == requiredExtension;
+                    && std::string(extension)
+                        == requiredExtension;
             });
 
         if (it == extensions.end()) {
@@ -96,19 +111,23 @@ Root::Root()
     switch (profile->first) {
 
         case ls::IdentType::OVERRIDE:
-            std::cerr << "(identified via override)\n";
+            std::cerr
+                << "(identified via override)\n";
             break;
 
         case ls::IdentType::EXECUTABLE:
-            std::cerr << "(identified via executable)\n";
+            std::cerr
+                << "(identified via executable)\n";
             break;
 
         case ls::IdentType::WINE_EXECUTABLE:
-            std::cerr << "(identified via wine executable)\n";
+            std::cerr
+                << "(identified via wine executable)\n";
             break;
 
         case ls::IdentType::PROCESS_NAME:
-            std::cerr << "(identified via process name)\n";
+            std::cerr
+                << "(identified via process name)\n";
             break;
     }
 
@@ -126,7 +145,8 @@ bool Root::update()
 
     if (profile.has_value()) {
         this->active_profile = profile->second;
-    } else {
+    }
+    else {
         this->active_profile = std::nullopt;
     }
 
@@ -144,11 +164,12 @@ void Root::modifyInstanceCreateInfo(
     LOG("Instance", "modify enter");
 
     if (!this->active_profile.has_value()) {
+
         finish();
         return;
     }
 
-    auto extensions = add_extensions(
+    g_instanceExtensions = add_extensions(
         createInfo.ppEnabledExtensionNames,
         createInfo.enabledExtensionCount,
         {
@@ -158,10 +179,11 @@ void Root::modifyInstanceCreateInfo(
         });
 
     createInfo.enabledExtensionCount =
-        static_cast<uint32_t>(extensions.size());
+        static_cast<uint32_t>(
+            g_instanceExtensions.size());
 
     createInfo.ppEnabledExtensionNames =
-        extensions.data();
+        g_instanceExtensions.data();
 
     LOG("Instance",
         "extension count = "
@@ -183,11 +205,12 @@ void Root::modifyDeviceCreateInfo(
     LOG("Device", "modify enter");
 
     if (!this->active_profile.has_value()) {
+
         finish();
         return;
     }
 
-    auto extensions = add_extensions(
+    g_deviceExtensions = add_extensions(
         createInfo.ppEnabledExtensionNames,
         createInfo.enabledExtensionCount,
         {
@@ -199,10 +222,11 @@ void Root::modifyDeviceCreateInfo(
         });
 
     createInfo.enabledExtensionCount =
-        static_cast<uint32_t>(extensions.size());
+        static_cast<uint32_t>(
+            g_deviceExtensions.size());
 
     createInfo.ppEnabledExtensionNames =
-        extensions.data();
+        g_deviceExtensions.data();
 
     LOG("Device",
         "extension count = "
@@ -214,9 +238,10 @@ void Root::modifyDeviceCreateInfo(
 
     bool foundTimeline = false;
 
-    auto* featureInfo =
-        reinterpret_cast<VkBaseInStructure*>(
-            const_cast<void*>(createInfo.pNext));
+    const VkBaseInStructure* featureInfo =
+        reinterpret_cast<
+            const VkBaseInStructure*>(
+                createInfo.pNext);
 
     uint32_t index = 0;
 
@@ -236,13 +261,14 @@ void Root::modifyDeviceCreateInfo(
                 auto* features =
                     reinterpret_cast<
                         VkPhysicalDeviceVulkan12Features*>(
-                            featureInfo);
-
-                LOG("Device",
-                    "Found Vulkan12Features");
+                            const_cast<VkBaseInStructure*>(
+                                featureInfo));
 
                 features->timelineSemaphore =
                     VK_TRUE;
+
+                LOG("Device",
+                    "Enabled Vulkan12 timelineSemaphore");
 
                 foundTimeline = true;
                 break;
@@ -253,13 +279,14 @@ void Root::modifyDeviceCreateInfo(
                 auto* features =
                     reinterpret_cast<
                         VkPhysicalDeviceTimelineSemaphoreFeatures*>(
-                            featureInfo);
-
-                LOG("Device",
-                    "Found TimelineSemaphoreFeatures");
+                            const_cast<VkBaseInStructure*>(
+                                featureInfo));
 
                 features->timelineSemaphore =
                     VK_TRUE;
+
+                LOG("Device",
+                    "Enabled TimelineSemaphore");
 
                 foundTimeline = true;
                 break;
@@ -270,19 +297,12 @@ void Root::modifyDeviceCreateInfo(
         }
 
         featureInfo =
-            reinterpret_cast<VkBaseInStructure*>(
-                const_cast<void*>(
-                    reinterpret_cast<const void*>(
-                        featureInfo->pNext)));
+            reinterpret_cast<
+                const VkBaseInStructure*>(
+                    featureInfo->pNext);
 
         index++;
     }
-
-    // =====================================================
-    // IMPORTANT:
-    // DO NOT inject stack/local pNext structs
-    // Wine Vulkan may crash on dangling chains.
-    // =====================================================
 
     if (!foundTimeline) {
 
@@ -310,6 +330,7 @@ void Root::modifySwapchainCreateInfo(
     LOG("Swapchain", "modify enter");
 
     if (!this->active_profile.has_value()) {
+
         finish();
         return;
     }
@@ -372,17 +393,17 @@ void Root::createSwapchainContext(
 
         try {
 
-            std::string dll{};
+            std::string dll;
 
             if (global.dll.has_value()) {
                 dll = *global.dll;
-            } else {
+            }
+            else {
                 dll = ls::findShaderDll().string();
             }
 
             LOG("Backend",
-                "dll = "
-                << dll);
+                "dll = " << dll);
 
             this->backend.emplace(
 
@@ -395,21 +416,16 @@ void Root::createSwapchainContext(
                 {
                     std::cerr
                         << "lsfg-vk: probing device\n"
-                        << "  name: "
-                        << deviceName
-                        << "\n"
+                        << "  name: " << deviceName << "\n"
                         << "  ids: "
-                        << ids.first
-                        << ":"
-                        << ids.second
-                        << "\n"
+                        << ids.first << ":"
+                        << ids.second << "\n"
                         << "  pci: "
                         << (pci ? *pci : "none")
                         << "\n";
 
-                    if (!gpu) {
+                    if (!gpu)
                         return true;
-                    }
 
                     return
                         (deviceName == *gpu)
@@ -440,7 +456,8 @@ void Root::createSwapchainContext(
             profile,
             info));
 
-    LOG("Backend", "createSwapchainContext exit");
+    LOG("Backend",
+        "createSwapchainContext exit");
 }
 
 // =====================================================
@@ -450,7 +467,8 @@ void Root::createSwapchainContext(
 void Root::removeSwapchainContext(
     VkSwapchainKHR swapchain)
 {
-    LOG("Swapchain", "remove context");
+    LOG("Swapchain",
+        "remove context");
 
     this->swapchains.erase(swapchain);
 }
