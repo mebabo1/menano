@@ -17,7 +17,6 @@
 #include <string>
 #include <utility>
 #include <vector>
-#include <filesystem>
 
 #include <vulkan/vulkan_core.h>
 
@@ -36,14 +35,14 @@ std::vector<const char*> add_extensions(
     std::vector<const char*> extensions(count);
     std::copy_n(existingExtensions, count, extensions.data());
 
-    for (const auto& req : requiredExtensions) {
+    for (const auto& requiredExtension : requiredExtensions) {
         auto it = std::ranges::find_if(extensions,
-            [&](const char* ext) {
-                return ext && std::string(ext) == req;
+            [&](const char* extension) {
+                return extension && std::string(extension) == requiredExtension;
             });
 
         if (it == extensions.end())
-            extensions.push_back(req);
+            extensions.push_back(requiredExtension);
     }
 
     return extensions;
@@ -56,35 +55,24 @@ std::vector<const char*> add_extensions(
 // =====================================================
 
 Root::Root() {
-    LOG("Root", "ctor");
-
     const auto& profile = findProfile(this->config.get(), ls::identify());
 
-    if (!profile.has_value()) {
-        LOG("Root", "no profile");
+    if (!profile.has_value())
         return;
-    }
 
     this->active_profile = profile->second;
 
-    LOG("Root", "profile = " << this->active_profile->name);
+    std::cerr << "lsfg-vk: using profile '" << this->active_profile->name << "'\n";
 }
 
 bool Root::update() {
-    LOG("Root", "update");
-
     if (!this->config.update())
         return false;
 
     const auto& profile = findProfile(this->config.get(), ls::identify());
 
-    if (profile.has_value()) {
-        this->active_profile = profile->second;
-        LOG("Root", "profile updated");
-    } else {
-        this->active_profile = std::nullopt;
-        LOG("Root", "profile cleared");
-    }
+    this->active_profile =
+        profile.has_value() ? std::optional(profile->second) : std::nullopt;
 
     return true;
 }
@@ -97,8 +85,6 @@ void Root::modifyInstanceCreateInfo(
     VkInstanceCreateInfo& createInfo,
     const std::function<void(void)>& finish) const
 {
-    LOG("Instance", "modify");
-
     if (!this->active_profile.has_value()) {
         finish();
         return;
@@ -128,8 +114,6 @@ void Root::modifyDeviceCreateInfo(
     VkDeviceCreateInfo& createInfo,
     const std::function<void(void)>& finish) const
 {
-    LOG("Device", "modify");
-
     if (!this->active_profile.has_value()) {
         finish();
         return;
@@ -152,40 +136,33 @@ void Root::modifyDeviceCreateInfo(
 
     bool foundTimeline = false;
 
-    auto* feature =
+    auto* featureInfo =
         reinterpret_cast<VkBaseInStructure*>(const_cast<void*>(createInfo.pNext));
 
-    int idx = 0;
-    while (feature) {
-        LOG("Device", "pNext[" << idx++ << "] sType=" << feature->sType);
-
-        if (feature->sType == VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES) {
-            auto* f = (VkPhysicalDeviceVulkan12Features*)feature;
+    while (featureInfo) {
+        if (featureInfo->sType == VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES) {
+            auto* f = reinterpret_cast<VkPhysicalDeviceVulkan12Features*>(featureInfo);
             f->timelineSemaphore = VK_TRUE;
             foundTimeline = true;
         }
 
-        if (feature->sType == VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_TIMELINE_SEMAPHORE_FEATURES) {
-            auto* f = (VkPhysicalDeviceTimelineSemaphoreFeatures*)feature;
+        if (featureInfo->sType == VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_TIMELINE_SEMAPHORE_FEATURES) {
+            auto* f = reinterpret_cast<VkPhysicalDeviceTimelineSemaphoreFeatures*>(featureInfo);
             f->timelineSemaphore = VK_TRUE;
             foundTimeline = true;
         }
 
-        feature = (VkBaseInStructure*)feature->pNext;
+        featureInfo = reinterpret_cast<VkBaseInStructure*>(featureInfo->pNext);
     }
 
-    // ❗ FIX: const void* → void*
-    static VkPhysicalDeviceTimelineSemaphoreFeatures timelineFeatures{
-        VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_TIMELINE_SEMAPHORE_FEATURES,
-        nullptr,
-        VK_TRUE
-    };
-
+    // 🔥 FIX: NO STACK pNext injection (critical fix)
     if (!foundTimeline) {
-        LOG("Device", "inject timeline feature");
+        auto* timeline = new VkPhysicalDeviceTimelineSemaphoreFeatures{};
+        timeline->sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_TIMELINE_SEMAPHORE_FEATURES;
+        timeline->timelineSemaphore = VK_TRUE;
 
-        timelineFeatures.pNext = const_cast<void*>(createInfo.pNext);
-        createInfo.pNext = &timelineFeatures;
+        timeline->pNext = const_cast<void*>(createInfo.pNext);
+        createInfo.pNext = timeline;
     }
 
     finish();
@@ -200,8 +177,6 @@ void Root::modifySwapchainCreateInfo(
     VkSwapchainCreateInfoKHR& createInfo,
     const std::function<void(void)>& finish) const
 {
-    LOG("Swapchain", "modify");
-
     if (!this->active_profile.has_value()) {
         finish();
         return;
@@ -217,8 +192,6 @@ void Root::modifySwapchainCreateInfo(
     if (res != VK_SUCCESS)
         throw ls::vulkan_error(res, "surface caps failed");
 
-    LOG("Swapchain", "maxImageCount=" << caps.maxImageCount);
-
     context_ModifySwapchainCreateInfo(
         *this->active_profile,
         caps.maxImageCount,
@@ -229,7 +202,7 @@ void Root::modifySwapchainCreateInfo(
 }
 
 // =====================================================
-// BACKEND / SWAPCHAIN CONTEXT
+// BACKEND
 // =====================================================
 
 void Root::createSwapchainContext(
@@ -237,29 +210,21 @@ void Root::createSwapchainContext(
     VkSwapchainKHR swapchain,
     const SwapchainInfo& info)
 {
-    LOG("Backend", "swapchain create");
-
     if (!this->active_profile.has_value())
         throw ls::error("inactive layer");
 
     const auto& profile = *this->active_profile;
 
     if (!this->backend.has_value()) {
-        LOG("Backend", "init");
-
         const auto& global = this->config.get().global();
 
         setenv("DISABLE_LSFGVK", "1", 1);
 
         try {
-            std::filesystem::path dllPath =
+            std::string dll =
                 global.dll.has_value()
-                    ? std::filesystem::path(*global.dll)
-                    : ls::findShaderDll();
-
-            std::string dll = dllPath.string();
-
-            LOG("Backend", "dll=" << dll);
+                    ? *global.dll
+                    : ls::findShaderDll().string();
 
             this->backend.emplace(
                 [gpu = profile.gpu](
@@ -292,6 +257,5 @@ void Root::createSwapchainContext(
 }
 
 void Root::removeSwapchainContext(VkSwapchainKHR swapchain) {
-    LOG("Backend", "swapchain remove");
     this->swapchains.erase(swapchain);
 }
