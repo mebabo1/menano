@@ -7,10 +7,8 @@
 #include "hooks.hpp"
 #include "layer.hpp"
 
-#ifdef __ANDROID__
 #include <android/hardware_buffer.h>
 #include <android/log.h>
-#endif
 
 #include <vulkan/vulkan_core.h>
 #include <lsfg_3_1.hpp>
@@ -73,7 +71,6 @@ LsContext::LsContext(const Hooks::DeviceInfo& info, VkSwapchainKHR swapchain,
         ? VK_FORMAT_R8G8B8A8_UNORM
         : VK_FORMAT_R16G16B16A16_SFLOAT;
 
-#ifdef __ANDROID__
     // Android path: use AHardwareBuffer-backed images for sharing with framegen.
     // Turnip/Mesa on Android doesn't support OPAQUE_FD export, so we use the
     // AHB path (createContextFromAHB + presentContext with -1 + waitIdle).
@@ -135,7 +132,6 @@ LsContext::LsContext(const Hooks::DeviceInfo& info, VkSwapchainKHR swapchain,
 
     std::cerr << "lsfg-vk: Android AHB context created (id=" << ctxId << ")\n";
 
-#else
     // Desktop Linux path: use OPAQUE_FD-based image sharing
 
     std::array<int, 2> fds{};
@@ -183,7 +179,6 @@ LsContext::LsContext(const Hooks::DeviceInfo& info, VkSwapchainKHR swapchain,
     );
 
     unsetenv("DISABLE_LSFG"); // NOLINT
-#endif
 
     // prepare render passes
     this->cmdPool = Mini::CommandPool(info.device, info.queue.first);
@@ -202,7 +197,6 @@ VkResult LsContext::present(const Hooks::DeviceInfo& info, const void* pNext, Vk
     const auto& conf = Config::activeConf;
     auto& pass = this->passInfos.at(this->frameIdx % 8);
 
-#ifdef __ANDROID__
     // Android path: synchronous frame generation using waitIdle()
     // instead of OPAQUE_FD semaphore export which Turnip doesn't support.
 
@@ -422,5 +416,4 @@ VkResult LsContext::present(const Hooks::DeviceInfo& info, const void* pNext, Vk
 
     this->frameIdx++;
     return res;
-#endif
 }
