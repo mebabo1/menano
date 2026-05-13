@@ -18,6 +18,7 @@
 #include <utility>
 #include <vector>
 
+#include <stdlib.h>
 #include <vulkan/vulkan_core.h>
 
 using namespace lsfgvk;
@@ -25,27 +26,36 @@ using namespace lsfgvk::layer;
 
 namespace {
 
-#define LOG(tag, msg) std::cerr << "[LSFG][" << tag << "] " << msg << "\n"
+#define LOG(tag, msg) \
+    std::cerr << "[LSFG][" << tag << "] " << msg << std::endl;
 
-// =====================================================
-// EXTENSION ADD
-// =====================================================
+/// helper function to add required extensions
 std::vector<const char*> add_extensions(
     const char* const* existingExtensions,
     size_t count,
     const std::vector<const char*>& requiredExtensions)
 {
-    std::vector<const char*> extensions(count);
-    std::copy_n(existingExtensions, count, extensions.data());
+    std::vector<const char*> extensions;
 
-    for (const auto& req : requiredExtensions) {
-        auto it = std::ranges::find_if(extensions,
-            [&](const char* e) {
-                return e && std::string(e) == req;
+    extensions.reserve(count + requiredExtensions.size());
+
+    for (size_t i = 0; i < count; i++) {
+        if (existingExtensions[i])
+            extensions.push_back(existingExtensions[i]);
+    }
+
+    for (const auto& requiredExtension : requiredExtensions) {
+        auto it = std::ranges::find_if(
+            extensions,
+            [requiredExtension](const char* extension) {
+                return extension
+                    && std::string(extension) == requiredExtension;
             });
 
-        if (it == extensions.end())
-            extensions.push_back(req);
+        if (it == extensions.end()) {
+            LOG("Extensions", "Adding: " << requiredExtension);
+            extensions.push_back(requiredExtension);
+        }
     }
 
     return extensions;
@@ -58,26 +68,55 @@ std::vector<const char*> add_extensions(
 // =====================================================
 
 Root::Root() {
-    const auto& profile = findProfile(this->config.get(), ls::identify());
+    LOG("Root", "ctor enter");
 
-    if (!profile.has_value())
+    const auto& profile =
+        findProfile(this->config.get(), ls::identify());
+
+    if (!profile.has_value()) {
+        LOG("Root", "no profile found");
         return;
+    }
 
     this->active_profile = profile->second;
 
-    std::cerr << "lsfg-vk: profile '" << this->active_profile->name << "'\n";
+    std::cerr
+        << "lsfg-vk: using profile with name '"
+        << this->active_profile->name
+        << "' ";
+
+    switch (profile->first) {
+        case ls::IdentType::OVERRIDE:
+            std::cerr << "(identified via override)\n";
+            break;
+
+        case ls::IdentType::EXECUTABLE:
+            std::cerr << "(identified via executable)\n";
+            break;
+
+        case ls::IdentType::WINE_EXECUTABLE:
+            std::cerr << "(identified via wine executable)\n";
+            break;
+
+        case ls::IdentType::PROCESS_NAME:
+            std::cerr << "(identified via process name)\n";
+            break;
+    }
+
+    LOG("Root", "ctor exit");
 }
 
 bool Root::update() {
     if (!this->config.update())
         return false;
 
-    const auto& profile = findProfile(this->config.get(), ls::identify());
+    const auto& profile =
+        findProfile(this->config.get(), ls::identify());
 
-    this->active_profile =
-        profile.has_value()
-            ? std::optional(profile->second)
-            : std::nullopt;
+    if (profile.has_value())
+        this->active_profile = profile->second;
+    else
+        this->active_profile = std::nullopt;
 
     return true;
 }
@@ -90,6 +129,8 @@ void Root::modifyInstanceCreateInfo(
     VkInstanceCreateInfo& createInfo,
     const std::function<void(void)>& finish) const
 {
+    LOG("Instance", "modify enter");
+
     if (!this->active_profile.has_value()) {
         finish();
         return;
@@ -102,13 +143,21 @@ void Root::modifyInstanceCreateInfo(
             "VK_KHR_get_physical_device_properties2",
             "VK_KHR_external_memory_capabilities",
             "VK_KHR_external_semaphore_capabilities"
-        }
-    );
+        });
 
-    createInfo.ppEnabledExtensionNames = extensions.data();
-    createInfo.enabledExtensionCount = (uint32_t)extensions.size();
+    createInfo.enabledExtensionCount =
+        static_cast<uint32_t>(extensions.size());
+
+    createInfo.ppEnabledExtensionNames =
+        extensions.data();
+
+    LOG("Instance",
+        "extension count = "
+        << createInfo.enabledExtensionCount);
 
     finish();
+
+    LOG("Instance", "modify exit");
 }
 
 // =====================================================
@@ -119,6 +168,8 @@ void Root::modifyDeviceCreateInfo(
     VkDeviceCreateInfo& createInfo,
     const std::function<void(void)>& finish) const
 {
+    LOG("Device", "modify enter");
+
     if (!this->active_profile.has_value()) {
         finish();
         return;
@@ -133,49 +184,103 @@ void Root::modifyDeviceCreateInfo(
             "VK_KHR_external_semaphore",
             "VK_KHR_external_semaphore_fd",
             "VK_KHR_timeline_semaphore"
-        }
-    );
+        });
 
-    createInfo.ppEnabledExtensionNames = extensions.data();
-    createInfo.enabledExtensionCount = (uint32_t)extensions.size();
+    createInfo.enabledExtensionCount =
+        static_cast<uint32_t>(extensions.size());
+
+    createInfo.ppEnabledExtensionNames =
+        extensions.data();
+
+    LOG("Device",
+        "extension count = "
+        << createInfo.enabledExtensionCount);
+
+    // =====================================================
+    // SAFE pNext traversal
+    // =====================================================
 
     bool foundTimeline = false;
 
-    // =====================================================
-    // SAFE traversal (read-only)
-    // =====================================================
-    const VkBaseInStructure* it =
-        reinterpret_cast<const VkBaseInStructure*>(createInfo.pNext);
+    auto* featureInfo =
+        reinterpret_cast<VkBaseInStructure*>(
+            const_cast<void*>(createInfo.pNext));
 
-    while (it) {
-        if (it->sType == VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES) {
-            auto* f = (VkPhysicalDeviceVulkan12Features*)it;
-            f->timelineSemaphore = VK_TRUE;
-            foundTimeline = true;
+    uint32_t index = 0;
+
+    while (featureInfo) {
+
+        LOG("Device",
+            "pNext[" << index
+            << "] sType="
+            << featureInfo->sType
+            << " ptr="
+            << featureInfo);
+
+        switch (featureInfo->sType) {
+
+            case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES:
+            {
+                auto* features =
+                    reinterpret_cast<
+                        VkPhysicalDeviceVulkan12Features*>(
+                            featureInfo);
+
+                LOG("Device",
+                    "Found Vulkan12Features");
+
+                features->timelineSemaphore =
+                    VK_TRUE;
+
+                foundTimeline = true;
+                break;
+            }
+
+            case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_TIMELINE_SEMAPHORE_FEATURES:
+            {
+                auto* features =
+                    reinterpret_cast<
+                        VkPhysicalDeviceTimelineSemaphoreFeatures*>(
+                            featureInfo);
+
+                LOG("Device",
+                    "Found TimelineSemaphoreFeatures");
+
+                features->timelineSemaphore =
+                    VK_TRUE;
+
+                foundTimeline = true;
+                break;
+            }
+
+            default:
+                break;
         }
 
-        if (it->sType == VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_TIMELINE_SEMAPHORE_FEATURES) {
-            auto* f = (VkPhysicalDeviceTimelineSemaphoreFeatures*)it;
-            f->timelineSemaphore = VK_TRUE;
-            foundTimeline = true;
-        }
+        featureInfo =
+            reinterpret_cast<VkBaseInStructure*>(
+                const_cast<void*>(featureInfo->pNext));
 
-        it = reinterpret_cast<const VkBaseInStructure*>(it->pNext);
+        index++;
     }
 
     // =====================================================
-    // SAFE per-call allocation (NO static, NO heap leak chain)
+    // IMPORTANT:
+    // DO NOT inject local stack feature structs
+    // Wine Vulkan can crash on dangling pNext chains.
     // =====================================================
-    if (!foundTimeline) {
-        auto* timeline = new VkPhysicalDeviceTimelineSemaphoreFeatures{};
-        timeline->sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_TIMELINE_SEMAPHORE_FEATURES;
-        timeline->timelineSemaphore = VK_TRUE;
 
-        timeline->pNext = createInfo.pNext;
-        createInfo.pNext = timeline;
+    if (!foundTimeline) {
+        LOG("Device",
+            "timeline semaphore feature NOT found in existing chain");
+
+        LOG("Device",
+            "Skipping manual pNext injection for Wine safety");
     }
 
     finish();
+
+    LOG("Device", "modify exit");
 }
 
 // =====================================================
@@ -187,28 +292,39 @@ void Root::modifySwapchainCreateInfo(
     VkSwapchainCreateInfoKHR& createInfo,
     const std::function<void(void)>& finish) const
 {
+    LOG("Swapchain", "modify enter");
+
     if (!this->active_profile.has_value()) {
         finish();
         return;
     }
 
     VkSurfaceCapabilitiesKHR caps{};
-    auto res = vk.fi().GetPhysicalDeviceSurfaceCapabilitiesKHR(
-        vk.physdev(),
-        createInfo.surface,
-        &caps
-    );
 
-    if (res != VK_SUCCESS)
-        throw ls::vulkan_error(res, "surface caps failed");
+    auto res =
+        vk.fi().GetPhysicalDeviceSurfaceCapabilitiesKHR(
+            vk.physdev(),
+            createInfo.surface,
+            &caps);
+
+    if (res != VK_SUCCESS) {
+        throw ls::vulkan_error(
+            res,
+            "vkGetPhysicalDeviceSurfaceCapabilitiesKHR() failed");
+    }
+
+    LOG("Swapchain",
+        "maxImageCount="
+        << caps.maxImageCount);
 
     context_ModifySwapchainCreateInfo(
         *this->active_profile,
         caps.maxImageCount,
-        createInfo
-    );
+        createInfo);
 
     finish();
+
+    LOG("Swapchain", "modify exit");
 }
 
 // =====================================================
@@ -220,41 +336,72 @@ void Root::createSwapchainContext(
     VkSwapchainKHR swapchain,
     const SwapchainInfo& info)
 {
-    if (!this->active_profile.has_value())
-        throw ls::error("inactive layer");
+    LOG("Backend", "createSwapchainContext enter");
 
-    const auto& profile = *this->active_profile;
+    if (!this->active_profile.has_value()) {
+        throw ls::error(
+            "attempted to create swapchain context while layer is inactive");
+    }
+
+    const auto& profile =
+        *this->active_profile;
 
     if (!this->backend.has_value()) {
-        const auto& global = this->config.get().global();
+
+        const auto& global =
+            this->config.get().global();
 
         setenv("DISABLE_LSFGVK", "1", 1);
 
         try {
-            std::string dll =
-                global.dll.has_value()
-                    ? *global.dll
-                    : ls::findShaderDll().string();
+
+            std::string dll{};
+
+            if (global.dll.has_value())
+                dll = *global.dll;
+            else
+                dll = ls::findShaderDll().string();
+
+            LOG("Backend", "dll=" << dll);
 
             this->backend.emplace(
                 [gpu = profile.gpu](
-                    const std::string& name,
-                    std::pair<const std::string&, const std::string&> ids,
+                    const std::string& deviceName,
+                    std::pair<
+                        const std::string&,
+                        const std::string&> ids,
                     const std::optional<std::string>& pci)
                 {
-                    if (!gpu) return true;
+                    std::cerr
+                        << "lsfg-vk: probing device\n"
+                        << "  name: " << deviceName << "\n"
+                        << "  ids: "
+                        << ids.first
+                        << ":"
+                        << ids.second
+                        << "\n"
+                        << "  pci: "
+                        << (pci ? *pci : "none")
+                        << "\n";
 
-                    return name == *gpu
+                    if (!gpu)
+                        return true;
+
+                    return
+                        (deviceName == *gpu)
                         || (ids.first + ":" + ids.second == *gpu)
                         || (pci && *pci == *gpu);
                 },
                 dll,
-                global.allow_fp16
-            );
-        }
-        catch (const std::exception& e) {
+                global.allow_fp16);
+
+        } catch (const std::exception& e) {
+
             unsetenv("DISABLE_LSFGVK");
-            throw ls::error("backend init failed", e);
+
+            throw ls::error(
+                "failed to create backend instance",
+                e);
         }
 
         unsetenv("DISABLE_LSFGVK");
@@ -262,14 +409,23 @@ void Root::createSwapchainContext(
 
     this->swapchains.emplace(
         swapchain,
-        Swapchain(vk, this->backend.mut(), profile, info)
-    );
+        Swapchain(
+            vk,
+            this->backend.mut(),
+            profile,
+            info));
+
+    LOG("Backend", "createSwapchainContext exit");
 }
 
 // =====================================================
 // CLEANUP
 // =====================================================
 
-void Root::removeSwapchainContext(VkSwapchainKHR swapchain) {
+void Root::removeSwapchainContext(
+    VkSwapchainKHR swapchain)
+{
+    LOG("Swapchain", "remove context");
+
     this->swapchains.erase(swapchain);
 }
