@@ -36,14 +36,14 @@ std::vector<const char*> add_extensions(
     std::vector<const char*> extensions(count);
     std::copy_n(existingExtensions, count, extensions.data());
 
-    for (const auto& requiredExtension : requiredExtensions) {
+    for (const auto& req : requiredExtensions) {
         auto it = std::ranges::find_if(extensions,
-            [requiredExtension](const char* extension) {
-                return extension && std::string(extension) == requiredExtension;
+            [&](const char* ext) {
+                return ext && std::string(ext) == req;
             });
 
         if (it == extensions.end())
-            extensions.push_back(requiredExtension);
+            extensions.push_back(req);
     }
 
     return extensions;
@@ -51,49 +51,36 @@ std::vector<const char*> add_extensions(
 
 } // namespace
 
+// =====================================================
+// ROOT
+// =====================================================
+
 Root::Root() {
-    LOG("Root", "ctor start");
+    LOG("Root", "ctor");
 
     const auto& profile = findProfile(this->config.get(), ls::identify());
 
     if (!profile.has_value()) {
-        LOG("Root", "no profile found");
+        LOG("Root", "no profile");
         return;
     }
 
     this->active_profile = profile->second;
 
     LOG("Root", "profile = " << this->active_profile->name);
-
-    switch (profile->first) {
-        case ls::IdentType::OVERRIDE:
-            LOG("Root", "IDENT OVERRIDE");
-            break;
-        case ls::IdentType::EXECUTABLE:
-            LOG("Root", "IDENT EXECUTABLE");
-            break;
-        case ls::IdentType::WINE_EXECUTABLE:
-            LOG("Root", "IDENT WINE_EXECUTABLE");
-            break;
-        case ls::IdentType::PROCESS_NAME:
-            LOG("Root", "IDENT PROCESS_NAME");
-            break;
-    }
 }
 
 bool Root::update() {
     LOG("Root", "update");
 
-    if (!this->config.update()) {
-        LOG("Root", "config unchanged/failed");
+    if (!this->config.update())
         return false;
-    }
 
     const auto& profile = findProfile(this->config.get(), ls::identify());
 
     if (profile.has_value()) {
         this->active_profile = profile->second;
-        LOG("Root", "profile updated = " << this->active_profile->name);
+        LOG("Root", "profile updated");
     } else {
         this->active_profile = std::nullopt;
         LOG("Root", "profile cleared");
@@ -102,19 +89,20 @@ bool Root::update() {
     return true;
 }
 
+// =====================================================
+// INSTANCE
+// =====================================================
+
 void Root::modifyInstanceCreateInfo(
     VkInstanceCreateInfo& createInfo,
     const std::function<void(void)>& finish) const
 {
-    LOG("Instance", "modify start");
+    LOG("Instance", "modify");
 
     if (!this->active_profile.has_value()) {
-        LOG("Instance", "inactive");
         finish();
         return;
     }
-
-    LOG("Instance", "extension count = " << createInfo.enabledExtensionCount);
 
     auto extensions = add_extensions(
         createInfo.ppEnabledExtensionNames,
@@ -126,22 +114,23 @@ void Root::modifyInstanceCreateInfo(
         }
     );
 
-    createInfo.enabledExtensionCount = (uint32_t)extensions.size();
     createInfo.ppEnabledExtensionNames = extensions.data();
-
-    LOG("Instance", "final extension count = " << extensions.size());
+    createInfo.enabledExtensionCount = (uint32_t)extensions.size();
 
     finish();
 }
+
+// =====================================================
+// DEVICE
+// =====================================================
 
 void Root::modifyDeviceCreateInfo(
     VkDeviceCreateInfo& createInfo,
     const std::function<void(void)>& finish) const
 {
-    LOG("Device", "modify start");
+    LOG("Device", "modify");
 
     if (!this->active_profile.has_value()) {
-        LOG("Device", "inactive");
         finish();
         return;
     }
@@ -158,48 +147,53 @@ void Root::modifyDeviceCreateInfo(
         }
     );
 
-    createInfo.enabledExtensionCount = (uint32_t)extensions.size();
     createInfo.ppEnabledExtensionNames = extensions.data();
+    createInfo.enabledExtensionCount = (uint32_t)extensions.size();
 
-    bool timelineEnabled = false;
+    bool foundTimeline = false;
 
-    auto* featureInfo =
+    auto* feature =
         reinterpret_cast<VkBaseInStructure*>(const_cast<void*>(createInfo.pNext));
 
     int idx = 0;
-    while (featureInfo) {
-        LOG("Device", "pNext[" << idx++ << "] sType=" << featureInfo->sType);
+    while (feature) {
+        LOG("Device", "pNext[" << idx++ << "] sType=" << feature->sType);
 
-        if (featureInfo->sType == VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES) {
-            auto* f = (VkPhysicalDeviceVulkan12Features*)featureInfo;
+        if (feature->sType == VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES) {
+            auto* f = (VkPhysicalDeviceVulkan12Features*)feature;
             f->timelineSemaphore = VK_TRUE;
-            timelineEnabled = true;
+            foundTimeline = true;
         }
 
-        if (featureInfo->sType == VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_TIMELINE_SEMAPHORE_FEATURES) {
-            auto* f = (VkPhysicalDeviceTimelineSemaphoreFeatures*)featureInfo;
+        if (feature->sType == VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_TIMELINE_SEMAPHORE_FEATURES) {
+            auto* f = (VkPhysicalDeviceTimelineSemaphoreFeatures*)feature;
             f->timelineSemaphore = VK_TRUE;
-            timelineEnabled = true;
+            foundTimeline = true;
         }
 
-        featureInfo = (VkBaseInStructure*)featureInfo->pNext;
+        feature = (VkBaseInStructure*)feature->pNext;
     }
 
-    if (!timelineEnabled) {
+    // ❗ FIX: const void* → void*
+    static VkPhysicalDeviceTimelineSemaphoreFeatures timelineFeatures{
+        VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_TIMELINE_SEMAPHORE_FEATURES,
+        nullptr,
+        VK_TRUE
+    };
+
+    if (!foundTimeline) {
         LOG("Device", "inject timeline feature");
 
-        static VkPhysicalDeviceTimelineSemaphoreFeatures timelineFeatures{
-            VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_TIMELINE_SEMAPHORE_FEATURES,
-            nullptr,
-            VK_TRUE
-        };
-
-        timelineFeatures.pNext = createInfo.pNext;
+        timelineFeatures.pNext = const_cast<void*>(createInfo.pNext);
         createInfo.pNext = &timelineFeatures;
     }
 
     finish();
 }
+
+// =====================================================
+// SWAPCHAIN
+// =====================================================
 
 void Root::modifySwapchainCreateInfo(
     const vk::Vulkan& vk,
@@ -223,7 +217,7 @@ void Root::modifySwapchainCreateInfo(
     if (res != VK_SUCCESS)
         throw ls::vulkan_error(res, "surface caps failed");
 
-    LOG("Swapchain", "maxImageCount = " << caps.maxImageCount);
+    LOG("Swapchain", "maxImageCount=" << caps.maxImageCount);
 
     context_ModifySwapchainCreateInfo(
         *this->active_profile,
@@ -233,6 +227,10 @@ void Root::modifySwapchainCreateInfo(
 
     finish();
 }
+
+// =====================================================
+// BACKEND / SWAPCHAIN CONTEXT
+// =====================================================
 
 void Root::createSwapchainContext(
     const vk::Vulkan& vk,
@@ -247,7 +245,7 @@ void Root::createSwapchainContext(
     const auto& profile = *this->active_profile;
 
     if (!this->backend.has_value()) {
-        LOG("Backend", "init backend");
+        LOG("Backend", "init");
 
         const auto& global = this->config.get().global();
 
@@ -261,18 +259,17 @@ void Root::createSwapchainContext(
 
             std::string dll = dllPath.string();
 
-            LOG("Backend", "dll = " << dll);
+            LOG("Backend", "dll=" << dll);
 
             this->backend.emplace(
                 [gpu = profile.gpu](
-                    const std::string& deviceName,
+                    const std::string& name,
                     std::pair<const std::string&, const std::string&> ids,
                     const std::optional<std::string>& pci)
                 {
-                    if (!gpu)
-                        return true;
+                    if (!gpu) return true;
 
-                    return (deviceName == *gpu)
+                    return name == *gpu
                         || (ids.first + ":" + ids.second == *gpu)
                         || (pci && *pci == *gpu);
                 },
