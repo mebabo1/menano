@@ -35,6 +35,7 @@ jobs:
         sudo mkdir -p /usr/include/android  
         sudo cp -r $NDK/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/include/android/* /usr/include/android/  
         sudo chmod -R 644 /usr/include/android
+        sudo chmod -R a+rX /usr/include/android
 
     - name: Update Vulkan headers
       run: |
