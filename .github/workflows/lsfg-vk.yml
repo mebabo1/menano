@@ -36,7 +36,10 @@ jobs:
         sudo rm -rf /usr/include/{vulkan,vk_video}
         sudo mv /tmp/vkh/include/{vulkan,vk_video} /usr/include/
         rm -rf /tmp/vkh
- 
+
+    - name: Android Turnip patches
+      run: |
+        curl -L https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/lsfg-vk-layer/src/instance.cpp -o lsfg-vk-layer/src/instance.cpp
     - name: Configure lsfg-vk
       run: |        
         cmake -B build -G Ninja \
