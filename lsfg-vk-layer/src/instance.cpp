@@ -1,8 +1,8 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later */
 
-#include "instance.hpp"
+#include "lsfg-vk-layer/src/instance.hpp"
 #include "lsfg-vk-common/helpers/paths.hpp"
-#include "swapchain.hpp"
+#include "lsfg-vk-layer/src/swapchain.hpp"
 #include "lsfg-vk-common/configuration/detection.hpp"
 #include "lsfg-vk-common/helpers/errors.hpp"
 #include "lsfg-vk-common/vulkan/vulkan.hpp"
