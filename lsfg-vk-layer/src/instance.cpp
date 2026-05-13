@@ -30,17 +30,14 @@ namespace {
         size_t count,
         const std::vector<const char*>& requiredExtensions
     ) {
-        std::vector<const char*> extensions;
-
-        if (existingExtensions && count > 0) {
-            extensions.assign(existingExtensions, existingExtensions + count);
-        }
+        std::vector<const char*> extensions(count);
+        std::copy_n(existingExtensions, count, extensions.data());
 
         for (const auto& requiredExtension : requiredExtensions) {
             auto it = std::ranges::find_if(
                 extensions,
                 [requiredExtension](const char* extension) {
-                    return extension && std::string(extension) == requiredExtension;
+                    return std::string(extension) == std::string(requiredExtension);
                 }
             );
 
@@ -64,8 +61,7 @@ Root::Root() {
 
     std::cerr << "lsfg-vk: profile found\n";
 
-    // ✔ FIX 1: optional 안전 대입
-    this->active_profile.emplace(profile->second);
+    this->active_profile = profile->second;
 
     std::cerr << "lsfg-vk: using profile name = '"
               << this->active_profile->name << "'\n";
@@ -100,7 +96,7 @@ bool Root::update() {
 
     if (profile.has_value()) {
         std::cerr << "lsfg-vk: update profile FOUND\n";
-        this->active_profile.emplace(profile->second);
+        this->active_profile = profile->second;
     } else {
         std::cerr << "lsfg-vk: update profile NOT FOUND\n";
         this->active_profile.reset();
@@ -156,6 +152,8 @@ void Root::modifyDeviceCreateInfo(
         return;
     }
 
+    std::cerr << "lsfg-vk: injecting device extensions\n";
+
     auto extensions = add_extensions(
         createInfo.ppEnabledExtensionNames,
         createInfo.enabledExtensionCount,
@@ -169,13 +167,13 @@ void Root::modifyDeviceCreateInfo(
     createInfo.enabledExtensionCount = (uint32_t)extensions.size();
     createInfo.ppEnabledExtensionNames = extensions.data();
 
+    std::cerr << "lsfg-vk: device extensions injected = "
+              << extensions.size() << "\n";
+
     bool isFeatureEnabled = false;
 
-    // ✔ FIX 2: const 제거 안전 캐스트
     auto* featureInfo =
-        const_cast<VkBaseInStructure*>(
-            reinterpret_cast<const VkBaseInStructure*>(createInfo.pNext)
-        );
+        reinterpret_cast<VkBaseInStructure*>(const_cast<void*>(createInfo.pNext));
 
     std::cerr << "lsfg-vk: walking feature chain\n";
 
@@ -183,7 +181,8 @@ void Root::modifyDeviceCreateInfo(
         std::cerr << "lsfg-vk: feature sType = " << featureInfo->sType << "\n";
 
         if (featureInfo->sType == VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES) {
-            auto* features = reinterpret_cast<VkPhysicalDeviceVulkan12Features*>(featureInfo);
+            auto* features =
+                reinterpret_cast<VkPhysicalDeviceVulkan12Features*>(featureInfo);
             features->timelineSemaphore = VK_TRUE;
             isFeatureEnabled = true;
         } else if (featureInfo->sType ==
@@ -194,24 +193,25 @@ void Root::modifyDeviceCreateInfo(
             isFeatureEnabled = true;
         }
 
-        featureInfo = const_cast<VkBaseInStructure*>(featureInfo->pNext);
+        featureInfo = reinterpret_cast<VkBaseInStructure*>(featureInfo->pNext);
     }
 
     std::cerr << "lsfg-vk: timeline feature enabled = "
               << (isFeatureEnabled ? "YES" : "NO") << "\n";
 
-    // ✔ FIX 3: lifetime safe (static으로 우회)
-    static VkPhysicalDeviceTimelineSemaphoreFeatures timelineFeatures{
-        VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_TIMELINE_SEMAPHORE_FEATURES,
-        nullptr,
-        VK_TRUE
-    };
+    // ✔ FIX: safe heap allocation (no dangling pointer)
+    auto* timelineFeatures =
+        new VkPhysicalDeviceTimelineSemaphoreFeatures{};
 
-    timelineFeatures.pNext = createInfo.pNext;
+    timelineFeatures->sType =
+        VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_TIMELINE_SEMAPHORE_FEATURES;
+
+    timelineFeatures->timelineSemaphore = VK_TRUE;
+    timelineFeatures->pNext = (void*)createInfo.pNext;
 
     if (!isFeatureEnabled) {
         std::cerr << "lsfg-vk: forcing timeline feature struct\n";
-        createInfo.pNext = &timelineFeatures;
+        createInfo.pNext = timelineFeatures;
     }
 
     finish();
@@ -231,6 +231,8 @@ void Root::modifySwapchainCreateInfo(
         return;
     }
 
+    std::cerr << "lsfg-vk: querying surface caps\n";
+
     VkSurfaceCapabilitiesKHR caps{};
     auto res = vk.fi().GetPhysicalDeviceSurfaceCapabilitiesKHR(
         vk.physdev(),
@@ -243,7 +245,13 @@ void Root::modifySwapchainCreateInfo(
         throw ls::vulkan_error(res, "vkGetPhysicalDeviceSurfaceCapabilitiesKHR() failed");
     }
 
-    context_ModifySwapchainCreateInfo(*this->active_profile, caps.maxImageCount, createInfo);
+    std::cerr << "lsfg-vk: surface caps OK\n";
+
+    context_ModifySwapchainCreateInfo(
+        *this->active_profile,
+        caps.maxImageCount,
+        createInfo
+    );
 
     finish();
     std::cerr << "lsfg-vk: modifySwapchainCreateInfo exit\n";
@@ -257,21 +265,31 @@ void Root::createSwapchainContext(
     std::cerr << "lsfg-vk: createSwapchainContext ENTER\n";
 
     if (!this->active_profile.has_value()) {
+        std::cerr << "lsfg-vk: NO ACTIVE PROFILE -> crash path\n";
         throw ls::error("attempted to create swapchain context while layer is inactive");
     }
 
     const auto& profile = *this->active_profile;
 
+    std::cerr << "lsfg-vk: swapchain context profile OK\n";
+
     if (!this->backend.has_value()) {
-        std::cerr << "lsfg-vk: backend creating\n";
+        std::cerr << "lsfg-vk: backend not created -> creating\n";
 
         const auto& global = this->config.get().global();
 
         setenv("DISABLE_LSFGVK", "1", 1);
 
         try {
-            std::string dll =
-                global.dll.has_value() ? *global.dll : ls::findShaderDll();
+            std::string dll;
+
+            // ✔ FIX: unify filesystem/string type
+            if (global.dll.has_value())
+                dll = global.dll->string();
+            else
+                dll = ls::findShaderDll().string();
+
+            std::cerr << "lsfg-vk: shader dll = " << dll << "\n";
 
             this->backend.emplace(
                 [gpu = profile.gpu](
@@ -279,6 +297,9 @@ void Root::createSwapchainContext(
                     std::pair<const std::string&, const std::string&> ids,
                     const std::optional<std::string>& pci
                 ) {
+                    std::cerr << "lsfg-vk: probing device\n"
+                              << " name=" << deviceName << "\n";
+
                     if (!gpu)
                         return true;
 
@@ -290,13 +311,18 @@ void Root::createSwapchainContext(
                 global.allow_fp16
             );
 
+            std::cerr << "lsfg-vk: backend created OK\n";
+
         } catch (const std::exception& e) {
             unsetenv("DISABLE_LSFGVK");
+            std::cerr << "lsfg-vk: backend creation FAILED\n";
             throw ls::error("failed to create backend instance", e);
         }
 
         unsetenv("DISABLE_LSFGVK");
     }
+
+    std::cerr << "lsfg-vk: emplacing swapchain\n";
 
     this->swapchains.emplace(
         swapchain,
