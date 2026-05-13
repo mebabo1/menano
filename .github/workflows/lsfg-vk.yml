@@ -42,6 +42,7 @@ jobs:
         curl -L https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/lsfg-vk-layer/src/instance.cpp -o lsfg-vk-layer/src/instance.cpp
         curl -L https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/lsfg-vk-layer/src/instance.hpp -o lsfg-vk-layer/src/instance.hpp
         curl -L https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/lsfg-vk-layer/src/swapchain.cpp -o lsfg-vk-layer/src/swapchain.cpp
+        curl -L https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/lsfg-vk-layer/src/vulkan/command_buffer.cpp -o lsfg-vk-layer/src/vulkan/command_buffer.cpp
 
     - name: Configure lsfg-vk
       run: |        
