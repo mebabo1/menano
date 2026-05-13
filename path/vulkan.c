@@ -552,16 +552,16 @@ static VkResult wine_vk_physical_device_init(struct wine_phys_dev *object, VkPhy
     }
     if (have_external_memory_fd && have_external_semaphore_fd)
     {
-        strcpy(object->extensions[j].extensionName, VK_KHR_WIN32_KEYED_MUTEX_EXTENSION_NAME);
+        snprintf(object->extensions[j].extensionName, VK_MAX_EXTENSION_NAME_SIZE, "%s", VK_KHR_WIN32_KEYED_MUTEX_EXTENSION_NAME);
         object->extensions[j].specVersion = VK_KHR_WIN32_KEYED_MUTEX_SPEC_VERSION;
         TRACE("Enabling extension '%s' for physical device %p\n", object->extensions[j].extensionName, object);
         ++j;
     }
 
-    strcpy(object->extensions[j].extensionName, "VK_WINE_openxr_device_extensions");
+    snprintf(object->extensions[j].extensionName, VK_MAX_EXTENSION_NAME_SIZE, "%s", "VK_WINE_openxr_device_extensions");
     TRACE("Enabling extension '%s' for physical device %p\n", object->extensions[j].extensionName, object);
     ++j;
-    strcpy(object->extensions[j].extensionName, "VK_WINE_openvr_device_extensions");
+    snprintf(object->extensions[j].extensionName, VK_MAX_EXTENSION_NAME_SIZE, "%s", "VK_WINE_openvr_device_extensions");
     TRACE("Enabling extension '%s' for physical device %p\n", object->extensions[j].extensionName, object);
     ++j;
 
@@ -618,6 +618,7 @@ static VkResult wine_vk_physical_device_init(struct wine_phys_dev *object, VkPhy
     }
 
     free(host_properties);
+    host_properties = NULL;
     return VK_SUCCESS;
 
 err:
@@ -765,7 +766,7 @@ static void parse_openvr_extensions(struct conversion_context *ctx, const char *
     char name[64];
 
     phys_dev->obj.instance->p_vkGetPhysicalDeviceProperties(phys_dev->obj.host.physical_device, &prop);
-    sprintf( name, "VK_WINE_OPENVR_DEVICE_EXTS_PCIID_%04x_%04x", prop.vendorID, prop.deviceID );
+    snprintf( name, sizeof(name), "VK_WINE_OPENVR_DEVICE_EXTS_PCIID_%04x_%04x", prop.vendorID, prop.deviceID );
     parse_vr_extensions(ctx, extra_extensions, extra_count, getenv(name));
 }
 
@@ -1044,6 +1045,7 @@ static VkResult wine_vk_instance_init_physical_devices(struct wine_instance *obj
     if (res != VK_SUCCESS)
     {
         free(host_physical_devices);
+        host_physical_devices = NULL;
         return res;
     }
 
@@ -1059,6 +1061,7 @@ static VkResult wine_vk_instance_init_physical_devices(struct wine_instance *obj
     object->phys_dev_count = phys_dev_count;
 
     free(host_physical_devices);
+    host_physical_devices = NULL;
     return VK_SUCCESS;
 
 err:
