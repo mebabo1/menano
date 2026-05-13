@@ -27,6 +27,9 @@ namespace {
 
 #define LOG(tag, msg) std::cerr << "[LSFG][" << tag << "] " << msg << "\n"
 
+// =====================================================
+// EXTENSION ADD
+// =====================================================
 std::vector<const char*> add_extensions(
     const char* const* existingExtensions,
     size_t count,
@@ -35,27 +38,18 @@ std::vector<const char*> add_extensions(
     std::vector<const char*> extensions(count);
     std::copy_n(existingExtensions, count, extensions.data());
 
-    for (const auto& requiredExtension : requiredExtensions) {
+    for (const auto& req : requiredExtensions) {
         auto it = std::ranges::find_if(extensions,
-            [&](const char* extension) {
-                return extension && std::string(extension) == requiredExtension;
+            [&](const char* e) {
+                return e && std::string(e) == req;
             });
 
         if (it == extensions.end())
-            extensions.push_back(requiredExtension);
+            extensions.push_back(req);
     }
 
     return extensions;
 }
-
-// =====================================================
-// SAFE STATIC FEATURE (NO STACK / NO NEW)
-// =====================================================
-static VkPhysicalDeviceTimelineSemaphoreFeatures timelineFeatureStatic{
-    VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_TIMELINE_SEMAPHORE_FEATURES,
-    nullptr,
-    VK_TRUE
-};
 
 } // namespace
 
@@ -71,7 +65,7 @@ Root::Root() {
 
     this->active_profile = profile->second;
 
-    std::cerr << "lsfg-vk: using profile '" << this->active_profile->name << "'\n";
+    std::cerr << "lsfg-vk: profile '" << this->active_profile->name << "'\n";
 }
 
 bool Root::update() {
@@ -81,7 +75,9 @@ bool Root::update() {
     const auto& profile = findProfile(this->config.get(), ls::identify());
 
     this->active_profile =
-        profile.has_value() ? std::optional(profile->second) : std::nullopt;
+        profile.has_value()
+            ? std::optional(profile->second)
+            : std::nullopt;
 
     return true;
 }
@@ -146,34 +142,37 @@ void Root::modifyDeviceCreateInfo(
     bool foundTimeline = false;
 
     // =====================================================
-    // SAFE CONST-CORRECT pNext traversal
+    // SAFE traversal (read-only)
     // =====================================================
-    const VkBaseInStructure* featureInfo =
+    const VkBaseInStructure* it =
         reinterpret_cast<const VkBaseInStructure*>(createInfo.pNext);
 
-    while (featureInfo) {
-        if (featureInfo->sType == VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES) {
-            auto* f = (VkPhysicalDeviceVulkan12Features*)featureInfo;
+    while (it) {
+        if (it->sType == VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES) {
+            auto* f = (VkPhysicalDeviceVulkan12Features*)it;
             f->timelineSemaphore = VK_TRUE;
             foundTimeline = true;
         }
 
-        if (featureInfo->sType == VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_TIMELINE_SEMAPHORE_FEATURES) {
-            auto* f = (VkPhysicalDeviceTimelineSemaphoreFeatures*)featureInfo;
+        if (it->sType == VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_TIMELINE_SEMAPHORE_FEATURES) {
+            auto* f = (VkPhysicalDeviceTimelineSemaphoreFeatures*)it;
             f->timelineSemaphore = VK_TRUE;
             foundTimeline = true;
         }
 
-        featureInfo =
-            reinterpret_cast<const VkBaseInStructure*>(featureInfo->pNext);
+        it = reinterpret_cast<const VkBaseInStructure*>(it->pNext);
     }
 
     // =====================================================
-    // SAFE STATIC injection (NO new, NO stack)
+    // SAFE per-call allocation (NO static, NO heap leak chain)
     // =====================================================
     if (!foundTimeline) {
-        timelineFeatureStatic.pNext = createInfo.pNext;
-        createInfo.pNext = &timelineFeatureStatic;
+        auto* timeline = new VkPhysicalDeviceTimelineSemaphoreFeatures{};
+        timeline->sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_TIMELINE_SEMAPHORE_FEATURES;
+        timeline->timelineSemaphore = VK_TRUE;
+
+        timeline->pNext = createInfo.pNext;
+        createInfo.pNext = timeline;
     }
 
     finish();
