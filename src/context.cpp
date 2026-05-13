@@ -2,298 +2,425 @@
 #include "config/config.hpp"
 #include "common/exception.hpp"
 #include "extract/extract.hpp"
+#include "extract/trans.hpp"
 #include "utils/utils.hpp"
 #include "hooks.hpp"
 #include "layer.hpp"
+
+#ifdef __ANDROID__
+#include <android/hardware_buffer.h>
+#include <android/log.h>
+#endif
 
 #include <vulkan/vulkan_core.h>
 #include <lsfg_3_1.hpp>
 #include <lsfg_3_1p.hpp>
 
-#include <stdexcept>
+#include <filesystem>
+#include <exception>
+#include <iostream>
 #include <cstdint>
 #include <cstdlib>
 #include <vector>
+#include <chrono>
 #include <memory>
 #include <string>
+#include <thread>
 #include <array>
-#include <iostream>
 
-enum class LsfgMode {
-    ExternalFd,
-    InternalVk
-};
+LsContext::LsContext(const Hooks::DeviceInfo& info, VkSwapchainKHR swapchain,
+        VkExtent2D extent, const std::vector<VkImage>& swapchainImages)
+        : swapchain(swapchain), swapchainImages(swapchainImages),
+          extent(extent) {
+    // get updated configuration
+    auto& conf = Config::activeConf;
+    if (!conf.config_file.empty()
+            && (
+                    !std::filesystem::exists(conf.config_file)
+                  || conf.timestamp != std::filesystem::last_write_time(conf.config_file)
+            )) {
+        std::cerr << "lsfg-vk: Rereading configuration, as it is no longer valid.\n";
+        std::this_thread::sleep_for(std::chrono::milliseconds(100));
 
-LsContext::LsContext(
-    const Hooks::DeviceInfo& info,
-    VkSwapchainKHR swapchain,
-    VkExtent2D extent,
-    const std::vector<VkImage>& swapchainImages)
-    : info(info),
-      swapchain(swapchain),
-      swapchainImages(swapchainImages),
-      extent(extent) {
+        // reread configuration
+        const std::string file = Utils::getConfigFile();
+        const auto name = Utils::getProcessName();
+        try {
+            Config::updateConfig(file);
+            conf = Config::getConfig(name);
+        } catch (const std::exception& e) {
+            std::cerr << "lsfg-vk: Failed to update configuration, continuing using old:\n";
+            std::cerr << "- " << e.what() << '\n';
+        }
 
-    if (!Config::currentConf.has_value())
-        throw std::runtime_error("No configuration set");
+        LSFG_3_1P::finalize();
+        LSFG_3_1::finalize();
 
-    auto& globalConf = Config::globalConf;
-    auto& conf = *Config::currentConf;
+        // print config
+        std::cerr << "lsfg-vk: Reloaded configuration for " << name.second << ":\n";
+        if (!conf.dll.empty()) std::cerr << "  Using DLL from: " << conf.dll << '\n';
+        std::cerr << "  Multiplier: " << conf.multiplier << '\n';
+        std::cerr << "  Flow Scale: " << conf.flowScale << '\n';
+        std::cerr << "  Performance Mode: " << (conf.performance ? "Enabled" : "Disabled") << '\n';
+        std::cerr << "  HDR Mode: " << (conf.hdr ? "Enabled" : "Disabled") << '\n';
+        if (conf.e_present != 2) std::cerr << "  ! Present Mode: " << conf.e_present << '\n';
 
-    VkFormat format =
-        conf.hdr
-            ? VK_FORMAT_R16G16B16A16_SFLOAT
-            : VK_FORMAT_R8G8B8A8_UNORM;
-
-    std::array<int, 2> fds{-1, -1};
-    std::vector<int> outFds(conf.multiplier - 1, -1);
-
-    bool fdSupported = true;
-
-    this->frame_0 = Mini::Image(
-        info.device,
-        info.physicalDevice,
-        extent,
-        format,
-        VK_IMAGE_USAGE_TRANSFER_DST_BIT |
-        VK_IMAGE_USAGE_TRANSFER_SRC_BIT |
-        VK_IMAGE_USAGE_SAMPLED_BIT |
-        VK_IMAGE_USAGE_STORAGE_BIT,
-        VK_IMAGE_ASPECT_COLOR_BIT,
-        fdSupported ? &fds[0] : nullptr
-    );
-
-    this->frame_1 = Mini::Image(
-        info.device,
-        info.physicalDevice,
-        extent,
-        format,
-        VK_IMAGE_USAGE_TRANSFER_DST_BIT |
-        VK_IMAGE_USAGE_TRANSFER_SRC_BIT |
-        VK_IMAGE_USAGE_SAMPLED_BIT |
-        VK_IMAGE_USAGE_STORAGE_BIT,
-        VK_IMAGE_ASPECT_COLOR_BIT,
-        fdSupported ? &fds[1] : nullptr
-    );
-
-    for (size_t i = 0; i < conf.multiplier - 1; i++) {
-        this->out_n.emplace_back(
-            info.device,
-            info.physicalDevice,
-            extent,
-            format,
-            VK_IMAGE_USAGE_TRANSFER_SRC_BIT |
-            VK_IMAGE_USAGE_TRANSFER_DST_BIT |
-            VK_IMAGE_USAGE_SAMPLED_BIT |
-            VK_IMAGE_USAGE_STORAGE_BIT,
-            VK_IMAGE_ASPECT_COLOR_BIT,
-            fdSupported ? &outFds[i] : nullptr
-        );
+        if (conf.multiplier <= 1) return;
     }
+    // we could take the format from the swapchain,
+    // but honestly this is safer.
+    const VkFormat format = conf.hdr
+        ? VK_FORMAT_R8G8B8A8_UNORM
+        : VK_FORMAT_R16G16B16A16_SFLOAT;
 
-    bool fdValid =
-        (fds[0] >= 0 && fds[1] >= 0);
+#ifdef __ANDROID__
+    // Android path: use AHardwareBuffer-backed images for sharing with framegen.
+    // Turnip/Mesa on Android doesn't support OPAQUE_FD export, so we use the
+    // AHB path (createContextFromAHB + presentContext with -1 + waitIdle).
 
-    for (auto fd : outFds)
-        fdValid &= (fd >= 0);
+    this->frame_0 = Mini::Image(info.device, info.physicalDevice,
+        extent, format, VK_IMAGE_USAGE_TRANSFER_DST_BIT, VK_IMAGE_ASPECT_COLOR_BIT);
+    this->frame_1 = Mini::Image(info.device, info.physicalDevice,
+        extent, format, VK_IMAGE_USAGE_TRANSFER_DST_BIT, VK_IMAGE_ASPECT_COLOR_BIT);
 
-    this->mode = fdValid
-        ? LsfgMode::ExternalFd
-        : LsfgMode::InternalVk;
+    for (size_t i = 0; i < static_cast<size_t>(conf.multiplier - 1); ++i)
+        this->out_n.emplace_back(info.device, info.physicalDevice,
+            extent, format,
+            VK_IMAGE_USAGE_TRANSFER_SRC_BIT, VK_IMAGE_ASPECT_COLOR_BIT);
 
-    auto* init = LSFG_3_1::initialize;
-    auto* create = LSFG_3_1::createContext;
-    auto* destroy = LSFG_3_1::deleteContext;
-
+    // initialize lsfg
+    auto* lsfgInitialize = LSFG_3_1::initialize;
+    auto* lsfgDeleteContext = LSFG_3_1::deleteContext;
     if (conf.performance) {
-        init = LSFG_3_1P::initialize;
-        create = LSFG_3_1P::createContext;
-        destroy = LSFG_3_1P::deleteContext;
+        lsfgInitialize = LSFG_3_1P::initialize;
+        lsfgDeleteContext = LSFG_3_1P::deleteContext;
     }
 
-    setenv("DISABLE_LSFG", "1", 1);
+    setenv("DISABLE_LSFG", "1", 1); // NOLINT
 
-    init(
+    lsfgInitialize(
         Utils::getDeviceUUID(info.physicalDevice),
-        conf.hdr,
-        1.0F / conf.flowScale,
-        conf.multiplier - 1,
-        globalConf.no_fp16,
-        Extract::getShader
+        conf.hdr, 1.0F / conf.flowScale, conf.multiplier - 1,
+        [](const std::string& name) {
+            auto dxbc = Extract::getShader(name);
+            auto spirv = Extract::translateShader(dxbc);
+            return spirv;
+        }
     );
 
-    if (mode == LsfgMode::ExternalFd) {
+    // Create framegen context using AHB sharing
+    std::vector<AHardwareBuffer*> outAhbs;
+    outAhbs.reserve(conf.multiplier - 1);
+    for (size_t i = 0; i < static_cast<size_t>(conf.multiplier - 1); ++i)
+        outAhbs.push_back(this->out_n.at(i).getAhb());
 
-        this->lsfgCtxId =
-            std::shared_ptr<int32_t>(
-                new int32_t(
-                    create(
-                        fds[0],
-                        fds[1],
-                        outFds,
-                        extent,
-                        format
-                    )
-                ),
-                [destroy](const int32_t* id) {
-                    destroy(*id);
-                }
-            );
+    int32_t ctxId;
+    if (conf.performance)
+        ctxId = LSFG_3_1P::createContextFromAHB(
+            this->frame_0.getAhb(), this->frame_1.getAhb(),
+            outAhbs, extent, format);
+    else
+        ctxId = LSFG_3_1::createContextFromAHB(
+            this->frame_0.getAhb(), this->frame_1.getAhb(),
+            outAhbs, extent, format);
 
-    } else {
+    this->lsfgCtxId = std::shared_ptr<int32_t>(
+        new int32_t(ctxId),
+        [lsfgDeleteContext = lsfgDeleteContext](const int32_t* id) {
+            lsfgDeleteContext(*id);
+        }
+    );
 
-        this->lsfgCtxId =
-            std::shared_ptr<int32_t>(
-                new int32_t(
-                    LSFG_3_1::createContextVk(
-                        frame_0.handle(),
-                        frame_1.handle(),
-                        out_n_handles,
-                        extent,
-                        format
-                    )
-                ),
-                [destroy](const int32_t* id) {
-                    destroy(*id);
-                }
-            );
+    unsetenv("DISABLE_LSFG"); // NOLINT
+
+    std::cerr << "lsfg-vk: Android AHB context created (id=" << ctxId << ")\n";
+
+#else
+    // Desktop Linux path: use OPAQUE_FD-based image sharing
+
+    std::array<int, 2> fds{};
+    this->frame_0 = Mini::Image(info.device, info.physicalDevice,
+        extent, format, VK_IMAGE_USAGE_TRANSFER_DST_BIT, VK_IMAGE_ASPECT_COLOR_BIT,
+        &fds.at(0));
+    this->frame_1 = Mini::Image(info.device, info.physicalDevice,
+        extent, format, VK_IMAGE_USAGE_TRANSFER_DST_BIT, VK_IMAGE_ASPECT_COLOR_BIT,
+        &fds.at(1));
+
+    std::vector<int> outFds(conf.multiplier - 1);
+    for (size_t i = 0; i < (conf.multiplier - 1); ++i)
+        this->out_n.emplace_back(info.device, info.physicalDevice,
+            extent, format,
+            VK_IMAGE_USAGE_TRANSFER_SRC_BIT, VK_IMAGE_ASPECT_COLOR_BIT,
+            &outFds.at(i));
+
+    // initialize lsfg
+    auto* lsfgInitialize = LSFG_3_1::initialize;
+    auto* lsfgCreateContext = LSFG_3_1::createContext;
+    auto* lsfgDeleteContext = LSFG_3_1::deleteContext;
+    if (conf.performance) {
+        lsfgInitialize = LSFG_3_1P::initialize;
+        lsfgCreateContext = LSFG_3_1P::createContext;
+        lsfgDeleteContext = LSFG_3_1P::deleteContext;
     }
 
-    unsetenv("DISABLE_LSFG");
+    setenv("DISABLE_LSFG", "1", 1); // NOLINT
 
-    this->cmdPool =
-        Mini::CommandPool(info.device, info.queue.first);
+    lsfgInitialize(
+        Utils::getDeviceUUID(info.physicalDevice),
+        conf.hdr, 1.0F / conf.flowScale, conf.multiplier - 1,
+        [](const std::string& name) {
+            auto dxbc = Extract::getShader(name);
+            auto spirv = Extract::translateShader(dxbc);
+            return spirv;
+        }
+    );
+
+    this->lsfgCtxId = std::shared_ptr<int32_t>(
+        new int32_t(lsfgCreateContext(fds.at(0), fds.at(1), outFds, extent, format)),
+        [lsfgDeleteContext = lsfgDeleteContext](const int32_t* id) {
+            lsfgDeleteContext(*id);
+        }
+    );
+
+    unsetenv("DISABLE_LSFG"); // NOLINT
+#endif
+
+    // prepare render passes
+    this->cmdPool = Mini::CommandPool(info.device, info.queue.first);
+    for (size_t i = 0; i < 8; i++) {
+        auto& pass = this->passInfos.at(i);
+        pass.renderSemaphores.resize(conf.multiplier - 1);
+        pass.acquireSemaphores.resize(conf.multiplier - 1);
+        pass.postCopyBufs.resize(conf.multiplier - 1);
+        pass.postCopySemaphores.resize(conf.multiplier - 1);
+        pass.prevPostCopySemaphores.resize(conf.multiplier - 1);
+    }
 }
 
-VkResult LsContext::present(
-    const Hooks::DeviceInfo& info,
-    const void* pNext,
-    VkQueue queue,
-    const std::vector<VkSemaphore>& gameRenderSemaphores,
-    uint32_t presentIdx) {
+VkResult LsContext::present(const Hooks::DeviceInfo& info, const void* pNext, VkQueue queue,
+        const std::vector<VkSemaphore>& gameRenderSemaphores, uint32_t presentIdx) {
+    const auto& conf = Config::activeConf;
+    auto& pass = this->passInfos.at(this->frameIdx % 8);
 
-    auto& conf = *Config::currentConf;
-    auto& pass = this->passInfos[this->frameIdx % 8];
+#ifdef __ANDROID__
+    // Android path: synchronous frame generation using waitIdle()
+    // instead of OPAQUE_FD semaphore export which Turnip doesn't support.
 
-    int preCopyFd{};
-
-    pass.preCopySemaphores[0] =
-        Mini::Semaphore(info.device, &preCopyFd);
-
-    pass.preCopySemaphores[1] =
-        Mini::Semaphore(info.device);
-
-    pass.preCopyBuf =
-        Mini::CommandBuffer(info.device, this->cmdPool);
-
+    // 1. copy swapchain image to frame_0/frame_1
+    //    Use a simple semaphore (no fd export) to synchronize the copy
+    pass.preCopySemaphores.at(1) = Mini::Semaphore(info.device);
+    pass.preCopyBuf = Mini::CommandBuffer(info.device, this->cmdPool);
     pass.preCopyBuf.begin();
 
-    Utils::copyImage(
-        pass.preCopyBuf.handle(),
-        this->swapchainImages[presentIdx],
-        (frameIdx % 2 == 0) ? frame_0.handle() : frame_1.handle(),
-        extent.width,
-        extent.height,
-        VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
-        VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
-        true,
-        false
-    );
+    Utils::copyImage(pass.preCopyBuf.handle(),
+        this->swapchainImages.at(presentIdx),
+        this->frameIdx % 2 == 0 ? this->frame_0.handle() : this->frame_1.handle(),
+        this->extent.width, this->extent.height,
+        VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
+        true, false);
 
     pass.preCopyBuf.end();
 
-    pass.preCopyBuf.submit(
-        info.queue.second,
-        gameRenderSemaphores,
-        {
-            pass.preCopySemaphores[0].handle(),
-            pass.preCopySemaphores[1].handle()
-        }
-    );
+    std::vector<VkSemaphore> gameRenderSemaphores2 = gameRenderSemaphores;
+    if (this->frameIdx > 0)
+        gameRenderSemaphores2.emplace_back(this->passInfos.at((this->frameIdx - 1) % 8)
+            .preCopySemaphores.at(1).handle());
 
-    std::vector<int> renderFds(conf.multiplier - 1);
+    // Submit the copy and wait for it to complete synchronously.
+    // On Android we need the copy to finish before calling presentContext
+    // because there's no FD-based cross-device semaphore to chain them.
+    pass.preCopyBuf.submit(info.queue.second,
+        gameRenderSemaphores2,
+        { pass.preCopySemaphores.at(1).handle() });
 
-    for (size_t i = 0; i < conf.multiplier - 1; i++) {
-        pass.renderSemaphores[i] =
-            Mini::Semaphore(info.device, &renderFds[i]);
-    }
+    // Wait for the pre-copy to finish before telling framegen to start.
+    // This is a device-wide idle wait — heavier than semaphore-based sync
+    // but necessary because OPAQUE_FD is not available on Android.
+    Layer::ovkQueueSubmit(info.queue.second, 0, nullptr, VK_NULL_HANDLE);
 
-    if (mode == LsfgMode::ExternalFd) {
+    // 2. Tell framegen to generate intermediary frames
+    //    presentContext(id, -1, {}) — no semaphore FDs, synchronous
+    std::vector<int> noOutSems;  // empty
+    if (conf.performance)
+        LSFG_3_1P::presentContext(*this->lsfgCtxId, -1, noOutSems);
+    else
+        LSFG_3_1::presentContext(*this->lsfgCtxId, -1, noOutSems);
 
-        LSFG_3_1::presentContext(
-            *lsfgCtxId,
-            preCopyFd,
-            renderFds
-        );
+    // 3. Wait for framegen's GPU work to finish before reading output images.
+    //    framegen uses its own VkDevice internally, so we need waitIdle()
+    //    to ensure cross-device synchronization.
+    if (conf.performance)
+        LSFG_3_1P::waitIdle();
+    else
+        LSFG_3_1::waitIdle();
 
-        for (size_t i = 0; i < conf.multiplier - 1; i++) {
-
-            pass.acquireSemaphores[i] =
-                Mini::Semaphore(info.device);
-
-            uint32_t imageIdx{};
-
-            Layer::ovkAcquireNextImageKHR(
-                info.device,
-                swapchain,
-                UINT64_MAX,
-                pass.acquireSemaphores[i].handle(),
-                VK_NULL_HANDLE,
-                &imageIdx
-            );
-
-            Utils::copyImage(
-                pass.postCopyBufs[i].handle(),
-                out_n[i].handle(),
-                swapchainImages[imageIdx],
-                extent.width,
-                extent.height,
-                VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
-                VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
-                false,
-                true
-            );
-
-            Layer::ovkQueuePresentKHR(queue, nullptr);
-        }
-
-    } else {
-
-        LSFG_3_1::presentContextVk(
-            *lsfgCtxId,
-            pass.preCopySemaphores[0].handle(),
-            pass.renderSemaphores,
-            frame_0.handle(),
-            frame_1.handle(),
-            out_n
-        );
-
+    // 4. Copy generated frames to swapchain images and present them
+    for (size_t i = 0; i < static_cast<size_t>(conf.multiplier - 1); i++) {
+        // acquire next swapchain image
+        pass.acquireSemaphores.at(i) = Mini::Semaphore(info.device);
         uint32_t imageIdx{};
+        auto res = Layer::ovkAcquireNextImageKHR(info.device, this->swapchain, UINT64_MAX,
+            pass.acquireSemaphores.at(i).handle(), VK_NULL_HANDLE, &imageIdx);
+        if (res != VK_SUCCESS && res != VK_SUBOPTIMAL_KHR)
+            throw LSFG::vulkan_error(res, "Failed to acquire next swapchain image");
 
-        Layer::ovkAcquireNextImageKHR(
-            info.device,
-            swapchain,
-            UINT64_MAX,
-            pass.preCopySemaphores[1].handle(),
-            VK_NULL_HANDLE,
-            &imageIdx
-        );
+        // copy output image to swapchain image
+        pass.postCopySemaphores.at(i) = Mini::Semaphore(info.device);
+        pass.postCopyBufs.at(i) = Mini::CommandBuffer(info.device, this->cmdPool);
+        pass.postCopyBufs.at(i).begin();
 
-        Utils::copyImage(
-            pass.postCopyBufs[0].handle(),
-            out_n[0].handle(),
-            swapchainImages[imageIdx],
-            extent.width,
-            extent.height,
-            VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
-            VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
-            false,
-            true
-        );
+        Utils::copyImage(pass.postCopyBufs.at(i).handle(),
+            this->out_n.at(i).handle(),
+            this->swapchainImages.at(imageIdx),
+            this->extent.width, this->extent.height,
+            VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
+            false, true);
 
-        Layer::ovkQueuePresentKHR(queue, nullptr);
+        pass.postCopyBufs.at(i).end();
+        pass.postCopyBufs.at(i).submit(info.queue.second,
+            { pass.acquireSemaphores.at(i).handle() },
+            { pass.postCopySemaphores.at(i).handle() });
+
+        // present swapchain image
+        VkSemaphore postCopySem = pass.postCopySemaphores.at(i).handle();
+        const VkPresentInfoKHR presentInfo{
+            .sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR,
+            .pNext = i == 0 ? pNext : nullptr,
+            .waitSemaphoreCount = 1,
+            .pWaitSemaphores = &postCopySem,
+            .swapchainCount = 1,
+            .pSwapchains = &this->swapchain,
+            .pImageIndices = &imageIdx,
+        };
+        res = Layer::ovkQueuePresentKHR(queue, &presentInfo);
+        if (res != VK_SUCCESS && res != VK_SUBOPTIMAL_KHR)
+            throw LSFG::vulkan_error(res, "Failed to present swapchain image");
     }
+
+    // 5. present actual next frame (the real capture, not a generated one)
+    //    Wait for the last post-copy to finish
+    pass.prevPostCopySemaphores.at(conf.multiplier - 1 - 1) = Mini::Semaphore(info.device);
+    VkSemaphore lastPostCopySem = pass.postCopySemaphores.at(conf.multiplier - 1 - 1).handle();
+    const VkPresentInfoKHR finalPresentInfo{
+        .sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR,
+        .waitSemaphoreCount = 1,
+        .pWaitSemaphores = &lastPostCopySem,
+        .swapchainCount = 1,
+        .pSwapchains = &this->swapchain,
+        .pImageIndices = &presentIdx,
+    };
+    auto res = Layer::ovkQueuePresentKHR(queue, &finalPresentInfo);
+    if (res != VK_SUCCESS && res != VK_SUBOPTIMAL_KHR)
+        throw LSFG::vulkan_error(res, "Failed to present swapchain image");
 
     this->frameIdx++;
-    return VK_SUCCESS;
+    return res;
+
+#else
+    // Desktop Linux path: OPAQUE_FD semaphore-based synchronization
+
+    // 1. copy swapchain image to frame_0/frame_1
+    int preCopySemaphoreFd{};
+    pass.preCopySemaphores.at(0) = Mini::Semaphore(info.device, &preCopySemaphoreFd);
+    pass.preCopySemaphores.at(1) = Mini::Semaphore(info.device);
+    pass.preCopyBuf = Mini::CommandBuffer(info.device, this->cmdPool);
+    pass.preCopyBuf.begin();
+
+    Utils::copyImage(pass.preCopyBuf.handle(),
+        this->swapchainImages.at(presentIdx),
+        this->frameIdx % 2 == 0 ? this->frame_0.handle() : this->frame_1.handle(),
+        this->extent.width, this->extent.height,
+        VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
+        true, false);
+
+    pass.preCopyBuf.end();
+
+    std::vector<VkSemaphore> gameRenderSemaphores2 = gameRenderSemaphores;
+    if (this->frameIdx > 0)
+        gameRenderSemaphores2.emplace_back(this->passInfos.at((this->frameIdx - 1) % 8)
+            .preCopySemaphores.at(1).handle());
+    pass.preCopyBuf.submit(info.queue.second,
+        gameRenderSemaphores2,
+        { pass.preCopySemaphores.at(0).handle(),
+          pass.preCopySemaphores.at(1).handle() });
+
+    // 2. render intermediary frames
+    std::vector<int> renderSemaphoreFds(conf.multiplier - 1);
+    for (size_t i = 0; i < (conf.multiplier - 1); ++i)
+        pass.renderSemaphores.at(i) = Mini::Semaphore(info.device, &renderSemaphoreFds.at(i));
+
+    if (conf.performance)
+        LSFG_3_1P::presentContext(*this->lsfgCtxId,
+            preCopySemaphoreFd,
+            renderSemaphoreFds);
+    else
+        LSFG_3_1::presentContext(*this->lsfgCtxId,
+            preCopySemaphoreFd,
+            renderSemaphoreFds);
+
+    for (size_t i = 0; i < (conf.multiplier - 1); i++) {
+        // 3. acquire next swapchain image
+        pass.acquireSemaphores.at(i) = Mini::Semaphore(info.device);
+        uint32_t imageIdx{};
+        auto res = Layer::ovkAcquireNextImageKHR(info.device, this->swapchain, UINT64_MAX,
+            pass.acquireSemaphores.at(i).handle(), VK_NULL_HANDLE, &imageIdx);
+        if (res != VK_SUCCESS && res != VK_SUBOPTIMAL_KHR)
+            throw LSFG::vulkan_error(res, "Failed to acquire next swapchain image");
+
+        // 4. copy output image to swapchain image
+        pass.postCopySemaphores.at(i) = Mini::Semaphore(info.device);
+        pass.prevPostCopySemaphores.at(i) = Mini::Semaphore(info.device);
+        pass.postCopyBufs.at(i) = Mini::CommandBuffer(info.device, this->cmdPool);
+        pass.postCopyBufs.at(i).begin();
+
+        Utils::copyImage(pass.postCopyBufs.at(i).handle(),
+            this->out_n.at(i).handle(),
+            this->swapchainImages.at(imageIdx),
+            this->extent.width, this->extent.height,
+            VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
+            false, true);
+
+        pass.postCopyBufs.at(i).end();
+        pass.postCopyBufs.at(i).submit(info.queue.second,
+            { pass.acquireSemaphores.at(i).handle(),
+              pass.renderSemaphores.at(i).handle() },
+            { pass.postCopySemaphores.at(i).handle(),
+              pass.prevPostCopySemaphores.at(i).handle() });
+
+        // 5. present swapchain image
+        std::vector<VkSemaphore> waitSemaphores{ pass.postCopySemaphores.at(i).handle() };
+        if (i != 0) waitSemaphores.emplace_back(pass.prevPostCopySemaphores.at(i - 1).handle());
+
+        const VkPresentInfoKHR presentInfo{
+            .sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR,
+            .pNext = i == 0 ? pNext : nullptr, // only set on first present
+            .waitSemaphoreCount = static_cast<uint32_t>(waitSemaphores.size()),
+            .pWaitSemaphores = waitSemaphores.data(),
+            .swapchainCount = 1,
+            .pSwapchains = &this->swapchain,
+            .pImageIndices = &imageIdx,
+        };
+        res = Layer::ovkQueuePresentKHR(queue, &presentInfo);
+        if (res != VK_SUCCESS && res != VK_SUBOPTIMAL_KHR)
+            throw LSFG::vulkan_error(res, "Failed to present swapchain image");
+    }
+
+    // 6. present actual next frame
+    VkSemaphore lastPrevPostCopySemaphore =
+        pass.prevPostCopySemaphores.at(conf.multiplier - 1 - 1).handle();
+    const VkPresentInfoKHR presentInfo{
+        .sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR,
+        .waitSemaphoreCount = 1,
+        .pWaitSemaphores = &lastPrevPostCopySemaphore,
+        .swapchainCount = 1,
+        .pSwapchains = &this->swapchain,
+        .pImageIndices = &presentIdx,
+    };
+    auto res = Layer::ovkQueuePresentKHR(queue, &presentInfo);
+    if (res != VK_SUCCESS && res != VK_SUBOPTIMAL_KHR)
+        throw LSFG::vulkan_error(res, "Failed to present swapchain image");
+
+    this->frameIdx++;
+    return res;
+#endif
 }
