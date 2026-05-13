@@ -51,6 +51,29 @@ jobs:
           -DLSFGVK_INSTALL_XDG_FILES=OFF \
           -DLSFGVK_LAYER_LIBRARY_PATH="/data/data/com.termux/files/usr/glibc/lib/liblsfg-vk-layer.so"
 
+    - name: Run mpv test
+      run: |
+        DISPLAY=:0 \
+        XDG_RUNTIME_DIR="/run/user/$(id -u)" \
+        VK_ICD_FILENAMES=/usr/share/vulkan/icd.d/panfrost_icd.json \
+        VK_INSTANCE_LAYERS=VK_LAYER_LSFGVK_frame_generation \
+        mpv \
+          --no-config \
+          --vo=gpu \
+          --gpu-api=vulkan \
+          --gpu-context=x11vk \
+          --fullscreen \
+          --untimed \
+          --no-audio \
+          --cache=no \
+          --video-sync=desync \
+          --framedrop=vo \
+          --profile=low-latency \
+          --hwdec=no \
+          --osc=no \
+          --osd-level=0 \
+          --demuxer=lavf
+
     - name: Build with Ninja
       run: |
         ninja -C build
