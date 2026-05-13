@@ -30,35 +30,12 @@ jobs:
         unzip android-ndk-r26d-linux.zip
         echo "NDK=$PWD/android-ndk-r26d" >> $GITHUB_ENV
 
-    - name: Copy Android headers to /usr/include  
-      run: |  
-        sudo mkdir -p /usr/include/android  
-        sudo cp -r $NDK/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/include/android/* /usr/include/android/  
-        sudo chmod -R 644 /usr/include/android
-        sudo chmod -R a+rX /usr/include/android
-
     - name: Update Vulkan headers
       run: |
         git clone -b vulkan-sdk-1.4.328 https://github.com/KhronosGroup/Vulkan-Headers /tmp/vkh
         sudo rm -rf /usr/include/{vulkan,vk_video}
         sudo mv /tmp/vkh/include/{vulkan,vk_video} /usr/include/
         rm -rf /tmp/vkh
-
-    - name: Android Turnip patches
-      run: |
-        find . -type f \( -name "*.cpp" -o -name "*.hpp" \) | while read f; do
-          sed -i '/#ifdef __ANDROID__/d' "$f"
-          sed -i '/#endif/d' "$f"
-        done
-        # curl -L https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/include/mini/semaphore.hpp -o include/mini/semaphore.hpp
-        # curl -L https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/path/semaphore.cpp -o src/mini/semaphore.cpp
-        curl -L https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/path/device.cpp -o framegen/src/core/device.cpp
-        # curl -L https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/include/utils/utils.hpp -o include/utils/utils.hpp
-        # curl -L https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/src/utils/utils.cpp -o src/utils/utils.cpp
-        # curl -L https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/include/context.hpp -o include/context.hpp
-        curl -L https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/src/context.cpp -o src/context.cpp
-        # curl -L https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/framegen/v3.1_src/lsfg.cpp -o framegen/v3.1_src/lsfg.cpp
-        # curl -L https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/framegen/v3.1p_src/lsfg.cpp -o framegen/v3.1p_src/lsfg.cpp
  
     - name: Configure lsfg-vk
       run: |        
