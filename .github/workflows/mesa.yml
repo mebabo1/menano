@@ -162,7 +162,6 @@ jobs:
            -Dglx=dri \
            -Degl=enabled \
            -Dglvnd=enabled \
-           -Dallow-fallback-for='libdrm,perfetto' \
            -Dmicrosoft-clc=disabled \
            -Dllvm=enabled \
            -Dshared-llvm=enabled \
