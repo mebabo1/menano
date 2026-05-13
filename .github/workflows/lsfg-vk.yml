@@ -30,6 +30,12 @@ jobs:
         unzip android-ndk-r26d-linux.zip
         echo "NDK=$PWD/android-ndk-r26d" >> $GITHUB_ENV
 
+    - name: Copy Android headers to /usr/include  
+      run: |  
+        sudo mkdir -p /usr/include/android  
+        sudo cp -r $NDK/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/include/android/* /usr/include/android/  
+        sudo chmod -R 644 /usr/include/android
+
     - name: Update Vulkan headers
       run: |
         git clone -b vulkan-sdk-1.4.328 https://github.com/KhronosGroup/Vulkan-Headers /tmp/vkh
