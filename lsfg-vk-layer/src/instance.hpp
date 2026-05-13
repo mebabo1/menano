@@ -122,6 +122,27 @@ namespace lsfgvk::layer {
             deviceExtensionsStorage;
 
         // =====================================================
+        // SAFE FEATURE STORAGE
+        //
+        // prevents dangling pNext chains:
+        // createInfo.pNext
+        //
+        // Winevulkan/DXVK may access pNext structures
+        // after callback scope exits.
+        // =====================================================
+
+        mutable std::optional<
+            VkPhysicalDeviceTimelineSemaphoreFeatures>
+                timelineSemaphoreFeaturesStorage;
+
+        // Optional future-safe storage
+        // for VK_KHR_synchronization2 support.
+
+        mutable std::optional<
+            VkPhysicalDeviceSynchronization2Features>
+                synchronization2FeaturesStorage;
+
+        // =====================================================
         // BACKEND
         // =====================================================
 
