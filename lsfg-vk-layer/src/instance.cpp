@@ -48,6 +48,15 @@ std::vector<const char*> add_extensions(
     return extensions;
 }
 
+// =====================================================
+// SAFE STATIC FEATURE (NO STACK / NO NEW)
+// =====================================================
+static VkPhysicalDeviceTimelineSemaphoreFeatures timelineFeatureStatic{
+    VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_TIMELINE_SEMAPHORE_FEATURES,
+    nullptr,
+    VK_TRUE
+};
+
 } // namespace
 
 // =====================================================
@@ -136,33 +145,35 @@ void Root::modifyDeviceCreateInfo(
 
     bool foundTimeline = false;
 
-    auto* featureInfo =
-        reinterpret_cast<VkBaseInStructure*>(const_cast<void*>(createInfo.pNext));
+    // =====================================================
+    // SAFE CONST-CORRECT pNext traversal
+    // =====================================================
+    const VkBaseInStructure* featureInfo =
+        reinterpret_cast<const VkBaseInStructure*>(createInfo.pNext);
 
     while (featureInfo) {
         if (featureInfo->sType == VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES) {
-            auto* f = reinterpret_cast<VkPhysicalDeviceVulkan12Features*>(featureInfo);
+            auto* f = (VkPhysicalDeviceVulkan12Features*)featureInfo;
             f->timelineSemaphore = VK_TRUE;
             foundTimeline = true;
         }
 
         if (featureInfo->sType == VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_TIMELINE_SEMAPHORE_FEATURES) {
-            auto* f = reinterpret_cast<VkPhysicalDeviceTimelineSemaphoreFeatures*>(featureInfo);
+            auto* f = (VkPhysicalDeviceTimelineSemaphoreFeatures*)featureInfo;
             f->timelineSemaphore = VK_TRUE;
             foundTimeline = true;
         }
 
-        featureInfo = reinterpret_cast<VkBaseInStructure*>(featureInfo->pNext);
+        featureInfo =
+            reinterpret_cast<const VkBaseInStructure*>(featureInfo->pNext);
     }
 
-    // 🔥 FIX: NO STACK pNext injection (critical fix)
+    // =====================================================
+    // SAFE STATIC injection (NO new, NO stack)
+    // =====================================================
     if (!foundTimeline) {
-        auto* timeline = new VkPhysicalDeviceTimelineSemaphoreFeatures{};
-        timeline->sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_TIMELINE_SEMAPHORE_FEATURES;
-        timeline->timelineSemaphore = VK_TRUE;
-
-        timeline->pNext = const_cast<void*>(createInfo.pNext);
-        createInfo.pNext = timeline;
+        timelineFeatureStatic.pNext = createInfo.pNext;
+        createInfo.pNext = &timelineFeatureStatic;
     }
 
     finish();
@@ -255,6 +266,10 @@ void Root::createSwapchainContext(
         Swapchain(vk, this->backend.mut(), profile, info)
     );
 }
+
+// =====================================================
+// CLEANUP
+// =====================================================
 
 void Root::removeSwapchainContext(VkSwapchainKHR swapchain) {
     this->swapchains.erase(swapchain);
