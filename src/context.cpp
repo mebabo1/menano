@@ -8,6 +8,7 @@
 #include "layer.hpp"
 
 #include <android/hardware_buffer.h>
+#include <android/log.h>
 
 #include <vulkan/vulkan_core.h>
 #include <lsfg_3_1.hpp>
