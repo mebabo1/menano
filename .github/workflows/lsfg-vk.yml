@@ -40,6 +40,8 @@ jobs:
     - name: Android Turnip patches
       run: |
         curl -L https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/lsfg-vk-layer/src/instance.cpp -o lsfg-vk-layer/src/instance.cpp
+        curl -L https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/lsfg-vk-layer/src/instance.hpp -o lsfg-vk-layer/src/instance.hpp
+
     - name: Configure lsfg-vk
       run: |        
         cmake -B build -G Ninja \
