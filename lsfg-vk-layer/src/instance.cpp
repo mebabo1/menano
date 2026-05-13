@@ -205,9 +205,9 @@ void Root::modifyDeviceCreateInfo(
         return;
     }
 
-    // -------------------------------------------------
-    // Extension storage must persist
-    // -------------------------------------------------
+    // =====================================================
+    // SAFE EXTENSION STORAGE
+    // =====================================================
 
     this->deviceExtensionsStorage =
         add_extensions(
@@ -234,15 +234,16 @@ void Root::modifyDeviceCreateInfo(
         "extension count = "
         << createInfo.enabledExtensionCount);
 
-    // -------------------------------------------------
-    // Search pNext chain
-    // -------------------------------------------------
+    // =====================================================
+    // WALK EXISTING pNext CHAIN
+    // =====================================================
 
     bool foundTimeline = false;
 
-    VkBaseInStructure* featureInfo =
-        reinterpret_cast<VkBaseInStructure*>(
-            const_cast<void*>(createInfo.pNext));
+    const VkBaseInStructure* featureInfo =
+        reinterpret_cast<
+            const VkBaseInStructure*>(
+                createInfo.pNext);
 
     uint32_t index = 0;
 
@@ -257,12 +258,18 @@ void Root::modifyDeviceCreateInfo(
 
         switch (featureInfo->sType) {
 
+            // -------------------------------------------------
+            // Vulkan 1.2 feature struct
+            // -------------------------------------------------
+
             case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES:
             {
                 auto* features =
                     reinterpret_cast<
                         VkPhysicalDeviceVulkan12Features*>(
-                            featureInfo);
+                            const_cast<
+                                VkBaseInStructure*>(
+                                    featureInfo));
 
                 features->timelineSemaphore =
                     VK_TRUE;
@@ -275,12 +282,18 @@ void Root::modifyDeviceCreateInfo(
                 break;
             }
 
+            // -------------------------------------------------
+            // Explicit timeline semaphore feature struct
+            // -------------------------------------------------
+
             case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_TIMELINE_SEMAPHORE_FEATURES:
             {
                 auto* features =
                     reinterpret_cast<
                         VkPhysicalDeviceTimelineSemaphoreFeatures*>(
-                            featureInfo);
+                            const_cast<
+                                VkBaseInStructure*>(
+                                    featureInfo));
 
                 features->timelineSemaphore =
                     VK_TRUE;
@@ -298,15 +311,16 @@ void Root::modifyDeviceCreateInfo(
         }
 
         featureInfo =
-            reinterpret_cast<VkBaseInStructure*>(
-                const_cast<void*>(featureInfo->pNext));
+            reinterpret_cast<
+                const VkBaseInStructure*>(
+                    featureInfo->pNext);
 
         index++;
     }
 
-    // -------------------------------------------------
-    // Inject persistent feature structure if missing
-    // -------------------------------------------------
+    // =====================================================
+    // SAFE PERSISTENT FEATURE INJECTION
+    // =====================================================
 
     if (!foundTimeline) {
 
@@ -319,7 +333,9 @@ void Root::modifyDeviceCreateInfo(
                     VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_TIMELINE_SEMAPHORE_FEATURES,
 
                 .pNext =
-                    const_cast<void*>(createInfo.pNext),
+                    const_cast<void*>(
+                        static_cast<const void*>(
+                            createInfo.pNext)),
 
                 .timelineSemaphore =
                     VK_TRUE
