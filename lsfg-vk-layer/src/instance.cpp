@@ -29,18 +29,6 @@ namespace {
 #define LOG(tag, msg) \
     std::cerr << "[LSFG][" << tag << "] " << msg << std::endl
 
-// =====================================================
-// SAFE EXTENSION STORAGE
-// prevents dangling ppEnabledExtensionNames
-// =====================================================
-
-thread_local std::vector<const char*> g_instanceExtensions;
-thread_local std::vector<const char*> g_deviceExtensions;
-
-// =====================================================
-// helper
-// =====================================================
-
 std::vector<const char*> add_extensions(
     const char* const* existingExtensions,
     size_t count,
@@ -51,6 +39,9 @@ std::vector<const char*> add_extensions(
     extensions.reserve(count + requiredExtensions.size());
 
     for (size_t i = 0; i < count; i++) {
+
+        if (!existingExtensions)
+            break;
 
         if (!existingExtensions[i])
             continue;
@@ -169,21 +160,24 @@ void Root::modifyInstanceCreateInfo(
         return;
     }
 
-    g_instanceExtensions = add_extensions(
-        createInfo.ppEnabledExtensionNames,
-        createInfo.enabledExtensionCount,
-        {
-            "VK_KHR_get_physical_device_properties2",
-            "VK_KHR_external_memory_capabilities",
-            "VK_KHR_external_semaphore_capabilities"
-        });
+    this->instanceExtensionsStorage =
+        add_extensions(
+            createInfo.ppEnabledExtensionNames,
+            createInfo.enabledExtensionCount,
+            {
+                "VK_KHR_get_physical_device_properties2",
+                "VK_KHR_external_memory_capabilities",
+                "VK_KHR_external_semaphore_capabilities"
+            });
 
     createInfo.enabledExtensionCount =
         static_cast<uint32_t>(
-            g_instanceExtensions.size());
+            this->instanceExtensionsStorage.size());
 
     createInfo.ppEnabledExtensionNames =
-        g_instanceExtensions.data();
+        this->instanceExtensionsStorage.empty()
+            ? nullptr
+            : this->instanceExtensionsStorage.data();
 
     LOG("Instance",
         "extension count = "
@@ -210,31 +204,30 @@ void Root::modifyDeviceCreateInfo(
         return;
     }
 
-    g_deviceExtensions = add_extensions(
-        createInfo.ppEnabledExtensionNames,
-        createInfo.enabledExtensionCount,
-        {
-            "VK_KHR_external_memory",
-            "VK_KHR_external_memory_fd",
-            "VK_KHR_external_semaphore",
-            "VK_KHR_external_semaphore_fd",
-            "VK_KHR_timeline_semaphore"
-        });
+    this->deviceExtensionsStorage =
+        add_extensions(
+            createInfo.ppEnabledExtensionNames,
+            createInfo.enabledExtensionCount,
+            {
+                "VK_KHR_external_memory",
+                "VK_KHR_external_memory_fd",
+                "VK_KHR_external_semaphore",
+                "VK_KHR_external_semaphore_fd",
+                "VK_KHR_timeline_semaphore"
+            });
 
     createInfo.enabledExtensionCount =
         static_cast<uint32_t>(
-            g_deviceExtensions.size());
+            this->deviceExtensionsStorage.size());
 
     createInfo.ppEnabledExtensionNames =
-        g_deviceExtensions.data();
+        this->deviceExtensionsStorage.empty()
+            ? nullptr
+            : this->deviceExtensionsStorage.data();
 
     LOG("Device",
         "extension count = "
         << createInfo.enabledExtensionCount);
-
-    // =====================================================
-    // SAFE pNext traversal
-    // =====================================================
 
     bool foundTimeline = false;
 
@@ -261,16 +254,18 @@ void Root::modifyDeviceCreateInfo(
                 auto* features =
                     reinterpret_cast<
                         VkPhysicalDeviceVulkan12Features*>(
-                            const_cast<VkBaseInStructure*>(
-                                featureInfo));
+                            const_cast<
+                                VkBaseInStructure*>(
+                                    featureInfo));
 
                 features->timelineSemaphore =
                     VK_TRUE;
 
+                foundTimeline = true;
+
                 LOG("Device",
                     "Enabled Vulkan12 timelineSemaphore");
 
-                foundTimeline = true;
                 break;
             }
 
@@ -279,16 +274,18 @@ void Root::modifyDeviceCreateInfo(
                 auto* features =
                     reinterpret_cast<
                         VkPhysicalDeviceTimelineSemaphoreFeatures*>(
-                            const_cast<VkBaseInStructure*>(
-                                featureInfo));
+                            const_cast<
+                                VkBaseInStructure*>(
+                                    featureInfo));
 
                 features->timelineSemaphore =
                     VK_TRUE;
 
+                foundTimeline = true;
+
                 LOG("Device",
                     "Enabled TimelineSemaphore");
 
-                foundTimeline = true;
                 break;
             }
 
