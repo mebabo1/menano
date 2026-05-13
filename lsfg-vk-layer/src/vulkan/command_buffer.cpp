@@ -199,63 +199,177 @@ void CommandBuffer::end(const vk::Vulkan& vk) const {
         throw ls::vulkan_error(res, "vkEndCommandBuffer() failed");
 }
 
-void CommandBuffer::submit(const vk::Vulkan& vk,
+void CommandBuffer::submit(
+        const vk::Vulkan& vk,
         std::vector<VkSemaphore> waitSemaphores,
-        VkSemaphore waitTimelineSemaphore, uint64_t waitValue,
+        VkSemaphore waitTimelineSemaphore,
+        uint64_t waitValue,
         std::vector<VkSemaphore> signalSemaphores,
-        VkSemaphore signalTimelineSemaphore, uint64_t signalValue,
-        VkFence fence) const {
-    // create arrays of semaphores and values
-    if (waitTimelineSemaphore)
-        waitSemaphores.push_back(waitTimelineSemaphore);
+        VkSemaphore signalTimelineSemaphore,
+        uint64_t signalValue,
+        VkFence fence) const
+{
+    // =====================================================
+    // TIMELINE SEMAPHORE SETUP
+    // =====================================================
 
-    std::vector<uint64_t> waitValues(waitSemaphores.size(), 0);
-    waitValues.back() = waitValue;
+    bool hasTimelineWait =
+        waitTimelineSemaphore != VK_NULL_HANDLE;
 
-    if (signalTimelineSemaphore)
-        signalSemaphores.push_back(signalTimelineSemaphore);
+    bool hasTimelineSignal =
+        signalTimelineSemaphore != VK_NULL_HANDLE;
 
-    std::vector<uint64_t> signalValues(signalSemaphores.size(), 0);
-    signalValues.back() = signalValue;
+    if (hasTimelineWait) {
+        waitSemaphores.push_back(
+            waitTimelineSemaphore);
+    }
 
-    // create submit info
-    const VkTimelineSemaphoreSubmitInfo timelineInfo{
-        .sType = VK_STRUCTURE_TYPE_TIMELINE_SEMAPHORE_SUBMIT_INFO,
-        .waitSemaphoreValueCount = static_cast<uint32_t>(waitValues.size()),
-        .pWaitSemaphoreValues = waitValues.data(),
-        .signalSemaphoreValueCount = static_cast<uint32_t>(signalValues.size()),
-        .pSignalSemaphoreValues = signalValues.data()
-    };
-    std::vector<VkPipelineStageFlags> stages(waitSemaphores.size(),
-        VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT);
+    if (hasTimelineSignal) {
+        signalSemaphores.push_back(
+            signalTimelineSemaphore);
+    }
+
+    // =====================================================
+    // TIMELINE VALUES
+    // =====================================================
+
+    std::vector<uint64_t> waitValues(
+        waitSemaphores.size(),
+        0);
+
+    std::vector<uint64_t> signalValues(
+        signalSemaphores.size(),
+        0);
+
+    if (hasTimelineWait && !waitValues.empty()) {
+        waitValues.back() = waitValue;
+    }
+
+    if (hasTimelineSignal && !signalValues.empty()) {
+        signalValues.back() = signalValue;
+    }
+
+    // =====================================================
+    // PIPELINE STAGES
+    // =====================================================
+
+    std::vector<VkPipelineStageFlags> stages(
+        waitSemaphores.size(),
+        VK_PIPELINE_STAGE_ALL_COMMANDS_BIT);
+
+    // =====================================================
+    // OPTIONAL TIMELINE INFO
+    // =====================================================
+
+    VkTimelineSemaphoreSubmitInfo timelineInfo{};
+    const void* next = nullptr;
+
+    if (hasTimelineWait || hasTimelineSignal) {
+
+        timelineInfo =
+            VkTimelineSemaphoreSubmitInfo{
+                .sType =
+                    VK_STRUCTURE_TYPE_TIMELINE_SEMAPHORE_SUBMIT_INFO,
+
+                .pNext = nullptr,
+
+                .waitSemaphoreValueCount =
+                    static_cast<uint32_t>(
+                        waitValues.size()),
+
+                .pWaitSemaphoreValues =
+                    waitValues.empty()
+                        ? nullptr
+                        : waitValues.data(),
+
+                .signalSemaphoreValueCount =
+                    static_cast<uint32_t>(
+                        signalValues.size()),
+
+                .pSignalSemaphoreValues =
+                    signalValues.empty()
+                        ? nullptr
+                        : signalValues.data()
+            };
+
+        next = &timelineInfo;
+    }
+
+    // =====================================================
+    // SUBMIT INFO
+    // =====================================================
+
     const VkSubmitInfo submitInfo{
         .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
-        .pNext = &timelineInfo,
-        .waitSemaphoreCount = static_cast<uint32_t>(waitSemaphores.size()),
-        .pWaitSemaphores = waitSemaphores.data(),
-        .pWaitDstStageMask = stages.data(),
+
+        .pNext = next,
+
+        .waitSemaphoreCount =
+            static_cast<uint32_t>(
+                waitSemaphores.size()),
+
+        .pWaitSemaphores =
+            waitSemaphores.empty()
+                ? nullptr
+                : waitSemaphores.data(),
+
+        .pWaitDstStageMask =
+            stages.empty()
+                ? nullptr
+                : stages.data(),
+
         .commandBufferCount = 1,
-        .pCommandBuffers = &*this->commandBuffer,
-        .signalSemaphoreCount = static_cast<uint32_t>(signalSemaphores.size()),
-        .pSignalSemaphores = signalSemaphores.data()
+
+        .pCommandBuffers =
+            &*this->commandBuffer,
+
+        .signalSemaphoreCount =
+            static_cast<uint32_t>(
+                signalSemaphores.size()),
+
+        .pSignalSemaphores =
+            signalSemaphores.empty()
+                ? nullptr
+                : signalSemaphores.data()
     };
-    auto res = vk.df().QueueSubmit(vk.queue(), 1, &submitInfo, fence);
-    if (res != VK_SUCCESS)
-        throw ls::vulkan_error(res, "vkQueueSubmit() failed");
-}
 
+    // =====================================================
+    // DEBUG LOGGING
+    // =====================================================
 
-void CommandBuffer::submit(const vk::Vulkan& vk) const {
-    const VkSubmitInfo submitInfo{
-        .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
-        .commandBufferCount = 1,
-        .pCommandBuffers = &*this->commandBuffer
-    };
-    const vk::Fence fence{vk};
-    auto res = vk.df().QueueSubmit(vk.queue(), 1, &submitInfo, fence.handle());
-    if (res != VK_SUCCESS)
-        throw ls::vulkan_error(res, "vkQueueSubmit() failed");
+    std::cerr
+        << "[LSFG][Submit] "
+        << "waitCount="
+        << waitSemaphores.size()
+        << " signalCount="
+        << signalSemaphores.size()
+        << " waitTimeline="
+        << hasTimelineWait
+        << " signalTimeline="
+        << hasTimelineSignal
+        << std::endl;
 
-    if (!fence.wait(vk))
-        throw ls::vulkan_error(VK_TIMEOUT, "Fence::wait() timed out");
+    // =====================================================
+    // SUBMIT
+    // =====================================================
+
+    auto res =
+        vk.df().QueueSubmit(
+            vk.queue(),
+            1,
+            &submitInfo,
+            fence);
+
+    if (res != VK_SUCCESS) {
+
+        std::cerr
+            << "[LSFG][Submit] "
+            << "QueueSubmit failed: "
+            << res
+            << std::endl;
+
+        throw ls::vulkan_error(
+            res,
+            "vkQueueSubmit() failed");
+    }
 }
