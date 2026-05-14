@@ -10,6 +10,8 @@
 #include "lsfg-vk-common/vulkan/shader.hpp"
 #include "lsfg-vk-common/vulkan/vulkan.hpp"
 
+#include <iostream>
+
 #include <cstdint>
 #include <optional>
 #include <utility>
