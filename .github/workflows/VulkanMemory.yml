@@ -1,58 +1,46 @@
-name: Build code (ARM64 for Termux glibc)
+name: Build VMA (ARM64 for Termux glibc)
 
 on:
-  push:
-  pull_request:
-  workflow_dispatch:
+  workflow_dispatch: # 수동 실행
 
 jobs:
-  arm64-build:
+  build:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v4
+    - name: Checkout VMA
+      uses: actions/checkout@v4
+      with:
+        repository: GPUOpen-LibrariesAndSDKs/VulkanMemoryAllocator
+        fetch-depth: 0
 
-    - name: Install ARM64 Cross-Compiler & Build Tools
+    - name: Install ARM64 Toolchain
       run: |
         sudo apt update
-        sudo apt install -y \
-          gcc-aarch64-linux-gnu \
-          g++-aarch64-linux-gnu \
-          cmake ninja-build pkg-config
+        sudo apt install -y gcc-aarch64-linux-gnu g++-aarch64-linux-gnu cmake ninja-build
 
     - name: Setup Vulkan Headers
       run: |
-        # 특정 태그 대신 main 브랜치 혹은 안정적인 최신 헤더를 가져옵니다.
-        # 버전이 꼭 중요하다면 v1.3.283 (뒤에 .0 제외)으로 시도하세요.
         git clone --depth 1 https://github.com/KhronosGroup/Vulkan-Headers.git
         echo "VULKAN_HEADERS_DIR=$GITHUB_WORKSPACE/Vulkan-Headers" >> $GITHUB_ENV
 
-    - name: Configure CMake for ARM64 (Cross-Compile)
+    - name: Configure CMake
       run: |
-        # 빌드 디렉토리 생성
-        mkdir -p build
-        
-        # 크로스 컴파일 핵심 설정
+        # VMA는 루트에 CMakeLists.txt가 있으므로 -S . 을 사용합니다.
         cmake -S . -B build -G Ninja \
-          -DCMAKE_BUILD_TYPE=Release \
           -DCMAKE_SYSTEM_NAME=Linux \
           -DCMAKE_SYSTEM_PROCESSOR=aarch64 \
           -DCMAKE_C_COMPILER=aarch64-linux-gnu-gcc \
           -DCMAKE_CXX_COMPILER=aarch64-linux-gnu-g++ \
           -DVulkan_INCLUDE_DIR=$VULKAN_HEADERS_DIR/include \
-          -DCMAKE_CXX_FLAGS="-Wall -Wextra" \
-          # [중요] 링크 시 실제 libvulkan.so가 없어도 통과하도록 설정하거나 
-          # 런타임에 동적 로딩을 한다면 아래 옵션이 필요할 수 있습니다.
+          -DVMA_BUILD_SAMPLES=OFF \
+          -DVMA_BUILD_TESTS=OFF \
           -DCMAKE_EXE_LINKER_FLAGS="-Wl,--allow-shlib-undefined"
 
     - name: Build
-      run: |
-        cmake --build build --parallel $(nproc)
+      run: cmake --build build --parallel $(nproc)
 
     - name: Upload Artifact
       uses: actions/upload-artifact@v4
       with:
-        name: build-arm64
-        # 빌드된 결과물 파일명이나 디렉토리에 맞춰 수정하세요 (예: build/lsfg-vk)
-        path: |
-          build/*.so
-          build/lsfg-vk
+        name: vma-arm64
+        path: build/
