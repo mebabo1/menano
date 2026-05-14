@@ -32,23 +32,23 @@ jobs:
         fetch-depth: 1
       
     - name: Java setup
+    - name: Java setup
       uses: actions/setup-java@v4
       with:
         distribution: 'temurin'
         java-version: '17'
-        
-    - name: Restore cache
-      uses: actions/cache@v4
-      with:
-          path: |
-            ~/.gradle/caches
-            ~/.gradle/wrapper
-          key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*') }}
-          restore-keys: |
-            ${{ runner.os }}-gradle-
+
+    - name: Install Gradle & Repair Wrapper
+      run: |
+        # 1. Gradle 설치
+        sudo apt-get update
+        sudo apt-get install -y gradle
+
+        gradle wrapper
+        chmod +x gradlew
 
     - name: Build
-      run: chmod +x gradlew && ./gradlew assembleDebug
+      run: ./gradlew assembleDebug
 
     - name: Build companion package
       run: ./build_termux_package || echo "Companion build script not found or failed, skipping."
