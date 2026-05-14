@@ -24,17 +24,6 @@ jobs:
         wget https://dl.google.com/android/repository/android-ndk-r27-linux.zip
         unzip -q android-ndk-r27-linux.zip
         echo "ANDROID_NDK_HOME=$GITHUB_WORKSPACE/android-ndk-r27" >> $GITHUB_ENV
-
-    - name: Patch Vulkan Headers for Android
-      run: |
-        find . -type f \( -name "*.cpp" -o -name "*.hpp" \) | while read f; do
-          sed -i 's|#include <vulkan/vulkan.h>|#define VK_USE_PLATFORM_ANDROID_KHR\n#define VK_NO_PROTOTYPES\n#include <volk.h>\n#include <vulkan/vulkan_android.h>|g' "$f"
-          sed -i 's|#include <vulkan/vulkan_core.h>|#define VK_USE_PLATFORM_ANDROID_KHR\n#define VK_NO_PROTOTYPES\n#include <volk.h>\n#include <vulkan/vulkan_android.h>|g' "$f"
-        done
-
-    - name: Patch Android AHB Vulkan code
-      run: |
-        sed -i '/vkGetAndroidHardwareBufferPropertiesANDROID/d' lsfg-vk-android/framegen/src/core/image.cpp
       
     - name: Configure lsfg-vk for Termux Bionic
       run: |
