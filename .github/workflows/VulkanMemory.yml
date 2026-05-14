@@ -42,7 +42,8 @@ jobs:
           -DLSFGVK_INSTALL_XDG_FILES=OFF \
           -DLSFGVK_LAYER_LIBRARY_PATH="/data/data/com.termux/files/usr/lib/liblsfg-vk-layer.so" \
           -DCMAKE_CXX_FLAGS="-DVK_USE_PLATFORM_ANDROID_KHR" \
-          -DCMAKE_SHARED_LINKER_FLAGS="-lvulkan -llog -landroid" # [핵심 수정] 라이브러리 강제 링크
+          -DCMAKE_SHARED_LINKER_FLAGS="-lvulkan -llog -landroid" \
+          -DCMAKE_EXE_LINKER_FLAGS="-lvulkan -llog -landroid"
           
     - name: Build
       run: cmake --build build --parallel $(nproc)
