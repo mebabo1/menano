@@ -34,7 +34,7 @@ jobs:
         cmake -S lsfg-vk-android -B build -G Ninja \
           -DCMAKE_TOOLCHAIN_FILE=$ANDROID_NDK_HOME/build/cmake/android.toolchain.cmake \
           -DANDROID_ABI=arm64-v8a \
-          -DANDROID_PLATFORM=android-28 \
+          -DANDROID_PLATFORM=android-26 \
           -DCMAKE_BUILD_TYPE=Release \
           -DCMAKE_CXX_STANDARD=20 \
           -DCMAKE_CXX_STANDARD_REQUIRED=ON \
@@ -44,6 +44,7 @@ jobs:
           -DLSFGVK_BUILD_CLI=OFF \
           -DLSFGVK_INSTALL_XDG_FILES=OFF \
           -DLSFGVK_LAYER_LIBRARY_PATH="/data/data/com.termux/files/usr/lib/liblsfg-vk-layer.so" \
+          -DCMAKE_CXX_FLAGS="-DVK_USE_PLATFORM_ANDROID_KHR -DVK_NO_PROTOTYPES" \
           -DCMAKE_SHARED_LINKER_FLAGS="-llog -Wl,--allow-shlib-undefined -Wl,-rpath,/data/data/com.termux/files/usr/lib" \
           -DCMAKE_EXE_LINKER_FLAGS="-llog -Wl,--allow-shlib-undefined -Wl,-rpath,/data/data/com.termux/files/usr/lib"
 
