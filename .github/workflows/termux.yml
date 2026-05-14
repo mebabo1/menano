@@ -35,16 +35,18 @@ jobs:
       uses: actions/setup-java@v4
       with:
         distribution: 'temurin'
-        java-version: '17'
+        # Gradle 4.4.1과 호환되는 Java 8로 변경
+        java-version: '8'
 
-    - name: Install Gradle & Repair Wrapper
+    - name: Repair Gradle Wrapper
       run: |
-        # Gradle 설치 및 환경 정리
-        sudo apt-get update
-        sudo apt-get install -y gradle
+        # 기존에 깨진 래퍼 파일들이 있다면 정리하고 새로 생성 시도
+        chmod +x gradlew || true
         
-        # Jar 파일이 없거나 깨졌을 경우를 대비해 래퍼 재생성
-        gradle wrapper
+        # 만약 gradle-wrapper.jar가 없어서 실행이 안 되는 경우를 대비
+        # 시스템에 임시로 gradle을 설치해 래퍼만 재생성합니다.
+        sudo apt-get update && sudo apt-get install -y gradle
+        gradle wrapper --gradle-version 4.4.1
         chmod +x gradlew
 
     - name: Build with Gradle
