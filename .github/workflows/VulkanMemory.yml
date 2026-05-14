@@ -20,7 +20,6 @@ jobs:
         sudo apt-get install -y cmake ninja-build wget unzip
 
     - name: Install Android NDK (r27)
-      # [수정] std::format 지원이 강화된 NDK r27을 사용합니다.
       run: |
         wget https://dl.google.com/android/repository/android-ndk-r27-linux.zip
         unzip -q android-ndk-r27-linux.zip
@@ -28,6 +27,8 @@ jobs:
 
     - name: Configure lsfg-vk for Termux Bionic
       run: |
+        # 1. 링커가 시스템 라이브러리를 무시하지 않도록 강제 플래그 설정
+        # 2. vulkan, log, android 라이브러리를 명시적으로 링크
         cmake -S lsfg-vk-android -B build -G Ninja \
           -DCMAKE_TOOLCHAIN_FILE=$ANDROID_NDK_HOME/build/cmake/android.toolchain.cmake \
           -DANDROID_ABI=arm64-v8a \
@@ -42,10 +43,9 @@ jobs:
           -DLSFGVK_INSTALL_XDG_FILES=OFF \
           -DLSFGVK_LAYER_LIBRARY_PATH="/data/data/com.termux/files/usr/lib/liblsfg-vk-layer.so" \
           -DCMAKE_CXX_FLAGS="-DVK_USE_PLATFORM_ANDROID_KHR" \
-          -DCMAKE_SHARED_LINKER_FLAGS="-lvulkan -llog -landroid" \
-          -DCMAKE_EXE_LINKER_FLAGS="-lvulkan -llog -landroid" \
-          -DCMAKE_LIBRARY_PATH="$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/lib/aarch64-linux-android/26"
-          
+          -DCMAKE_SHARED_LINKER_FLAGS="-Wl,--no-as-needed -lvulkan -llog -landroid" \
+          -DCMAKE_EXE_LINKER_FLAGS="-Wl,--no-as-needed -lvulkan -llog -landroid"
+
     - name: Build
       run: cmake --build build --parallel $(nproc)
 
