@@ -10,7 +10,7 @@ jobs:
     - name: Checkout lsfg-vk repository
       uses: actions/checkout@v4
       with:
-        repository: FrankBarretta/lsfg-vk-android
+        repository: RedClient231/LSFG-MODIFIED
         fetch-depth: 0
         submodules: recursive
 
@@ -29,7 +29,7 @@ jobs:
       run: |
         # 1. 링커가 시스템 라이브러리를 무시하지 않도록 강제 플래그 설정
         # 2. vulkan, log, android 라이브러리를 명시적으로 링크
-        cmake -B build -G Ninja \
+        cmake -S lsfg-vk-android -B build -G Ninja \
           -DCMAKE_TOOLCHAIN_FILE=$ANDROID_NDK_HOME/build/cmake/android.toolchain.cmake \
           -DANDROID_ABI=arm64-v8a \
           -DANDROID_PLATFORM=android-26 \
