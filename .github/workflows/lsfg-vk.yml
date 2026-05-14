@@ -49,6 +49,9 @@ jobs:
           -DLSFGVK_BUILD_UI=OFF \
           -DLSFGVK_BUILD_CLI=OFF \
           -DLSFGVK_INSTALL_XDG_FILES=OFF \
+          -DCMAKE_SHARED_LINKER_FLAGS="-Wl,--allow-shlib-undefined -Wl,-rpath,/data/data/com.termux/files/usr/glibc/lib" \
+          -DCMAKE_EXE_LINKER_FLAGS="-Wl,--allow-shlib-undefined -Wl,-rpath,/data/data/com.termux/files/usr/glibc/lib" \
+          -DBUILD_SHARED_LIBS=ON \
           -DLSFGVK_LAYER_LIBRARY_PATH="/data/data/com.termux/files/usr/glibc/lib/liblsfg-vk-layer.so"
 
     - name: Build with Ninja
