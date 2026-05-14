@@ -27,9 +27,6 @@ jobs:
 
     - name: Configure lsfg-vk for Termux Bionic
       run: |
-        # 핵심 변경 사항:
-        # 1. --allow-shlib-undefined: 빌드 서버에 없는 시스템 심볼(vulkan 등) 에러 무시
-        # 2. -rpath: 실행 시점에 라이브러리를 찾을 Termux 내부 경로 고정
         cmake -S lsfg-vk-android -B build -G Ninja \
           -DCMAKE_TOOLCHAIN_FILE=$ANDROID_NDK_HOME/build/cmake/android.toolchain.cmake \
           -DANDROID_ABI=arm64-v8a \
@@ -44,9 +41,10 @@ jobs:
           -DLSFGVK_INSTALL_XDG_FILES=OFF \
           -DLSFGVK_LAYER_LIBRARY_PATH="/data/data/com.termux/files/usr/lib/liblsfg-vk-layer.so" \
           -DCMAKE_CXX_FLAGS="-DVK_USE_PLATFORM_ANDROID_KHR" \
-          -DCMAKE_SHARED_LINKER_FLAGS="-Wl,--allow-shlib-undefined -Wl,-rpath,/data/data/com.termux/files/usr/lib" \
-          -DCMAKE_EXE_LINKER_FLAGS="-Wl,--allow-shlib-undefined -Wl,-rpath,/data/data/com.termux/files/usr/lib"
-
+          # [핵심 수정] log 라이브러리는 안드로이드 필수이므로 명시적으로 추가
+          -DCMAKE_SHARED_LINKER_FLAGS="-Wl,--allow-shlib-undefined -Wl,-rpath,/data/data/com.termux/files/usr/lib -llog" \
+          -DCMAKE_EXE_LINKER_FLAGS="-Wl,--allow-shlib-undefined -Wl,-rpath,/data/data/com.termux/files/usr/lib -llog"
+          
     - name: Build
       run: cmake --build build --parallel $(nproc)
 
