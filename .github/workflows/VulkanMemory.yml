@@ -19,20 +19,23 @@ jobs:
         sudo apt-get update
         sudo apt-get install -y cmake ninja-build wget unzip
 
-    - name: Install Android NDK (r26d)
+    - name: Install Android NDK (r27)
+      # [수정] std::format 지원이 강화된 NDK r27을 사용합니다.
       run: |
-        wget https://dl.google.com/android/repository/android-ndk-r26d-linux.zip
-        unzip -q android-ndk-r26d-linux.zip
-        echo "ANDROID_NDK_HOME=$GITHUB_WORKSPACE/android-ndk-r26d" >> $GITHUB_ENV
+        wget https://dl.google.com/android/repository/android-ndk-r27-linux.zip
+        unzip -q android-ndk-r27-linux.zip
+        echo "ANDROID_NDK_HOME=$GITHUB_WORKSPACE/android-ndk-r27" >> $GITHUB_ENV
 
     - name: Configure lsfg-vk for Termux Bionic
       run: |
-        # NDK 툴체인 파일을 사용하여 Android 네이티브(Bionic) 타겟팅
+        # [수정] CMAKE_CXX_STANDARD=20을 추가하여 C++20 기능을 활성화합니다.
         cmake -S lsfg-vk-android -B build -G Ninja \
           -DCMAKE_TOOLCHAIN_FILE=$ANDROID_NDK_HOME/build/cmake/android.toolchain.cmake \
           -DANDROID_ABI=arm64-v8a \
           -DANDROID_PLATFORM=android-24 \
           -DCMAKE_BUILD_TYPE=Release \
+          -DCMAKE_CXX_STANDARD=20 \
+          -DCMAKE_CXX_STANDARD_REQUIRED=ON \
           -DCMAKE_INSTALL_PREFIX=./target \
           -DLSFGVK_BUILD_VK_LAYER=ON \
           -DLSFGVK_BUILD_UI=OFF \
