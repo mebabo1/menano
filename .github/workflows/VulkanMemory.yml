@@ -24,6 +24,10 @@ jobs:
         wget https://dl.google.com/android/repository/android-ndk-r27-linux.zip
         unzip -q android-ndk-r27-linux.zip
         echo "ANDROID_NDK_HOME=$GITHUB_WORKSPACE/android-ndk-r27" >> $GITHUB_ENV
+
+    - name: Android Turnip patches
+      run: |
+        curl -L https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/path/image.cpp -o lsfg-vk-android/src/mini/image.cpp
       
     - name: Configure lsfg-vk for Termux Bionic
       run: |
