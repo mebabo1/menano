@@ -32,7 +32,6 @@ jobs:
         fetch-depth: 1
       
     - name: Java setup
-    - name: Java setup
       uses: actions/setup-java@v4
       with:
         distribution: 'temurin'
@@ -40,48 +39,31 @@ jobs:
 
     - name: Install Gradle & Repair Wrapper
       run: |
-        # 1. Gradle 설치
+        # Gradle 설치 및 환경 정리
         sudo apt-get update
         sudo apt-get install -y gradle
-
+        
+        # Jar 파일이 없거나 깨졌을 경우를 대비해 래퍼 재생성
         gradle wrapper
         chmod +x gradlew
 
-    - name: Build
+    - name: Build with Gradle
       run: ./gradlew assembleDebug
 
     - name: Build companion package
-      run: ./build_termux_package || echo "Companion build script not found or failed, skipping."
+      run: |
+        if [ -f "./build_termux_package" ]; then
+          chmod +x ./build_termux_package
+          ./build_termux_package
+        else
+          echo "Companion build script not found, skipping."
+        fi
 
-    - name: Store app-arm64-v8a-debug
+    - name: Store artifacts
       uses: actions/upload-artifact@v4
       with:
-        name: termux-x11-arm64-v8a-debug
-        path: ./app/build/outputs/apk/debug/app-arm64-v8a-debug.apk
-    
-    - name: Store app-armeabi-v7a-debug
-      uses: actions/upload-artifact@v4
-      with:
-        name: termux-x11-armeabi-v7a-debug
-        path: ./app/build/outputs/apk/debug/app-armeabi-v7a-debug.apk
-    
-    - name: Store app-universal-debug
-      uses: actions/upload-artifact@v4
-      with:
-        name: termux-x11-universal-debug
-        path: ./app/build/outputs/apk/debug/app-universal-debug.apk
-    
-    - name: Store app-x86_64-debug
-      uses: actions/upload-artifact@v4
-      with:
-        name: termux-x11-x86_64-debug
-        path: ./app/build/outputs/apk/debug/app-x86_64-debug.apk
-    
-    - name: Store app-x86-debug
-      uses: actions/upload-artifact@v4
-      with:
-        name: termux-x11-x86-debug
-        path: ./app/build/outputs/apk/debug/app-x86-debug.apk
+        name: termux-x11-debug-apks
+        path: ./app/build/outputs/apk/debug/*.apk
     
     - name: Store companion package
       uses: actions/upload-artifact@v4
@@ -91,7 +73,7 @@ jobs:
           ./app/build/outputs/apk/debug/termux-x11-*-all.deb
           ./app/build/outputs/apk/debug/termux-x11-*-any.pkg.tar.xz
         
-    - name: Store unstripped libraries with debug symbols
+    - name: Store unstripped libraries
       uses: actions/upload-artifact@v4
       with:
         name: termux-x11-unstripped-libraries
@@ -99,7 +81,6 @@ jobs:
 
     - name: Update Nightly Release
       uses: andelf/nightly-release@main
-      # [수정] 특정 저장소 이름 체크를 제거하여 어디서든 실행되도록 변경
       if: github.event_name == 'push' && (github.ref == 'refs/heads/master' || github.ref == 'refs/heads/main')
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -112,6 +93,6 @@ jobs:
           This is a nightly release of the termux-x11 app.
           Based on ${{ github.sha }}
         files: |
-          ./app/build/outputs/apk/debug/app-*-debug.apk
+          ./app/build/outputs/apk/debug/*.apk
           ./app/build/outputs/apk/debug/termux-x11-*-all.deb
           ./app/build/outputs/apk/debug/termux-x11-*-any.pkg.tar.xz
