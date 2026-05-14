@@ -43,7 +43,8 @@ jobs:
           -DLSFGVK_LAYER_LIBRARY_PATH="/data/data/com.termux/files/usr/lib/liblsfg-vk-layer.so" \
           -DCMAKE_CXX_FLAGS="-DVK_USE_PLATFORM_ANDROID_KHR" \
           -DCMAKE_SHARED_LINKER_FLAGS="-lvulkan -llog -landroid" \
-          -DCMAKE_EXE_LINKER_FLAGS="-lvulkan -llog -landroid"
+          -DCMAKE_EXE_LINKER_FLAGS="-lvulkan -llog -landroid" \
+          -DCMAKE_LIBRARY_PATH="$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/lib/aarch64-linux-android/26"
           
     - name: Build
       run: cmake --build build --parallel $(nproc)
