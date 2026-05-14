@@ -25,6 +25,13 @@ jobs:
         unzip -q android-ndk-r27-linux.zip
         echo "ANDROID_NDK_HOME=$GITHUB_WORKSPACE/android-ndk-r27" >> $GITHUB_ENV
 
+    - name: Patch Vulkan Headers for Android
+      run: |
+        find . -type f \( -name "*.cpp" -o -name "*.hpp" \) | while read f; do
+          sed -i 's|#include <vulkan/vulkan.h>|#include <volk.h>|g' "$f"
+          sed -i 's|#include <vulkan/vulkan_core.h>|#include <volk.h>|g' "$f"
+        done
+
     - name: Configure lsfg-vk for Termux Bionic
       run: |
         cmake -S lsfg-vk-android -B build -G Ninja \
