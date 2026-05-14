@@ -1,0 +1,57 @@
+name: Build code (ARM64 for Termux glibc)
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  arm64-build:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        build_type: [Release] # 디버깅이 필요 없다면 릴리즈만 권장
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Install ARM64 Cross-Compiler & Dependencies
+      run: |
+        sudo apt update
+        sudo apt install -y \
+          gcc-aarch64-linux-gnu \
+          g++-aarch64-linux-gnu \
+          cmake ninja-build pkg-config \
+          libvulkan-dev # 빌드 시스템용 기본 헤더
+
+    - name: Set Vulkan SDK Version
+      run: echo "VULKAN_SDK_VERSION=1.3.283.0" >> $GITHUB_ENV
+
+    - name: Setup Vulkan Headers (Architecture Independent)
+      run: |
+        # SDK 전체를 받는 대신 헤더만 Khronos에서 직접 가져옵니다 (ARM64 라이브러리는 빌드 시 시스템 라이브러리 사용)
+        git clone -b v${{env.VULKAN_SDK_VERSION}} --depth 1 https://github.com/KhronosGroup/Vulkan-Headers.git
+        echo "VULKAN_HEADERS_DIR=$GITHUB_WORKSPACE/Vulkan-Headers" >> $GITHUB_ENV
+
+    - name: Configure CMake for ARM64
+      run: |
+        mkdir -p build
+        cmake -S . -B build \
+          -DCMAKE_BUILD_TYPE=${{matrix.build_type}} \
+          -DCMAKE_SYSTEM_NAME=Linux \
+          -DCMAKE_SYSTEM_PROCESSOR=aarch64 \
+          -DCMAKE_C_COMPILER=aarch64-linux-gnu-gcc \
+          -DCMAKE_CXX_COMPILER=aarch64-linux-gnu-g++ \
+          -DVulkan_INCLUDE_DIR=$VULKAN_HEADERS_DIR/include \
+          -DCMAKE_CXX_FLAGS="-Wall -Wextra -Wpedantic" # 복잡한 경고 옵션은 일단 축소
+
+    - name: Build
+      run: |
+        cmake --build build --parallel $(nproc)
+
+    - name: Upload Artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: build-arm64
+        path: build/  # 생성된 바이너리 경로에 맞춰 수정하세요
