@@ -48,7 +48,9 @@ jobs:
             ${{ runner.os }}-gradle-
 
     - name: Build
-      run: ./gradlew assembleDebug
+      run:
+        chmod +x gradlew
+        ./gradlew assembleDebug
 
     - name: Build companion package
       run: ./build_termux_package || echo "Companion build script not found or failed, skipping."
