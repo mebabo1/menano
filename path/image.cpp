@@ -1,27 +1,133 @@
-#include "mini/image.hpp"
-#include "common/exception.hpp"
-#include "layer.hpp"
-
 #define VK_USE_PLATFORM_ANDROID_KHR
 #define VK_NO_PROTOTYPES
 
 #include <volk.h>
 #include <vulkan/vulkan_android.h>
 
-#ifdef __ANDROID__
-#include <android/hardware_buffer.h>
-#include <android/log.h>
-#endif
+#include "core/image.hpp"
+#include "core/device.hpp"
+#include "common/exception.hpp"
 
-#include <memory>
 #include <cstdint>
+#include <memory>
 #include <optional>
 
-using namespace Mini;
+#ifdef __ANDROID__
+#include <android/hardware_buffer.h>
+#endif
 
-Image::Image(VkDevice device, VkPhysicalDevice physicalDevice,
-        VkExtent2D extent, VkFormat format,
-        VkImageUsageFlags usage, VkImageAspectFlags aspectFlags, int* fd)
+using namespace LSFG::Core;
+
+Image::Image(const Core::Device& device, VkExtent2D extent, VkFormat format,
+        VkImageUsageFlags usage, VkImageAspectFlags aspectFlags)
+        : extent(extent), format(format), aspectFlags(aspectFlags) {
+    // create image
+    const VkImageCreateInfo desc{
+        .sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,
+        .imageType = VK_IMAGE_TYPE_2D,
+        .format = format,
+        .extent = {
+            .width = extent.width,
+            .height = extent.height,
+            .depth = 1
+        },
+        .mipLevels = 1,
+        .arrayLayers = 1,
+        .samples = VK_SAMPLE_COUNT_1_BIT,
+        .usage = usage,
+        .sharingMode = VK_SHARING_MODE_EXCLUSIVE
+    };
+    VkImage imageHandle{};
+    auto res = vkCreateImage(device.handle(), &desc, nullptr, &imageHandle);
+    if (res != VK_SUCCESS || imageHandle == VK_NULL_HANDLE)
+        throw LSFG::vulkan_error(res, "Failed to create Vulkan image");
+
+    // find memory type
+    VkPhysicalDeviceMemoryProperties memProps;
+    vkGetPhysicalDeviceMemoryProperties(device.getPhysicalDevice(), &memProps);
+
+    VkMemoryRequirements memReqs;
+    vkGetImageMemoryRequirements(device.handle(), imageHandle, &memReqs);
+
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wunsafe-buffer-usage"
+    std::optional<uint32_t> memType{};
+    for (uint32_t i = 0; i < memProps.memoryTypeCount; ++i) {
+        if ((memReqs.memoryTypeBits & (1 << i)) && // NOLINTBEGIN
+            (memProps.memoryTypes[i].propertyFlags & VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT)) {
+            memType.emplace(i);
+            break;
+        } // NOLINTEND
+    }
+    if (!memType.has_value())
+        throw LSFG::vulkan_error(VK_ERROR_UNKNOWN, "Unable to find memory type for image");
+#pragma clang diagnostic pop
+
+    // allocate and bind memory
+    const VkMemoryAllocateInfo allocInfo{
+        .sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
+        .allocationSize = memReqs.size,
+        .memoryTypeIndex = memType.value()
+    };
+    VkDeviceMemory memoryHandle{};
+    res = vkAllocateMemory(device.handle(), &allocInfo, nullptr, &memoryHandle);
+    if (res != VK_SUCCESS || memoryHandle == VK_NULL_HANDLE)
+        throw LSFG::vulkan_error(res, "Failed to allocate memory for Vulkan image");
+
+    res = vkBindImageMemory(device.handle(), imageHandle, memoryHandle, 0);
+    if (res != VK_SUCCESS)
+        throw LSFG::vulkan_error(res, "Failed to bind memory to Vulkan image");
+
+    // create image view
+    const VkImageViewCreateInfo viewDesc{
+        .sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
+        .image = imageHandle,
+        .viewType = VK_IMAGE_VIEW_TYPE_2D,
+        .format = format,
+        .components = {
+            .r = VK_COMPONENT_SWIZZLE_IDENTITY,
+            .g = VK_COMPONENT_SWIZZLE_IDENTITY,
+            .b = VK_COMPONENT_SWIZZLE_IDENTITY,
+            .a = VK_COMPONENT_SWIZZLE_IDENTITY
+        },
+        .subresourceRange = {
+            .aspectMask = aspectFlags,
+            .levelCount = 1,
+            .layerCount = 1
+        }
+    };
+
+    VkImageView viewHandle{};
+    res = vkCreateImageView(device.handle(), &viewDesc, nullptr, &viewHandle);
+    if (res != VK_SUCCESS || viewHandle == VK_NULL_HANDLE)
+        throw LSFG::vulkan_error(res, "Failed to create image view");
+
+    // store objects in shared ptr
+    this->layout = std::make_shared<VkImageLayout>(VK_IMAGE_LAYOUT_UNDEFINED);
+    this->image = std::shared_ptr<VkImage>(
+        new VkImage(imageHandle),
+        [dev = device.handle()](VkImage* img) {
+            vkDestroyImage(dev, *img, nullptr);
+        }
+    );
+    this->memory = std::shared_ptr<VkDeviceMemory>(
+        new VkDeviceMemory(memoryHandle),
+        [dev = device.handle()](VkDeviceMemory* mem) {
+            vkFreeMemory(dev, *mem, nullptr);
+        }
+    );
+    this->view = std::shared_ptr<VkImageView>(
+        new VkImageView(viewHandle),
+        [dev = device.handle()](VkImageView* imgView) {
+            vkDestroyImageView(dev, *imgView, nullptr);
+        }
+    );
+}
+
+// shared memory constructor
+
+Image::Image(const Core::Device& device, VkExtent2D extent, VkFormat format,
+        VkImageUsageFlags usage, VkImageAspectFlags aspectFlags, int fd)
         : extent(extent), format(format), aspectFlags(aspectFlags) {
     // create image
     const VkExternalMemoryImageCreateInfo externalInfo{
@@ -45,16 +151,16 @@ Image::Image(VkDevice device, VkPhysicalDevice physicalDevice,
         .sharingMode = VK_SHARING_MODE_EXCLUSIVE
     };
     VkImage imageHandle{};
-    auto res = Layer::ovkCreateImage(device, &desc, nullptr, &imageHandle);
+    auto res = vkCreateImage(device.handle(), &desc, nullptr, &imageHandle);
     if (res != VK_SUCCESS || imageHandle == VK_NULL_HANDLE)
         throw LSFG::vulkan_error(res, "Failed to create Vulkan image");
 
     // find memory type
     VkPhysicalDeviceMemoryProperties memProps;
-    Layer::ovkGetPhysicalDeviceMemoryProperties(physicalDevice, &memProps);
+    vkGetPhysicalDeviceMemoryProperties(device.getPhysicalDevice(), &memProps);
 
     VkMemoryRequirements memReqs;
-    Layer::ovkGetImageMemoryRequirements(device, imageHandle, &memReqs);
+    vkGetImageMemoryRequirements(device.handle(), imageHandle, &memReqs);
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wunsafe-buffer-usage"
@@ -70,102 +176,108 @@ Image::Image(VkDevice device, VkPhysicalDevice physicalDevice,
         throw LSFG::vulkan_error(VK_ERROR_UNKNOWN, "Unable to find memory type for image");
 #pragma clang diagnostic pop
 
-    // allocate and bind memory
-    const VkMemoryDedicatedAllocateInfoKHR dedicatedInfo{
+    // ~~allocate~~ and bind memory
+    const VkMemoryDedicatedAllocateInfoKHR dedicatedInfo2{
         .sType = VK_STRUCTURE_TYPE_MEMORY_DEDICATED_ALLOCATE_INFO_KHR,
         .image = imageHandle,
     };
-    const VkExportMemoryAllocateInfo exportInfo{
-        .sType = VK_STRUCTURE_TYPE_EXPORT_MEMORY_ALLOCATE_INFO,
-        .pNext = &dedicatedInfo,
-        .handleTypes = VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_FD_BIT_KHR
+    const VkImportMemoryFdInfoKHR importInfo{
+        .sType = VK_STRUCTURE_TYPE_IMPORT_MEMORY_FD_INFO_KHR,
+        .pNext = &dedicatedInfo2,
+        .handleType = VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_FD_BIT_KHR,
+        .fd = fd // closes the fd
     };
     const VkMemoryAllocateInfo allocInfo{
         .sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
-        .pNext = &exportInfo,
+        .pNext = fd == -1 ? nullptr : &importInfo,
         .allocationSize = memReqs.size,
         .memoryTypeIndex = memType.value()
     };
     VkDeviceMemory memoryHandle{};
-    res = Layer::ovkAllocateMemory(device, &allocInfo, nullptr, &memoryHandle);
+    res = vkAllocateMemory(device.handle(), &allocInfo, nullptr, &memoryHandle);
     if (res != VK_SUCCESS || memoryHandle == VK_NULL_HANDLE)
         throw LSFG::vulkan_error(res, "Failed to allocate memory for Vulkan image");
 
-    res = Layer::ovkBindImageMemory(device, imageHandle, memoryHandle, 0);
+    res = vkBindImageMemory(device.handle(), imageHandle, memoryHandle, 0);
     if (res != VK_SUCCESS)
         throw LSFG::vulkan_error(res, "Failed to bind memory to Vulkan image");
 
-    // obtain the sharing fd
-    const VkMemoryGetFdInfoKHR fdInfo{
-        .sType = VK_STRUCTURE_TYPE_MEMORY_GET_FD_INFO_KHR,
-        .memory = memoryHandle,
-        .handleType = VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_FD_BIT_KHR,
+    // create image view
+    const VkImageViewCreateInfo viewDesc{
+        .sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
+        .image = imageHandle,
+        .viewType = VK_IMAGE_VIEW_TYPE_2D,
+        .format = format,
+        .components = {
+            .r = VK_COMPONENT_SWIZZLE_IDENTITY,
+            .g = VK_COMPONENT_SWIZZLE_IDENTITY,
+            .b = VK_COMPONENT_SWIZZLE_IDENTITY,
+            .a = VK_COMPONENT_SWIZZLE_IDENTITY
+        },
+        .subresourceRange = {
+            .aspectMask = aspectFlags,
+            .levelCount = 1,
+            .layerCount = 1
+        }
     };
-    res = Layer::ovkGetMemoryFdKHR(device, &fdInfo, fd);
-    if (res != VK_SUCCESS || *fd < 0)
-        throw LSFG::vulkan_error(res, "Failed to obtain sharing fd for Vulkan image");
+
+    VkImageView viewHandle{};
+    res = vkCreateImageView(device.handle(), &viewDesc, nullptr, &viewHandle);
+    if (res != VK_SUCCESS || viewHandle == VK_NULL_HANDLE)
+        throw LSFG::vulkan_error(res, "Failed to create image view");
 
     // store objects in shared ptr
+    this->layout = std::make_shared<VkImageLayout>(VK_IMAGE_LAYOUT_UNDEFINED);
     this->image = std::shared_ptr<VkImage>(
         new VkImage(imageHandle),
-        [dev = device](VkImage* img) {
-            Layer::ovkDestroyImage(dev, *img, nullptr);
+        [dev = device.handle()](VkImage* img) {
+            vkDestroyImage(dev, *img, nullptr);
         }
     );
     this->memory = std::shared_ptr<VkDeviceMemory>(
         new VkDeviceMemory(memoryHandle),
-        [dev = device](VkDeviceMemory* mem) {
-            Layer::ovkFreeMemory(dev, *mem, nullptr);
+        [dev = device.handle()](VkDeviceMemory* mem) {
+            vkFreeMemory(dev, *mem, nullptr);
+        }
+    );
+    this->view = std::shared_ptr<VkImageView>(
+        new VkImageView(viewHandle),
+        [dev = device.handle()](VkImageView* imgView) {
+            vkDestroyImageView(dev, *imgView, nullptr);
         }
     );
 }
 
 #ifdef __ANDROID__
-Image::Image(VkDevice device, VkPhysicalDevice physicalDevice,
-        VkExtent2D extent, VkFormat format,
-        VkImageUsageFlags usage, VkImageAspectFlags aspectFlags)
-        : extent(extent), format(format), aspectFlags(aspectFlags) {
-    // Convert VkFormat to AHardwareBuffer format
-    uint32_t ahbFormat = 0;
-    switch (format) {
-        case VK_FORMAT_R8G8B8A8_UNORM:        ahbFormat = AHARDWAREBUFFER_FORMAT_R8G8B8A8_UNORM; break;
-        case VK_FORMAT_R16G16B16A16_SFLOAT:   ahbFormat = AHARDWAREBUFFER_FORMAT_R16G16B16A16_FLOAT; break;
-        default:
-            throw LSFG::vulkan_error(VK_ERROR_FORMAT_NOT_SUPPORTED,
-                "Unsupported VkFormat for AHB allocation");
-    }
 
-    // Allocate AHardwareBuffer
-    AHardwareBuffer_Desc ahbDesc{
-        .width = extent.width,
-        .height = extent.height,
-        .layers = 1,
-        .format = ahbFormat,
-        .usage = AHARDWAREBUFFER_USAGE_GPU_SAMPLED_IMAGE
-               | AHARDWAREBUFFER_USAGE_GPU_COLOR_OUTPUT
-               | AHARDWAREBUFFER_USAGE_CPU_READ_OFTEN,
-        .stride = 0,
-        .rfu0 = 0,
-        .rfu1 = 0,
+// AHardwareBuffer-backed constructor. Android-specific path: opaque-FD export
+// from AHB-imported memory isn't supported by Adreno/Mali, so we share via
+// the AHB itself instead. Caller retains AHB ownership.
+Image::Image(const Core::Device& device, VkExtent2D extent, VkFormat format,
+        VkImageUsageFlags usage, VkImageAspectFlags aspectFlags,
+        AHardwareBuffer* ahb)
+        : extent(extent), format(format), aspectFlags(aspectFlags), externalShared(true) {
+    if (ahb == nullptr)
+        throw LSFG::vulkan_error(VK_ERROR_INITIALIZATION_FAILED, "AHB is null");
+
+    VkAndroidHardwareBufferFormatPropertiesANDROID fmtProps{
+        .sType = VK_STRUCTURE_TYPE_ANDROID_HARDWARE_BUFFER_FORMAT_PROPERTIES_ANDROID,
     };
-    AHardwareBuffer* ahbHandle{};
-    if (AHardwareBuffer_allocate(&ahbDesc, &ahbHandle) != 0 || ahbHandle == nullptr)
-        throw LSFG::vulkan_error(VK_ERROR_OUT_OF_DEVICE_MEMORY,
-            "Failed to allocate AHardwareBuffer for image");
-    this->ahb = ahbHandle;
+    VkAndroidHardwareBufferPropertiesANDROID ahbProps{
+        .sType = VK_STRUCTURE_TYPE_ANDROID_HARDWARE_BUFFER_PROPERTIES_ANDROID,
+        .pNext = &fmtProps,
+    };
+    auto res = vkGetAndroidHardwareBufferPropertiesANDROID(device.handle(), ahb, &ahbProps);
+    if (res != VK_SUCCESS)
+        throw LSFG::vulkan_error(res, "vkGetAndroidHardwareBufferPropertiesANDROID failed");
 
-    // Create VkImage wrapping the AHB external memory.
-    // NOTE: We skip vkGetAndroidHardwareBufferPropertiesANDROID because
-    // the Vortek ICD wrapper doesn't pass it through. Instead we use
-    // vkGetImageMemoryRequirements after image creation to get the
-    // allocation size and memory type bits.
-    VkExternalMemoryImageCreateInfo extImageInfo{
+    const VkExternalMemoryImageCreateInfo externalInfo{
         .sType = VK_STRUCTURE_TYPE_EXTERNAL_MEMORY_IMAGE_CREATE_INFO,
         .handleTypes = VK_EXTERNAL_MEMORY_HANDLE_TYPE_ANDROID_HARDWARE_BUFFER_BIT_ANDROID,
     };
-    VkImageCreateInfo desc{
+    const VkImageCreateInfo desc{
         .sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,
-        .pNext = &extImageInfo,
+        .pNext = &externalInfo,
         .imageType = VK_IMAGE_TYPE_2D,
         .format = format,
         .extent = { extent.width, extent.height, 1 },
@@ -173,91 +285,101 @@ Image::Image(VkDevice device, VkPhysicalDevice physicalDevice,
         .arrayLayers = 1,
         .samples = VK_SAMPLE_COUNT_1_BIT,
         .tiling = VK_IMAGE_TILING_OPTIMAL,
-        .usage = VK_IMAGE_USAGE_SAMPLED_BIT
-               | VK_IMAGE_USAGE_STORAGE_BIT
-               | VK_IMAGE_USAGE_TRANSFER_SRC_BIT
-               | VK_IMAGE_USAGE_TRANSFER_DST_BIT,
+        .usage = usage,
         .sharingMode = VK_SHARING_MODE_EXCLUSIVE,
         .initialLayout = VK_IMAGE_LAYOUT_UNDEFINED,
     };
     VkImage imageHandle{};
-    auto res = Layer::ovkCreateImage(device, &desc, nullptr, &imageHandle);
+    res = vkCreateImage(device.handle(), &desc, nullptr, &imageHandle);
     if (res != VK_SUCCESS || imageHandle == VK_NULL_HANDLE)
-        throw LSFG::vulkan_error(res, "Failed to create Vulkan image from AHB");
+        throw LSFG::vulkan_error(res, "Failed to create Vulkan image (AHB)");
 
-    // Get memory requirements from the image — this gives us allocationSize
-    // and memoryTypeBits without needing vkGetAndroidHardwareBufferPropertiesANDROID.
-    VkMemoryRequirements memReqs;
-    Layer::ovkGetImageMemoryRequirements(device, imageHandle, &memReqs);
-
-    // Find a compatible device-local memory type from the requirements
     VkPhysicalDeviceMemoryProperties memProps;
-    Layer::ovkGetPhysicalDeviceMemoryProperties(physicalDevice, &memProps);
-
-    uint32_t typeIndex = UINT32_MAX;
+    vkGetPhysicalDeviceMemoryProperties(device.getPhysicalDevice(), &memProps);
+    std::optional<uint32_t> memType{};
     for (uint32_t i = 0; i < memProps.memoryTypeCount; ++i) {
-        if ((memReqs.memoryTypeBits & (1u << i)) &&
-            (memProps.memoryTypes[i].propertyFlags & VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT)) {
-            typeIndex = i;
-            break;
-        }
+        if (ahbProps.memoryTypeBits & (1u << i)) { memType.emplace(i); break; }
     }
-    if (typeIndex == UINT32_MAX) {
-        // Fallback: pick first compatible type (may not be device-local)
-        for (uint32_t i = 0; i < memProps.memoryTypeCount; ++i) {
-            if (memReqs.memoryTypeBits & (1u << i)) {
-                typeIndex = i;
-                break;
-            }
-        }
+    if (!memType.has_value()) {
+        vkDestroyImage(device.handle(), imageHandle, nullptr);
+        throw LSFG::vulkan_error(VK_ERROR_UNKNOWN, "No memory type for AHB import");
     }
-    if (typeIndex == UINT32_MAX)
-        throw LSFG::vulkan_error(VK_ERROR_UNKNOWN, "No memory type matches AHB image requirements");
 
-    // Import AHB into Vulkan memory with dedicated allocation for the image
-    VkMemoryDedicatedAllocateInfo dedicatedInfo{
+    const VkMemoryDedicatedAllocateInfo dedicated{
         .sType = VK_STRUCTURE_TYPE_MEMORY_DEDICATED_ALLOCATE_INFO,
         .image = imageHandle,
     };
-    VkImportAndroidHardwareBufferInfoANDROID importInfo{
+    const VkImportAndroidHardwareBufferInfoANDROID importInfo{
         .sType = VK_STRUCTURE_TYPE_IMPORT_ANDROID_HARDWARE_BUFFER_INFO_ANDROID,
-        .pNext = &dedicatedInfo,
-        .buffer = ahbHandle,
+        .pNext = &dedicated,
+        .buffer = ahb,
     };
-    VkMemoryAllocateInfo allocInfo{
+    const VkMemoryAllocateInfo allocInfo{
         .sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
         .pNext = &importInfo,
-        .allocationSize = memReqs.size,
-        .memoryTypeIndex = typeIndex,
+        .allocationSize = ahbProps.allocationSize,
+        .memoryTypeIndex = memType.value(),
     };
     VkDeviceMemory memoryHandle{};
-    res = Layer::ovkAllocateMemory(device, &allocInfo, nullptr, &memoryHandle);
-    if (res != VK_SUCCESS || memoryHandle == VK_NULL_HANDLE)
-        throw LSFG::vulkan_error(res, "Failed to import AHB into Vulkan memory");
+    res = vkAllocateMemory(device.handle(), &allocInfo, nullptr, &memoryHandle);
+    if (res != VK_SUCCESS || memoryHandle == VK_NULL_HANDLE) {
+        vkDestroyImage(device.handle(), imageHandle, nullptr);
+        throw LSFG::vulkan_error(res, "Failed to import AHB into VkDeviceMemory");
+    }
 
-    res = Layer::ovkBindImageMemory(device, imageHandle, memoryHandle, 0);
-    if (res != VK_SUCCESS)
-        throw LSFG::vulkan_error(res, "Failed to bind AHB memory to Vulkan image");
+    res = vkBindImageMemory(device.handle(), imageHandle, memoryHandle, 0);
+    if (res != VK_SUCCESS) {
+        vkFreeMemory(device.handle(), memoryHandle, nullptr);
+        vkDestroyImage(device.handle(), imageHandle, nullptr);
+        throw LSFG::vulkan_error(res, "Failed to bind AHB memory");
+    }
 
-    // Store objects with proper cleanup
+    const VkImageViewCreateInfo viewDescAhb{
+        .sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
+        .image = imageHandle,
+        .viewType = VK_IMAGE_VIEW_TYPE_2D,
+        .format = format,
+        .components = {
+            .r = VK_COMPONENT_SWIZZLE_IDENTITY,
+            .g = VK_COMPONENT_SWIZZLE_IDENTITY,
+            .b = VK_COMPONENT_SWIZZLE_IDENTITY,
+            .a = VK_COMPONENT_SWIZZLE_IDENTITY,
+        },
+        .subresourceRange = {
+            .aspectMask = aspectFlags,
+            .levelCount = 1,
+            .layerCount = 1,
+        },
+    };
+    VkImageView viewHandleAhb{};
+    res = vkCreateImageView(device.handle(), &viewDescAhb, nullptr, &viewHandleAhb);
+    if (res != VK_SUCCESS || viewHandleAhb == VK_NULL_HANDLE) {
+        vkFreeMemory(device.handle(), memoryHandle, nullptr);
+        vkDestroyImage(device.handle(), imageHandle, nullptr);
+        throw LSFG::vulkan_error(res, "Failed to create AHB image view");
+    }
+
+    // The Android side hands AHB-backed images back and forth in GENERAL layout.
+    // Track that here so queue-family acquire/release barriers use the same layout.
+    this->layout = std::make_shared<VkImageLayout>(VK_IMAGE_LAYOUT_GENERAL);
     this->image = std::shared_ptr<VkImage>(
         new VkImage(imageHandle),
-        [dev = device](VkImage* img) {
-            Layer::ovkDestroyImage(dev, *img, nullptr);
+        [dev = device.handle()](VkImage* img) {
+            vkDestroyImage(dev, *img, nullptr);
         }
     );
     this->memory = std::shared_ptr<VkDeviceMemory>(
         new VkDeviceMemory(memoryHandle),
-        [dev = device](VkDeviceMemory* mem) {
-            Layer::ovkFreeMemory(dev, *mem, nullptr);
+        [dev = device.handle()](VkDeviceMemory* mem) {
+            vkFreeMemory(dev, *mem, nullptr);
         }
     );
-    // Shared ownership of the AHB — released when last reference dies
-    this->ahbRef = std::shared_ptr<AHardwareBuffer>(
-        ahbHandle,
-        [](AHardwareBuffer* b) {
-            if (b) AHardwareBuffer_release(b);
+    this->view = std::shared_ptr<VkImageView>(
+        new VkImageView(viewHandleAhb),
+        [dev = device.handle()](VkImageView* imgView) {
+            vkDestroyImageView(dev, *imgView, nullptr);
         }
     );
 }
-#endif
+
+#endif // __ANDROID__
