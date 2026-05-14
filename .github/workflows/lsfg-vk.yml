@@ -39,7 +39,7 @@ jobs:
 
     - name: Configure lsfg-vk
       run: |        
-        cmake -B build -G Ninja \
+        cmake -S lsfg-vk-android -B build -G Ninja \
           -DCMAKE_BUILD_TYPE=RelWithDebInfo \
           -DCMAKE_INSTALL_PREFIX=./target \
           -DCMAKE_SYSTEM_PROCESSOR=aarch64 \
