@@ -29,11 +29,12 @@ jobs:
       run: |
         cmake -S lsfg-vk-android -B build -G Ninja \
           -DCMAKE_TOOLCHAIN_FILE=$ANDROID_NDK_HOME/build/cmake/android.toolchain.cmake \
+          # [추가] CMake 경고 억제 및 정책 명시
+          -DCMAKE_POLICY_DEFAULT_CMP0000=NEW \
           -DANDROID_ABI=arm64-v8a \
           -DANDROID_PLATFORM=android-26 \
           -DCMAKE_BUILD_TYPE=Release \
           -DCMAKE_CXX_STANDARD=20 \
-          # [핵심] 모든 라이브러리를 .so 형태로 빌드하도록 강제
           -DBUILD_SHARED_LIBS=ON \
           -DCMAKE_INSTALL_PREFIX=./target \
           -DLSFGVK_BUILD_VK_LAYER=ON \
