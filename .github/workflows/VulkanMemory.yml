@@ -28,8 +28,8 @@ jobs:
     - name: Patch Vulkan Headers for Android
       run: |
         find . -type f \( -name "*.cpp" -o -name "*.hpp" \) | while read f; do
-          sed -i 's|#include <vulkan/vulkan.h>|#include <volk.h>|g' "$f"
-          sed -i 's|#include <vulkan/vulkan_core.h>|#include <volk.h>|g' "$f"
+          sed -i 's|#include <vulkan/vulkan.h>|#define VK_USE_PLATFORM_ANDROID_KHR\n#define VK_NO_PROTOTYPES\n#include <volk.h>\n#include <vulkan/vulkan_android.h>|g' "$f"
+          sed -i 's|#include <vulkan/vulkan_core.h>|#define VK_USE_PLATFORM_ANDROID_KHR\n#define VK_NO_PROTOTYPES\n#include <volk.h>\n#include <vulkan/vulkan_android.h>|g' "$f"
         done
 
     - name: Configure lsfg-vk for Termux Bionic
