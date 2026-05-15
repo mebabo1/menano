@@ -64,6 +64,7 @@ jobs:
             fi
             
             # .so 파일도 최상단에 복사 (확인용)
+            cp libbcn_layer.json /workspace/final_output/share/vulkan/implicit_layer.d/
             cp libbcn_layer.so /workspace/final_output/
 
             echo "===== CHECK OUTPUT CONTENT ====="
