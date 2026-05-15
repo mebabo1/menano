@@ -48,6 +48,8 @@ jobs:
 
             cd bcn_layer
 
+            sed -i 's|/usr/lib/x86_64-linux-gnu|/data/data/com.termux/files/usr/glibc/lib|g' Makefile
+
             # 빌드
             make -j$(nproc)
 
