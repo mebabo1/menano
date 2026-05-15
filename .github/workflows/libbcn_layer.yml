@@ -14,19 +14,18 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      - name: Install Cross-Build Tools
+      - name: Install Build Tools
         run: |
           sudo apt-get update
-          # 호스트용 glslc와 ARM64 크로스 컴파일러 설치
+          # glslc를 포함한 shaderc와 ARM64 크로스 컴파일러 설치
           sudo apt-get install -y \
             build-essential \
             git \
             make \
-            google-glslc \
+            shaderc \
             gcc-aarch64-linux-gnu \
             g++-aarch64-linux-gnu \
-            libvulkan-dev \
-            spirv-tools
+            libvulkan-dev
 
       - name: Build libbcn_layer
         run: |
@@ -37,17 +36,17 @@ jobs:
           sed -i '1i #include <cmath>' src/bcn_layer.cpp
           sed -i '1i #include <cstring>' src/logger.cpp
 
-          # [패치 2] Makefile 수정 (크로스 컴파일러 지정)
-          # 컴파일러를 aarch64-linux-gnu- 버전으로 교체합니다.
-          sed -i 's|gcc|aarch64-linux-gnu-gcc|g' Makefile
-          sed -i 's|g++|aarch64-linux-gnu-g++|g' Makefile
-          
-          # x86 전용 라이브러리 경로 제거 (크로스 컴파일러가 기본 경로를 찾도록)
+          # [패치 2] Makefile 수정
+          # 크로스 컴파일러가 표준 라이브러리를 잘 찾도록 x86 전용 경로 제거
           sed -i 's|-L/lib/x86_64-linux-gnu||g' Makefile
-
+          
           # [패치 3] 빌드 실행
-          # 호스트의 glslc를 사용하여 쉐이더를 먼저 빌드하고, 라이브러리를 빌드합니다.
-          make -j"$(nproc)"
+          # CC와 CXX 변수를 통해 크로스 컴파일러를 직접 지정합니다.
+          # glslc는 호스트(x86_64) 버전을 사용하여 쉐이더를 빌드합니다.
+          make -j"$(nproc)" \
+            CC=aarch64-linux-gnu-gcc \
+            CXX=aarch64-linux-gnu-g++ \
+            GLSLC=glslc
 
           # [패치 4] 결과물 정리
           OUTPUT_DIR="../final_output"
@@ -60,12 +59,15 @@ jobs:
           cp libbcn_layer.so "$OUTPUT_DIR/lib/"
           cp libbcn_layer.json "$OUTPUT_DIR/manifest/"
           
-          # JSON 내의 경로 패치
+          # JSON 내의 경로 패치 (Termux 설치 경로 기준)
           sed -i "s|\"./libbcn_layer.so\"|\"$TERMUX_INSTALL_PATH/libbcn_layer.so\"|g" "$OUTPUT_DIR/manifest/libbcn_layer.json"
 
           if ls src/*.spv >/dev/null 2>&1; then
             cp src/*.spv "$OUTPUT_DIR/shaders/"
           fi
+
+          echo "===== ELF 파일 정보 확인 ====="
+          file "$OUTPUT_DIR/lib/libbcn_layer.so"
 
       - name: Upload Artifacts
         uses: actions/upload-artifact@v4
