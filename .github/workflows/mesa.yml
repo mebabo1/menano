@@ -152,7 +152,7 @@ jobs:
            -Dgallium-drivers=freedreno,zink \
            -Dmediafoundation-codecs=all \
            -Dvulkan-drivers=freedreno \
-           -Dvulkan-layers=device-select,overlay,bcn \
+           -Dvulkan-layers=device-select,overlay \
            -Dfreedreno-kmds=kgsl \
            -Dshader-cache=enabled \
            -Dgles1=enabled \
