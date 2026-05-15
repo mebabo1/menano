@@ -1,95 +1,205 @@
-name: Build wrapper layer
+name: Build Wrapper Layer (Termux/Bionic Style)
 
-on: 
+on:
   push:
-  workflow_dispatch: # 수동 실행 버튼 추가
+  workflow_dispatch:
 
 permissions:
   contents: read
 
 jobs:
-  macOS-CI:
-    strategy:
-      matrix:
-        glx_option: ['xlib']
-
+  build-wrapper:
     runs-on: ubuntu-24.04
 
+    env:
+      ANDROID_NDK_VERSION: r27c
+      API_LEVEL: 26
+
     steps:
-    # 1. 워크플로우 실행을 위해 기본 저장소 체크아웃 (기본 환경 설정용)
-    - name: Initialize Workspace
-      uses: actions/checkout@v4
+      # ------------------------------------------------------------
+      # Checkout
+      # ------------------------------------------------------------
+      - name: Checkout Workspace
+        uses: actions/checkout@v4
 
-    # 2. 외부 GitLab 저장소에서 wrapper-25 브랜치 직접 가져오기
-    - name: Clone GitLab Repository
-      run: |
-        git clone --depth 1 --branch wrapper-25 https://gitlab.freedesktop.org/Pipetto-crypto/mesa.git mesa-src
+      # ------------------------------------------------------------
+      # Clone wrapper-25 branch
+      # ------------------------------------------------------------
+      - name: Clone Mesa Wrapper Source
+        run: |
+          git clone --depth 1 \
+            --branch wrapper-25 \
+            https://gitlab.freedesktop.org/Pipetto-crypto/mesa.git \
+            mesa-src
 
-    - name: Setup Python
-      uses: actions/setup-python@v5
-      with:
-        python-version: '3.10'
+      # ------------------------------------------------------------
+      # Python
+      # ------------------------------------------------------------
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
 
-    - name: 安装系统依赖
-      run: |
-        sudo sed -i "s/^Types: deb$/Types: deb deb-src/" /etc/apt/sources.list.d/ubuntu.sources
-        sudo apt update
-        sudo apt install -y glslang-tools libxrandr-dev libxxf86vm-dev libxcb-shm0-dev libxcb-glx0-dev \
-            libxext-dev llvm-19 libx11-dev libx11-xcb-dev libxcb1-dev libxcb-dri3-dev libxcb-present-dev \
-            libxcb-randr0-dev libxcb-sync-dev libxcb-xfixes0-dev libxshmfence-dev libdrm-dev libxfixes-dev \
-            libgbm-dev libegl1-mesa-dev libexpat1-dev libwayland-dev python3-pip \
-            python3-setuptools python3-wheel ninja-build
+      - name: Install Python Packages
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install meson mako pyyaml ninja
 
-    - name: Install Python Build Tools
-      run: |
-        python -m pip install --upgrade pip
-        python -m pip install meson mako pyyaml ninja
+      # ------------------------------------------------------------
+      # Android NDK
+      # ------------------------------------------------------------
+      - name: Setup Android NDK
+        run: |
+          cd /tmp
 
-    - name: Configure Mesa Wrapper Build
-      run: |
-        cd mesa-src
-        rm -rf build
+          wget https://dl.google.com/android/repository/android-ndk-${ANDROID_NDK_VERSION}-linux.zip
+          unzip -q android-ndk-${ANDROID_NDK_VERSION}-linux.zip
 
-        meson setup build \
-          --buildtype=debugoptimized \
-          -Dprefix=$PWD/install-root \
-          -Dbuild-tests=false \
-          -Dllvm=enabled \
-          -Dosmesa=true \
-          -Degl=enabled \
-          -Dgbm=disabled \
-          -Dshared-glapi=enabled \
-          -Dglx=dri \
-          -Dplatforms=x11,android \
-          -Dplatform-sdk-version=26 \
-          -Dandroid-stub=true \
-          -Dgallium-drivers=freedreno,zink,swrast \
-          -Dvulkan-drivers=freedreno,swrast
+          echo "ANDROID_NDK=/tmp/android-ndk-${ANDROID_NDK_VERSION}" >> $GITHUB_ENV
 
-    - name: Build
-      run: |
-        cd mesa-src
-        meson compile -C build -j$(nproc)
+      # ------------------------------------------------------------
+      # Linux build deps
+      # ------------------------------------------------------------
+      - name: Install Build Dependencies
+        run: |
+          sudo apt update
 
-    - name: Install
-      run: |
-        cd mesa-src
-        meson install -C build --destdir $PWD/install-output
+          sudo apt install -y \
+            git \
+            wget \
+            unzip \
+            pkg-config \
+            ninja-build \
+            bison \
+            flex \
+            cmake \
+            python3-dev \
+            libdrm-dev \
+            libexpat1-dev \
+            libelf-dev \
+            libzstd-dev \
+            zlib1g-dev \
+            libxcb1-dev \
+            libxcb-dri3-dev \
+            libxcb-present-dev \
+            libxcb-randr0-dev \
+            libxcb-sync-dev \
+            libxcb-xfixes0-dev \
+            libxcb-shm0-dev \
+            libx11-dev \
+            libx11-xcb-dev \
+            libxext-dev \
+            libxfixes-dev \
+            libxrandr-dev \
+            libxxf86vm-dev \
+            libxshmfence-dev \
+            wayland-protocols \
+            libwayland-dev \
+            glslang-tools
 
-    - name: Show Results
-      run: |
-        cd mesa-src
-        echo "--- Libraries found ---"
-        find build -name "*wrapper*" || true
-        find install-output -name "*.so" || true
-        find install-output -name "*.json" || true
+      # ------------------------------------------------------------
+      # Android cross file
+      # ------------------------------------------------------------
+      - name: Create Meson Android Cross File
+        run: |
+          TOOLCHAIN=$ANDROID_NDK/toolchains/llvm/prebuilt/linux-x86_64
 
-    - name: Upload Artifact
-      if: always()
-      uses: actions/upload-artifact@v4
-      with:
-        name: macos-wrapper25-${{ matrix.glx_option }}
-        path: |
-          mesa-src/build/meson-logs/
-          mesa-src/install-output/
-        retention-days: 5
+          cat > mesa-src/android-aarch64.cross <<EOF
+          [host_machine]
+          system = 'android'
+          cpu_family = 'aarch64'
+          cpu = 'armv8'
+          endian = 'little'
+
+          [binaries]
+          c = '$TOOLCHAIN/bin/aarch64-linux-android${API_LEVEL}-clang'
+          cpp = '$TOOLCHAIN/bin/aarch64-linux-android${API_LEVEL}-clang++'
+          ar = '$TOOLCHAIN/bin/llvm-ar'
+          strip = '$TOOLCHAIN/bin/llvm-strip'
+          pkgconfig = 'pkg-config'
+
+          [properties]
+          needs_exe_wrapper = true
+
+          c_args = [
+            '-DANDROID',
+            '-D__ANDROID_API__=${API_LEVEL}'
+          ]
+
+          cpp_args = [
+            '-DANDROID',
+            '-D__ANDROID_API__=${API_LEVEL}'
+          ]
+          EOF
+
+      # ------------------------------------------------------------
+      # Configure
+      # ------------------------------------------------------------
+      - name: Configure Mesa Wrapper
+        run: |
+          cd mesa-src
+
+          rm -rf build
+
+          meson setup build \
+            --cross-file android-aarch64.cross \
+            --buildtype=release \
+            -Dprefix=$PWD/install-root \
+            -Dplatforms=android \
+            -Dplatform-sdk-version=${API_LEVEL} \
+            -Dandroid-stub=false \
+            -Dllvm=disabled \
+            -Dshared-glapi=enabled \
+            -Degl=enabled \
+            -Dgbm=disabled \
+            -Dglx=disabled \
+            -Dosmesa=false \
+            -Dopengl=false \
+            -Dgallium-drivers= \
+            -Dvulkan-drivers=freedreno \
+            -Dbuild-tests=false
+
+      # ------------------------------------------------------------
+      # Build
+      # ------------------------------------------------------------
+      - name: Build Wrapper
+        run: |
+          cd mesa-src
+          meson compile -C build -j$(nproc)
+
+      # ------------------------------------------------------------
+      # Install
+      # ------------------------------------------------------------
+      - name: Install Build Output
+        run: |
+          cd mesa-src
+          meson install -C build --destdir $PWD/install-output
+
+      # ------------------------------------------------------------
+      # Show output
+      # ------------------------------------------------------------
+      - name: Show Wrapper Files
+        run: |
+          cd mesa-src
+
+          echo "=== Wrapper libraries ==="
+          find build -iname "*wrapper*" || true
+
+          echo "=== Vulkan libraries ==="
+          find install-output -iname "*.so" || true
+
+          echo "=== Vulkan ICD json ==="
+          find install-output -iname "*.json" || true
+
+      # ------------------------------------------------------------
+      # Upload
+      # ------------------------------------------------------------
+      - name: Upload Artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: wrapper-android-aarch64
+          path: |
+            mesa-src/build/meson-logs/
+            mesa-src/install-output/
+          retention-days: 5
