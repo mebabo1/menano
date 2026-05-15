@@ -41,27 +41,54 @@ jobs:
               file
 
           run: |
+            set -e
+
+            # glslc 없으면 glslangValidator로 대체
+            if ! command -v glslc >/dev/null 2>&1; then
+              ln -sf $(which glslangValidator) /usr/bin/glslc
+            fi
+
+            echo "===== TOOLCHAIN ====="
+            which glslc
+            glslc --version || true
+
             cd /workspace
 
-            # 저장소 클론
+            echo "===== CLONE ====="
             git clone --depth 1 https://github.com/Pipetto-crypto/bcn_layer.git
 
             cd bcn_layer
 
-            sed -i 's|/usr/lib/x86_64-linux-gnu|/data/data/com.termux/files/usr/glibc/lib|g' Makefile
+            echo "===== PATCH MAKEFILE ====="
 
-            # 빌드
+            # x86_64 전용 경로 제거
+            sed -i 's|/lib/x86_64-linux-gnu|/lib|g' Makefile
+
+            cat Makefile
+
+            echo "===== BUILD ====="
+
             make -j$(nproc)
 
-            # 출력 폴더 생성
+            echo "===== PREPARE OUTPUT ====="
+
             mkdir -p /workspace/output
 
-            # 결과물 복사
-            cp libbcn_layer.so /workspace/output/
-            cp libbcn_layer.json /workspace/output/
+            echo "===== INSTALL ====="
 
-            # 아키텍처 확인
+            make install \
+              PREFIX=/data/data/com.termux/files/usr/glibc \
+              DESTDIR=/workspace/output
+
+            echo "===== ELF INFO ====="
+
             file libbcn_layer.so
+
+            readelf -h libbcn_layer.so || true
+
+            echo "===== OUTPUT TREE ====="
+
+            find /workspace/output
 
       - name: Upload Artifacts
         uses: actions/upload-artifact@v4
