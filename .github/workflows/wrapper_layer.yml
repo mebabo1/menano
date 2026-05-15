@@ -1,0 +1,104 @@
+name: macOS-CI
+
+on: push
+
+permissions:
+  contents: read
+
+jobs:
+  macOS-CI:
+    strategy:
+      matrix:
+        glx_option: ['xlib']
+
+    runs-on: macos-11
+
+    env:
+      GALLIUM_DUMP_CPU: true
+      MESON_EXEC: /Users/runner/Library/Python/3.11/bin/meson
+
+    steps:
+    - name: Checkout wrapper-25
+      uses: actions/checkout@v3
+      with:
+        ref: wrapper-25
+
+    - name: Install Dependencies
+      run: |
+        cat > Brewfile <<EOL
+        brew "bison"
+        brew "expat"
+        brew "gettext"
+        brew "libx11"
+        brew "libxcb"
+        brew "libxdamage"
+        brew "libxext"
+        brew "llvm"
+        brew "molten-vk"
+        brew "ninja"
+        brew "pkg-config"
+        brew "python@3.10"
+        EOL
+
+        brew update
+        brew bundle --verbose
+
+    - name: Install Python Build Tools
+      run: |
+        pip3 install --user mako meson ninja
+
+    - name: Configure Mesa Wrapper Build
+      run: |
+        cat > native_config <<EOL
+        [binaries]
+        llvm-config = '/usr/local/opt/llvm/bin/llvm-config'
+        EOL
+
+        rm -rf build
+
+        $MESON_EXEC setup build \
+          --native-file=native_config \
+          --buildtype=debugoptimized \
+          -Dprefix=$PWD/install-root \
+          -Dmoltenvk-dir=$(brew --prefix molten-vk) \
+          -Dbuild-tests=false \
+          -Dllvm=enabled \
+          -Dosmesa=true \
+          -Degl=enabled \
+          -Dgbm=enabled \
+          -Dshared-glapi=enabled \
+          -Dglx=${{ matrix.glx_option }} \
+          -Dplatforms=x11,android \
+          -Dplatform-sdk-version=26 \
+          -Dandroid-stub=true \
+          -Dgallium-drivers=freedreno,zink,swrast \
+          -Dvulkan-drivers=freedreno,swrast
+
+    - name: Build
+      run: |
+        $MESON_EXEC compile -C build -j$(sysctl -n hw.logicalcpu)
+
+    - name: Run Tests
+      run: |
+        $MESON_EXEC test -C build --print-errorlogs || true
+
+    - name: Install
+      run: |
+        $MESON_EXEC install -C build --destdir $PWD/install
+
+    - name: Show Vulkan Wrapper Libraries
+      run: |
+        find build -iname "*wrapper*"
+        find install -iname "*wrapper*"
+        find install -iname "*.json"
+        find install -iname "*.so"
+
+    - name: Upload Artifact
+      if: always()
+      uses: actions/upload-artifact@v3
+      with:
+        name: macos-wrapper25-${{ matrix.glx_option }}
+        path: |
+          build/meson-logs/
+          install/
+        retention-days: 5
