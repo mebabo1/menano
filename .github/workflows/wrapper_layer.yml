@@ -61,7 +61,7 @@ jobs:
           -Dllvm=enabled \
           -Dosmesa=true \
           -Degl=enabled \
-          -Dgbm=disabled \  # 👈 기존 enabled에서 disabled로 변경!
+          -Dgbm=disabled \
           -Dshared-glapi=enabled \
           -Dglx=${{ matrix.glx_option }} \
           -Dplatforms=x11,android \
