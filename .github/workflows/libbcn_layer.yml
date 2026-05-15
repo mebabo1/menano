@@ -34,7 +34,7 @@ jobs:
               make \
               gcc \
               g++ \
-              glslc \
+              glslang-tools \
               spirv-tools \
               spirv-headers \
               libvulkan-dev \
@@ -48,9 +48,8 @@ jobs:
 
             echo "===== TOOLCHAIN ====="
 
-            which glslc
-
-            glslc --version || true
+            which glslangValidator
+            glslangValidator --version || true
 
             cd /workspace
 
@@ -64,6 +63,13 @@ jobs:
 
             # ARM64 lib 경로 수정
             sed -i 's|/lib/x86_64-linux-gnu|/lib|g' Makefile
+
+            # GLSLC 변수 추가
+            sed -i '1i GLSLC ?= glslangValidator' Makefile
+            sed -i '2i GLSLC_FLAGS ?= --target-env vulkan1.1 --enable-include -V -S comp' Makefile
+
+            # glslc 호출을 변수화
+            sed -i 's|glslc \$< -o \$@|$(GLSLC) $(GLSLC_FLAGS) \$< -o \$@|g' Makefile
 
             echo "===== PATCHED MAKEFILE ====="
 
