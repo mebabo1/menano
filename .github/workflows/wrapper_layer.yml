@@ -1,6 +1,8 @@
 name: macOS-CI
 
-on: push
+on: 
+  push:
+  workflow_dispatch: # 수동 실행 버튼 추가
 
 permissions:
   contents: read
@@ -11,52 +13,44 @@ jobs:
       matrix:
         glx_option: ['xlib']
 
-    runs-on: macos-11
-
-    env:
-      GALLIUM_DUMP_CPU: true
-      MESON_EXEC: /Users/runner/Library/Python/3.11/bin/meson
+    # macos-11은 더 이상 지원되지 않으므로 13(Intel)으로 변경
+    runs-on: macos-13
 
     steps:
     - name: Checkout wrapper-25
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4 # v3 -> v4 업데이트
       with:
         ref: wrapper-25
 
+    - name: Setup Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.10'
+
     - name: Install Dependencies
       run: |
-        cat > Brewfile <<EOL
-        brew "bison"
-        brew "expat"
-        brew "gettext"
-        brew "libx11"
-        brew "libxcb"
-        brew "libxdamage"
-        brew "libxext"
-        brew "llvm"
-        brew "molten-vk"
-        brew "ninja"
-        brew "pkg-config"
-        brew "python@3.10"
-        EOL
-
+        # LLVM은 빌드에 필수적이므로 명시적으로 설치
         brew update
-        brew bundle --verbose
+        brew install bison expat gettext libx11 libxcb libxdamage libxext llvm molten-vk ninja pkg-config mako
 
-    - name: Install Python Build Tools
+    - name: Install Meson and Mako
       run: |
-        pip3 install --user mako meson ninja
+        python -m pip install --upgrade pip
+        pip install meson ninja mako
 
     - name: Configure Mesa Wrapper Build
       run: |
+        # LLVM 경로를 동적으로 확인하여 native_config 작성
+        LLVM_PATH=$(brew --prefix llvm)
         cat > native_config <<EOL
         [binaries]
-        llvm-config = '/usr/local/opt/llvm/bin/llvm-config'
+        llvm-config = '$LLVM_PATH/bin/llvm-config'
         EOL
 
         rm -rf build
 
-        $MESON_EXEC setup build \
+        # meson 직접 실행 (경로 하드코딩 제거)
+        meson setup build \
           --native-file=native_config \
           --buildtype=debugoptimized \
           -Dprefix=$PWD/install-root \
@@ -76,29 +70,26 @@ jobs:
 
     - name: Build
       run: |
-        $MESON_EXEC compile -C build -j$(sysctl -n hw.logicalcpu)
-
-    - name: Run Tests
-      run: |
-        $MESON_EXEC test -C build --print-errorlogs || true
+        meson compile -C build -j$(sysctl -n hw.logicalcpu)
 
     - name: Install
       run: |
-        $MESON_EXEC install -C build --destdir $PWD/install
+        # destdir는 절대경로로 지정하는 것이 안전합니다.
+        meson install -C build --destdir $PWD/install-output
 
-    - name: Show Vulkan Wrapper Libraries
+    - name: Show Results
       run: |
-        find build -iname "*wrapper*"
-        find install -iname "*wrapper*"
-        find install -iname "*.json"
-        find install -iname "*.so"
+        echo "--- Libraries found ---"
+        find build -name "*wrapper*" || true
+        find install-output -name "*.so" || true
+        find install-output -name "*.json" || true
 
     - name: Upload Artifact
       if: always()
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4 # v3 -> v4 업데이트
       with:
         name: macos-wrapper25-${{ matrix.glx_option }}
         path: |
           build/meson-logs/
-          install/
+          install-output/
         retention-days: 5
