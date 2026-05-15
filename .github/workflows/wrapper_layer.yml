@@ -48,21 +48,12 @@ jobs:
 
     - name: Configure Mesa Wrapper Build
       run: |
-        LLVM_PATH=$(brew --prefix llvm)
-        
-        cat > mesa-src/native_config <<EOL
-        [binaries]
-        llvm-config = '$LLVM_PATH/bin/llvm-config'
-        EOL
-
         cd mesa-src
         rm -rf build
 
         meson setup build \
-          --native-file=native_config \
           --buildtype=debugoptimized \
           -Dprefix=$PWD/install-root \
-          -Dmoltenvk-dir=$(brew --prefix molten-vk) \
           -Dbuild-tests=false \
           -Dllvm=enabled \
           -Dosmesa=true \
@@ -79,7 +70,7 @@ jobs:
     - name: Build
       run: |
         cd mesa-src
-        meson compile -C build -j$(sysctl -n hw.logicalcpu)
+        meson compile -C build -j$(nproc)
 
     - name: Install
       run: |
