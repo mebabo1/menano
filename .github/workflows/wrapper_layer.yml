@@ -63,7 +63,7 @@ jobs:
           -Degl=enabled \
           -Dgbm=disabled \
           -Dshared-glapi=enabled \
-          -Dglx=${{ matrix.glx_option }} \
+          -Dglx=dri \
           -Dplatforms=x11,android \
           -Dplatform-sdk-version=26 \
           -Dandroid-stub=true \
