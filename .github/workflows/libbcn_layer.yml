@@ -11,21 +11,21 @@ jobs:
     name: Build libbcn_layer on Ubuntu 22.04 (ARM64)
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout Repository
+        uses: actions/checkout@v4
 
       - name: Build ARM64 libbcn_layer
         uses: uraimo/run-on-arch-action@v2
-
         with:
           arch: aarch64
           distro: ubuntu22.04
 
+          # 현재 디렉토리를 컨테이너 내부의 /workspace로 마운트
           dockerRunArgs: |
             --volume "${PWD}:/workspace"
 
           install: |
             apt-get update
-
             apt-get install -y \
               build-essential \
               git \
@@ -45,91 +45,72 @@ jobs:
           run: |
             set -eux
 
-            echo "===== TOOLCHAIN ====="
-
+            echo "===== TOOLCHAIN CHECK ====="
             which glslangValidator || true
             glslangValidator --version || true
-
-            which cpp || true
             cpp --version || true
 
+            # 워크스페이스 이동
             cd /workspace
 
-            echo "===== CLONE ====="
-
-            git clone --depth 1 \
-              https://github.com/Pipetto-crypto/bcn_layer.git
-
+            echo "===== CLONE REPOSITORY ====="
+            # 기존 폴더가 있다면 삭제 후 클론 (클린 빌드 보장)
+            rm -rf bcn_layer
+            git clone --depth 1 https://github.com/Pipetto-crypto/bcn_layer.git
             cd bcn_layer
 
             echo "===== PATCH MAKEFILE ====="
+            # 1. ARM64 라이브러리 경로 수정 (x86_64 -> aarch64 표준 경로)
+            sed -i 's|/lib/x86_64-linux-gnu|/usr/lib/aarch64-linux-gnu|g' Makefile
 
-            # ARM64 lib path 수정
-            sed -i \
-              's|/lib/x86_64-linux-gnu|/lib|g' \
-              Makefile
+            # 2. 기존 glslc 컴파일 라인 제거
+            sed -i '/glslc \$< -o \$@/d' Makefile
 
-            # 기존 glslc 라인 제거
-            sed -i \
-              '/glslc \$< -o \$@/d' \
-              Makefile
+            # 3. 새로운 Shader 컴파일 규칙 추가 (탭 문자(\t) 유지를 위해 printf 사용)
+            # Makefile에서 %는 printf의 포맷 문자와 겹치므로 %%로 작성합니다.
+            printf "src/%%.spv : src/%%.comp\n\tcpp -P \$< > \$<.tmp.comp\n\tglslangValidator -V -S comp \$<.tmp.comp -o \$@\n\trm -f \$<.tmp.comp\n" >> Makefile
 
-            # 새로운 shader compile rule 추가
-            cat >> Makefile <<'EOF'
-
-            src/%.spv : src/%.comp
-	            cpp -P $< > $<.tmp.comp
-	            glslangValidator -V -S comp $<.tmp.comp -o $@
-	            rm -f $<.tmp.comp
-
-            EOF
-
-            echo "===== PATCHED MAKEFILE ====="
-
+            echo "===== VERIFY MAKEFILE ====="
             cat Makefile
 
             echo "===== BUILD ====="
-
+            # CPU 코어 수에 맞춰 병렬 빌드 실행
             make -j"$(nproc)"
 
-            echo "===== INSTALL ====="
-
+            echo "===== INSTALL & ORGANIZE ====="
             mkdir -p /workspace/output
-
+            
+            # 빌드 결과물을 output 폴더로 수집
             make install \
               PREFIX=/data/data/com.termux/files/usr/glibc \
               DESTDIR=/workspace/output
 
-            echo "===== COPY EXTRA FILES ====="
-
+            # 추가 파일(쉐이더 및 디스어셈블리) 정리
             mkdir -p /workspace/output/shaders
             mkdir -p /workspace/output/disasm
 
-            cp src/*.spv \
-              /workspace/output/shaders/ || true
+            if [ -f src/*.spv ]; then
+              cp src/*.spv /workspace/output/shaders/
+              for f in src/*.spv; do
+                spirv-dis "$f" -o "/workspace/output/disasm/$(basename "$f").txt" || true
+              done
+            fi
 
-            for f in src/*.spv; do
-              spirv-dis "$f" \
-                -o "/workspace/output/disasm/$(basename "$f").txt" || true
-            done
+            echo "===== BINARY ANALYSIS ====="
+            if [ -f libbcn_layer.so ]; then
+              file libbcn_layer.so
+              readelf -h libbcn_layer.so
+              nm -D libbcn_layer.so | grep BCn || true
+            else
+              echo "Error: libbcn_layer.so not found!"
+              exit 1
+            fi
 
-            echo "===== ELF INFO ====="
-
-            file libbcn_layer.so
-
-            readelf -h libbcn_layer.so || true
-
-            echo "===== SYMBOLS ====="
-
-            nm -D libbcn_layer.so | grep BCn || true
-
-            echo "===== OUTPUT TREE ====="
-
+            echo "===== FINAL OUTPUT LIST ====="
             find /workspace/output
 
       - name: Upload Artifacts
         uses: actions/upload-artifact@v4
-
         with:
           name: libbcn_layer-arm64
           path: output/
