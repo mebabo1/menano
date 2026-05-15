@@ -47,7 +47,6 @@ jobs:
             echo "===== TOOLCHAIN CHECK ====="
             which glslangValidator || true
             glslangValidator --version || true
-            cpp --version || true
 
             cd /workspace
 
@@ -56,21 +55,23 @@ jobs:
             git clone --depth 1 https://github.com/Pipetto-crypto/bcn_layer.git
             cd bcn_layer
 
+            echo "===== PATCH SOURCE CODE (Fix Missing Headers) ====="
+            # 1. log2 에러 해결: cmath 헤더 추가
+            sed -i '1i #include <cmath>' src/bcn_layer.cpp
+            
+            # 2. strcmp, strtok 에러 해결: cstring 헤더 추가
+            sed -i '1i #include <cstring>' src/logger.cpp
+
             echo "===== PATCH MAKEFILE ====="
-            # 1. 라이브러리 경로 수정
+            # 라이브러리 경로 수정 (ARM64 표준 경로)
             sed -i 's|/lib/x86_64-linux-gnu|/usr/lib/aarch64-linux-gnu|g' Makefile
 
-            # 2. 기존 glslc 규칙 제거
+            # 기존 glslc 규칙 제거 및 새로운 Shader 컴파일 규칙 추가
             sed -i '/glslc \$< -o \$@/d' Makefile
-
-            # 3. 새로운 Shader 컴파일 규칙 추가
-            # 수정 포인트: cpp 명령에 '-x assembler-with-cpp' 옵션 추가
             printf "src/%%.spv : src/%%.comp\n\tcpp -x assembler-with-cpp -P \$< > \$<.tmp.comp\n\tglslangValidator -V -S comp \$<.tmp.comp -o \$@\n\trm -f \$<.tmp.comp\n" >> Makefile
 
-            echo "===== VERIFY MAKEFILE ====="
-            cat Makefile
-
             echo "===== BUILD ====="
+            # 소스 수정이 반영되었으므로 빌드 진행
             make -j"$(nproc)"
 
             echo "===== INSTALL & ORGANIZE ====="
@@ -82,7 +83,6 @@ jobs:
             mkdir -p /workspace/output/shaders
             mkdir -p /workspace/output/disasm
 
-            # .spv 파일이 생성되었는지 확인 후 작업
             if ls src/*.spv >/dev/null 2>&1; then
               cp src/*.spv /workspace/output/shaders/
               for f in src/*.spv; do
@@ -94,6 +94,7 @@ jobs:
             if [ -f libbcn_layer.so ]; then
               file libbcn_layer.so
               readelf -h libbcn_layer.so
+              nm -D libbcn_layer.so | grep BCn || true
             else
               echo "Build Failed: libbcn_layer.so not found"
               exit 1
