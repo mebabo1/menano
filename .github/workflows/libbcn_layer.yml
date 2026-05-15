@@ -1,4 +1,4 @@
-name: Build libbcn_layer ARM64
+name: Build libbcn_layer Cross-Compile (ARM64)
 
 on:
   push:
@@ -6,81 +6,69 @@ on:
   workflow_dispatch:
 
 jobs:
-  build-arm64:
+  build-cross:
     runs-on: ubuntu-latest
-    name: Build libbcn_layer on Ubuntu 22.04 (ARM64)
+    name: Cross-build libbcn_layer for ARM64
 
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      - name: Build ARM64 libbcn_layer
-        uses: uraimo/run-on-arch-action@v2
-        with:
-          arch: aarch64
-          distro: ubuntu22.04
-          dockerRunArgs: |
-            --volume "${PWD}:/workspace"
+      - name: Install Cross-Build Tools
+        run: |
+          sudo apt-get update
+          # 호스트용 glslc와 ARM64 크로스 컴파일러 설치
+          sudo apt-get install -y \
+            build-essential \
+            git \
+            make \
+            google-glslc \
+            gcc-aarch64-linux-gnu \
+            g++-aarch64-linux-gnu \
+            libvulkan-dev \
+            spirv-tools
 
-          install: |
-            apt-get update
-            # shaderc 대신 google-glslc와 libshaderc-dev를 설치합니다.
-            apt-get install -y build-essential git make gcc g++ \
-              google-glslc libshaderc-dev \
-              spirv-tools spirv-headers libvulkan-dev vulkan-tools xxd file binutils
+      - name: Build libbcn_layer
+        run: |
+          git clone --depth 1 https://github.com/Pipetto-crypto/bcn_layer.git
+          cd bcn_layer
 
-          run: |
-            set -eux
-            cd /workspace
+          # [패치 1] 소스 헤더 누락 수정
+          sed -i '1i #include <cmath>' src/bcn_layer.cpp
+          sed -i '1i #include <cstring>' src/logger.cpp
 
-            rm -rf bcn_layer
-            git clone --depth 1 https://github.com/Pipetto-crypto/bcn_layer.git
-            cd bcn_layer
+          # [패치 2] Makefile 수정 (크로스 컴파일러 지정)
+          # 컴파일러를 aarch64-linux-gnu- 버전으로 교체합니다.
+          sed -i 's|gcc|aarch64-linux-gnu-gcc|g' Makefile
+          sed -i 's|g++|aarch64-linux-gnu-g++|g' Makefile
+          
+          # x86 전용 라이브러리 경로 제거 (크로스 컴파일러가 기본 경로를 찾도록)
+          sed -i 's|-L/lib/x86_64-linux-gnu||g' Makefile
 
-            # [패치 1] 소스 헤더 누락 수정
-            sed -i '1i #include <cmath>' src/bcn_layer.cpp
-            sed -i '1i #include <cstring>' src/logger.cpp
+          # [패치 3] 빌드 실행
+          # 호스트의 glslc를 사용하여 쉐이더를 먼저 빌드하고, 라이브러리를 빌드합니다.
+          make -j"$(nproc)"
 
-            # [패치 2] Makefile 수정
-            # 1. 라이브러리 경로 수정
-            sed -i 's|/lib/x86_64-linux-gnu|/usr/lib/aarch64-linux-gnu|g' Makefile
-            
-            # 2. glslc 실행 파일 확인 및 경로 보정
-            # 시스템에 glslc가 어디에 있든 작동하도록 심볼릭 링크를 확인하거나 직접 교체합니다.
-            GLSLC_PATH=$(which glslc)
-            sed -i "s|glslc|${GLSLC_PATH}|g" Makefile
+          # [패치 4] 결과물 정리
+          OUTPUT_DIR="../final_output"
+          TERMUX_INSTALL_PATH="/data/data/com.termux/files/usr/glibc/lib"
 
-            # [패치 3] RPATH 설정
-            export LDFLAGS="-Wl,-rpath,'\$ORIGIN'"
+          mkdir -p "$OUTPUT_DIR/lib"
+          mkdir -p "$OUTPUT_DIR/manifest"
+          mkdir -p "$OUTPUT_DIR/shaders"
 
-            # 빌드 실행
-            make -j"$(nproc)"
+          cp libbcn_layer.so "$OUTPUT_DIR/lib/"
+          cp libbcn_layer.json "$OUTPUT_DIR/manifest/"
+          
+          # JSON 내의 경로 패치
+          sed -i "s|\"./libbcn_layer.so\"|\"$TERMUX_INSTALL_PATH/libbcn_layer.so\"|g" "$OUTPUT_DIR/manifest/libbcn_layer.json"
 
-            # [패치 4] 결과물 정리
-            OUTPUT_DIR="/workspace/final_output"
-            TERMUX_INSTALL_PATH="/data/data/com.termux/files/usr/glibc/lib"
-
-            mkdir -p "$OUTPUT_DIR/lib"
-            mkdir -p "$OUTPUT_DIR/manifest"
-            mkdir -p "$OUTPUT_DIR/shaders"
-
-            cp libbcn_layer.so "$OUTPUT_DIR/lib/"
-            cp libbcn_layer.json "$OUTPUT_DIR/manifest/"
-            
-            # JSON 내의 경로를 Termux 환경에 맞춰 패치
-            sed -i "s|\"./libbcn_layer.so\"|\"$TERMUX_INSTALL_PATH/libbcn_layer.so\"|g" "$OUTPUT_DIR/manifest/libbcn_layer.json"
-
-            if ls src/*.spv >/dev/null 2>&1; then
-              cp src/*.spv "$OUTPUT_DIR/shaders/"
-            fi
-
-            echo "===== 검증 ====="
-            ls -l "$OUTPUT_DIR/lib/libbcn_layer.so"
-            ls -l "$OUTPUT_DIR/shaders/"
+          if ls src/*.spv >/dev/null 2>&1; then
+            cp src/*.spv "$OUTPUT_DIR/shaders/"
+          fi
 
       - name: Upload Artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: libbcn_layer-arm64
+          name: libbcn_layer-arm64-cross
           path: final_output/
-          if-no-files-found: error
