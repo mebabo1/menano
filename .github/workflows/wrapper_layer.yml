@@ -60,7 +60,7 @@ jobs:
           -Dbuild-tests=false \
           -Dllvm=enabled \
           -Dosmesa=true \
-          -Degl=enabled \
+          -Degl=disabled \
           -Dgbm=disabled \
           -Dshared-glapi=enabled \
           -Dglx=xlib \
