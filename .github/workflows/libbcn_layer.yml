@@ -1,0 +1,69 @@
+name: Build libbcn_layer ARM64
+
+on:
+  push:
+    branches: [ "master", "main" ]
+  workflow_dispatch:
+
+jobs:
+  build-arm64:
+    runs-on: ubuntu-latest
+    name: Build libbcn_layer on Ubuntu 22.04 (ARM64)
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run ARM64 Build
+        uses: uraimo/run-on-arch-action@v2
+
+        with:
+          arch: aarch64
+          distro: ubuntu22.04
+
+          dockerRunArgs: |
+            --volume "${PWD}:/workspace"
+
+          install: |
+            apt-get update
+
+            apt-get install -y \
+              build-essential \
+              git \
+              make \
+              gcc \
+              g++ \
+              glslang-tools \
+              spirv-tools \
+              spirv-headers \
+              libvulkan-dev \
+              vulkan-tools \
+              xxd \
+              file
+
+          run: |
+            cd /workspace
+
+            # 저장소 클론
+            git clone --depth 1 https://github.com/Pipetto-crypto/bcn_layer.git
+
+            cd bcn_layer
+
+            # 빌드
+            make -j$(nproc)
+
+            # 출력 폴더 생성
+            mkdir -p /workspace/output
+
+            # 결과물 복사
+            cp libbcn_layer.so /workspace/output/
+            cp libbcn_layer.json /workspace/output/
+
+            # 아키텍처 확인
+            file libbcn_layer.so
+
+      - name: Upload Artifacts
+        uses: actions/upload-artifact@v4
+
+        with:
+          name: libbcn_layer-arm64
+          path: output/
