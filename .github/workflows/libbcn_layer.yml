@@ -19,92 +19,62 @@ jobs:
         with:
           arch: aarch64
           distro: ubuntu22.04
-
           dockerRunArgs: |
             --volume "${PWD}:/workspace"
 
           install: |
             apt-get update
-            apt-get install -y \
-              build-essential \
-              git \
-              make \
-              gcc \
-              g++ \
-              cpp \
-              glslang-tools \
-              spirv-tools \
-              spirv-headers \
-              libvulkan-dev \
-              vulkan-tools \
-              xxd \
-              file \
-              binutils
+            apt-get install -y build-essential git make gcc g++ cpp glslang-tools \
+              spirv-tools spirv-headers libvulkan-dev vulkan-tools xxd file binutils
 
           run: |
             set -eux
-
-            echo "===== TOOLCHAIN CHECK ====="
-            which glslangValidator || true
-            glslangValidator --version || true
-
             cd /workspace
 
-            echo "===== CLONE REPOSITORY ====="
+            # 1. 클론 및 이동
             rm -rf bcn_layer
             git clone --depth 1 https://github.com/Pipetto-crypto/bcn_layer.git
             cd bcn_layer
 
-            echo "===== PATCH SOURCE CODE (Fix Missing Headers) ====="
-            # 1. log2 에러 해결: cmath 헤더 추가
+            # 2. 소스 및 Makefile 패치 (기존과 동일)
             sed -i '1i #include <cmath>' src/bcn_layer.cpp
-            
-            # 2. strcmp, strtok 에러 해결: cstring 헤더 추가
             sed -i '1i #include <cstring>' src/logger.cpp
-
-            echo "===== PATCH MAKEFILE ====="
-            # 라이브러리 경로 수정 (ARM64 표준 경로)
             sed -i 's|/lib/x86_64-linux-gnu|/usr/lib/aarch64-linux-gnu|g' Makefile
-
-            # 기존 glslc 규칙 제거 및 새로운 Shader 컴파일 규칙 추가
             sed -i '/glslc \$< -o \$@/d' Makefile
             printf "src/%%.spv : src/%%.comp\n\tcpp -x assembler-with-cpp -P \$< > \$<.tmp.comp\n\tglslangValidator -V -S comp \$<.tmp.comp -o \$@\n\trm -f \$<.tmp.comp\n" >> Makefile
 
-            echo "===== BUILD ====="
-            # 소스 수정이 반영되었으므로 빌드 진행
+            # 3. 빌드
             make -j"$(nproc)"
 
-            echo "===== INSTALL & ORGANIZE ====="
-            mkdir -p /workspace/output
+            # 4. 설치 (중요: /workspace/final_output에 직접 쌓기)
+            # 이렇게 해야 호스트의 ${PWD}/final_output 에서 바로 접근 가능합니다.
+            mkdir -p /workspace/final_output
             make install \
               PREFIX=/data/data/com.termux/files/usr/glibc \
-              DESTDIR=/workspace/output
+              DESTDIR=/workspace/final_output
 
-            mkdir -p /workspace/output/shaders
-            mkdir -p /workspace/output/disasm
-
+            # 쉐이더 및 추가 파일 정리
+            mkdir -p /workspace/final_output/shaders
+            mkdir -p /workspace/final_output/disasm
             if ls src/*.spv >/dev/null 2>&1; then
-              cp src/*.spv /workspace/output/shaders/
+              cp src/*.spv /workspace/final_output/shaders/
               for f in src/*.spv; do
-                spirv-dis "$f" -o "/workspace/output/disasm/$(basename "$f").txt" || true
+                spirv-dis "$f" -o "/workspace/final_output/disasm/$(basename "$f").txt" || true
               done
             fi
+            
+            # .so 파일도 최상단에 복사 (확인용)
+            cp libbcn_layer.so /workspace/final_output/
 
-            echo "===== BINARY ANALYSIS ====="
-            if [ -f libbcn_layer.so ]; then
-              file libbcn_layer.so
-              readelf -h libbcn_layer.so
-              nm -D libbcn_layer.so | grep BCn || true
-            else
-              echo "Build Failed: libbcn_layer.so not found"
-              exit 1
-            fi
-
-            echo "===== FINAL OUTPUT LIST ====="
-            find /workspace/output
+            echo "===== CHECK OUTPUT CONTENT ====="
+            ls -R /workspace/final_output
 
       - name: Upload Artifacts
         uses: actions/upload-artifact@v4
         with:
           name: libbcn_layer-arm64
-          path: output/
+          # /workspace가 호스트의 현재 디렉토리이므로, 
+          # 컨테이너 안에서 /workspace/final_output에 담은 것은 
+          # 밖에서는 final_output/ 경로가 됩니다.
+          path: final_output/
+          if-no-files-found: error # 파일이 없으면 에러를 내도록 설정하여 확인 용이하게 변경
