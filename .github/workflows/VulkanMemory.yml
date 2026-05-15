@@ -10,7 +10,7 @@ jobs:
     - name: Checkout lsfg-vk repository
       uses: actions/checkout@v4
       with:
-        repository: RedClient231/LSFG-MODIFIED
+        repository: xXJSONDeruloXx/lsfg-vk-android
         fetch-depth: 0
         submodules: recursive
 
