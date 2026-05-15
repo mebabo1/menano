@@ -38,31 +38,34 @@ jobs:
               libvulkan-dev \
               vulkan-tools \
               xxd \
-              file
+              file \
+              binutils
 
           run: |
             set -e
 
-            # glslc 없으면 glslangValidator로 대체
-            if ! command -v glslc >/dev/null 2>&1; then
-              ln -sf $(which glslangValidator) /usr/bin/glslc
-            fi
-
             echo "===== TOOLCHAIN ====="
-            which glslc
-            glslc --version || true
+
+            which glslangValidator
+            glslangValidator --version
 
             cd /workspace
 
             echo "===== CLONE ====="
+
             git clone --depth 1 https://github.com/Pipetto-crypto/bcn_layer.git
 
             cd bcn_layer
 
             echo "===== PATCH MAKEFILE ====="
 
-            # x86_64 전용 경로 제거
+            # ARM64 경로 수정
             sed -i 's|/lib/x86_64-linux-gnu|/lib|g' Makefile
+
+            # glslc -> glslangValidator
+            sed -i 's|glslc \$< -o \$@|glslangValidator -V -S comp \$< -o \$@|g' Makefile
+
+            echo "===== PATCHED MAKEFILE ====="
 
             cat Makefile
 
@@ -80,11 +83,21 @@ jobs:
               PREFIX=/data/data/com.termux/files/usr/glibc \
               DESTDIR=/workspace/output
 
+            echo "===== COPY SHADERS ====="
+
+            mkdir -p /workspace/output/shaders
+
+            cp src/*.spv /workspace/output/shaders/ || true
+
             echo "===== ELF INFO ====="
 
             file libbcn_layer.so
 
             readelf -h libbcn_layer.so || true
+
+            echo "===== SYMBOLS ====="
+
+            nm -D libbcn_layer.so | grep BCn || true
 
             echo "===== OUTPUT TREE ====="
 
