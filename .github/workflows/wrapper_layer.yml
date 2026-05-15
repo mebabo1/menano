@@ -38,7 +38,7 @@ jobs:
     - name: Install Meson and Mako
       run: |
         python -m pip install --upgrade pip
-        pip install meson ninja mako
+        pip install meson ninja mako pyyaml
 
     - name: Configure Mesa Wrapper Build
       run: |
