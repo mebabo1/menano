@@ -60,7 +60,6 @@ jobs:
           -Dmoltenvk-dir=$(brew --prefix molten-vk) \
           -Dbuild-tests=false \
           -Dllvm=enabled \
-          -Dosmesa=true \
           -Degl=enabled \
           -Dgbm=enabled \
           -Dshared-glapi=enabled \
