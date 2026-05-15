@@ -44,7 +44,6 @@ jobs:
       run: |
         LLVM_PATH=$(brew --prefix llvm)
         
-        # 다운로드한 GitLab 소스 폴더(mesa-src) 안에 설정 파일 생성
         cat > mesa-src/native_config <<EOL
         [binaries]
         llvm-config = '$LLVM_PATH/bin/llvm-config'
@@ -60,15 +59,16 @@ jobs:
           -Dmoltenvk-dir=$(brew --prefix molten-vk) \
           -Dbuild-tests=false \
           -Dllvm=enabled \
+          -Dosmesa=true \
           -Degl=enabled \
-          -Dgbm=enabled \
+          -Dgbm=disabled \  # 👈 기존 enabled에서 disabled로 변경!
           -Dshared-glapi=enabled \
           -Dglx=${{ matrix.glx_option }} \
           -Dplatforms=x11,android \
           -Dplatform-sdk-version=26 \
           -Dandroid-stub=true \
-          -Dgallium-drivers=freedreno,zink \
-          -Dvulkan-drivers=freedreno
+          -Dgallium-drivers=freedreno,zink,swrast \
+          -Dvulkan-drivers=freedreno,swrast
 
     - name: Build
       run: |
