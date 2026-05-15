@@ -24,7 +24,8 @@ jobs:
 
           install: |
             apt-get update
-            apt-get install -y build-essential git make gcc g++ cpp glslang-tools \
+            # shaderc 패키지에 glslc가 포함되어 있습니다.
+            apt-get install -y build-essential git make gcc g++ shaderc \
               spirv-tools spirv-headers libvulkan-dev vulkan-tools xxd file binutils
 
           run: |
@@ -35,25 +36,28 @@ jobs:
             git clone --depth 1 https://github.com/Pipetto-crypto/bcn_layer.git
             cd bcn_layer
 
-            # [패치 1] 소스 헤더 누락 수정
+            # [패치 1] 소스 헤더 누락 수정 (표준 규격 준수)
             sed -i '1i #include <cmath>' src/bcn_layer.cpp
             sed -i '1i #include <cstring>' src/logger.cpp
 
-            # [패치 2] Makefile 수정 (ARM64 경로 및 쉐이더 컴파일 규칙)
+            # [패치 2] Makefile 수정
+            # 1. x86_64 전용 라이브러리 경로를 ARM64 표준 경로로 수정
             sed -i 's|/lib/x86_64-linux-gnu|/usr/lib/aarch64-linux-gnu|g' Makefile
-            sed -i '/glslc \$< -o \$@/d' Makefile
-            printf "src/%%.spv : src/%%.comp\n\tcpp -x assembler-with-cpp -P \$< > \$<.tmp.comp\n\tglslangValidator -V -S comp \$<.tmp.comp -o \$@\n\trm -f \$<.tmp.comp\n" >> Makefile
+            
+            # 2. glslc 명령어를 시스템 절대 경로로 명시 (혹시 모를 경로 오류 방지)
+            sed -i 's|glslc|/usr/bin/glslc|g' Makefile
 
-            # [패치 3] 빌드 시 RPATH 설정 (라이브러리 로딩 안정성 강화)
-            # 링커 옵션에 현재 폴더를 우선 탐색하도록 추가합니다.
+            # [참고] 이전의 'cpp + glslangValidator' 패치는 삭제했습니다. 
+            # 이제 원본 Makefile의 glslc 규칙을 그대로 사용합니다.
+
+            # [패치 3] 빌드 시 RPATH 설정
             export LDFLAGS="-Wl,-rpath,'\$ORIGIN'"
 
-            # 빌드 실행
+            # 빌드 실행 (glslc가 정상적으로 호출됩니다)
             make -j"$(nproc)"
 
             # [패치 4] 결과물 정리 및 JSON 경로 수정
             OUTPUT_DIR="/workspace/final_output"
-            # Termux 내 실제 설치될 경로 (사용자 환경에 맞춰 수정 가능)
             TERMUX_INSTALL_PATH="/data/data/com.termux/files/usr/glibc/lib"
 
             mkdir -p "$OUTPUT_DIR/lib"
@@ -63,20 +67,20 @@ jobs:
             # .so 파일 복사
             cp libbcn_layer.so "$OUTPUT_DIR/lib/"
             
-            # JSON 파일 복사 및 내부 library_path 수정 (핵심!)
-            # JSON 내의 library_path를 절대 경로로 바꾸거나, 파일명만 남겨서 같은 폴더에서 찾게 합니다.
+            # JSON 파일 복사 및 내부 library_path 수정
             cp libbcn_layer.json "$OUTPUT_DIR/manifest/"
             sed -i "s|\"./libbcn_layer.so\"|\"$TERMUX_INSTALL_PATH/libbcn_layer.so\"|g" "$OUTPUT_DIR/manifest/libbcn_layer.json"
-            # 만약 상대 경로로 작동시키려면 아래와 같이 사용:
-            # sed -i 's|".*libbcn_layer.so"|"libbcn_layer.so"|g' "$OUTPUT_DIR/manifest/libbcn_layer.json"
 
-            # 쉐이더 파일 복사
+            # 생성된 쉐이더(.spv) 파일 복사
             if ls src/*.spv >/dev/null 2>&1; then
               cp src/*.spv "$OUTPUT_DIR/shaders/"
             fi
 
             echo "===== JSON 내용 확인 ====="
             cat "$OUTPUT_DIR/manifest/libbcn_layer.json"
+            
+            echo "===== 생성된 파일 확인 ====="
+            ls -l libbcn_layer.so src/*.spv
 
       - name: Upload Artifacts
         uses: actions/upload-artifact@v4
