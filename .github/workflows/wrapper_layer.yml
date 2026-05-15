@@ -139,7 +139,7 @@ jobs:
             -Dgbm=disabled \
             -Dglx=disabled \
             -Dosmesa=false \
-            -Dopengl=false \
+            -Dopengl=true \
             -Dgallium-drivers= \
             -Dvulkan-drivers=freedreno
 
