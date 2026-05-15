@@ -40,11 +40,10 @@ jobs:
             libgbm-dev libegl1-mesa-dev libexpat1-dev libwayland-dev python3-pip \
             python3-setuptools python3-wheel ninja-build
 
-    - name: 安装 Python 构建工具
+    - name: Install Python Build Tools
       run: |
-        # 使用系统级的 pip 安装，避免用户级安装的路径问题
-        #sudo pip3 install --upgrade pip
-        sudo pip3 install meson mako
+        python -m pip install --upgrade pip
+        python -m pip install meson mako pyyaml ninja
 
     - name: Configure Mesa Wrapper Build
       run: |
