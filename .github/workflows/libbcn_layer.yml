@@ -34,6 +34,7 @@ jobs:
               make \
               gcc \
               g++ \
+              glslc \
               spirv-tools \
               spirv-headers \
               libvulkan-dev \
@@ -44,19 +45,6 @@ jobs:
 
           run: |
             set -e
-
-            echo "===== INSTALL GLSLC ====="
-
-            cd /tmp
-
-            wget -O shaderc.tgz \
-              https://storage.googleapis.com/shaderc/artifacts/prod/graphics_shader_compiler/shaderc/linux/continuous_clang_release/linux/install.tgz
-
-            tar xf shaderc.tgz
-
-            cp bin/glslc /usr/local/bin/
-
-            chmod +x /usr/local/bin/glslc
 
             echo "===== TOOLCHAIN ====="
 
@@ -74,7 +62,7 @@ jobs:
 
             echo "===== PATCH MAKEFILE ====="
 
-            # ARM64 전용 lib 경로 수정
+            # ARM64 lib 경로 수정
             sed -i 's|/lib/x86_64-linux-gnu|/lib|g' Makefile
 
             echo "===== PATCHED MAKEFILE ====="
