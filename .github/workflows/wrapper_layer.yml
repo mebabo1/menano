@@ -13,7 +13,7 @@ jobs:
       matrix:
         glx_option: ['xlib']
 
-    runs-on: macos-13
+    runs-on: macos-latest
 
     steps:
     # 1. 워크플로우 실행을 위해 기본 저장소 체크아웃 (기본 환경 설정용)
