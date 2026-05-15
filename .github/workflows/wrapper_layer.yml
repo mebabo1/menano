@@ -1,4 +1,4 @@
-name: Build Wrapper Layer (Termux/Bionic Style)
+name: Build Android Vulkan Wrapper
 
 on:
   push:
@@ -12,8 +12,8 @@ jobs:
     runs-on: ubuntu-24.04
 
     env:
-      ANDROID_NDK_VERSION: r27c
       API_LEVEL: 26
+      ANDROID_NDK_VERSION: r27c
 
     steps:
       # ------------------------------------------------------------
@@ -23,7 +23,7 @@ jobs:
         uses: actions/checkout@v4
 
       # ------------------------------------------------------------
-      # Clone wrapper-25 branch
+      # Clone Mesa wrapper branch
       # ------------------------------------------------------------
       - name: Clone Mesa Wrapper Source
         run: |
@@ -40,27 +40,18 @@ jobs:
         with:
           python-version: "3.11"
 
-      - name: Install Python Packages
+      # ------------------------------------------------------------
+      # Python packages
+      # ------------------------------------------------------------
+      - name: Install Python Build Tools
         run: |
           python -m pip install --upgrade pip
           python -m pip install meson mako pyyaml ninja
 
       # ------------------------------------------------------------
-      # Android NDK
+      # Linux build dependencies
       # ------------------------------------------------------------
-      - name: Setup Android NDK
-        run: |
-          cd /tmp
-
-          wget https://dl.google.com/android/repository/android-ndk-${ANDROID_NDK_VERSION}-linux.zip
-          unzip -q android-ndk-${ANDROID_NDK_VERSION}-linux.zip
-
-          echo "ANDROID_NDK=/tmp/android-ndk-${ANDROID_NDK_VERSION}" >> $GITHUB_ENV
-
-      # ------------------------------------------------------------
-      # Linux build deps
-      # ------------------------------------------------------------
-      - name: Install Build Dependencies
+      - name: Install System Dependencies
         run: |
           sudo apt update
 
@@ -70,37 +61,34 @@ jobs:
             unzip \
             pkg-config \
             ninja-build \
+            cmake \
             bison \
             flex \
-            cmake \
             python3-dev \
             libdrm-dev \
             libexpat1-dev \
             libelf-dev \
             libzstd-dev \
             zlib1g-dev \
-            libxcb1-dev \
-            libxcb-dri3-dev \
-            libxcb-present-dev \
-            libxcb-randr0-dev \
-            libxcb-sync-dev \
-            libxcb-xfixes0-dev \
-            libxcb-shm0-dev \
-            libx11-dev \
-            libx11-xcb-dev \
-            libxext-dev \
-            libxfixes-dev \
-            libxrandr-dev \
-            libxxf86vm-dev \
-            libxshmfence-dev \
-            wayland-protocols \
-            libwayland-dev \
             glslang-tools
 
       # ------------------------------------------------------------
-      # Android cross file
+      # Android NDK
       # ------------------------------------------------------------
-      - name: Create Meson Android Cross File
+      - name: Download Android NDK
+        run: |
+          cd /tmp
+
+          wget -q https://dl.google.com/android/repository/android-ndk-${ANDROID_NDK_VERSION}-linux.zip
+
+          unzip -q android-ndk-${ANDROID_NDK_VERSION}-linux.zip
+
+          echo "ANDROID_NDK=/tmp/android-ndk-${ANDROID_NDK_VERSION}" >> $GITHUB_ENV
+
+      # ------------------------------------------------------------
+      # Create Android cross file
+      # ------------------------------------------------------------
+      - name: Create Meson Cross File
         run: |
           TOOLCHAIN=$ANDROID_NDK/toolchains/llvm/prebuilt/linux-x86_64
 
@@ -116,20 +104,16 @@ jobs:
           cpp = '$TOOLCHAIN/bin/aarch64-linux-android${API_LEVEL}-clang++'
           ar = '$TOOLCHAIN/bin/llvm-ar'
           strip = '$TOOLCHAIN/bin/llvm-strip'
+          c_ld = '$TOOLCHAIN/bin/ld.lld'
+          cpp_ld = '$TOOLCHAIN/bin/ld.lld'
           pkgconfig = 'pkg-config'
 
           [properties]
           needs_exe_wrapper = true
 
-          c_args = [
-            '-DANDROID',
-            '-D__ANDROID_API__=${API_LEVEL}'
-          ]
-
-          cpp_args = [
-            '-DANDROID',
-            '-D__ANDROID_API__=${API_LEVEL}'
-          ]
+          [built-in options]
+          c_args = ['-DANDROID', '-D__ANDROID_API__=${API_LEVEL}']
+          cpp_args = ['-DANDROID', '-D__ANDROID_API__=${API_LEVEL}']
           EOF
 
       # ------------------------------------------------------------
@@ -148,6 +132,7 @@ jobs:
             -Dplatforms=android \
             -Dplatform-sdk-version=${API_LEVEL} \
             -Dandroid-stub=false \
+            -Dbuild-tests=false \
             -Dllvm=disabled \
             -Dshared-glapi=enabled \
             -Degl=enabled \
@@ -156,13 +141,12 @@ jobs:
             -Dosmesa=false \
             -Dopengl=false \
             -Dgallium-drivers= \
-            -Dvulkan-drivers=freedreno \
-            -Dbuild-tests=false
+            -Dvulkan-drivers=freedreno
 
       # ------------------------------------------------------------
       # Build
       # ------------------------------------------------------------
-      - name: Build Wrapper
+      - name: Build Vulkan Wrapper
         run: |
           cd mesa-src
           meson compile -C build -j$(nproc)
@@ -170,7 +154,7 @@ jobs:
       # ------------------------------------------------------------
       # Install
       # ------------------------------------------------------------
-      - name: Install Build Output
+      - name: Install Build
         run: |
           cd mesa-src
           meson install -C build --destdir $PWD/install-output
@@ -178,27 +162,27 @@ jobs:
       # ------------------------------------------------------------
       # Show output
       # ------------------------------------------------------------
-      - name: Show Wrapper Files
+      - name: Show Generated Files
         run: |
           cd mesa-src
 
-          echo "=== Wrapper libraries ==="
+          echo "=== Wrapper Libraries ==="
           find build -iname "*wrapper*" || true
 
-          echo "=== Vulkan libraries ==="
+          echo "=== Vulkan Libraries ==="
           find install-output -iname "*.so" || true
 
-          echo "=== Vulkan ICD json ==="
+          echo "=== Vulkan JSON Files ==="
           find install-output -iname "*.json" || true
 
       # ------------------------------------------------------------
-      # Upload
+      # Upload artifacts
       # ------------------------------------------------------------
       - name: Upload Artifact
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: wrapper-android-aarch64
+          name: android-wrapper-build
           path: |
             mesa-src/build/meson-logs/
             mesa-src/install-output/
