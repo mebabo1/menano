@@ -13,14 +13,17 @@ jobs:
       matrix:
         glx_option: ['xlib']
 
-    # macos-11은 더 이상 지원되지 않으므로 13(Intel)으로 변경
-    runs-on: macos-latest
+    runs-on: macos-13
 
     steps:
-    - name: Checkout wrapper-25
-      uses: actions/checkout@v4 # v3 -> v4 업데이트
-      with:
-        ref: wrapper-25
+    # 1. 워크플로우 실행을 위해 기본 저장소 체크아웃 (기본 환경 설정용)
+    - name: Initialize Workspace
+      uses: actions/checkout@v4
+
+    # 2. 외부 GitLab 저장소에서 wrapper-25 브랜치 직접 가져오기
+    - name: Clone GitLab Repository
+      run: |
+        git clone --depth 1 --branch wrapper-25 https://gitlab.freedesktop.org/Pipetto-crypto/mesa.git mesa-src
 
     - name: Setup Python
       uses: actions/setup-python@v5
@@ -29,7 +32,6 @@ jobs:
 
     - name: Install Dependencies
       run: |
-        # LLVM은 빌드에 필수적이므로 명시적으로 설치
         brew update
         brew install bison expat gettext libx11 libxcb libxdamage libxext llvm molten-vk ninja pkg-config mako
 
@@ -40,16 +42,17 @@ jobs:
 
     - name: Configure Mesa Wrapper Build
       run: |
-        # LLVM 경로를 동적으로 확인하여 native_config 작성
         LLVM_PATH=$(brew --prefix llvm)
-        cat > native_config <<EOL
+        
+        # 다운로드한 GitLab 소스 폴더(mesa-src) 안에 설정 파일 생성
+        cat > mesa-src/native_config <<EOL
         [binaries]
         llvm-config = '$LLVM_PATH/bin/llvm-config'
         EOL
 
+        cd mesa-src
         rm -rf build
 
-        # meson 직접 실행 (경로 하드코딩 제거)
         meson setup build \
           --native-file=native_config \
           --buildtype=debugoptimized \
@@ -70,15 +73,17 @@ jobs:
 
     - name: Build
       run: |
+        cd mesa-src
         meson compile -C build -j$(sysctl -n hw.logicalcpu)
 
     - name: Install
       run: |
-        # destdir는 절대경로로 지정하는 것이 안전합니다.
+        cd mesa-src
         meson install -C build --destdir $PWD/install-output
 
     - name: Show Results
       run: |
+        cd mesa-src
         echo "--- Libraries found ---"
         find build -name "*wrapper*" || true
         find install-output -name "*.so" || true
@@ -86,10 +91,10 @@ jobs:
 
     - name: Upload Artifact
       if: always()
-      uses: actions/upload-artifact@v4 # v3 -> v4 업데이트
+      uses: actions/upload-artifact@v4
       with:
         name: macos-wrapper25-${{ matrix.glx_option }}
         path: |
-          build/meson-logs/
-          install-output/
+          mesa-src/build/meson-logs/
+          mesa-src/install-output/
         retention-days: 5
