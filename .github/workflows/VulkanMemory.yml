@@ -27,6 +27,7 @@ jobs:
 
     - name: Android Turnip patches
       run: |
+        find . -type f  -exec grep -l "/tmp" {} ; 2>/dev/null | xargs sed -i 's|/tmp/|/data/data/com.termux/files/usr/tmp/|g' 2>/dev/null || true
         # curl -L https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/path/image.cpp -o framegen/src/core/image.cpp
   
     - name: Configure lsfg-vk for Termux Bionic
