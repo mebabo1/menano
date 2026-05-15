@@ -7,7 +7,8 @@ on:
 
 jobs:
   build-cross:
-    runs-on: ubuntu-latest
+    # 24.04(latest) 대신 패키지가 안정적인 22.04를 사용합니다.
+    runs-on: ubuntu-22.04
     name: Cross-build libbcn_layer for ARM64
 
     steps:
@@ -17,13 +18,12 @@ jobs:
       - name: Install Build Tools
         run: |
           sudo apt-get update
-          # Ubuntu 24.04에서 glslc를 포함하는 정확한 패키지명은 google-shaderc입니다.
+          # 22.04에서 glslc를 포함하는 패키지는 shaderc입니다.
           sudo apt-get install -y \
             build-essential \
             git \
             make \
-            google-shaderc \
-            glslang-tools \
+            shaderc \
             gcc-aarch64-linux-gnu \
             g++-aarch64-linux-gnu \
             libc6-dev-arm64-cross \
@@ -39,24 +39,20 @@ jobs:
           sed -i '1i #include <cstring>' src/logger.cpp
 
           # [패치 2] Makefile 수정
-          # 크로스 컴파일러가 표준 라이브러리를 찾도록 방해 요소 제거
+          # 1. 크로스 컴파일 방해 요소 제거
           sed -i 's|-L/lib/x86_64-linux-gnu||g' Makefile
           
-          # [패치 3] glslc 경로 강제 지정
-          # google-shaderc 패키지는 /usr/bin/glslc에 설치됩니다.
-          # 만약의 경우를 대비해 시스템에서 glslc 경로를 찾아 변수에 할당합니다.
-          FOUND_GLSLC=$(which glslc || echo "/usr/bin/glslc")
-          echo "Using glslc at: $FOUND_GLSLC"
+          # 2. glslc 경로를 시스템 절대 경로로 강제 고정
+          # Makefile 내의 GLSLC ?= glslc 부분을 /usr/bin/glslc로 바꿉니다.
+          sed -i 's|glslc|/usr/bin/glslc|g' Makefile
 
-          # [패치 4] 빌드 실행
-          # GLSLC 변수를 명시적으로 전달하여 Makefile의 기본값을 덮어씁니다.
+          # [패치 3] 빌드 실행
+          # CC와 CXX를 ARM64용 크로스 컴파일러로 지정합니다.
           make -j"$(nproc)" \
             CC=aarch64-linux-gnu-gcc \
-            CXX=aarch64-linux-gnu-g++ \
-            GLSLC="$FOUND_GLSLC" \
-            STRIP=aarch64-linux-gnu-strip
+            CXX=aarch64-linux-gnu-g++
 
-          # [패치 5] 결과물 정리
+          # [패치 4] 결과물 정리
           OUTPUT_DIR="../final_output"
           TERMUX_INSTALL_PATH="/data/data/com.termux/files/usr/glibc/lib"
 
@@ -67,10 +63,10 @@ jobs:
           cp libbcn_layer.so "$OUTPUT_DIR/lib/"
           cp libbcn_layer.json "$OUTPUT_DIR/manifest/"
           
-          # JSON 내의 경로 패치
+          # JSON 내의 library_path를 Termux 환경에 맞게 수정
           sed -i "s|\"./libbcn_layer.so\"|\"$TERMUX_INSTALL_PATH/libbcn_layer.so\"|g" "$OUTPUT_DIR/manifest/libbcn_layer.json"
 
-          # 컴파일된 쉐이더 파일(.spv) 복사
+          # 컴파일 완료된 쉐이더 복사
           if ls src/*.spv >/dev/null 2>&1; then
             cp src/*.spv "$OUTPUT_DIR/shaders/"
           fi
