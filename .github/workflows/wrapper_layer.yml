@@ -1,4 +1,4 @@
-name: macOS-CI
+name: Build wrapper layer
 
 on: 
   push:
