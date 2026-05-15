@@ -36,7 +36,7 @@ jobs:
         sudo apt update
         sudo apt install -y glslang-tools libxrandr-dev libxxf86vm-dev libxcb-shm0-dev libxcb-glx0-dev \
             libxext-dev llvm-19 libx11-dev libx11-xcb-dev libxcb1-dev libxcb-dri3-dev libxcb-present-dev \
-            libxcb-randr0-dev libxcb-sync-dev libxcb-xfixes0-dev libxshmfence-dev libdrm-dev \
+            libxcb-randr0-dev libxcb-sync-dev libxcb-xfixes0-dev libxshmfence-dev libdrm-dev libxfixes-dev \
             libgbm-dev libegl1-mesa-dev libexpat1-dev libwayland-dev python3-pip \
             python3-setuptools python3-wheel ninja-build
 
