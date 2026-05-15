@@ -13,7 +13,7 @@ jobs:
       matrix:
         glx_option: ['xlib']
 
-    runs-on: macos-latest
+    runs-on: ubuntu-24.04
 
     steps:
     # 1. 워크플로우 실행을 위해 기본 저장소 체크아웃 (기본 환경 설정용)
@@ -60,10 +60,10 @@ jobs:
           -Dbuild-tests=false \
           -Dllvm=enabled \
           -Dosmesa=true \
-          -Degl=disabled \
+          -Degl=enabled \
           -Dgbm=disabled \
           -Dshared-glapi=enabled \
-          -Dglx=xlib \
+          -Dglx=dri \
           -Dplatforms=x11,android \
           -Dplatform-sdk-version=26 \
           -Dandroid-stub=true \
