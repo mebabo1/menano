@@ -68,8 +68,8 @@ jobs:
           -Dplatforms=x11,android \
           -Dplatform-sdk-version=26 \
           -Dandroid-stub=true \
-          -Dgallium-drivers=freedreno,zink,swrast \
-          -Dvulkan-drivers=freedreno,swrast
+          -Dgallium-drivers=freedreno,zink \
+          -Dvulkan-drivers=freedreno
 
     - name: Build
       run: |
