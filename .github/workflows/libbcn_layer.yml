@@ -31,51 +31,56 @@ jobs:
             set -eux
             cd /workspace
 
-            # 1. 클론 및 이동
             rm -rf bcn_layer
             git clone --depth 1 https://github.com/Pipetto-crypto/bcn_layer.git
             cd bcn_layer
 
-            # 2. 소스 및 Makefile 패치 (기존과 동일)
+            # [패치 1] 소스 헤더 누락 수정
             sed -i '1i #include <cmath>' src/bcn_layer.cpp
             sed -i '1i #include <cstring>' src/logger.cpp
+
+            # [패치 2] Makefile 수정 (ARM64 경로 및 쉐이더 컴파일 규칙)
             sed -i 's|/lib/x86_64-linux-gnu|/usr/lib/aarch64-linux-gnu|g' Makefile
             sed -i '/glslc \$< -o \$@/d' Makefile
             printf "src/%%.spv : src/%%.comp\n\tcpp -x assembler-with-cpp -P \$< > \$<.tmp.comp\n\tglslangValidator -V -S comp \$<.tmp.comp -o \$@\n\trm -f \$<.tmp.comp\n" >> Makefile
 
-            # 3. 빌드
+            # [패치 3] 빌드 시 RPATH 설정 (라이브러리 로딩 안정성 강화)
+            # 링커 옵션에 현재 폴더를 우선 탐색하도록 추가합니다.
+            export LDFLAGS="-Wl,-rpath,'\$ORIGIN'"
+
+            # 빌드 실행
             make -j"$(nproc)"
 
-            # 4. 설치 (중요: /workspace/final_output에 직접 쌓기)
-            # 이렇게 해야 호스트의 ${PWD}/final_output 에서 바로 접근 가능합니다.
-            mkdir -p /workspace/final_output
-            make install \
-              PREFIX=/data/data/com.termux/files/usr/glibc \
-              DESTDIR=/workspace/final_output
+            # [패치 4] 결과물 정리 및 JSON 경로 수정
+            OUTPUT_DIR="/workspace/final_output"
+            # Termux 내 실제 설치될 경로 (사용자 환경에 맞춰 수정 가능)
+            TERMUX_INSTALL_PATH="/data/data/com.termux/files/usr/glibc/lib"
 
-            # 쉐이더 및 추가 파일 정리
-            mkdir -p /workspace/final_output/shaders
-            mkdir -p /workspace/final_output/disasm
-            if ls src/*.spv >/dev/null 2>&1; then
-              cp src/*.spv /workspace/final_output/shaders/
-              for f in src/*.spv; do
-                spirv-dis "$f" -o "/workspace/final_output/disasm/$(basename "$f").txt" || true
-              done
-            fi
+            mkdir -p "$OUTPUT_DIR/lib"
+            mkdir -p "$OUTPUT_DIR/manifest"
+            mkdir -p "$OUTPUT_DIR/shaders"
+
+            # .so 파일 복사
+            cp libbcn_layer.so "$OUTPUT_DIR/lib/"
             
-            # .so 파일도 최상단에 복사 (확인용)
-            cp libbcn_layer.json /workspace/final_output/share/vulkan/implicit_layer.d/
-            cp libbcn_layer.so /workspace/final_output/
+            # JSON 파일 복사 및 내부 library_path 수정 (핵심!)
+            # JSON 내의 library_path를 절대 경로로 바꾸거나, 파일명만 남겨서 같은 폴더에서 찾게 합니다.
+            cp libbcn_layer.json "$OUTPUT_DIR/manifest/"
+            sed -i "s|\"./libbcn_layer.so\"|\"$TERMUX_INSTALL_PATH/libbcn_layer.so\"|g" "$OUTPUT_DIR/manifest/libbcn_layer.json"
+            # 만약 상대 경로로 작동시키려면 아래와 같이 사용:
+            # sed -i 's|".*libbcn_layer.so"|"libbcn_layer.so"|g' "$OUTPUT_DIR/manifest/libbcn_layer.json"
 
-            echo "===== CHECK OUTPUT CONTENT ====="
-            ls -R /workspace/final_output
+            # 쉐이더 파일 복사
+            if ls src/*.spv >/dev/null 2>&1; then
+              cp src/*.spv "$OUTPUT_DIR/shaders/"
+            fi
+
+            echo "===== JSON 내용 확인 ====="
+            cat "$OUTPUT_DIR/manifest/libbcn_layer.json"
 
       - name: Upload Artifacts
         uses: actions/upload-artifact@v4
         with:
           name: libbcn_layer-arm64
-          # /workspace가 호스트의 현재 디렉토리이므로, 
-          # 컨테이너 안에서 /workspace/final_output에 담은 것은 
-          # 밖에서는 final_output/ 경로가 됩니다.
           path: final_output/
-          if-no-files-found: error # 파일이 없으면 에러를 내도록 설정하여 확인 용이하게 변경
+          if-no-files-found: error
