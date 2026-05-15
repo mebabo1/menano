@@ -17,14 +17,16 @@ jobs:
       - name: Install Build Tools
         run: |
           sudo apt-get update
-          # glslc를 포함한 shaderc와 ARM64 크로스 컴파일러 설치
+          # Ubuntu 24.04용 패키지 구성: glslang-tools에 glslc 기능이 포함되어 있거나 
+          # 별도의 glslangValidator를 사용할 수 있습니다. 여기서는 확실한 shaderc 관련 패키지를 선택합니다.
           sudo apt-get install -y \
             build-essential \
             git \
             make \
-            shaderc \
+            glslang-tools \
             gcc-aarch64-linux-gnu \
             g++-aarch64-linux-gnu \
+            libc6-dev-arm64-cross \
             libvulkan-dev
 
       - name: Build libbcn_layer
@@ -37,16 +39,23 @@ jobs:
           sed -i '1i #include <cstring>' src/logger.cpp
 
           # [패치 2] Makefile 수정
-          # 크로스 컴파일러가 표준 라이브러리를 잘 찾도록 x86 전용 경로 제거
+          # 크로스 컴파일 시 x86_64 전용 라이브러리 경로가 방해되지 않도록 제거
           sed -i 's|-L/lib/x86_64-linux-gnu||g' Makefile
           
+          # glslc 대신 glslangValidator를 사용하는 환경일 경우를 대비해 
+          # glslc 명령어를 glslangValidator로 대체하거나 패치합니다.
+          # (만약 glslc가 설치되지 않았다면 glslangValidator가 대안입니다)
+          if ! command -v glslc &> /dev/null; then
+            echo "glslc not found, using glslangValidator as fallback"
+            sed -i 's|glslc \$< -o \$@|glslangValidator -V -S comp \$< -o \$@|g' Makefile
+          fi
+
           # [패치 3] 빌드 실행
-          # CC와 CXX 변수를 통해 크로스 컴파일러를 직접 지정합니다.
-          # glslc는 호스트(x86_64) 버전을 사용하여 쉐이더를 빌드합니다.
+          # 호스트의 쉐이더 컴파일러와 ARM64용 크로스 컴파일러를 명시적으로 전달
           make -j"$(nproc)" \
             CC=aarch64-linux-gnu-gcc \
             CXX=aarch64-linux-gnu-g++ \
-            GLSLC=glslc
+            STRIP=aarch64-linux-gnu-strip
 
           # [패치 4] 결과물 정리
           OUTPUT_DIR="../final_output"
@@ -59,14 +68,14 @@ jobs:
           cp libbcn_layer.so "$OUTPUT_DIR/lib/"
           cp libbcn_layer.json "$OUTPUT_DIR/manifest/"
           
-          # JSON 내의 경로 패치 (Termux 설치 경로 기준)
+          # JSON 내의 경로 패치
           sed -i "s|\"./libbcn_layer.so\"|\"$TERMUX_INSTALL_PATH/libbcn_layer.so\"|g" "$OUTPUT_DIR/manifest/libbcn_layer.json"
 
           if ls src/*.spv >/dev/null 2>&1; then
             cp src/*.spv "$OUTPUT_DIR/shaders/"
           fi
 
-          echo "===== ELF 파일 정보 확인 ====="
+          echo "===== 아키텍처 확인 ====="
           file "$OUTPUT_DIR/lib/libbcn_layer.so"
 
       - name: Upload Artifacts
