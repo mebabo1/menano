@@ -1,69 +1,109 @@
-name: Build lsfg-vk ARM64 (Manual)
+name: Build libbcn_layer ARM64
 
 on:
-  workflow_dispatch: # Actions 탭에서 수동으로 버튼을 눌러 실행할 수 있게 합니다.
+  push:
+    branches: [ "master", "main" ]
+  workflow_dispatch:
 
 jobs:
-  build:
-    runs-on: ubuntu-24.04
+  build-arm64:
+    runs-on: ubuntu-latest
+    name: Build libbcn_layer on Ubuntu 22.04 (ARM64)
+
     steps:
-    - name: Checkout lsfg-vk repository
-      uses: actions/checkout@v4
-      with:
-        repository: PancakeTAS/lsfg-vk  # <== [핵심] 가져올 원본 소스코드 저장소를 정확히 지정합니다.
-        fetch-depth: 0
-        ref:
-        submodules: recursive
+      - name: Checkout Repository
+        uses: actions/checkout@v4
 
-    - name: Install build dependencies
-      run: |
-        sudo apt-get update
-        sudo apt-get install -y \
-          git curl llvm clang clang-tools clang-tidy \
-          cmake ninja-build pkg-config \
-          gcc-aarch64-linux-gnu g++-aarch64-linux-gnu \
-          libvulkan-dev mesa-common-dev
+      - name: Build ARM64 libbcn_layer
+        uses: uraimo/run-on-arch-action@v2
+        with:
+          arch: aarch64
+          distro: ubuntu22.04
 
-    - name: Install Android NDK
-      run: |
-        wget https://dl.google.com/android/repository/android-ndk-r26d-linux.zip
-        unzip android-ndk-r26d-linux.zip
-        echo "NDK=$PWD/android-ndk-r26d" >> $GITHUB_ENV
+          dockerRunArgs: |
+            --volume "${PWD}:/workspace"
 
-    - name: Update Vulkan headers
-      run: |
-        git clone -b vulkan-sdk-1.4.328 https://github.com/KhronosGroup/Vulkan-Headers /tmp/vkh
-        sudo rm -rf /usr/include/{vulkan,vk_video}
-        sudo mv /tmp/vkh/include/{vulkan,vk_video} /usr/include/
-        rm -rf /tmp/vkh
+          install: |
+            apt-get update
+            apt-get install -y \
+              build-essential \
+              git \
+              make \
+              gcc \
+              g++ \
+              cpp \
+              glslang-tools \
+              spirv-tools \
+              spirv-headers \
+              libvulkan-dev \
+              vulkan-tools \
+              xxd \
+              file \
+              binutils
 
-    - name: Configure lsfg-vk
-      run: |        
-        cmake -B build -G Ninja \
-          -DCMAKE_BUILD_TYPE=RelWithDebInfo \
-          -DCMAKE_INSTALL_PREFIX=./target \
-          -DCMAKE_SYSTEM_PROCESSOR=aarch64 \
-          -DCMAKE_C_COMPILER=aarch64-linux-gnu-gcc \
-          -DCMAKE_CXX_COMPILER=aarch64-linux-gnu-g++ \
-          -DLSFGVK_BUILD_VK_LAYER=ON \
-          -DLSFGVK_BUILD_UI=OFF \
-          -DLSFGVK_BUILD_CLI=OFF \
-          -DLSFGVK_INSTALL_XDG_FILES=OFF \
-          -DCMAKE_SHARED_LINKER_FLAGS="-Wl,--allow-shlib-undefined -Wl,-rpath,/data/data/com.termux/files/usr/glibc/lib" \
-          -DCMAKE_EXE_LINKER_FLAGS="-Wl,--allow-shlib-undefined -Wl,-rpath,/data/data/com.termux/files/usr/glibc/lib" \
-          -DBUILD_SHARED_LIBS=ON \
-          -DLSFGVK_LAYER_LIBRARY_PATH="/data/data/com.termux/files/usr/glibc/lib/liblsfg-vk-layer.so"
+          run: |
+            set -eux
 
-    - name: Build with Ninja
-      run: |
-        ninja -C build
+            echo "===== TOOLCHAIN CHECK ====="
+            which glslangValidator || true
+            glslangValidator --version || true
 
-    - name: Install with CMake
-      run: |
-        cmake --install build
+            cd /workspace
 
-    - name: Upload lsfg-vk artifact
-      uses: actions/upload-artifact@v4
-      with:
-        name: lsfg-vk-arm64
-        path: target/*
+            echo "===== CLONE REPOSITORY ====="
+            rm -rf bcn_layer
+            git clone --depth 1 https://github.com/Pipetto-crypto/bcn_layer.git
+            cd bcn_layer
+
+            echo "===== PATCH SOURCE CODE (Fix log2 error) ====="
+            # log2 함수 사용을 위해 cmath 헤더를 파일 최상단에 추가
+            sed -i '1i #include <cmath>' src/bcn_layer.cpp
+
+            echo "===== PATCH MAKEFILE ====="
+            # 1. 라이브러리 경로 수정
+            sed -i 's|/lib/x86_64-linux-gnu|/usr/lib/aarch64-linux-gnu|g' Makefile
+
+            # 2. 기존 glslc 규칙 제거
+            sed -i '/glslc \$< -o \$@/d' Makefile
+
+            # 3. 새로운 Shader 컴파일 규칙 추가 (cpp -x assembler-with-cpp 적용)
+            printf "src/%%.spv : src/%%.comp\n\tcpp -x assembler-with-cpp -P \$< > \$<.tmp.comp\n\tglslangValidator -V -S comp \$<.tmp.comp -o \$@\n\trm -f \$<.tmp.comp\n" >> Makefile
+
+            echo "===== BUILD ====="
+            # -lm 옵션이 부족할 경우를 대비해 필요시 Makefile 수정이 가능하나, 
+            # 일단 헤더 추가만으로 해결되는 경우가 많습니다.
+            make -j"$(nproc)"
+
+            echo "===== INSTALL & ORGANIZE ====="
+            mkdir -p /workspace/output
+            make install \
+              PREFIX=/data/data/com.termux/files/usr/glibc \
+              DESTDIR=/workspace/output
+
+            mkdir -p /workspace/output/shaders
+            mkdir -p /workspace/output/disasm
+
+            if ls src/*.spv >/dev/null 2>&1; then
+              cp src/*.spv /workspace/output/shaders/
+              for f in src/*.spv; do
+                spirv-dis "$f" -o "/workspace/output/disasm/$(basename "$f").txt" || true
+              done
+            fi
+
+            echo "===== BINARY ANALYSIS ====="
+            if [ -f libbcn_layer.so ]; then
+              file libbcn_layer.so
+              readelf -h libbcn_layer.so
+            else
+              echo "Build Failed: libbcn_layer.so not found"
+              exit 1
+            fi
+
+            echo "===== FINAL OUTPUT LIST ====="
+            find /workspace/output
+
+      - name: Upload Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: libbcn_layer-arm64
+          path: output/
