@@ -8,12 +8,11 @@ on:
 jobs:
   build-arm64:
     runs-on: ubuntu-latest
-    name: Build libbcn_layer on Ubuntu 22.04 (ARM64)
 
     steps:
       - uses: actions/checkout@v4
 
-      - name: Run ARM64 Build
+      - name: Build ARM64 libbcn_layer
         uses: uraimo/run-on-arch-action@v2
 
         with:
@@ -29,11 +28,10 @@ jobs:
             apt-get install -y \
               build-essential \
               git \
-              wget \
-              tar \
               make \
               gcc \
               g++ \
+              cpp \
               glslang-tools \
               spirv-tools \
               spirv-headers \
@@ -44,56 +42,56 @@ jobs:
               binutils
 
           run: |
-            set -e
-
-            echo "===== TOOLCHAIN ====="
-
-            which glslangValidator
-            glslangValidator --version || true
+            set -eux
 
             cd /workspace
 
             echo "===== CLONE ====="
 
-            git clone --depth 1 https://github.com/Pipetto-crypto/bcn_layer.git
+            git clone --depth 1 \
+              https://github.com/Pipetto-crypto/bcn_layer.git
 
             cd bcn_layer
 
             echo "===== PATCH MAKEFILE ====="
 
-            # ARM64 lib 경로 수정
-            sed -i 's|/lib/x86_64-linux-gnu|/lib|g' Makefile
+            # ARM64 lib path 수정
+            sed -i \
+              's|/lib/x86_64-linux-gnu|/lib|g' \
+              Makefile
 
-            # GLSLC 변수 추가
-            sed -i '1i GLSLC ?= glslangValidator' Makefile
-            sed -i '2i GLSLC_FLAGS ?= --target-env vulkan1.1 --enable-include -V -S comp' Makefile
-
-            # glslc 호출을 변수화
-            sed -i 's|glslc \$< -o \$@|$(GLSLC) $(GLSLC_FLAGS) \$< -o \$@|g' Makefile
-
-            echo "===== PATCHED MAKEFILE ====="
-
-            cat Makefile
+            # glslc -> cpp + glslangValidator
+            sed -i \
+              '/glslc \$< -o \$@/c\
+            	cpp -P $< > $<.tmp && \
+            	glslangValidator -V -S comp $<.tmp -o $@ && \
+            	rm -f $<.tmp' \
+              Makefile
 
             echo "===== BUILD ====="
 
-            make -j$(nproc)
-
-            echo "===== PREPARE OUTPUT ====="
-
-            mkdir -p /workspace/output
+            make -j"$(nproc)"
 
             echo "===== INSTALL ====="
+
+            mkdir -p /workspace/output
 
             make install \
               PREFIX=/data/data/com.termux/files/usr/glibc \
               DESTDIR=/workspace/output
 
-            echo "===== COPY SHADERS ====="
+            echo "===== COPY EXTRA FILES ====="
 
             mkdir -p /workspace/output/shaders
+            mkdir -p /workspace/output/disasm
 
-            cp src/*.spv /workspace/output/shaders/ || true
+            cp src/*.spv \
+              /workspace/output/shaders/ || true
+
+            for f in src/*.spv; do
+              spirv-dis "$f" \
+                -o "/workspace/output/disasm/$(basename "$f").txt" || true
+            done
 
             echo "===== ELF INFO ====="
 
@@ -105,7 +103,7 @@ jobs:
 
             nm -D libbcn_layer.so | grep BCn || true
 
-            echo "===== OUTPUT TREE ====="
+            echo "===== OUTPUT ====="
 
             find /workspace/output
 
