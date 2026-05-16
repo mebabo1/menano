@@ -98,13 +98,12 @@ jobs:
             -Dgallium-drivers= \
             -Dandroid-stub=true \
             -Dzstd=disabled \
-            -Dvideo-codecs=all_free \
             -Dbuildtype=release
 
       - name: Build Vulkan Wrapper
         run: |
           cd mesa-src
-          meson compile -C build -j$(nproc) -v
+          meson compile -C build -j$(nproc)
 
       - name: Install Build
         run: |
