@@ -141,8 +141,8 @@ jobs:
             -Dosmesa=false \
             -Dopengl=true \
             -Dzstd=disabled \
-            -Dgallium-drivers=zink \
-            -Dvulkan-drivers=freedreno
+            -Dgallium-drivers= \
+            -Dvulkan-drivers=
 
       # ------------------------------------------------------------
       # Build
