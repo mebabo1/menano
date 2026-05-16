@@ -77,7 +77,9 @@ jobs:
 
       - name: Create Android Cross File
         run: |
-          TOOLCHAIN=$ANDROID_NDK/toolchains/llvm/prebuilt/linux-x86_64/bin
+          NDK_ROOT=$ANDROID_NDK/toolchains/llvm/prebuilt/linux-x86_64
+          TOOLCHAIN=$NDK_ROOT/bin
+          SYSROOT=$NDK_ROOT/sysroot
 
           cat > /tmp/android-cross.ini <<EOF
           [host_machine]
@@ -95,6 +97,7 @@ jobs:
 
           [properties]
           needs_exe_wrapper = true
+          sysroot = '$SYSROOT'
 
           [built-in options]
           c_args = ['-D__TERMUX__', '-D__USE_GNU', '-fPIC']
