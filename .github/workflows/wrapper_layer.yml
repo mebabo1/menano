@@ -97,6 +97,7 @@ jobs:
             -Dvulkan-drivers=wrapper \
             -Dgallium-drivers= \
             -Dandroid-stub=true \
+            -Dzstd=disabled \
             -Dbuildtype=release
 
       - name: Build Vulkan Wrapper
