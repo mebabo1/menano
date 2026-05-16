@@ -1,173 +1,115 @@
 name: Build Android Vulkan Wrapper
 
 on:
-  push:
-  workflow_dispatch:
-
-permissions:
-  contents: read
+push:
+workflow_dispatch:
 
 jobs:
-  build-wrapper:
-    runs-on: ubuntu-24.04
+build-wrapper:
+runs-on: ubuntu-24.04
 
-    env:
-      API_LEVEL: 30
-      ANDROID_NDK_VERSION: r27c
+env:
+  ANDROID_NDK_VERSION: r27c
 
-    steps:
-      - name: Checkout Workspace
-        uses: actions/checkout@v4
+steps:
+  - name: Checkout
+    uses: actions/checkout@v4
 
-      - name: Clone Mesa Wrapper Source
-        run: |
-          git clone --depth 1 \
-            --branch wrapper-25 \
-            https://gitlab.freedesktop.org/Pipetto-crypto/mesa.git \
-            mesa-src
+  - name: Clone Mesa Wrapper
+    run: |
+      git clone --depth 1 \
+        --branch wrapper-25 \
+        https://gitlab.freedesktop.org/Pipetto-crypto/mesa.git \
+        mesa-src
 
-      - name: Setup Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
+  - name: Setup Python
+    uses: actions/setup-python@v5
+    with:
+      python-version: "3.11"
 
-      - name: Install Python Tools
-        run: |
-          python -m pip install --upgrade pip
-          python -m pip install meson mako pyyaml ninja
+  - name: Install Dependencies
+    run: |
+      sudo apt update
 
-      - name: Install System Dependencies
-        run: |
-          sudo apt update
+      sudo apt install -y \
+        git wget unzip \
+        pkg-config ninja-build cmake \
+        bison flex python3-dev \
+        libx11-dev libxext-dev \
+        libxcb1-dev libxrandr-dev \
+        libxfixes-dev libdrm-dev \
+        libxshmfence-dev \
+        zlib1g-dev libzstd-dev \
+        glslang-tools
 
-          sudo apt install -y \
-            git wget unzip pkg-config \
-            ninja-build cmake bison flex \
-            python3-dev \
-            libx11-dev \
-            libx11-xcb-dev \
-            libxcb1-dev \
-            libxcb-glx0-dev \
-            libxcb-shm0-dev \
-            libxcb-xfixes0-dev \
-            libxcb-sync-dev \
-            libxcb-randr0-dev \
-            libxcb-present-dev \
-            libxcb-dri3-dev \
-            libxrandr-dev \
-            libxfixes-dev \
-            libxshmfence-dev \
-            zlib1g-dev \
-            glslang-tools
+      python -m pip install --upgrade pip
+      python -m pip install meson mako pyyaml ninja
 
-      - name: Download Android NDK
-        run: |
-          cd /tmp
+  - name: Download Android NDK
+    run: |
+      cd /tmp
 
-          wget -q \
-            https://dl.google.com/android/repository/android-ndk-${ANDROID_NDK_VERSION}-linux.zip
+      wget -q \
+        https://dl.google.com/android/repository/android-ndk-${ANDROID_NDK_VERSION}-linux.zip
 
-          unzip -q android-ndk-${ANDROID_NDK_VERSION}-linux.zip
+      unzip -q android-ndk-${ANDROID_NDK_VERSION}-linux.zip
 
-          echo "ANDROID_NDK=/tmp/android-ndk-${ANDROID_NDK_VERSION}" >> $GITHUB_ENV
+      echo "ANDROID_NDK=/tmp/android-ndk-${ANDROID_NDK_VERSION}" >> $GITHUB_ENV
 
-      - name: Create Meson Cross File
-        run: |
-          TOOLCHAIN=$ANDROID_NDK/toolchains/llvm/prebuilt/linux-x86_64
+  - name: Setup Android Clang
+    run: |
+      TOOLCHAIN=$ANDROID_NDK/toolchains/llvm/prebuilt/linux-x86_64/bin
 
-          cat > mesa-src/android-aarch64.cross <<EOF
-          [host_machine]
-          system = 'linux'
-          cpu_family = 'aarch64'
-          cpu = 'armv8'
-          endian = 'little'
+      echo "CC=$TOOLCHAIN/aarch64-linux-android30-clang" >> $GITHUB_ENV
+      echo "CXX=$TOOLCHAIN/aarch64-linux-android30-clang++" >> $GITHUB_ENV
+      echo "AR=$TOOLCHAIN/llvm-ar" >> $GITHUB_ENV
+      echo "STRIP=$TOOLCHAIN/llvm-strip" >> $GITHUB_ENV
 
-          [binaries]
-          c = '$TOOLCHAIN/bin/aarch64-linux-android${API_LEVEL}-clang'
-          cpp = '$TOOLCHAIN/bin/aarch64-linux-android${API_LEVEL}-clang++'
-          ar = '$TOOLCHAIN/bin/llvm-ar'
-          strip = '$TOOLCHAIN/bin/llvm-strip'
-          c_ld = '$TOOLCHAIN/bin/ld.lld'
-          cpp_ld = '$TOOLCHAIN/bin/ld.lld'
-          pkgconfig = 'pkg-config'
+  - name: Configure Mesa
+    run: |
+      cd mesa-src
 
-          [properties]
-          needs_exe_wrapper = true
+      export CPPFLAGS="-D__TERMUX__ -D__USE_GNU -U__ANDROID__ --target=aarch64-linux-android30"
+      export CFLAGS="-fPIC"
+      export CXXFLAGS="-fPIC"
+      export LDFLAGS="-landroid-shmem"
 
-          [built-in options]
-          c_args = [
-            '--target=aarch64-linux-android${API_LEVEL}',
-            '-D__TERMUX__',
-            '-D__USE_GNU',
-            '-U__ANDROID__',
-            '-fPIC'
-          ]
+      meson setup build \
+        -Dcpp_rtti=false \
+        -Dopengl=false \
+        -Degl=disabled \
+        -Dgbm=disabled \
+        -Dllvm=disabled \
+        -Dshared-llvm=disabled \
+        -Dxmlconfig=disabled \
+        -Dgallium-drivers= \
+        -Dvulkan-drivers=wrapper \
+        -Dvulkan-layers= \
+        -Dplatforms=x11 \
+        -Dzstd=disabled \
+        -Dbuildtype=release \
+        --prefix=/usr
 
-          cpp_args = [
-            '--target=aarch64-linux-android${API_LEVEL}',
-            '-D__TERMUX__',
-            '-D__USE_GNU',
-            '-U__ANDROID__',
-            '-fPIC'
-          ]
-          EOF
+  - name: Build
+    run: |
+      cd mesa-src
 
-      - name: Configure Mesa Wrapper
-        run: |
-          cd mesa-src
+      ninja -C build 2>&1 | tee build.log
 
-          rm -rf build
+  - name: Install
+    run: |
+      cd mesa-src
 
-          meson setup build \
-            --cross-file android-aarch64.cross \
-            --buildtype=release \
-            -Dplatforms=x11 \
-            -Degl-native-platform=x11 \
-            -Dvulkan-drivers=wrapper \
-            -Dvulkan-layers= \
-            -Dgallium-drivers= \
-            -Dllvm=disabled \
-            -Dshared-llvm=disabled \
-            -Dopengl=false \
-            -Dgbm=disabled \
-            -Degl=disabled \
-            -Dglx=disabled \
-            -Dxmlconfig=disabled \
-            -Dzstd=disabled \
-            -Dbuild-tests=false
+      DESTDIR=$PWD/install ninja -C build install
 
-      - name: Build Vulkan Wrapper
-        run: |
-          cd mesa-src
+  - name: Show Files
+    run: |
+      find mesa-src/install -type f
 
-          meson compile -C build -j1 \
-            2>&1 | tee build.log
-
-          echo "===== BUILD ERRORS ====="
-
-          grep -iE "error:|fatal:" build.log | tail -100 || true
-
-      - name: Install Build
-        run: |
-          cd mesa-src
-
-          meson install -C build \
-            --destdir $PWD/install-output
-
-      - name: Show Output
-        run: |
-          cd mesa-src
-
-          echo "=== Generated Files ==="
-
-          find install-output -type f
-
-      - name: Upload Artifact
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: android-wrapper-build
-          path: |
-            mesa-src/build/meson-logs/
-            mesa-src/build/build.log
-            mesa-src/install-output/
+  - name: Upload
+    uses: actions/upload-artifact@v4
+    with:
+      name: vulkan-wrapper
+      path: |
+        mesa-src/build.log
+        mesa-src/install
