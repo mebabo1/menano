@@ -59,51 +59,25 @@ jobs:
 
           echo "ANDROID_NDK=/tmp/android-ndk-${ANDROID_NDK_VERSION}" >> $GITHUB_ENV
 
-      - name: Create Android Cross File
+      - name: Setup Android Toolchain
         run: |
           TOOLCHAIN=$ANDROID_NDK/toolchains/llvm/prebuilt/linux-x86_64/bin
 
-          cat > /tmp/android-cross.txt <<EOF
-          [host_machine]
-          system = 'android'
-          cpu_family = 'aarch64'
-          cpu = 'armv8'
-          endian = 'little'
-
-          [binaries]
-          c = '$TOOLCHAIN/aarch64-linux-android30-clang'
-          cpp = '$TOOLCHAIN/aarch64-linux-android30-clang++'
-          ar = '$TOOLCHAIN/llvm-ar'
-          strip = '$TOOLCHAIN/llvm-strip'
-          pkgconfig = 'pkg-config'
-
-          [properties]
-          needs_exe_wrapper = true
-
-          [built-in options]
-          c_args = [
-            '-D__TERMUX__',
-            '-D__USE_GNU',
-            '-U__ANDROID__',
-            '-fPIC'
-          ]
-
-          cpp_args = [
-            '-D__TERMUX__',
-            '-D__USE_GNU',
-            '-U__ANDROID__',
-            '-fPIC'
-          ]
-          EOF
+          echo "CC=$TOOLCHAIN/aarch64-linux-android30-clang" >> $GITHUB_ENV
+          echo "CXX=$TOOLCHAIN/aarch64-linux-android30-clang++" >> $GITHUB_ENV
+          echo "AR=$TOOLCHAIN/llvm-ar" >> $GITHUB_ENV
+          echo "STRIP=$TOOLCHAIN/llvm-strip" >> $GITHUB_ENV
 
       - name: Configure Mesa
         run: |
           cd mesa-src
 
+          export CPPFLAGS="-D__TERMUX__ -D__USE_GNU -U__ANDROID__"
+          export CFLAGS="-fPIC"
+          export CXXFLAGS="-fPIC"
           export LDFLAGS="-landroid-shmem"
 
           meson setup build \
-            --cross-file /tmp/android-cross.txt \
             -Dcpp_rtti=false \
             -Dopengl=false \
             -Degl=disabled \
