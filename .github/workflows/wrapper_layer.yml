@@ -56,22 +56,24 @@ jobs:
           sudo apt update
 
           sudo apt install -y \
-            git \
-            wget \
-            unzip \
             pkg-config \
-            ninja-build \
-            cmake \
-            bison \
-            flex \
-            python3-dev \
+            libx11-dev \
+            libxcb1-dev \
+            libx11-xcb-dev \
+            libxcb-glx0-dev \
+            libxcb-shm0-dev \
+            libxcb-xfixes0-dev \
+            libxcb-sync-dev \
+            libxcb-randr0-dev \
+            libxcb-present-dev \
+            libxshmfence-dev \
+            libxfixes-dev \
             libdrm-dev \
             libexpat1-dev \
-            libelf-dev \
-            libzstd-dev \
-            zlib1g-dev \
             libssl-dev \
-            glslang-tools
+            libzstd-dev \
+            libunwind-dev \
+            zlib1g-dev
 
       # ------------------------------------------------------------
       # Android NDK
