@@ -72,13 +72,30 @@ jobs:
           # 6. 다음 스텝 컴파일러 탐색을 위한 환경 변수 고정
           echo "ANDROID_NDK=/tmp/android-ndk-${ANDROID_NDK_VERSION}" >> $GITHUB_ENV
 
-      # ------------------------------------------------------------
-      # [최신 NDK 패치] r27/r29에 맞춘 컴파일러 바이너리 명칭 및 타깃 지정
-      # ------------------------------------------------------------
+      - name: Debug and Find Clang Path
+        run: |
+          echo "=== NDK 내부 구조 탐색 ==="
+          # /tmp/android-ndk-r29 폴더 내부에서 'aarch64-linux-android'가 포함된 clang 파일의 실제 위치를 검색합니다.
+          REAL_CLANG_PATH=$(find /tmp/android-ndk-${ANDROID_NDK_VERSION} -name "aarch64-linux-android*-clang" -o -name "clang" | grep "bin/clang" | head -n 1)
+          
+          if [ -z "$REAL_CLANG_PATH" ]; then
+            # 만약 위 조건으로 안 나오면 bin 폴더에 있는 모든 clang을 다 뒤집니다.
+            REAL_CLANG_PATH=$(find /tmp/android-ndk-${ANDROID_NDK_VERSION} -name "clang" | grep "bin" | head -n 1)
+          fi
+
+          echo "실제 발견된 Clang 절대경로: $REAL_CLANG_PATH"
+          
+          # 컴파일러가 들어있는 실제 bin 폴더의 부모 경로를 환경 변수로 저장
+          TOOLCHAIN_BIN=$(dirname "$REAL_CLANG_PATH")
+          echo "TOOLCHAIN_BIN=$TOOLCHAIN_BIN" >> $GITHUB_ENV
+          
+          # 실제 바이너리 이름도 저장 (clang 인지, aarch64-linux-android-clang 인지)
+          CLANG_NAME=$(basename "$REAL_CLANG_PATH")
+          echo "CLANG_NAME=$CLANG_NAME" >> $GITHUB_ENV
+
       - name: Create Meson Cross File
         run: |
-          TOOLCHAIN=$ANDROID_NDK/toolchains/llvm/prebuilt/darwin-x86_64
-
+          # 디버깅 스텝에서 찾은 실제 경로와 바이너리 이름을 그대로 사용합니다.
           cat > mesa-src/android-aarch64.cross <<EOF
           [host_machine]
           system = 'android'
@@ -87,20 +104,18 @@ jobs:
           endian = 'little'
 
           [binaries]
-          # 최신 NDK는 파일명에 API 레벨(26)이 붙지 않은 순수 명칭을 사용합니다.
-          c = '$TOOLCHAIN/bin/aarch64-linux-android-clang'
-          cpp = '$TOOLCHAIN/bin/aarch64-linux-android-clang++'
-          ar = '$TOOLCHAIN/bin/llvm-ar'
-          strip = '$TOOLCHAIN/bin/llvm-strip'
-          c_ld = '$TOOLCHAIN/bin/ld.lld'
-          cpp_ld = '$TOOLCHAIN/bin/ld.lld'
+          c = '$TOOLCHAIN_BIN/$CLANG_NAME'
+          cpp = '$TOOLCHAIN_BIN/${CLANG_NAME}++'
+          ar = '$TOOLCHAIN_BIN/llvm-ar'
+          strip = '$TOOLCHAIN_BIN/llvm-strip'
+          c_ld = '$TOOLCHAIN_BIN/ld.lld'
+          cpp_ld = '$TOOLCHAIN_BIN/ld.lld'
           pkgconfig = 'pkg-config'
 
           [properties]
           needs_exe_wrapper = true
 
           [built-in options]
-          # 컴파일러 뒤에 -target 인자를 통해 API 레벨(26)을 명확히 전달합니다.
           c_args = ['-target', 'aarch64-linux-android${API_LEVEL}', '-DANDROID']
           cpp_args = ['-target', 'aarch64-linux-android${API_LEVEL}', '-DANDROID']
           EOF
