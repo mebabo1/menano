@@ -70,6 +70,7 @@ jobs:
             libelf-dev \
             libzstd-dev \
             zlib1g-dev \
+            libssl-dev \
             glslang-tools
 
       # ------------------------------------------------------------
