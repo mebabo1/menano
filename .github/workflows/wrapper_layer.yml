@@ -129,23 +129,12 @@ jobs:
           rm -rf build
 
           meson setup build \
-            --cross-file android-aarch64.cross \
-            --buildtype=release \
-            -Dprefix=/ \
+            --cross-file cross_files/android-aarch64 \
             -Dplatforms=android \
-            -Dandroid-stub=true \
-            -Dbuild-tests=false \
-            -Dllvm=disabled \
-            -Dlibdrm=false \
-            -Dshared-glapi=enabled \
-            -Degl=disabled \
-            -Dgbm=disabled \
-            -Dglx=disabled \
-            -Dosmesa=false \
-            -Dopengl=false \
-            -Dzstd=disabled \
+            -Dvulkan-drivers=wrap \
             -Dgallium-drivers= \
-            -Dvulkan-drivers=wrapper
+            -Dandroid-stub=true \
+            -Dbuildtype=release
 
       # ------------------------------------------------------------
       # Build Step
