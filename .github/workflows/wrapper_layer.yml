@@ -149,7 +149,7 @@ jobs:
       - name: Build Vulkan Wrapper
         run: |
           cd mesa-src
-          meson compile -C build -j$(nproc)
+          meson compile -C build -j1 -v
 
       # ------------------------------------------------------------
       # Install
