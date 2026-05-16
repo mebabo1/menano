@@ -45,15 +45,30 @@ jobs:
           brew update
           brew install bison flex pkg-config ninja glslang
 
+
       # ------------------------------------------------------------
-      # [변경] macOS용 Android NDK 다운로드 (해당 아카이브는 멀티 플랫폼 바이너리 포함)
+      # [최신 패치] .dmg 파일을 다운로드하고 가상 디스크를 마운트하여 추출합니다.
       # ------------------------------------------------------------
-      - name: Download Android NDK
+      - name: Download and Extract Android NDK (.dmg)
         run: |
           cd /tmp
-          wget -q https://dl.google.com/android/repository/android-ndk-${ANDROID_NDK_VERSION}-macos.zip
-          unzip -q android-ndk-${ANDROID_NDK_VERSION}-macos.zip
-          # 환경 변수에 NDK 경로 설정
+          
+          # 1. 구글 저장소에서 .dmg 파일 다운로드 (r27c도 .dmg 포맷 제공)
+          curl -L -O https://dl.google.com/android/repository/android-ndk-${ANDROID_NDK_VERSION}-darwin.dmg
+          
+          # 2. macOS 시스템 명령어로 dmg 파일 조용히 마운트 (마운트된 경로 추출)
+          MOUNT_DIR=$(hdiutil attach -nobrowse -readonly android-ndk-${ANDROID_NDK_VERSION}-darwin.dmg | grep -o '/Volumes/.*')
+          echo "NDK 마운트 경로: $MOUNT_DIR"
+          
+          # 3. 마운트된 볼륨 안의 NDK 폴더를 /tmp/android-ndk-r27c 위치로 통째로 복사
+          # (보통 볼륨 내부에 폴더 형태로 들어있으므로 전체를 이관합니다)
+          cp -R "$MOUNT_DIR"/android-ndk-${ANDROID_NDK_VERSION} /tmp/android-ndk-${ANDROID_NDK_VERSION}
+          
+          # 4. 사용이 끝난 dmg 디스크 언마운트(추출) 및 가상파일 삭제
+          hdiutil detach "$MOUNT_DIR"
+          rm android-ndk-${ANDROID_NDK_VERSION}-darwin.dmg
+          
+          # 5. 다음 단계에서 사용할 수 있도록 환경 변수 주입
           echo "ANDROID_NDK=/tmp/android-ndk-${ANDROID_NDK_VERSION}" >> $GITHUB_ENV
 
       # ------------------------------------------------------------
