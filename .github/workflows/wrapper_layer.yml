@@ -142,7 +142,7 @@ jobs:
             -Dopengl=false \
             -Dzstd=disabled \
             -Dgallium-drivers= \
-            -Dvulkan-drivers=
+            -Dvulkan-drivers=lvp
 
       # ------------------------------------------------------------
       # Build
