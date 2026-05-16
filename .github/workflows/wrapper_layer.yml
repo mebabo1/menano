@@ -130,7 +130,7 @@ jobs:
             --cross-file android-aarch64.cross \
             --buildtype=release \
             -Dprefix=$PWD/install-root \
-            -Dplatforms=android \
+            -Dplatforms=x11 \
             -Dplatform-sdk-version=${API_LEVEL} \
             -Dandroid-stub=true \
             -Dbuild-tests=false \
