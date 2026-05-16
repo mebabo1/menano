@@ -81,17 +81,14 @@ jobs:
           cpp_args = ['-DANDROID']
           EOF
 
-      # ------------------------------------------------------------
-      # Configure Step (중요 수정 반영)
-      # ------------------------------------------------------------
       - name: Configure Mesa Wrapper
         run: |
           cd mesa-src
           rm -rf build
 
-          # 1. -Dprefix=/ 로 주어 destdir와 경로가 꼬이는 현상을 방지합니다.
-          # 2. -Dvulkan-drivers를 해당 포크의 기본 타깃인 swrast(또는 freedreno)로 명시하거나, 
-          #    만약 래퍼 레이어 자체만 빌드하는 게 목적이라면 빈 값으로 두되 타깃 플랫폼 설정을 정밀화합니다.
+          # 1. -Dvulkan-drivers=wrapper 가 이 포크 저장소의 올바른 전용 드라이버 명칭입니다.
+          # 2. swrast를 제거하여 LLVM 필수 요구 에러(lavapipe 에러)를 회피합니다.
+          # 3. -Dprefix=/ 로 설정하여 install-output 내부에 가상 경로가 길게 꼬이는 것을 막습니다.
           meson setup build \
             --cross-file android-aarch64.cross \
             --buildtype=release \
@@ -107,8 +104,8 @@ jobs:
             -Dosmesa=false \
             -Dopengl=false \
             -Dzstd=disabled \
-            -Dgallium-drivers=swrast \
-            -Dvulkan-drivers=swrast
+            -Dgallium-drivers= \
+            -Dvulkan-drivers=wrapper
 
       - name: Build Vulkan Wrapper
         run: |
