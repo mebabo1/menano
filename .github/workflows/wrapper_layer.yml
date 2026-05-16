@@ -1,4 +1,4 @@
-name: Build Android Vulkan Wrapper on macOS
+name: Build Android Vulkan Wrapper
 
 on:
   push:
@@ -9,13 +9,11 @@ permissions:
 
 jobs:
   build-wrapper:
-    # 안정적인 Apple Silicon(M1/M2 코어) 환경을 사용합니다.
-    runs-on: macos-14
+    runs-on: ubuntu-24.04
 
     env:
       API_LEVEL: 26
-      # Gradle 프로젝트 타깃에 맞추어 NDK 버전을 r29로 지정합니다.
-      ANDROID_NDK_VERSION: r29
+      ANDROID_NDK_VERSION: r27c
 
     steps:
       - name: Checkout Workspace
@@ -38,64 +36,29 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install meson mako pyyaml ninja
 
-      - name: Install System Dependencies (macOS)
+      - name: Install System Dependencies
         run: |
-          brew update
-          brew install bison flex pkg-config ninja glslang
+          sudo apt update
+          # [핵심 수정 1] 호스트 환경을 오염시키는 libdrm-dev를 완벽히 제거했습니다.
+          sudo apt install -y \
+            git wget unzip pkg-config \
+            ninja-build cmake bison flex \
+            python3-dev libexpat1-dev libelf-dev libzstd-dev zlib1g-dev glslang-tools
 
-      # ------------------------------------------------------------
-      # [수정 반영] 볼륨 내부 폴더명을 자동으로 추적하여 복사하는 안전 보장 레이어
-      # ------------------------------------------------------------
-      - name: Download and Extract Android NDK (.dmg)
+      - name: Download Android NDK
         run: |
           cd /tmp
-          
-          # 1. 구글 저장소에서 r29 .dmg 파일 다운로드
-          curl -L -O https://dl.google.com/android/repository/android-ndk-${ANDROID_NDK_VERSION}-darwin.dmg
-          
-          # 2. dmg 파일 가상 마운트 후 마운트 지점 확보
-          MOUNT_DIR=$(hdiutil attach -nobrowse -readonly android-ndk-${ANDROID_NDK_VERSION}-darwin.dmg | grep -o '/Volumes/.*')
-          echo "NDK 마운트 경로: $MOUNT_DIR"
-          
-          # 3. [핵심] 볼륨 내부에 폴더 이름이 무엇으로 되어 있든 첫 번째 디렉토리를 찾아냅니다.
-          INNER_FOLDER=$(ls -d "$MOUNT_DIR"/*/ | head -n 1)
-          echo "감지된 실제 내부 폴더 경로: $INNER_FOLDER"
-          
-          # 4. 안전하게 타깃 임시 경로를 생성하고 내장된 모든 파일 이관
-          mkdir -p /tmp/android-ndk-${ANDROID_NDK_VERSION}
-          cp -R "$INNER_FOLDER". /tmp/android-ndk-${ANDROID_NDK_VERSION}
-          
-          # 5. 작업 완료 후 볼륨 언마운트 및 불필요 파일 정리
-          hdiutil detach "$MOUNT_DIR"
-          rm android-ndk-${ANDROID_NDK_VERSION}-darwin.dmg
-          
-          # 6. 다음 스텝 컴파일러 탐색을 위한 환경 변수 고정
+          wget -q https://dl.google.com/android/repository/android-ndk-${ANDROID_NDK_VERSION}-linux.zip
+          unzip -q android-ndk-${ANDROID_NDK_VERSION}-linux.zip
           echo "ANDROID_NDK=/tmp/android-ndk-${ANDROID_NDK_VERSION}" >> $GITHUB_ENV
 
-      - name: Debug and Find Clang Path
-        run: |
-          echo "=== NDK 내부 구조 탐색 ==="
-          # /tmp/android-ndk-r29 폴더 내부에서 'aarch64-linux-android'가 포함된 clang 파일의 실제 위치를 검색합니다.
-          REAL_CLANG_PATH=$(find /tmp/android-ndk-${ANDROID_NDK_VERSION} -name "aarch64-linux-android*-clang" -o -name "clang" | grep "bin/clang" | head -n 1)
-          
-          if [ -z "$REAL_CLANG_PATH" ]; then
-            # 만약 위 조건으로 안 나오면 bin 폴더에 있는 모든 clang을 다 뒤집니다.
-            REAL_CLANG_PATH=$(find /tmp/android-ndk-${ANDROID_NDK_VERSION} -name "clang" | grep "bin" | head -n 1)
-          fi
-
-          echo "실제 발견된 Clang 절대경로: $REAL_CLANG_PATH"
-          
-          # 컴파일러가 들어있는 실제 bin 폴더의 부모 경로를 환경 변수로 저장
-          TOOLCHAIN_BIN=$(dirname "$REAL_CLANG_PATH")
-          echo "TOOLCHAIN_BIN=$TOOLCHAIN_BIN" >> $GITHUB_ENV
-          
-          # 실제 바이너리 이름도 저장 (clang 인지, aarch64-linux-android-clang 인지)
-          CLANG_NAME=$(basename "$REAL_CLANG_PATH")
-          echo "CLANG_NAME=$CLANG_NAME" >> $GITHUB_ENV
-
+      # ------------------------------------------------------------
+      # [핵심 수정 2] 가짜 헤더 단계를 완전히 지우고 크로스를 순수하게 유지
+      # ------------------------------------------------------------
       - name: Create Meson Cross File
         run: |
-          # 디버깅 스텝에서 찾은 실제 경로와 바이너리 이름을 그대로 사용합니다.
+          TOOLCHAIN=$ANDROID_NDK/toolchains/llvm/prebuilt/linux-x86_64
+
           cat > mesa-src/android-aarch64.cross <<EOF
           [host_machine]
           system = 'android'
@@ -104,30 +67,35 @@ jobs:
           endian = 'little'
 
           [binaries]
-          c = '$TOOLCHAIN_BIN/$CLANG_NAME'
-          cpp = '$TOOLCHAIN_BIN/${CLANG_NAME}++'
-          ar = '$TOOLCHAIN_BIN/llvm-ar'
-          strip = '$TOOLCHAIN_BIN/llvm-strip'
-          c_ld = '$TOOLCHAIN_BIN/ld.lld'
-          cpp_ld = '$TOOLCHAIN_BIN/ld.lld'
+          c = '$TOOLCHAIN/bin/aarch64-linux-android${API_LEVEL}-clang'
+          cpp = '$TOOLCHAIN/bin/aarch64-linux-android${API_LEVEL}-clang++'
+          ar = '$TOOLCHAIN/bin/llvm-ar'
+          strip = '$TOOLCHAIN/bin/llvm-strip'
+          c_ld = '$TOOLCHAIN/bin/ld.lld'
+          cpp_ld = '$TOOLCHAIN/bin/ld.lld'
           pkgconfig = 'pkg-config'
 
           [properties]
           needs_exe_wrapper = true
 
           [built-in options]
-          c_args = ['-target', 'aarch64-linux-android${API_LEVEL}', '-DANDROID']
-          cpp_args = ['-target', 'aarch64-linux-android${API_LEVEL}', '-DANDROID']
+          c_args = ['-DANDROID']
+          cpp_args = ['-DANDROID']
           EOF
 
       # ------------------------------------------------------------
-      # Configure Step (libdrm 및 의존성 강제 비활성화 패치)
+      # Configure Step (Vulkan Wrapper 전용 최적화)
       # ------------------------------------------------------------
       - name: Configure Mesa Wrapper
         run: |
           cd mesa-src
           rm -rf build
 
+          # [핵심 수정 3] 
+          # -Dlibdrm=disabled 를 명시하여 vk_instance.c가 리눅스용 DRM 코드를 컴파일하지 않게 막습니다.
+          # 안드로이드 고유 환경을 위해 -Dintel-clc=disabled도 안전장치로 추가합니다.
+          meson setup build \
+            --cross-file android-aarch64.cross \
           meson setup build \
             --cross-file android-aarch64.cross \
             -Dplatforms=android \
@@ -136,13 +104,10 @@ jobs:
             -Dandroid-stub=true \
             -Dbuildtype=release
 
-      # ------------------------------------------------------------
-      # Build Step
-      # ------------------------------------------------------------
       - name: Build Vulkan Wrapper
         run: |
           cd mesa-src
-          meson compile -C build -j$(sysctl -n hw.logicalcpu) -v
+          meson compile -C build -j$(nproc) -v
 
       - name: Install Build
         run: |
@@ -159,7 +124,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: android-wrapper-build-macos
+          name: android-wrapper-build
           path: |
             mesa-src/build/meson-logs/
             mesa-src/install-output/
