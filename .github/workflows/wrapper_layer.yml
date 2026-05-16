@@ -97,17 +97,8 @@ jobs:
           needs_exe_wrapper = true
 
           [built-in options]
-          c_args = [
-            '-D__TERMUX__',
-            '-D__USE_GNU',
-            '-fPIC'
-          ]
-
-          cpp_args = [
-            '-D__TERMUX__',
-            '-D__USE_GNU',
-            '-fPIC'
-          ]
+          c_args = ['-D__TERMUX__', '-D__USE_GNU', '-fPIC']
+          cpp_args = ['-D__TERMUX__', '-D__USE_GNU', '-fPIC']
           EOF
 
       - name: Configure Mesa
