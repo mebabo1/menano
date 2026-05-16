@@ -129,7 +129,7 @@ jobs:
           rm -rf build
 
           meson setup build \
-            --cross-file cross_files/android-aarch64 \
+            --cross-file android-aarch64.cross \
             -Dplatforms=android \
             -Dvulkan-drivers=wrap \
             -Dgallium-drivers= \
