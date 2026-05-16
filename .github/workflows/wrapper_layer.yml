@@ -140,6 +140,7 @@ jobs:
             -Dglx=disabled \
             -Dosmesa=false \
             -Dopengl=true \
+            -Dzstd=disabled \
             -Dgallium-drivers=zink \
             -Dvulkan-drivers=freedreno
 
