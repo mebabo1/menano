@@ -12,7 +12,7 @@ jobs:
     runs-on: ubuntu-24.04
 
     env:
-      API_LEVEL: 26
+      API_LEVEL: 30
       ANDROID_NDK_VERSION: r27c
 
     steps:
@@ -39,29 +39,45 @@ jobs:
       - name: Install System Dependencies
         run: |
           sudo apt update
-          # [핵심 수정 1] 호스트 환경을 오염시키는 libdrm-dev를 완벽히 제거했습니다.
+
           sudo apt install -y \
-            git wget unzip libdrm-dev pkg-config \
+            git wget unzip pkg-config \
             ninja-build cmake bison flex \
-            python3-dev libexpat1-dev libelf-dev libzstd-dev zlib1g-dev glslang-tools
+            python3-dev \
+            libx11-dev \
+            libx11-xcb-dev \
+            libxcb1-dev \
+            libxcb-glx0-dev \
+            libxcb-shm0-dev \
+            libxcb-xfixes0-dev \
+            libxcb-sync-dev \
+            libxcb-randr0-dev \
+            libxcb-present-dev \
+            libxcb-dri3-dev \
+            libxrandr-dev \
+            libxfixes-dev \
+            libxshmfence-dev \
+            zlib1g-dev \
+            glslang-tools
 
       - name: Download Android NDK
         run: |
           cd /tmp
-          wget -q https://dl.google.com/android/repository/android-ndk-${ANDROID_NDK_VERSION}-linux.zip
+
+          wget -q \
+            https://dl.google.com/android/repository/android-ndk-${ANDROID_NDK_VERSION}-linux.zip
+
           unzip -q android-ndk-${ANDROID_NDK_VERSION}-linux.zip
+
           echo "ANDROID_NDK=/tmp/android-ndk-${ANDROID_NDK_VERSION}" >> $GITHUB_ENV
 
-      # ------------------------------------------------------------
-      # [핵심 수정 2] 가짜 헤더 단계를 완전히 지우고 크로스를 순수하게 유지
-      # ------------------------------------------------------------
       - name: Create Meson Cross File
         run: |
           TOOLCHAIN=$ANDROID_NDK/toolchains/llvm/prebuilt/linux-x86_64
 
           cat > mesa-src/android-aarch64.cross <<EOF
           [host_machine]
-          system = 'android'
+          system = 'linux'
           cpu_family = 'aarch64'
           cpu = 'armv8'
           endian = 'little'
@@ -79,42 +95,72 @@ jobs:
           needs_exe_wrapper = true
 
           [built-in options]
-          c_args = ['-DANDROID']
-          cpp_args = ['-DANDROID']
+          c_args = [
+            '--target=aarch64-linux-android${API_LEVEL}',
+            '-D__TERMUX__',
+            '-D__USE_GNU',
+            '-U__ANDROID__',
+            '-fPIC'
+          ]
+
+          cpp_args = [
+            '--target=aarch64-linux-android${API_LEVEL}',
+            '-D__TERMUX__',
+            '-D__USE_GNU',
+            '-U__ANDROID__',
+            '-fPIC'
+          ]
           EOF
 
-      # ------------------------------------------------------------
-      # Configure Step (Vulkan Wrapper 전용 최적화)
-      # ------------------------------------------------------------
       - name: Configure Mesa Wrapper
         run: |
           cd mesa-src
+
           rm -rf build
 
           meson setup build \
             --cross-file android-aarch64.cross \
-            -Dplatforms=android \
+            --buildtype=release \
+            -Dplatforms=x11 \
+            -Degl-native-platform=x11 \
             -Dvulkan-drivers=wrapper \
+            -Dvulkan-layers= \
             -Dgallium-drivers= \
-            -Dandroid-stub=true \
+            -Dllvm=disabled \
+            -Dshared-llvm=disabled \
+            -Dopengl=false \
+            -Dgbm=disabled \
+            -Degl=disabled \
+            -Dglx=disabled \
+            -Dxmlconfig=disabled \
             -Dzstd=disabled \
-            -Dbuildtype=release
+            -Dbuild-tests=false
 
       - name: Build Vulkan Wrapper
         run: |
           cd mesa-src
-          meson compile -C build -j$(nproc)
+
+          meson compile -C build -j1 \
+            2>&1 | tee build.log
+
+          echo "===== BUILD ERRORS ====="
+
+          grep -iE "error:|fatal:" build.log | tail -100 || true
 
       - name: Install Build
         run: |
           cd mesa-src
-          meson install -C build --destdir $PWD/install-output
+
+          meson install -C build \
+            --destdir $PWD/install-output
 
       - name: Show Output
         run: |
           cd mesa-src
-          echo "=== 생성된 라이브러리 파일 확인 ==="
-          find install-output -type f || echo "No files installed."
+
+          echo "=== Generated Files ==="
+
+          find install-output -type f
 
       - name: Upload Artifact
         if: always()
@@ -123,5 +169,5 @@ jobs:
           name: android-wrapper-build
           path: |
             mesa-src/build/meson-logs/
+            mesa-src/build/build.log
             mesa-src/install-output/
-          retention-days: 5
