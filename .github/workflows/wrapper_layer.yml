@@ -73,7 +73,7 @@ jobs:
           echo "ANDROID_NDK=/tmp/android-ndk-${ANDROID_NDK_VERSION}" >> $GITHUB_ENV
 
       # ------------------------------------------------------------
-      # Create Meson Cross File (macOS 툴체인 최적화)
+      # [최신 NDK 패치] r27/r29에 맞춘 컴파일러 바이너리 명칭 및 타깃 지정
       # ------------------------------------------------------------
       - name: Create Meson Cross File
         run: |
@@ -87,8 +87,9 @@ jobs:
           endian = 'little'
 
           [binaries]
-          c = '$TOOLCHAIN/bin/aarch64-linux-android${API_LEVEL}-clang'
-          cpp = '$TOOLCHAIN/bin/aarch64-linux-android${API_LEVEL}-clang++'
+          # 최신 NDK는 파일명에 API 레벨(26)이 붙지 않은 순수 명칭을 사용합니다.
+          c = '$TOOLCHAIN/bin/aarch64-linux-android-clang'
+          cpp = '$TOOLCHAIN/bin/aarch64-linux-android-clang++'
           ar = '$TOOLCHAIN/bin/llvm-ar'
           strip = '$TOOLCHAIN/bin/llvm-strip'
           c_ld = '$TOOLCHAIN/bin/ld.lld'
@@ -99,8 +100,9 @@ jobs:
           needs_exe_wrapper = true
 
           [built-in options]
-          c_args = ['-DANDROID']
-          cpp_args = ['-DANDROID']
+          # 컴파일러 뒤에 -target 인자를 통해 API 레벨(26)을 명확히 전달합니다.
+          c_args = ['-target', 'aarch64-linux-android${API_LEVEL}', '-DANDROID']
+          cpp_args = ['-target', 'aarch64-linux-android${API_LEVEL}', '-DANDROID']
           EOF
 
       # ------------------------------------------------------------
