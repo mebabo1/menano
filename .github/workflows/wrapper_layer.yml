@@ -121,7 +121,7 @@ jobs:
           EOF
 
       # ------------------------------------------------------------
-      # Configure Step (Vulkan Wrapper 구조 유지)
+      # Configure Step (libdrm 및 의존성 강제 비활성화 패치)
       # ------------------------------------------------------------
       - name: Configure Mesa Wrapper
         run: |
@@ -136,6 +136,7 @@ jobs:
             -Dandroid-stub=true \
             -Dbuild-tests=false \
             -Dllvm=disabled \
+            -Dlibdrm=false \
             -Dshared-glapi=enabled \
             -Degl=disabled \
             -Dgbm=disabled \
