@@ -112,8 +112,8 @@ jobs:
           needs_exe_wrapper = true
 
           [built-in options]
-          c_args = ['-DANDROID', '-D__ANDROID_API__=${API_LEVEL}']
-          cpp_args = ['-DANDROID', '-D__ANDROID_API__=${API_LEVEL}']
+          c_args = ['-DANDROID']
+          cpp_args = ['-DANDROID']
           EOF
 
       # ------------------------------------------------------------
