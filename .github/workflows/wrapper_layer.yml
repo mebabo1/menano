@@ -16,9 +16,15 @@ jobs:
       ANDROID_NDK_VERSION: r27c
 
     steps:
+      # -----------------------------
+      # Checkout
+      # -----------------------------
       - name: Checkout Workspace
         uses: actions/checkout@v4
 
+      # -----------------------------
+      # Clone Mesa
+      # -----------------------------
       - name: Clone Mesa Wrapper Source
         run: |
           git clone --depth 1 \
@@ -26,6 +32,9 @@ jobs:
             https://gitlab.freedesktop.org/Pipetto-crypto/mesa.git \
             mesa-src
 
+      # -----------------------------
+      # Python
+      # -----------------------------
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
@@ -36,7 +45,10 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install meson mako pyyaml ninja
 
-      - name: Install System Dependencies (X11 FULL)
+      # -----------------------------
+      # System deps (X11 FULL)
+      # -----------------------------
+      - name: Install System Dependencies
         run: |
           sudo apt update
           sudo apt install -y \
@@ -52,6 +64,9 @@ jobs:
             libxcb-present-dev libxcb-dri3-dev \
             libxrandr-dev libxfixes-dev libxshmfence-dev
 
+      # -----------------------------
+      # Android NDK
+      # -----------------------------
       - name: Download Android NDK
         run: |
           cd /tmp
@@ -59,6 +74,9 @@ jobs:
           unzip -q android-ndk-${ANDROID_NDK_VERSION}-linux.zip
           echo "ANDROID_NDK=/tmp/android-ndk-${ANDROID_NDK_VERSION}" >> $GITHUB_ENV
 
+      # -----------------------------
+      # Cross file
+      # -----------------------------
       - name: Create Meson Cross File
         run: |
           TOOLCHAIN=$ANDROID_NDK/toolchains/llvm/prebuilt/linux-x86_64
@@ -87,7 +105,10 @@ jobs:
           cpp_args = ['-DANDROID', '-D__ANDROID_API__=${API_LEVEL}']
           EOF
 
-      - name: Configure Mesa Wrapper (X11 ENABLED)
+      # -----------------------------
+      # Configure
+      # -----------------------------
+      - name: Configure Mesa Wrapper (X11 + Vulkan wrapper)
         run: |
           cd mesa-src
           rm -rf build
@@ -101,7 +122,7 @@ jobs:
             -Dbuild-tests=false \
             -Dllvm=disabled \
             -Dshared-glapi=enabled \
-            -Degl=disabled
+            -Degl=disabled \
             -Dgbm=disabled \
             -Dglx=disabled \
             -Dosmesa=false \
@@ -110,21 +131,33 @@ jobs:
             -Dgallium-drivers= \
             -Dvulkan-drivers=wrapper
 
+      # -----------------------------
+      # Build
+      # -----------------------------
       - name: Build Vulkan Wrapper
         run: |
           cd mesa-src
           meson compile -C build -j$(nproc) -v
 
+      # -----------------------------
+      # Install
+      # -----------------------------
       - name: Install Build
         run: |
           cd mesa-src
           meson install -C build --destdir $PWD/install-output
 
+      # -----------------------------
+      # Output check
+      # -----------------------------
       - name: Show Output
         run: |
           cd mesa-src
           find install-output -type f | head -200
 
+      # -----------------------------
+      # Upload
+      # -----------------------------
       - name: Upload Artifact
         if: always()
         uses: actions/upload-artifact@v4
