@@ -71,7 +71,6 @@ jobs:
             libzstd-dev \
             zlib1g-dev \
             libssl-dev \
-            libxcb \
             glslang-tools
 
       # ------------------------------------------------------------
