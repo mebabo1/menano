@@ -13,6 +13,7 @@ jobs:
 
     env:
       ANDROID_NDK_VERSION: r27c
+      API_LEVEL: 30
 
     steps:
       - name: Checkout
@@ -35,18 +36,32 @@ jobs:
           sudo apt update
 
           sudo apt install -y \
-            git wget unzip \
-            pkg-config ninja-build cmake \
-            bison flex python3-dev \
-            libx11-dev libxext-dev \
-            libxcb1-dev libxrandr-dev \
-            libxfixes-dev libdrm-dev \
+            git \
+            wget \
+            unzip \
+            pkg-config \
+            ninja-build \
+            cmake \
+            bison \
+            flex \
+            python3-dev \
+            libx11-dev \
+            libxext-dev \
+            libxcb1-dev \
+            libxrandr-dev \
+            libxfixes-dev \
             libxshmfence-dev \
-            zlib1g-dev libzstd-dev \
+            libdrm-dev \
+            zlib1g-dev \
+            libzstd-dev \
             glslang-tools
 
           python -m pip install --upgrade pip
-          python -m pip install meson mako pyyaml ninja
+          python -m pip install \
+            meson \
+            mako \
+            pyyaml \
+            ninja
 
       - name: Download Android NDK
         run: |
@@ -59,25 +74,40 @@ jobs:
 
           echo "ANDROID_NDK=/tmp/android-ndk-${ANDROID_NDK_VERSION}" >> $GITHUB_ENV
 
-      - name: Setup Android Toolchain
+      - name: Create Android Cross File
         run: |
           TOOLCHAIN=$ANDROID_NDK/toolchains/llvm/prebuilt/linux-x86_64/bin
 
-          echo "CC=$TOOLCHAIN/aarch64-linux-android30-clang" >> $GITHUB_ENV
-          echo "CXX=$TOOLCHAIN/aarch64-linux-android30-clang++" >> $GITHUB_ENV
-          echo "AR=$TOOLCHAIN/llvm-ar" >> $GITHUB_ENV
-          echo "STRIP=$TOOLCHAIN/llvm-strip" >> $GITHUB_ENV
+          cat > /tmp/android-cross.ini <<EOF
+          [host_machine]
+          system = 'android'
+          cpu_family = 'aarch64'
+          cpu = 'armv8'
+          endian = 'little'
+
+          [binaries]
+          c = '$TOOLCHAIN/aarch64-linux-android${API_LEVEL}-clang'
+          cpp = '$TOOLCHAIN/aarch64-linux-android${API_LEVEL}-clang++'
+          ar = '$TOOLCHAIN/llvm-ar'
+          strip = '$TOOLCHAIN/llvm-strip'
+          pkgconfig = 'pkg-config'
+
+          [properties]
+          needs_exe_wrapper = true
+
+          [built-in options]
+          c_args = ['-D__TERMUX__', '-D__USE_GNU', '-U__ANDROID__', '-fPIC']
+          cpp_args = ['-D__TERMUX__', '-D__USE_GNU', '-U__ANDROID__', '-fPIC']
+          EOF
 
       - name: Configure Mesa
         run: |
           cd mesa-src
 
-          export CPPFLAGS="-D__TERMUX__ -D__USE_GNU -U__ANDROID__"
-          export CFLAGS="-fPIC"
-          export CXXFLAGS="-fPIC"
           export LDFLAGS="-landroid-shmem"
 
           meson setup build \
+            --cross-file /tmp/android-cross.ini \
             -Dcpp_rtti=false \
             -Dopengl=false \
             -Degl=disabled \
@@ -85,6 +115,8 @@ jobs:
             -Dllvm=disabled \
             -Dshared-llvm=disabled \
             -Dxmlconfig=disabled \
+            -Dbuild-tests=false \
+            -Dinstall-intel-gpu-tests=false \
             -Dgallium-drivers= \
             -Dvulkan-drivers=wrapper \
             -Dvulkan-layers= \
