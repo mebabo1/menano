@@ -1,4 +1,4 @@
-name: Build Android Vulkan Wrapper
+name: Build Android Vulkan Wrapper on macOS
 
 on:
   push:
@@ -9,7 +9,8 @@ permissions:
 
 jobs:
   build-wrapper:
-    runs-on: ubuntu-24.04
+    # 1. macOS 14 (Apple Silicon M1 러너) 사용으로 속도 최적화
+    runs-on: macos-latest
 
     env:
       API_LEVEL: 26
@@ -36,28 +37,32 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install meson mako pyyaml ninja
 
-      - name: Install System Dependencies
+      # ------------------------------------------------------------
+      # [변경] apt를 무시하고 Homebrew를 사용해 필수 도구 다운로드
+      # ------------------------------------------------------------
+      - name: Install System Dependencies (macOS)
         run: |
-          sudo apt update
-          # [핵심 수정 1] 호스트 환경을 오염시키는 libdrm-dev를 완벽히 제거했습니다.
-          sudo apt install -y \
-            git wget unzip pkg-config \
-            ninja-build cmake bison flex \
-            python3-dev libexpat1-dev libelf-dev libzstd-dev zlib1g-dev glslang-tools
+          brew update
+          brew install bison flex pkg-config ninja glslang
 
+      # ------------------------------------------------------------
+      # [변경] macOS용 Android NDK 다운로드 (해당 아카이브는 멀티 플랫폼 바이너리 포함)
+      # ------------------------------------------------------------
       - name: Download Android NDK
         run: |
           cd /tmp
-          wget -q https://dl.google.com/android/repository/android-ndk-${ANDROID_NDK_VERSION}-linux.zip
-          unzip -q android-ndk-${ANDROID_NDK_VERSION}-linux.zip
+          wget -q https://dl.google.com/android/repository/android-ndk-${ANDROID_NDK_VERSION}-macos.zip
+          unzip -q android-ndk-${ANDROID_NDK_VERSION}-macos.zip
+          # 환경 변수에 NDK 경로 설정
           echo "ANDROID_NDK=/tmp/android-ndk-${ANDROID_NDK_VERSION}" >> $GITHUB_ENV
 
       # ------------------------------------------------------------
-      # [핵심 수정 2] 가짜 헤더 단계를 완전히 지우고 크로스를 순수하게 유지
+      # [변경] 크로스 파일 내의 툴체인 경로를 linux에서 darwin으로 변경
       # ------------------------------------------------------------
       - name: Create Meson Cross File
         run: |
-          TOOLCHAIN=$ANDROID_NDK/toolchains/llvm/prebuilt/linux-x86_64
+          # ★ 핵심: 맥 호스트에서는 toolchains 경로가 darwin-x86_64 입니다.
+          TOOLCHAIN=$ANDROID_NDK/toolchains/llvm/prebuilt/darwin-x86_64
 
           cat > mesa-src/android-aarch64.cross <<EOF
           [host_machine]
@@ -84,16 +89,13 @@ jobs:
           EOF
 
       # ------------------------------------------------------------
-      # Configure Step (Vulkan Wrapper 전용 최적화)
+      # Configure Step (Vulkan Wrapper 구조 유지)
       # ------------------------------------------------------------
       - name: Configure Mesa Wrapper
         run: |
           cd mesa-src
           rm -rf build
 
-          # [핵심 수정 3] 
-          # -Dlibdrm=disabled 를 명시하여 vk_instance.c가 리눅스용 DRM 코드를 컴파일하지 않게 막습니다.
-          # 안드로이드 고유 환경을 위해 -Dintel-clc=disabled도 안전장치로 추가합니다.
           meson setup build \
             --cross-file android-aarch64.cross \
             --buildtype=release \
@@ -114,10 +116,13 @@ jobs:
             -Dgallium-drivers= \
             -Dvulkan-drivers=wrapper
 
+      # ------------------------------------------------------------
+      # [변경] 빌드 코어를 활용하기 위해 sysctl 명령어 사용
+      # ------------------------------------------------------------
       - name: Build Vulkan Wrapper
         run: |
           cd mesa-src
-          meson compile -C build -j$(nproc) -v
+          meson compile -C build -j$(sysctl -n hw.logicalcpu) -v
 
       - name: Install Build
         run: |
@@ -134,7 +139,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: android-wrapper-build
+          name: android-wrapper-build-macos
           path: |
             mesa-src/build/meson-logs/
             mesa-src/install-output/
