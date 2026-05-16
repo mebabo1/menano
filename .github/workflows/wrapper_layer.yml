@@ -131,7 +131,7 @@ jobs:
             -Dprefix=$PWD/install-root \
             -Dplatforms=android \
             -Dplatform-sdk-version=${API_LEVEL} \
-            -Dandroid-stub=false \
+            -Dandroid-stub=true \
             -Dbuild-tests=false \
             -Dllvm=disabled \
             -Dshared-glapi=enabled \
