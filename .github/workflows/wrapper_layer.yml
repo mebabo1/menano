@@ -40,7 +40,7 @@ jobs:
         run: |
           sudo apt update
           sudo apt install -y \
-            git wget unzip pkg-config \
+            git wget unzip pkg-config libdrm-dev \
             ninja-build cmake bison flex \
             python3-dev libexpat1-dev libelf-dev libzstd-dev zlib1g-dev glslang-tools
 
