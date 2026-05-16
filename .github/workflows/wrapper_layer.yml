@@ -65,6 +65,10 @@ jobs:
             libxcb-xfixes0-dev \
             libxcb-sync-dev \
             libxcb-randr0-dev \
+            libx11-dev \
+            libxrandr-dev \
+            libxcb-randr0-dev \
+            libxcb1-dev \
             libxcb-present-dev \
             libxshmfence-dev \
             libxfixes-dev \
