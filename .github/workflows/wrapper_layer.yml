@@ -39,12 +39,12 @@ jobs:
       - name: Install System Dependencies
         run: |
           sudo apt update
+          # 호스트용 그래픽 라이브러리(libdrm-dev 등)는 크로스 컴파일을 오염시키므로 
+          # 빌드 도구(bison, flex 등)만 최소한으로 설치합니다.
           sudo apt install -y \
             git wget unzip pkg-config \
             ninja-build cmake bison flex \
-            python3-dev libdrm-dev libexpat1-dev \
-            libelf-dev libzstd-dev zlib1g-dev \
-            libssl-dev glslang-tools
+            python3-dev libexpat1-dev libelf-dev libzstd-dev zlib1g-dev glslang-tools
 
       - name: Download Android NDK
         run: |
@@ -53,6 +53,9 @@ jobs:
           unzip -q android-ndk-${ANDROID_NDK_VERSION}-linux.zip
           echo "ANDROID_NDK=/tmp/android-ndk-${ANDROID_NDK_VERSION}" >> $GITHUB_ENV
 
+      # ------------------------------------------------------------
+      # [핵심 수정] 호스트 pkg-config 탐색 무력화
+      # ------------------------------------------------------------
       - name: Create Meson Cross File
         run: |
           TOOLCHAIN=$ANDROID_NDK/toolchains/llvm/prebuilt/linux-x86_64
@@ -71,7 +74,8 @@ jobs:
           strip = '$TOOLCHAIN/bin/llvm-strip'
           c_ld = '$TOOLCHAIN/bin/ld.lld'
           cpp_ld = '$TOOLCHAIN/bin/ld.lld'
-          pkgconfig = 'pkg-config'
+          # 호스트의 pkg-config가 실행되어 빌드 환경을 더럽히는 것을 막기 위해 false 처리를 합니다.
+          pkgconfig = '/bin/false'
 
           [properties]
           needs_exe_wrapper = true
@@ -81,14 +85,15 @@ jobs:
           cpp_args = ['-DANDROID']
           EOF
 
+      # ------------------------------------------------------------
+      # Configure
+      # ------------------------------------------------------------
       - name: Configure Mesa Wrapper
         run: |
           cd mesa-src
           rm -rf build
 
-          # 1. -Dvulkan-drivers=wrapper 가 이 포크 저장소의 올바른 전용 드라이버 명칭입니다.
-          # 2. swrast를 제거하여 LLVM 필수 요구 에러(lavapipe 에러)를 회피합니다.
-          # 3. -Dprefix=/ 로 설정하여 install-output 내부에 가상 경로가 길게 꼬이는 것을 막습니다.
+          # -Dprefix=/ 로 주어 최종 결과물 폴더 구조를 깔끔하게 뽑아냅니다.
           meson setup build \
             --cross-file android-aarch64.cross \
             --buildtype=release \
@@ -115,13 +120,12 @@ jobs:
       - name: Install Build
         run: |
           cd mesa-src
-          # 이제 결과물이 mesa-src/install-output/lib/ 구조로 깔끔하게 떨어집니다.
           meson install -C build --destdir $PWD/install-output
 
       - name: Show Output
         run: |
           cd mesa-src
-          echo "=== 징후 탐색: 생성된 모든 파일 목록 ==="
+          echo "=== 생성된 라이브러리 목록 ==="
           find install-output -type f || echo "No files installed."
 
       - name: Upload Artifact
