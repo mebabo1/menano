@@ -72,6 +72,7 @@ jobs:
             libexpat1-dev \
             libssl-dev \
             libzstd-dev \
+            libxcb-dri3-dev \
             libunwind-dev \
             zlib1g-dev
 
