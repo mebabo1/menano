@@ -141,7 +141,7 @@ jobs:
             -Dosmesa=false \
             -Dopengl=true \
             -Dzstd=disabled \
-            -Dgallium-drivers= \
+            -Dgallium-drivers=zink \
             -Dvulkan-drivers=
 
       # ------------------------------------------------------------
