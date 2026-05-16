@@ -52,11 +52,15 @@ jobs:
           unzip -q android-ndk-${ANDROID_NDK_VERSION}-linux.zip
           echo "ANDROID_NDK=/tmp/android-ndk-${ANDROID_NDK_VERSION}" >> $GITHUB_ENV
 
-      # ✨ [핵심 수정] Meson이 안드로이드 NDK를 완벽히 인식하도록 크로스 파일 생성
       - name: Create Meson Cross File
         run: |
           TOOLCHAIN=$ANDROID_NDK/toolchains/llvm/prebuilt/linux-x86_64/bin
           
+          # NDK 내부의 32비트/64비트 라이브러리 경로 및 Clang 전용 런타임 경로 지정
+          # r27c 기준 aarch64-linux-android 시스템 라이브러리 경로입니다.
+          NDK_LIB_DIR="$ANDROID_NDK/toolchains/llvm/prebuilt/linux-x86_64/target/usr/lib/aarch64-linux-android/${API_LEVEL}"
+          NDK_ARCH_DIR="$ANDROID_NDK/toolchains/llvm/prebuilt/linux-x86_64/lib/clang/18/lib/linux/aarch64"
+
           cat <<EOF > /tmp/android-cross.txt
           [binaries]
           c = '$TOOLCHAIN/aarch64-linux-android${API_LEVEL}-clang'
@@ -68,8 +72,20 @@ jobs:
           [properties]
           c_args = ['-fPIC', '-D__TERMUX__', '-D__USE_GNU', '-U__ANDROID__']
           cpp_args = ['-fPIC', '-D__TERMUX__', '-D__USE_GNU', '-U__ANDROID__']
-          c_link_args = ['-landroid-shmem']
-          cpp_link_args = ['-landroid-shmem']
+          
+          # ✨ [핵심 수정] 링커가 NDK 내부의 libatomic.a를 찾을 수 있도록 경로를 강제 지정합니다.
+          c_link_args = [
+            '-B$NDK_LIB_DIR',
+            '-L$NDK_LIB_DIR',
+            '-L$NDK_ARCH_DIR',
+            '-landroid-shmem'
+          ]
+          cpp_link_args = [
+            '-B$NDK_LIB_DIR',
+            '-L$NDK_LIB_DIR',
+            '-L$NDK_ARCH_DIR',
+            '-landroid-shmem'
+          ]
 
           [host_machine]
           system = 'android'
