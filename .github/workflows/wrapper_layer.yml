@@ -39,20 +39,11 @@ jobs:
       - name: Install System Dependencies
         run: |
           sudo apt update
+          # [핵심 수정 1] 호스트 환경을 오염시키는 libdrm-dev를 완벽히 제거했습니다.
           sudo apt install -y \
-            git wget unzip pkg-config libdrm-dev \
+            git wget unzip pkg-config \
             ninja-build cmake bison flex \
             python3-dev libexpat1-dev libelf-dev libzstd-dev zlib1g-dev glslang-tools
-
-      # ------------------------------------------------------------
-      # [수정 반영 1] 컴파일러를 속일 가짜 DRM 헤더 껍데기 생성
-      # ------------------------------------------------------------
-      - name: Create Fake DRM Headers
-        run: |
-          # 컴파일러가 #include <xf86drm.h>를 만났을 때 읽어갈 빈 껍데기 파일들을 만듭니다.
-          mkdir -p /tmp/fake-drm
-          touch /tmp/fake-drm/xf86drm.h
-          touch /tmp/fake-drm/xf86drmMode.h
 
       - name: Download Android NDK
         run: |
@@ -62,7 +53,7 @@ jobs:
           echo "ANDROID_NDK=/tmp/android-ndk-${ANDROID_NDK_VERSION}" >> $GITHUB_ENV
 
       # ------------------------------------------------------------
-      # [수정 반영 2] 크로스 파일 컴파일러 옵션에 가짜 경로 강제 주입
+      # [핵심 수정 2] 가짜 헤더 단계를 완전히 지우고 크로스를 순수하게 유지
       # ------------------------------------------------------------
       - name: Create Meson Cross File
         run: |
@@ -82,15 +73,14 @@ jobs:
           strip = '$TOOLCHAIN/bin/llvm-strip'
           c_ld = '$TOOLCHAIN/bin/ld.lld'
           cpp_ld = '$TOOLCHAIN/bin/ld.lld'
-          pkgconfig = 'pkg-config' # 순정 pkg-config 상태 유지 (wrapper 드라이버는 이를 무시함)
+          pkgconfig = 'pkg-config'
 
           [properties]
           needs_exe_wrapper = true
 
           [built-in options]
-          # 컴파일러가 소스 코드를 읽을 때 /tmp/fake-drm을 최우선으로 뒤지게 만듭니다.
-          c_args = ['-DANDROID', '-I/tmp/fake-drm']
-          cpp_args = ['-DANDROID', '-I/tmp/fake-drm']
+          c_args = ['-DANDROID']
+          cpp_args = ['-DANDROID']
           EOF
 
       # ------------------------------------------------------------
@@ -101,6 +91,9 @@ jobs:
           cd mesa-src
           rm -rf build
 
+          # [핵심 수정 3] 
+          # -Dlibdrm=disabled 를 명시하여 vk_instance.c가 리눅스용 DRM 코드를 컴파일하지 않게 막습니다.
+          # 안드로이드 고유 환경을 위해 -Dintel-clc=disabled도 안전장치로 추가합니다.
           meson setup build \
             --cross-file android-aarch64.cross \
             --buildtype=release \
@@ -109,6 +102,8 @@ jobs:
             -Dandroid-stub=true \
             -Dbuild-tests=false \
             -Dllvm=disabled \
+            -Dlibdrm=disabled \
+            -Dintel-clc=disabled \
             -Dshared-glapi=enabled \
             -Degl=disabled \
             -Dgbm=disabled \
