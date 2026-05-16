@@ -119,8 +119,6 @@ jobs:
             -Dandroid-stub=true \
             -Dbuild-tests=false \
             -Dllvm=disabled \
-            -Dlibdrm=disabled \
-            -Dintel-clc=disabled \
             -Dshared-glapi=enabled \
             -Degl=disabled \
             -Dgbm=disabled \
