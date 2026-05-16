@@ -91,11 +91,6 @@ jobs:
           cd mesa-src
           rm -rf build
 
-          # [핵심 수정 3] 
-          # -Dlibdrm=disabled 를 명시하여 vk_instance.c가 리눅스용 DRM 코드를 컴파일하지 않게 막습니다.
-          # 안드로이드 고유 환경을 위해 -Dintel-clc=disabled도 안전장치로 추가합니다.
-          meson setup build \
-            --cross-file android-aarch64.cross \
           meson setup build \
             --cross-file android-aarch64.cross \
             -Dplatforms=android \
