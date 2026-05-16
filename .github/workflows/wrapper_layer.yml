@@ -4,13 +4,15 @@ on:
   push:
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
   build-wrapper:
     runs-on: ubuntu-24.04
 
     env:
       ANDROID_NDK_VERSION: r27c
-      API_LEVEL: "30"
 
     steps:
       - name: Checkout
@@ -31,6 +33,7 @@ jobs:
       - name: Install Dependencies
         run: |
           sudo apt update
+
           sudo apt install -y \
             git wget unzip \
             pkg-config ninja-build cmake \
@@ -48,57 +51,57 @@ jobs:
       - name: Download Android NDK
         run: |
           cd /tmp
-          wget -q https://dl.google.com/android/repository/android-ndk-${ANDROID_NDK_VERSION}-linux.zip
+
+          wget -q \
+            https://dl.google.com/android/repository/android-ndk-${ANDROID_NDK_VERSION}-linux.zip
+
           unzip -q android-ndk-${ANDROID_NDK_VERSION}-linux.zip
+
           echo "ANDROID_NDK=/tmp/android-ndk-${ANDROID_NDK_VERSION}" >> $GITHUB_ENV
 
-      - name: Create Meson Cross File
+      - name: Create Android Cross File
         run: |
           TOOLCHAIN=$ANDROID_NDK/toolchains/llvm/prebuilt/linux-x86_64/bin
-          
-          # NDK 내부의 32비트/64비트 라이브러리 경로 및 Clang 전용 런타임 경로 지정
-          # r27c 기준 aarch64-linux-android 시스템 라이브러리 경로입니다.
-          NDK_LIB_DIR="$ANDROID_NDK/toolchains/llvm/prebuilt/linux-x86_64/target/usr/lib/aarch64-linux-android/${API_LEVEL}"
-          NDK_ARCH_DIR="$ANDROID_NDK/toolchains/llvm/prebuilt/linux-x86_64/lib/clang/18/lib/linux/aarch64"
 
-          cat <<EOF > /tmp/android-cross.txt
+          cat > /tmp/android-cross.txt <<EOF
+          [host_machine]
+          system = 'android'
+          cpu_family = 'aarch64'
+          cpu = 'armv8'
+          endian = 'little'
+
           [binaries]
-          c = '$TOOLCHAIN/aarch64-linux-android${API_LEVEL}-clang'
-          cpp = '$TOOLCHAIN/aarch64-linux-android${API_LEVEL}-clang++'
+          c = '$TOOLCHAIN/aarch64-linux-android30-clang'
+          cpp = '$TOOLCHAIN/aarch64-linux-android30-clang++'
           ar = '$TOOLCHAIN/llvm-ar'
           strip = '$TOOLCHAIN/llvm-strip'
           pkgconfig = 'pkg-config'
 
           [properties]
-          c_args = ['-fPIC', '-D__TERMUX__', '-D__USE_GNU', '-U__ANDROID__']
-          cpp_args = ['-fPIC', '-D__TERMUX__', '-D__USE_GNU', '-U__ANDROID__']
-          
-          # ✨ [핵심 수정] 링커가 NDK 내부의 libatomic.a를 찾을 수 있도록 경로를 강제 지정합니다.
-          c_link_args = [
-            '-B$NDK_LIB_DIR',
-            '-L$NDK_LIB_DIR',
-            '-L$NDK_ARCH_DIR',
-            '-landroid-shmem'
-          ]
-          cpp_link_args = [
-            '-B$NDK_LIB_DIR',
-            '-L$NDK_LIB_DIR',
-            '-L$NDK_ARCH_DIR',
-            '-landroid-shmem'
+          needs_exe_wrapper = true
+
+          [built-in options]
+          c_args = [
+            '-D__TERMUX__',
+            '-D__USE_GNU',
+            '-U__ANDROID__',
+            '-fPIC'
           ]
 
-          [host_machine]
-          system = 'android'
-          cpu_family = 'aarch64'
-          cpu = 'armv8-a'
-          endian = 'little'
+          cpp_args = [
+            '-D__TERMUX__',
+            '-D__USE_GNU',
+            '-U__ANDROID__',
+            '-fPIC'
+          ]
           EOF
 
       - name: Configure Mesa
         run: |
           cd mesa-src
-          
-          # `--cross-file` 옵션을 주어 위에서 만든 환경 설정을 강제 적용합니다.
+
+          export LDFLAGS="-landroid-shmem"
+
           meson setup build \
             --cross-file /tmp/android-cross.txt \
             -Dcpp_rtti=false \
@@ -113,17 +116,20 @@ jobs:
             -Dvulkan-layers= \
             -Dplatforms=x11 \
             -Dzstd=disabled \
+            -Dvideo-codecs= \
             -Dbuildtype=release \
             --prefix=/usr
 
       - name: Build
         run: |
           cd mesa-src
+
           ninja -C build 2>&1 | tee build.log
 
       - name: Install
         run: |
           cd mesa-src
+
           DESTDIR=$PWD/install ninja -C build install
 
       - name: Show Files
