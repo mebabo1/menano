@@ -106,6 +106,7 @@ jobs:
           cd mesa-src
 
           export LDFLAGS="-landroid-shmem"
+          export CFLAGS="$CFLAGS -march=armv8-a"
 
           meson setup build \
             --cross-file /tmp/android-cross.ini \
