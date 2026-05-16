@@ -41,7 +41,7 @@ jobs:
           sudo apt update
           # [핵심 수정 1] 호스트 환경을 오염시키는 libdrm-dev를 완벽히 제거했습니다.
           sudo apt install -y \
-            git wget unzip pkg-config \
+            git wget unzip libdrm-dev pkg-config \
             ninja-build cmake bison flex \
             python3-dev libexpat1-dev libelf-dev libzstd-dev zlib1g-dev glslang-tools
 
