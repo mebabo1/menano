@@ -9,12 +9,13 @@ permissions:
 
 jobs:
   build-wrapper:
-    # 1. macOS 14 (Apple Silicon M1 러너) 사용으로 속도 최적화
-    runs-on: macos-latest
+    # 안정적인 Apple Silicon(M1/M2 코어) 환경을 사용합니다.
+    runs-on: macos-14
 
     env:
       API_LEVEL: 26
-      ANDROID_NDK_VERSION: r27c
+      # Gradle 프로젝트 타깃에 맞추어 NDK 버전을 r29로 지정합니다.
+      ANDROID_NDK_VERSION: r29
 
     steps:
       - name: Checkout Workspace
@@ -37,46 +38,45 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install meson mako pyyaml ninja
 
-      # ------------------------------------------------------------
-      # [변경] apt를 무시하고 Homebrew를 사용해 필수 도구 다운로드
-      # ------------------------------------------------------------
       - name: Install System Dependencies (macOS)
         run: |
           brew update
           brew install bison flex pkg-config ninja glslang
 
-
       # ------------------------------------------------------------
-      # [최신 패치] .dmg 파일을 다운로드하고 가상 디스크를 마운트하여 추출합니다.
+      # [수정 반영] 볼륨 내부 폴더명을 자동으로 추적하여 복사하는 안전 보장 레이어
       # ------------------------------------------------------------
       - name: Download and Extract Android NDK (.dmg)
         run: |
           cd /tmp
           
-          # 1. 구글 저장소에서 .dmg 파일 다운로드 (r27c도 .dmg 포맷 제공)
+          # 1. 구글 저장소에서 r29 .dmg 파일 다운로드
           curl -L -O https://dl.google.com/android/repository/android-ndk-${ANDROID_NDK_VERSION}-darwin.dmg
           
-          # 2. macOS 시스템 명령어로 dmg 파일 조용히 마운트 (마운트된 경로 추출)
+          # 2. dmg 파일 가상 마운트 후 마운트 지점 확보
           MOUNT_DIR=$(hdiutil attach -nobrowse -readonly android-ndk-${ANDROID_NDK_VERSION}-darwin.dmg | grep -o '/Volumes/.*')
           echo "NDK 마운트 경로: $MOUNT_DIR"
           
-          # 3. 마운트된 볼륨 안의 NDK 폴더를 /tmp/android-ndk-r27c 위치로 통째로 복사
-          # (보통 볼륨 내부에 폴더 형태로 들어있으므로 전체를 이관합니다)
-          cp -R "$MOUNT_DIR"/android-ndk-${ANDROID_NDK_VERSION} /tmp/android-ndk-${ANDROID_NDK_VERSION}
+          # 3. [핵심] 볼륨 내부에 폴더 이름이 무엇으로 되어 있든 첫 번째 디렉토리를 찾아냅니다.
+          INNER_FOLDER=$(ls -d "$MOUNT_DIR"/*/ | head -n 1)
+          echo "감지된 실제 내부 폴더 경로: $INNER_FOLDER"
           
-          # 4. 사용이 끝난 dmg 디스크 언마운트(추출) 및 가상파일 삭제
+          # 4. 안전하게 타깃 임시 경로를 생성하고 내장된 모든 파일 이관
+          mkdir -p /tmp/android-ndk-${ANDROID_NDK_VERSION}
+          cp -R "$INNER_FOLDER". /tmp/android-ndk-${ANDROID_NDK_VERSION}
+          
+          # 5. 작업 완료 후 볼륨 언마운트 및 불필요 파일 정리
           hdiutil detach "$MOUNT_DIR"
           rm android-ndk-${ANDROID_NDK_VERSION}-darwin.dmg
           
-          # 5. 다음 단계에서 사용할 수 있도록 환경 변수 주입
+          # 6. 다음 스텝 컴파일러 탐색을 위한 환경 변수 고정
           echo "ANDROID_NDK=/tmp/android-ndk-${ANDROID_NDK_VERSION}" >> $GITHUB_ENV
 
       # ------------------------------------------------------------
-      # [변경] 크로스 파일 내의 툴체인 경로를 linux에서 darwin으로 변경
+      # Create Meson Cross File (macOS 툴체인 최적화)
       # ------------------------------------------------------------
       - name: Create Meson Cross File
         run: |
-          # ★ 핵심: 맥 호스트에서는 toolchains 경로가 darwin-x86_64 입니다.
           TOOLCHAIN=$ANDROID_NDK/toolchains/llvm/prebuilt/darwin-x86_64
 
           cat > mesa-src/android-aarch64.cross <<EOF
@@ -132,7 +132,7 @@ jobs:
             -Dvulkan-drivers=wrapper
 
       # ------------------------------------------------------------
-      # [변경] 빌드 코어를 활용하기 위해 sysctl 명령어 사용
+      # Build Step
       # ------------------------------------------------------------
       - name: Build Vulkan Wrapper
         run: |
