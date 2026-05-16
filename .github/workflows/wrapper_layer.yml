@@ -131,7 +131,7 @@ jobs:
           meson setup build \
             --cross-file android-aarch64.cross \
             -Dplatforms=android \
-            -Dvulkan-drivers=wrap \
+            -Dvulkan-drivers=wrapper \
             -Dgallium-drivers= \
             -Dandroid-stub=true \
             -Dbuildtype=release
