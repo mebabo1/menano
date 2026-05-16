@@ -96,7 +96,6 @@ jobs:
             -Dplatforms=android \
             -Dvulkan-drivers=wrapper \
             -Dgallium-drivers= \
-            -Dvulkan-layers= \
             -Dandroid-stub=true \
             -Dzstd=disabled \
             -Dvideo-codecs=all_free \
