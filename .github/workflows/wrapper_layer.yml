@@ -99,6 +99,7 @@ jobs:
             -Dvulkan-layers= \
             -Dandroid-stub=true \
             -Dzstd=disabled \
+            -Dvideo-codecs=disabled \
             -Dbuildtype=release
 
       - name: Build Vulkan Wrapper
