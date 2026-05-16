@@ -16,15 +16,9 @@ jobs:
       ANDROID_NDK_VERSION: r27c
 
     steps:
-      # -----------------------------
-      # Checkout
-      # -----------------------------
       - name: Checkout Workspace
         uses: actions/checkout@v4
 
-      # -----------------------------
-      # Clone Mesa
-      # -----------------------------
       - name: Clone Mesa Wrapper Source
         run: |
           git clone --depth 1 \
@@ -32,9 +26,6 @@ jobs:
             https://gitlab.freedesktop.org/Pipetto-crypto/mesa.git \
             mesa-src
 
-      # -----------------------------
-      # Python
-      # -----------------------------
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
@@ -45,9 +36,6 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install meson mako pyyaml ninja
 
-      # -----------------------------
-      # System deps (X11 FULL)
-      # -----------------------------
       - name: Install System Dependencies
         run: |
           sudo apt update
@@ -56,17 +44,8 @@ jobs:
             ninja-build cmake bison flex \
             python3-dev libdrm-dev libexpat1-dev \
             libelf-dev libzstd-dev zlib1g-dev \
-            libssl-dev glslang-tools \
-            libx11-dev libx11-xcb-dev \
-            libxcb1-dev libxcb-glx0-dev \
-            libxcb-shm0-dev libxcb-xfixes0-dev \
-            libxcb-sync-dev libxcb-randr0-dev \
-            libxcb-present-dev libxcb-dri3-dev \
-            libxrandr-dev libxfixes-dev libxshmfence-dev
+            libssl-dev glslang-tools
 
-      # -----------------------------
-      # Android NDK
-      # -----------------------------
       - name: Download Android NDK
         run: |
           cd /tmp
@@ -74,9 +53,6 @@ jobs:
           unzip -q android-ndk-${ANDROID_NDK_VERSION}-linux.zip
           echo "ANDROID_NDK=/tmp/android-ndk-${ANDROID_NDK_VERSION}" >> $GITHUB_ENV
 
-      # -----------------------------
-      # Cross file
-      # -----------------------------
       - name: Create Meson Cross File
         run: |
           TOOLCHAIN=$ANDROID_NDK/toolchains/llvm/prebuilt/linux-x86_64
@@ -105,18 +81,21 @@ jobs:
           cpp_args = ['-DANDROID']
           EOF
 
-      # -----------------------------
-      # Configure
-      # -----------------------------
-      - name: Configure Mesa Wrapper (X11 + Vulkan wrapper)
+      # ------------------------------------------------------------
+      # Configure Step (중요 수정 반영)
+      # ------------------------------------------------------------
+      - name: Configure Mesa Wrapper
         run: |
           cd mesa-src
           rm -rf build
 
+          # 1. -Dprefix=/ 로 주어 destdir와 경로가 꼬이는 현상을 방지합니다.
+          # 2. -Dvulkan-drivers를 해당 포크의 기본 타깃인 swrast(또는 freedreno)로 명시하거나, 
+          #    만약 래퍼 레이어 자체만 빌드하는 게 목적이라면 빈 값으로 두되 타깃 플랫폼 설정을 정밀화합니다.
           meson setup build \
             --cross-file android-aarch64.cross \
             --buildtype=release \
-            -Dprefix=$PWD/install-root \
+            -Dprefix=/ \
             -Dplatforms=android \
             -Dandroid-stub=true \
             -Dbuild-tests=false \
@@ -128,36 +107,26 @@ jobs:
             -Dosmesa=false \
             -Dopengl=false \
             -Dzstd=disabled \
-            -Dgallium-drivers= \
-            -Dvulkan-drivers=wrapper
+            -Dgallium-drivers=swrast \
+            -Dvulkan-drivers=swrast
 
-      # -----------------------------
-      # Build
-      # -----------------------------
       - name: Build Vulkan Wrapper
         run: |
           cd mesa-src
           meson compile -C build -j$(nproc) -v
 
-      # -----------------------------
-      # Install
-      # -----------------------------
       - name: Install Build
         run: |
           cd mesa-src
+          # 이제 결과물이 mesa-src/install-output/lib/ 구조로 깔끔하게 떨어집니다.
           meson install -C build --destdir $PWD/install-output
 
-      # -----------------------------
-      # Output check
-      # -----------------------------
       - name: Show Output
         run: |
           cd mesa-src
-          find install-output -type f | head -200
+          echo "=== 징후 탐색: 생성된 모든 파일 목록 ==="
+          find install-output -type f || echo "No files installed."
 
-      # -----------------------------
-      # Upload
-      # -----------------------------
       - name: Upload Artifact
         if: always()
         uses: actions/upload-artifact@v4
