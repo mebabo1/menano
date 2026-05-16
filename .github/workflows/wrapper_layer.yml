@@ -39,12 +39,51 @@ jobs:
       - name: Install System Dependencies
         run: |
           sudo apt update
-          # 호스트용 그래픽 라이브러리(libdrm-dev 등)는 크로스 컴파일을 오염시키므로 
-          # 빌드 도구(bison, flex 등)만 최소한으로 설치합니다.
           sudo apt install -y \
             git wget unzip pkg-config \
             ninja-build cmake bison flex \
             python3-dev libexpat1-dev libelf-dev libzstd-dev zlib1g-dev glslang-tools
+
+      # ------------------------------------------------------------
+      # [핵심 패치 1] 가짜 pkg-config 도구 및 무해한 libdrm 헤더 스텁 생성
+      # ------------------------------------------------------------
+      - name: Create Fake Pkg-Config and Libdrm Stubs
+        run: |
+          # 1. 컴파일러가 낚여서 바라볼 가짜 헤더 폴더 및 빈 파일 생성
+          mkdir -p /tmp/libdrm-stub
+          touch /tmp/libdrm-stub/xf86drm.h
+          touch /tmp/libdrm-stub/xf86drmMode.h
+
+          # 2. Meson의 탐색 레이어를 속이기 위한 맞춤형 가짜 pkg-config 스크립트 작성
+          cat > /tmp/fake-pkg-config <<'EOF'
+          #!/bin/bash
+          # Meson이 도구 버전 요구 시 정상 응답
+          if [ "$1" == "--version" ]; then
+              echo "0.29.2"
+              exit 0
+          fi
+          # libdrm을 물어보면 호스트(/usr/include) 경로 대신 우리가 만든 가짜 경로를 던짐
+          if echo "$*" | grep -q "libdrm"; then
+              if echo "$*" | grep -q "--exists"; then
+                  exit 0
+              fi
+              if echo "$*" | grep -q "--cflags"; then
+                  echo "-I/tmp/libdrm-stub"
+                  exit 0
+              fi
+              if echo "$*" | grep -q "--libs"; then
+                  echo "" # 라이브러리 링크는 필요 없으므로 빈 값 리턴
+                  exit 0
+              fi
+              if echo "$*" | grep -q "--modversion"; then
+                  echo "2.4.125"
+                  exit 0
+              fi
+          fi
+          exit 1
+          EOF
+          
+          chmod +x /tmp/fake-pkg-config
 
       - name: Download Android NDK
         run: |
@@ -54,7 +93,7 @@ jobs:
           echo "ANDROID_NDK=/tmp/android-ndk-${ANDROID_NDK_VERSION}" >> $GITHUB_ENV
 
       # ------------------------------------------------------------
-      # [핵심 수정] 호스트 pkg-config 탐색 무력화
+      # [핵심 패치 2] 크로스 파일의 pkgconfig 경로를 가짜 도구로 변경
       # ------------------------------------------------------------
       - name: Create Meson Cross File
         run: |
@@ -74,8 +113,8 @@ jobs:
           strip = '$TOOLCHAIN/bin/llvm-strip'
           c_ld = '$TOOLCHAIN/bin/ld.lld'
           cpp_ld = '$TOOLCHAIN/bin/ld.lld'
-          # 호스트의 pkg-config가 실행되어 빌드 환경을 더럽히는 것을 막기 위해 false 처리를 합니다.
-          pkgconfig = '/bin/false'
+          # /bin/false 대신 커스텀 가짜 pkg-config를 강제 지정합니다.
+          pkgconfig = '/tmp/fake-pkg-config'
 
           [properties]
           needs_exe_wrapper = true
@@ -93,7 +132,6 @@ jobs:
           cd mesa-src
           rm -rf build
 
-          # -Dprefix=/ 로 주어 최종 결과물 폴더 구조를 깔끔하게 뽑아냅니다.
           meson setup build \
             --cross-file android-aarch64.cross \
             --buildtype=release \
