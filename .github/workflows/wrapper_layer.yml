@@ -101,7 +101,7 @@ jobs:
             -Dbuild-tests=false \
             -Dllvm=disabled \
             -Dshared-glapi=enabled \
-            -Degl=enabled \
+            -Degl=disabled
             -Dgbm=disabled \
             -Dglx=disabled \
             -Dosmesa=false \
