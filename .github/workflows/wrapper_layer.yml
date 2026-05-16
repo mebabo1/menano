@@ -57,6 +57,7 @@ jobs:
             glslang-tools
 
           python -m pip install --upgrade pip
+
           python -m pip install \
             meson \
             mako \
@@ -96,8 +97,17 @@ jobs:
           needs_exe_wrapper = true
 
           [built-in options]
-          c_args = ['-D__TERMUX__', '-D__USE_GNU', '-U__ANDROID__', '-fPIC']
-          cpp_args = ['-D__TERMUX__', '-D__USE_GNU', '-U__ANDROID__', '-fPIC']
+          c_args = [
+            '-D__TERMUX__',
+            '-D__USE_GNU',
+            '-fPIC'
+          ]
+
+          cpp_args = [
+            '-D__TERMUX__',
+            '-D__USE_GNU',
+            '-fPIC'
+          ]
           EOF
 
       - name: Configure Mesa
@@ -130,7 +140,7 @@ jobs:
         run: |
           cd mesa-src
 
-          ninja -C build 2>&1 | tee build.log
+          ninja -C build -v 2>&1 | tee build.log
 
       - name: Install
         run: |
@@ -140,6 +150,7 @@ jobs:
 
       - name: Show Files
         run: |
+          echo "=== Installed Files ==="
           find mesa-src/install -type f
 
       - name: Upload
