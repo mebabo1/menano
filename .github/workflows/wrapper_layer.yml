@@ -45,45 +45,14 @@ jobs:
             python3-dev libexpat1-dev libelf-dev libzstd-dev zlib1g-dev glslang-tools
 
       # ------------------------------------------------------------
-      # [핵심 패치 1] 가짜 pkg-config 도구 및 무해한 libdrm 헤더 스텁 생성
+      # [수정 반영 1] 컴파일러를 속일 가짜 DRM 헤더 껍데기 생성
       # ------------------------------------------------------------
-      - name: Create Fake Pkg-Config and Libdrm Stubs
+      - name: Create Fake DRM Headers
         run: |
-          # 1. 컴파일러가 낚여서 바라볼 가짜 헤더 폴더 및 빈 파일 생성
-          mkdir -p /tmp/libdrm-stub
-          touch /tmp/libdrm-stub/xf86drm.h
-          touch /tmp/libdrm-stub/xf86drmMode.h
-
-          # 2. Meson의 탐색 레이어를 속이기 위한 맞춤형 가짜 pkg-config 스크립트 작성
-          cat > /tmp/fake-pkg-config <<'EOF'
-          #!/bin/bash
-          # Meson이 도구 버전 요구 시 정상 응답
-          if [ "$1" == "--version" ]; then
-              echo "0.29.2"
-              exit 0
-          fi
-          # libdrm을 물어보면 호스트(/usr/include) 경로 대신 우리가 만든 가짜 경로를 던짐
-          if echo "$*" | grep -q "libdrm"; then
-              if echo "$*" | grep -q "--exists"; then
-                  exit 0
-              fi
-              if echo "$*" | grep -q "--cflags"; then
-                  echo "-I/tmp/libdrm-stub"
-                  exit 0
-              fi
-              if echo "$*" | grep -q "--libs"; then
-                  echo "" # 라이브러리 링크는 필요 없으므로 빈 값 리턴
-                  exit 0
-              fi
-              if echo "$*" | grep -q "--modversion"; then
-                  echo "2.4.125"
-                  exit 0
-              fi
-          fi
-          exit 1
-          EOF
-          
-          chmod +x /tmp/fake-pkg-config
+          # 컴파일러가 #include <xf86drm.h>를 만났을 때 읽어갈 빈 껍데기 파일들을 만듭니다.
+          mkdir -p /tmp/fake-drm
+          touch /tmp/fake-drm/xf86drm.h
+          touch /tmp/fake-drm/xf86drmMode.h
 
       - name: Download Android NDK
         run: |
@@ -93,7 +62,7 @@ jobs:
           echo "ANDROID_NDK=/tmp/android-ndk-${ANDROID_NDK_VERSION}" >> $GITHUB_ENV
 
       # ------------------------------------------------------------
-      # [핵심 패치 2] 크로스 파일의 pkgconfig 경로를 가짜 도구로 변경
+      # [수정 반영 2] 크로스 파일 컴파일러 옵션에 가짜 경로 강제 주입
       # ------------------------------------------------------------
       - name: Create Meson Cross File
         run: |
@@ -113,19 +82,19 @@ jobs:
           strip = '$TOOLCHAIN/bin/llvm-strip'
           c_ld = '$TOOLCHAIN/bin/ld.lld'
           cpp_ld = '$TOOLCHAIN/bin/ld.lld'
-          # /bin/false 대신 커스텀 가짜 pkg-config를 강제 지정합니다.
-          pkgconfig = '/tmp/fake-pkg-config'
+          pkgconfig = 'pkg-config' # 순정 pkg-config 상태 유지 (wrapper 드라이버는 이를 무시함)
 
           [properties]
           needs_exe_wrapper = true
 
           [built-in options]
-          c_args = ['-DANDROID']
-          cpp_args = ['-DANDROID']
+          # 컴파일러가 소스 코드를 읽을 때 /tmp/fake-drm을 최우선으로 뒤지게 만듭니다.
+          c_args = ['-DANDROID', '-I/tmp/fake-drm']
+          cpp_args = ['-DANDROID', '-I/tmp/fake-drm']
           EOF
 
       # ------------------------------------------------------------
-      # Configure
+      # Configure Step (Vulkan Wrapper 전용 최적화)
       # ------------------------------------------------------------
       - name: Configure Mesa Wrapper
         run: |
@@ -163,7 +132,7 @@ jobs:
       - name: Show Output
         run: |
           cd mesa-src
-          echo "=== 생성된 라이브러리 목록 ==="
+          echo "=== 생성된 라이브러리 파일 확인 ==="
           find install-output -type f || echo "No files installed."
 
       - name: Upload Artifact
