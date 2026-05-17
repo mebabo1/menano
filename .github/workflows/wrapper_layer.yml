@@ -9,10 +9,10 @@ permissions:
 
 jobs:
   build-wrapper:
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-22.04
 
     env:
-      ANDROID_NDK_VERSION: r29
+      ANDROID_NDK_VERSION: r27
       API_LEVEL: 30
 
     steps:
@@ -54,7 +54,6 @@ jobs:
             libdrm-dev \
             zlib1g-dev \
             libzstd-dev \
-            libatomic1 \
             glslang-tools
 
           python -m pip install --upgrade pip
@@ -76,11 +75,26 @@ jobs:
 
           echo "ANDROID_NDK=/tmp/android-ndk-${ANDROID_NDK_VERSION}" >> $GITHUB_ENV
 
+      # [추가] 치트키인 termuxfs를 다운로드하고 압축을 해제합니다.
+      - name: Download and extract termuxfs for aarch64
+        run: |
+          mkdir -p $HOME/termuxfs/aarch64
+          cd $HOME/termuxfs/aarch64
+          wget -q https://github.com/ziad9267/termux-on-gha/releases/download/test/termuxfs.tar
+          tar -xf termuxfs.tar
+          
+          # 압축 해제 후 내부에 usr 폴더가 제대로 있는지 확인용 경로 설정
+          if [ -d "$HOME/termuxfs/aarch64/usr" ]; then
+            echo "TERMUX_PREFIX=$HOME/termuxfs/aarch64/usr" >> $GITHUB_ENV
+          else
+            echo "TERMUX_PREFIX=$HOME/termuxfs/aarch64" >> $GITHUB_ENV
+          fi
+
+      # [수정] sysroot와 링크 인자를 구글 순정 NDK 대신 termuxfs 경로로 지정합니다.
       - name: Create Android Cross File
         run: |
           NDK_ROOT=$ANDROID_NDK/toolchains/llvm/prebuilt/linux-x86_64
           TOOLCHAIN=$NDK_ROOT/bin
-          SYSROOT=$NDK_ROOT/sysroot
 
           cat > /tmp/android-cross.ini <<EOF
           [host_machine]
@@ -98,18 +112,23 @@ jobs:
 
           [properties]
           needs_exe_wrapper = true
-          sysroot = '$SYSROOT'
+          # 진짜 Termux 내부 환경을 sysroot로 바인딩
+          sysroot = '$TERMUX_PREFIX'
 
           [built-in options]
-          c_args = ['-D__TERMUX__', '-D__USE_GNU', '-fPIC']
-          cpp_args = ['-D__TERMUX__', '-D__USE_GNU', '-fPIC']
+          c_args = ['-D__TERMUX__', '-D__USE_GNU', '-fPIC', '-I$TERMUX_PREFIX/include']
+          cpp_args = ['-D__TERMUX__', '-D__USE_GNU', '-fPIC', '-I$TERMUX_PREFIX/include']
+          # termuxfs 내부에 빌드되어 있는 진짜 atomic과 shmem 라이브러리를 링크합니다.
+          c_link_args = ['-L$TERMUX_PREFIX/lib', '-landroid-shmem', '-latomic']
+          cpp_link_args = ['-L$TERMUX_PREFIX/lib', '-landroid-shmem', '-latomic']
           EOF
 
+      # [수정] LDFLAGS 환경변수도 termuxfs 경로에 맞춰 정렬합니다.
       - name: Configure Mesa
         run: |
           cd mesa-src
 
-          export LDFLAGS="-landroid-shmem -static-libgcc"
+          export LDFLAGS="-L$TERMUX_PREFIX/lib -landroid-shmem -latomic -static-libgcc"
           export CFLAGS="$CFLAGS -march=armv8-a"
 
           meson setup build \
