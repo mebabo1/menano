@@ -66,7 +66,7 @@ jobs:
           unzip -q android-ndk-${ANDROID_NDK_VERSION}-linux.zip
           echo "ANDROID_NDK=/tmp/android-ndk-${ANDROID_NDK_VERSION}" >> $GITHUB_ENV
 
-      # Termux 환경의 Sysroot 파일들을 다운로드합니다.
+      # [수정] 성공 스크립트의 핵심인 Termux 내부 깊숙한 진짜 usr 경로를 정확히 선언합니다.
       - name: Download and extract termuxfs for aarch64
         run: |
           mkdir -p $HOME/termuxfs/aarch64
@@ -74,14 +74,10 @@ jobs:
           wget -q https://github.com/ziad9267/termux-on-gha/releases/download/test/termuxfs.tar
           tar -xf termuxfs.tar
           
-          # 압축 해제된 내부에 'usr' 폴더가 있는 위치를 정확하게 찾아서 가리킵니다.
-          REAL_PREFIX=$(find $HOME/termuxfs/aarch64 -type d -name "usr" | head -n 1)
-          if [ -z "$REAL_PREFIX" ]; then
-            REAL_PREFIX=$HOME/termuxfs/aarch64
-          fi
-          echo "TERMUX_PREFIX=$REAL_PREFIX" >> $GITHUB_ENV
+          # 명시해주신 진짜 Termux 프리픽스 경로를 타겟팅합니다.
+          echo "TERMUX_PREFIX=$HOME/termuxfs/aarch64/data/data/com.termux/files/usr" >> $GITHUB_ENV
 
-      # [교정] pkgconfig 지정을 차단하고 컴파일러에 라이브러리 경로를 다이렉트로 꽂아줍니다.
+      # [수정] 올바른 경로를 기반으로 pkg-config 환경 변수들을 연동합니다.
       - name: Create Android Cross File
         run: |
           NDK_ROOT=$ANDROID_NDK/toolchains/llvm/prebuilt/linux-x86_64
@@ -100,29 +96,38 @@ jobs:
           cpp = '$TOOLCHAIN/aarch64-linux-android${API_LEVEL}-clang++'
           ar = '$TOOLCHAIN/llvm-ar'
           strip = '$TOOLCHAIN/llvm-strip'
-          # 호스트의 오작동하는 pkg-config 검색을 강제로 우회시킵니다.
-          pkgconfig = 'false'
+          pkgconfig = 'pkg-config'
 
           [properties]
           needs_exe_wrapper = true
           sysroot = '$SYSROOT'
 
           [built-in options]
-          # termuxfs의 include와 lib 경로를 빌드 옵션에 직접 하드코딩합니다.
           c_args = ['-D__TERMUX__', '-D__USE_GNU', '-fPIC', '-I$TERMUX_PREFIX/include']
           cpp_args = ['-D__TERMUX__', '-D__USE_GNU', '-fPIC', '-I$TERMUX_PREFIX/include']
-          c_link_args = ['-L$TERMUX_PREFIX/lib', '-landroid-shmem', '-latomic', '-lxcb', '-lxcb-randr']
-          cpp_link_args = ['-L$TERMUX_PREFIX/lib', '-landroid-shmem', '-latomic', '-lxcb', '-lxcb-randr']
+          c_link_args = ['-L$TERMUX_PREFIX/lib', '-landroid-shmem', '-latomic']
+          cpp_link_args = ['-L$TERMUX_PREFIX/lib', '-landroid-shmem', '-latomic']
+
+          # pkg-config 변수에 문자열 상수를 올바르게 지정합니다.
+          [env]
+          PKG_CONFIG_PATH = '$TERMUX_PREFIX/lib/pkgconfig:$TERMUX_PREFIX/share/pkgconfig'
+          PKG_CONFIG_LIBDIR = '$TERMUX_PREFIX/lib/pkgconfig'
+          PKG_CONFIG_SYSROOT_DIR = '$TERMUX_PREFIX'
           EOF
 
-      # [교정] 전역 빌드 플래그에서도 xcb 및 의존성들을 수동 강제 매핑합니다.
+      # [수정] 과거 성공 플래그인 X_CFLAGS, X_LIBS 세팅을 완벽히 주입합니다.
       - name: Configure Mesa
         run: |
           cd mesa-src
 
+          # 과거 빌드 성공에 기여했던 X11 환경 변수 강제 매핑
+          export X_CFLAGS="-I$TERMUX_PREFIX/include"
+          export X_LIBS="-L$TERMUX_PREFIX/lib -landroid-shmem"
+          
+          # 컴파일러가 의존성 검색 링킹 시 참조할 환경 변수 백업
           export CFLAGS="$CFLAGS -march=armv8-a -I$TERMUX_PREFIX/include"
           export CXXFLAGS="$CXXFLAGS -march=armv8-a -I$TERMUX_PREFIX/include"
-          export LDFLAGS="-L$TERMUX_PREFIX/lib -landroid-shmem -latomic -lxcb -lxcb-randr"
+          export LDFLAGS="-L$TERMUX_PREFIX/lib -landroid-shmem -latomic"
 
           meson setup build \
             --cross-file /tmp/android-cross.ini \
