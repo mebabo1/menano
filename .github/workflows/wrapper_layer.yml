@@ -81,7 +81,7 @@ jobs:
           fi
           echo "TERMUX_PREFIX=$REAL_PREFIX" >> $GITHUB_ENV
 
-      # [핵심 수정] sysroot는 순정 NDK를 바라보게 하고, termuxfs는 추가 경로로만 더해줍니다.
+      # [수정] pkg-config가 termuxfs 내부의 안드로이드 라이브러리를 찾도록 환경 설정을 주입합니다.
       - name: Create Android Cross File
         run: |
           NDK_ROOT=$ANDROID_NDK/toolchains/llvm/prebuilt/linux-x86_64
@@ -104,15 +104,22 @@ jobs:
 
           [properties]
           needs_exe_wrapper = true
-          # 1. 컴파일러가 장님이 되지 않도록 구글 순정 NDK sysroot를 유지합니다.
           sysroot = '$SYSROOT'
 
           [built-in options]
-          # 2. 대신 헤더(-I)와 라이브러리(-L) 탐색 경로에만 termuxfs를 추가 징검다리로 놓아줍니다.
           c_args = ['-D__TERMUX__', '-D__USE_GNU', '-fPIC', '-I$TERMUX_PREFIX/include']
           cpp_args = ['-D__TERMUX__', '-D__USE_GNU', '-fPIC', '-I$TERMUX_PREFIX/include']
           c_link_args = ['-L$TERMUX_PREFIX/lib', '-landroid-shmem', '-latomic']
           cpp_link_args = ['-L$TERMUX_PREFIX/lib', '-landroid-shmem', '-latomic']
+
+          # [핵심 추가] pkg-config가 검색할 디렉토리를 termuxfs 내부로 고정합니다.
+          [constants]
+          termux_pkg_config_path = '$TERMUX_PREFIX/lib/pkgconfig:$TERMUX_PREFIX/share/pkgconfig'
+
+          [env]
+          PKG_CONFIG_PATH = 'termux_pkg_config_path'
+          PKG_CONFIG_LIBDIR = '$TERMUX_PREFIX/lib/pkgconfig'
+          PKG_CONFIG_SYSROOT_DIR = '$TERMUX_PREFIX'
           EOF
 
       - name: Configure Mesa
