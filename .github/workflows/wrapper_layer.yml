@@ -76,6 +76,9 @@ jobs:
         run: |
           git clone --depth 1 https://github.com/termux/libandroid-shmem.git /tmp/libandroid-shmem
           cd /tmp/libandroid-shmem
+
+          cat shmem.c >> shmem.c.new
+          mv shmem.c.new shmem.c
           
           # NDK Clang을 사용하여 가짜 shmem 라이브러리 컴파일
           export CC="$TOOLCHAIN/bin/aarch64-linux-android${API_LEVEL}-clang"
