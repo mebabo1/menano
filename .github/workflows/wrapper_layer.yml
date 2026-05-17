@@ -76,7 +76,7 @@ jobs:
           # Termux 내부 깊숙한 진짜 usr 경로 지정
           echo "TERMUX_PREFIX=$HOME/termuxfs/aarch64/data/data/com.termux/files/usr" >> $GITHUB_ENV
 
-      # [교정] c_args와 cpp_args에서 -isystem을 전면 제거하여 C++ 라이브러리 순서를 보호합니다.
+      # [교정] -DHAVE_MEMFD_CREATE 플래그를 추가하여 구식 시스템 콜 에러를 원천 차단합니다.
       - name: Create Android Cross File
         run: |
           NDK_ROOT=$ANDROID_NDK/toolchains/llvm/prebuilt/linux-x86_64
@@ -102,9 +102,9 @@ jobs:
           sysroot = '$SYSROOT'
 
           [built-in options]
-          # 기본 플래그만 남기고, 순서를 꼬이게 만드는 외부 헤더 직접 주입을 차단합니다.
-          c_args = ['-D__TERMUX__', '-D__USE_GNU', '-fPIC']
-          cpp_args = ['-D__TERMUX__', '-D__USE_GNU', '-fPIC']
+          # -DHAVE_MEMFD_CREATE 를 주입하여 anon_file.c의 시스템 콜 에러를 통과시킵니다.
+          c_args = ['-D__TERMUX__', '-D__USE_GNU', '-fPIC', '-DHAVE_MEMFD_CREATE']
+          cpp_args = ['-D__TERMUX__', '-D__USE_GNU', '-fPIC', '-DHAVE_MEMFD_CREATE']
           c_link_args = ['-L$TERMUX_PREFIX/lib', '-landroid-shmem', '-latomic']
           cpp_link_args = ['-L$TERMUX_PREFIX/lib', '-landroid-shmem', '-latomic']
 
@@ -112,7 +112,7 @@ jobs:
           PKG_CONFIG_PATH = '$TERMUX_PREFIX/lib/pkgconfig:$TERMUX_PREFIX/share/pkgconfig'
           PKG_CONFIG_LIBDIR = '$TERMUX_PREFIX/lib/pkgconfig'
           PKG_CONFIG_SYSROOT_DIR = '$TERMUX_PREFIX'
-          EOF
+          EOF   
 
       # [교정] CFLAGS / CXXFLAGS의 헤더 주입을 완전히 빼고, 오직 과거 성공 플래그(X_CFLAGS)로만 제어합니다.
       - name: Configure Mesa
