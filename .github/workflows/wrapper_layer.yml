@@ -114,6 +114,10 @@ jobs:
           PKG_CONFIG_SYSROOT_DIR = '$TERMUX_PREFIX'
           EOF
 
+      - name: Patch memfd_create
+        run: |
+          sed -i 's/syscall(SYS_memfd_create/memfd_create/g' mesa-src/src/util/anon_file.c
+
       - name: Configure Mesa
         run: |
           cd mesa-src
