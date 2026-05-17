@@ -54,6 +54,7 @@ jobs:
             libdrm-dev \
             zlib1g-dev \
             libzstd-dev \
+            libatomic1 \
             glslang-tools
 
           python -m pip install --upgrade pip
