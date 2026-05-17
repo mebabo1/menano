@@ -75,6 +75,27 @@ jobs:
 
           echo "ANDROID_NDK=/tmp/android-ndk-${ANDROID_NDK_VERSION}" >> $GITHUB_ENV
 
+      - name: Create fake libatomic
+        run: |
+          mkdir -p /tmp/fake-atomic
+
+          cat > /tmp/fake-atomic/empty.c <<EOF
+          void __atomic_fetch_add_8() {}
+          void __atomic_fetch_sub_8() {}
+          void __atomic_load_8() {}
+          void __atomic_store_8() {}
+          EOF
+
+          TOOLCHAIN=$ANDROID_NDK/toolchains/llvm/prebuilt/linux-x86_64/bin
+
+          $TOOLCHAIN/aarch64-linux-android${API_LEVEL}-clang \
+            -c /tmp/fake-atomic/empty.c \
+            -o /tmp/fake-atomic/empty.o
+
+          $TOOLCHAIN/llvm-ar rcs \
+            /tmp/fake-atomic/libatomic.a \
+            /tmp/fake-atomic/empty.o
+
       - name: Create Android Cross File
         run: |
           NDK_ROOT=$ANDROID_NDK/toolchains/llvm/prebuilt/linux-x86_64
