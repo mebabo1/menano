@@ -66,7 +66,6 @@ jobs:
           unzip -q android-ndk-${ANDROID_NDK_VERSION}-linux.zip
           echo "ANDROID_NDK=/tmp/android-ndk-${ANDROID_NDK_VERSION}" >> $GITHUB_ENV
 
-      # [수정] 성공 스크립트의 핵심인 Termux 내부 깊숙한 진짜 usr 경로를 정확히 선언합니다.
       - name: Download and extract termuxfs for aarch64
         run: |
           mkdir -p $HOME/termuxfs/aarch64
@@ -74,10 +73,9 @@ jobs:
           wget -q https://github.com/ziad9267/termux-on-gha/releases/download/test/termuxfs.tar
           tar -xf termuxfs.tar
           
-          # 명시해주신 진짜 Termux 프리픽스 경로를 타겟팅합니다.
+          # Termux 내부 깊숙한 진짜 usr 경로 지정
           echo "TERMUX_PREFIX=$HOME/termuxfs/aarch64/data/data/com.termux/files/usr" >> $GITHUB_ENV
 
-      # [수정] 올바른 경로를 기반으로 pkg-config 환경 변수들을 연동합니다.
       - name: Create Android Cross File
         run: |
           NDK_ROOT=$ANDROID_NDK/toolchains/llvm/prebuilt/linux-x86_64
@@ -108,23 +106,25 @@ jobs:
           c_link_args = ['-L$TERMUX_PREFIX/lib', '-landroid-shmem', '-latomic']
           cpp_link_args = ['-L$TERMUX_PREFIX/lib', '-landroid-shmem', '-latomic']
 
-          # pkg-config 변수에 문자열 상수를 올바르게 지정합니다.
           [env]
           PKG_CONFIG_PATH = '$TERMUX_PREFIX/lib/pkgconfig:$TERMUX_PREFIX/share/pkgconfig'
           PKG_CONFIG_LIBDIR = '$TERMUX_PREFIX/lib/pkgconfig'
           PKG_CONFIG_SYSROOT_DIR = '$TERMUX_PREFIX'
           EOF
 
-      # [수정] 과거 성공 플래그인 X_CFLAGS, X_LIBS 세팅을 완벽히 주입합니다.
+      # [수정] 제안해주신 pkg-config 관련 핵심 환경변수들을 빌드 셸에 다이렉트로 export 합니다.
       - name: Configure Mesa
         run: |
           cd mesa-src
 
-          # 과거 빌드 성공에 기여했던 X11 환경 변수 강제 매핑
+          # 제안해주신 셸 환경변수 강제 주입 (가장 확실한 방법)
+          export PKG_CONFIG_PATH="$TERMUX_PREFIX/lib/pkgconfig:$TERMUX_PREFIX/share/pkgconfig"
+          export PKG_CONFIG_LIBDIR="$TERMUX_PREFIX/lib/pkgconfig"
+          export PKG_CONFIG_SYSROOT_DIR="$TERMUX_PREFIX"
+
+          # 과거 성공 플래그 및 기본 컴파일 플래그 유지
           export X_CFLAGS="-I$TERMUX_PREFIX/include"
           export X_LIBS="-L$TERMUX_PREFIX/lib -landroid-shmem"
-          
-          # 컴파일러가 의존성 검색 링킹 시 참조할 환경 변수 백업
           export CFLAGS="$CFLAGS -march=armv8-a -I$TERMUX_PREFIX/include"
           export CXXFLAGS="$CXXFLAGS -march=armv8-a -I$TERMUX_PREFIX/include"
           export LDFLAGS="-L$TERMUX_PREFIX/lib -landroid-shmem -latomic"
