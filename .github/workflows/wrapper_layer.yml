@@ -26,7 +26,7 @@ jobs:
             https://gitlab.freedesktop.org/Pipetto-crypto/mesa.git \
             mesa-src
           
-          # anon_file.c의 시스템 콜 코드만 안정적으로 치환해 둡니다.
+          # anon_file.c의 시스템 콜 코드 표준 함수로 치환
           sed -i 's/syscall(SYS_memfd_create,/memfd_create(/g' mesa-src/src/util/anon_file.c
 
       - name: Setup Python
@@ -76,11 +76,11 @@ jobs:
           wget -q https://github.com/ziad9267/termux-on-gha/releases/download/test/termuxfs.tar
           tar -xf termuxfs.tar
           
-          # Termux 내부 진짜 경로 지정 및 pkg-config용 베이스 시스루트 환경변수 확보
+          # Termux 경로 변수 정밀 확보
           echo "TERMUX_PREFIX=$HOME/termuxfs/aarch64/data/data/com.termux/files/usr" >> $GITHUB_ENV
           echo "TERMUX_SYSROOT=$HOME/termuxfs/aarch64" >> $GITHUB_ENV
 
-      # [교정 완료] 강제 헤더 인클루드 플래그를 심어 open, O_RDONLY 에러를 완벽하게 차단합니다.
+      # [교정] -landroid-sysvshm 으로 실제 Termux 공유메모리 라이브러리명을 일치시킵니다.
       - name: Create Android Cross File
         run: |
           NDK_ROOT=$ANDROID_NDK/toolchains/llvm/prebuilt/linux-x86_64
@@ -106,11 +106,10 @@ jobs:
           sysroot = '$SYSROOT'
 
           [built-in options]
-          # '-include', 'fcntl.h', '-include', 'unistd.h' 를 추가하여 모든 컴파일 대상 파일에 파일 제어 헤더를 강제 주입합니다.
           c_args = ['-D__TERMUX__', '-D__USE_GNU', '-fPIC', '-idirafter$TERMUX_PREFIX/include', '-include', 'fcntl.h', '-include', 'unistd.h']
           cpp_args = ['-D__TERMUX__', '-D__USE_GNU', '-fPIC', '-idirafter$TERMUX_PREFIX/include', '-include', 'fcntl.h', '-include', 'unistd.h']
-          c_link_args = ['-L$TERMUX_PREFIX/lib', '-landroid-shmem', '-latomic']
-          cpp_link_args = ['-L$TERMUX_PREFIX/lib', '-landroid-shmem', '-latomic']
+          c_link_args = ['-L$TERMUX_PREFIX/lib', '-landroid-sysvshm', '-latomic']
+          cpp_link_args = ['-L$TERMUX_PREFIX/lib', '-landroid-sysvshm', '-latomic']
 
           [env]
           PKG_CONFIG_PATH = '$TERMUX_PREFIX/lib/pkgconfig:$TERMUX_PREFIX/share/pkgconfig'
@@ -127,12 +126,11 @@ jobs:
           export PKG_CONFIG_SYSROOT_DIR="$TERMUX_SYSROOT"
 
           export X_CFLAGS="-I$TERMUX_PREFIX/include"
-          export X_LIBS="-L$TERMUX_PREFIX/lib -landroid-shmem"
+          export X_LIBS="-L$TERMUX_PREFIX/lib -landroid-sysvshm"
           
-          # 환경변수 빌드 플래그 라인에도 동일하게 강제 인클루드를 세팅하여 안전망을 만듭니다.
           export CFLAGS="-march=armv8-a -idirafter $TERMUX_PREFIX/include -include fcntl.h -include unistd.h"
           export CXXFLAGS="-march=armv8-a -idirafter $TERMUX_PREFIX/include -include fcntl.h -include unistd.h"
-          export LDFLAGS="-L$TERMUX_PREFIX/lib -landroid-shmem -latomic"
+          export LDFLAGS="-L$TERMUX_PREFIX/lib -landroid-sysvshm -latomic"
 
           meson setup build \
             --cross-file /tmp/android-cross.ini \
@@ -164,15 +162,43 @@ jobs:
           cd mesa-src
           DESTDIR=$PWD/install ninja -C build install
 
-      - name: Show Files
+      # [신설] 생성된 ICD JSON 명세서를 추출하여 이름과 내부 library_path 경로를 Termux 정석 포맷으로 강제 컨버팅합니다.
+      - name: Process ICD JSON for Termux
         run: |
-          echo "=== Installed Files ==="
-          find mesa-src/install -type f
+          mkdir -p output
+          
+          # 빌드 완료된 .so 파일 복사
+          cp mesa-src/install/usr/lib/libvulkan_wrapper.so output/
+          
+          # 생성된 오리지널 JSON 탐색 및 추출
+          ORIGINAL_JSON=$(find mesa-src/install -name "*.json" | head -n 1)
+          
+          if [ -f "$ORIGINAL_JSON" ]; then
+            echo "Found ICD JSON: $ORIGINAL_JSON"
+            # library_path 값을 Termux 내부에서 로드할 실제 소크 파일 절대경로 포맷으로 치환하여 저장
+            sed 's|"library_path": ".*"|"library_path": "/data/data/com.termux/files/usr/lib/libvulkan_wrapper.so"|g' "$ORIGINAL_JSON" > output/wrapper_icd.aarch64.json
+          else
+            echo "⚠️ Warning: 오리지널 ICD json 파일이 자동 생성되지 않았습니다. 수동 빌드 구조용 백업 포맷을 생성합니다."
+            cat > output/wrapper_icd.aarch64.json << 'EOF'
+          {
+              "file_format_version": "1.0.0",
+              "ICD": {
+                  "library_path": "/data/data/com.termux/files/usr/lib/libvulkan_wrapper.so",
+                  "api_version": "1.3.255"
+              }
+          }
+          EOF
+          fi
+
+      - name: Show Final Output Files
+        run: |
+          echo "=== Final Output Directory ==="
+          ls -l output
 
       - name: Upload
         uses: actions/upload-artifact@v4
         with:
-          name: vulkan-wrapper
+          name: vulkan-wrapper-aarch64
           path: |
             mesa-src/build.log
-            mesa-src/install
+            output/
