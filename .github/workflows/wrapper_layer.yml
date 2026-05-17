@@ -113,6 +113,10 @@ jobs:
           PKG_CONFIG_LIBDIR = '$TERMUX_PREFIX/lib/pkgconfig'
           PKG_CONFIG_SYSROOT_DIR = '$TERMUX_PREFIX'
           EOF   
+          # 파일이 밀려 쓰이지 않도록 셸 변수를 치환해 줍니다.
+          sed -i "s|@NDK_ROOT@|$ANDROID_NDK|g" /tmp/android-cross.ini
+          sed -i "s|@API_LEVEL@|$API_LEVEL|g" /tmp/android-cross.ini
+          sed -i "s|@TERMUX_PREFIX@|$TERMUX_PREFIX|g" /tmp/android-cross.ini
 
       # [교정] CFLAGS / CXXFLAGS의 헤더 주입을 완전히 빼고, 오직 과거 성공 플래그(X_CFLAGS)로만 제어합니다.
       - name: Configure Mesa
