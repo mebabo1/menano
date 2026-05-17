@@ -57,25 +57,16 @@ jobs:
             glslang-tools
 
           python -m pip install --upgrade pip
-
-          python -m pip install \
-            meson \
-            mako \
-            pyyaml \
-            ninja
+          python -m pip install meson mako pyyaml ninja
 
       - name: Download Android NDK
         run: |
           cd /tmp
-
-          wget -q \
-            https://dl.google.com/android/repository/android-ndk-${ANDROID_NDK_VERSION}-linux.zip
-
+          wget -q https://dl.google.com/android/repository/android-ndk-${ANDROID_NDK_VERSION}-linux.zip
           unzip -q android-ndk-${ANDROID_NDK_VERSION}-linux.zip
-
           echo "ANDROID_NDK=/tmp/android-ndk-${ANDROID_NDK_VERSION}" >> $GITHUB_ENV
 
-      # [추가] 치트키인 termuxfs를 다운로드하고 압축을 해제합니다.
+      # Termux 환경의 Sysroot 파일들을 다운로드합니다.
       - name: Download and extract termuxfs for aarch64
         run: |
           mkdir -p $HOME/termuxfs/aarch64
@@ -83,18 +74,19 @@ jobs:
           wget -q https://github.com/ziad9267/termux-on-gha/releases/download/test/termuxfs.tar
           tar -xf termuxfs.tar
           
-          # 압축 해제 후 내부에 usr 폴더가 제대로 있는지 확인용 경로 설정
-          if [ -d "$HOME/termuxfs/aarch64/usr" ]; then
-            echo "TERMUX_PREFIX=$HOME/termuxfs/aarch64/usr" >> $GITHUB_ENV
-          else
-            echo "TERMUX_PREFIX=$HOME/termuxfs/aarch64" >> $GITHUB_ENV
+          # 압축 해제된 내부에 'usr' 폴더가 있는 위치를 정확하게 찾아서 가리킵니다.
+          REAL_PREFIX=$(find $HOME/termuxfs/aarch64 -type d -name "usr" | head -n 1)
+          if [ -z "$REAL_PREFIX" ]; then
+            REAL_PREFIX=$HOME/termuxfs/aarch64
           fi
+          echo "TERMUX_PREFIX=$REAL_PREFIX" >> $GITHUB_ENV
 
-      # [수정] sysroot와 링크 인자를 구글 순정 NDK 대신 termuxfs 경로로 지정합니다.
+      # [핵심 수정] sysroot는 순정 NDK를 바라보게 하고, termuxfs는 추가 경로로만 더해줍니다.
       - name: Create Android Cross File
         run: |
           NDK_ROOT=$ANDROID_NDK/toolchains/llvm/prebuilt/linux-x86_64
           TOOLCHAIN=$NDK_ROOT/bin
+          SYSROOT=$NDK_ROOT/sysroot
 
           cat > /tmp/android-cross.ini <<EOF
           [host_machine]
@@ -112,23 +104,22 @@ jobs:
 
           [properties]
           needs_exe_wrapper = true
-          # 진짜 Termux 내부 환경을 sysroot로 바인딩
-          sysroot = '$TERMUX_PREFIX'
+          # 1. 컴파일러가 장님이 되지 않도록 구글 순정 NDK sysroot를 유지합니다.
+          sysroot = '$SYSROOT'
 
           [built-in options]
+          # 2. 대신 헤더(-I)와 라이브러리(-L) 탐색 경로에만 termuxfs를 추가 징검다리로 놓아줍니다.
           c_args = ['-D__TERMUX__', '-D__USE_GNU', '-fPIC', '-I$TERMUX_PREFIX/include']
           cpp_args = ['-D__TERMUX__', '-D__USE_GNU', '-fPIC', '-I$TERMUX_PREFIX/include']
-          # termuxfs 내부에 빌드되어 있는 진짜 atomic과 shmem 라이브러리를 링크합니다.
           c_link_args = ['-L$TERMUX_PREFIX/lib', '-landroid-shmem', '-latomic']
           cpp_link_args = ['-L$TERMUX_PREFIX/lib', '-landroid-shmem', '-latomic']
           EOF
 
-      # [수정] LDFLAGS 환경변수도 termuxfs 경로에 맞춰 정렬합니다.
       - name: Configure Mesa
         run: |
           cd mesa-src
 
-          export LDFLAGS="-L$TERMUX_PREFIX/lib -landroid-shmem -latomic -static-libgcc"
+          export LDFLAGS="-L$TERMUX_PREFIX/lib -landroid-shmem -latomic"
           export CFLAGS="$CFLAGS -march=armv8-a"
 
           meson setup build \
@@ -154,13 +145,11 @@ jobs:
       - name: Build
         run: |
           cd mesa-src
-
           ninja -C build -v 2>&1 | tee build.log
 
       - name: Install
         run: |
           cd mesa-src
-
           DESTDIR=$PWD/install ninja -C build install
 
       - name: Show Files
