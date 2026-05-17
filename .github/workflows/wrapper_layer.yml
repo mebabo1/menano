@@ -129,6 +129,7 @@ jobs:
             -Dzstd=disabled \
             -Dvideo-codecs= \
             -Dbuildtype=release \
+            -Datomic=disabled \
             --prefix=/usr
 
       - name: Build
