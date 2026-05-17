@@ -76,7 +76,7 @@ jobs:
           # Termux 내부 깊숙한 진짜 usr 경로 지정
           echo "TERMUX_PREFIX=$HOME/termuxfs/aarch64/data/data/com.termux/files/usr" >> $GITHUB_ENV
 
-      # [교정] Cross File 내부 아규먼트도 -isystem 으로 서브 우선순위 지정
+      # [교정] c_args와 cpp_args에서 -isystem을 전면 제거하여 C++ 라이브러리 순서를 보호합니다.
       - name: Create Android Cross File
         run: |
           NDK_ROOT=$ANDROID_NDK/toolchains/llvm/prebuilt/linux-x86_64
@@ -102,9 +102,9 @@ jobs:
           sysroot = '$SYSROOT'
 
           [built-in options]
-          # -I 대신 -isystem을 사용하여 NDK 표준 헤더(unistd.h 등)를 해치지 않게 보호합니다.
-          c_args = ['-D__TERMUX__', '-D__USE_GNU', '-fPIC', '-isystem$TERMUX_PREFIX/include']
-          cpp_args = ['-D__TERMUX__', '-D__USE_GNU', '-fPIC', '-isystem$TERMUX_PREFIX/include']
+          # 기본 플래그만 남기고, 순서를 꼬이게 만드는 외부 헤더 직접 주입을 차단합니다.
+          c_args = ['-D__TERMUX__', '-D__USE_GNU', '-fPIC']
+          cpp_args = ['-D__TERMUX__', '-D__USE_GNU', '-fPIC']
           c_link_args = ['-L$TERMUX_PREFIX/lib', '-landroid-shmem', '-latomic']
           cpp_link_args = ['-L$TERMUX_PREFIX/lib', '-landroid-shmem', '-latomic']
 
@@ -114,7 +114,7 @@ jobs:
           PKG_CONFIG_SYSROOT_DIR = '$TERMUX_PREFIX'
           EOF
 
-      # [교정] 전역 변수의 -I를 -isystem으로 교체하여 헤더 충돌을 우회합니다.
+      # [교정] CFLAGS / CXXFLAGS의 헤더 주입을 완전히 빼고, 오직 과거 성공 플래그(X_CFLAGS)로만 제어합니다.
       - name: Configure Mesa
         run: |
           cd mesa-src
@@ -123,13 +123,13 @@ jobs:
           export PKG_CONFIG_LIBDIR="$TERMUX_PREFIX/lib/pkgconfig"
           export PKG_CONFIG_SYSROOT_DIR="$TERMUX_PREFIX"
 
-          # 과거 성공하셨던 핵심 설정들
-          export X_CFLAGS="-isystem$TERMUX_PREFIX/include"
+          # 과거 성공했던 수동 주입 환경 변수 (Meson 빌드 내부에서 X11 탐색용으로만 안전하게 사용됨)
+          export X_CFLAGS="-I$TERMUX_PREFIX/include"
           export X_LIBS="-L$TERMUX_PREFIX/lib -landroid-shmem"
           
-          # 순정 표준 헤더가 오염되지 않도록 -isystem으로 경로 주입
-          export CFLAGS="$CFLAGS -march=armv8-a -isystem$TERMUX_PREFIX/include"
-          export CXXFLAGS="$CXXFLAGS -march=armv8-a -isystem$TERMUX_PREFIX/include"
+          # 전역 컴파일 아규먼트는 NDK 기본 족보를 유지하도록 march 전용 플래그만 세팅
+          export CFLAGS="-march=armv8-a"
+          export CXXFLAGS="-march=armv8-a"
           export LDFLAGS="-L$TERMUX_PREFIX/lib -landroid-shmem -latomic"
 
           meson setup build \
