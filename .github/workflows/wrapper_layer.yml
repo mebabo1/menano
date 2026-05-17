@@ -13,7 +13,7 @@ jobs:
 
     env:
       API_LEVEL: 30
-      ANDROID_NDK_VERSION: 27
+      ANDROID_NDK_VERSION: r27
 
     steps:
       - name: Checkout
