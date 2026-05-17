@@ -81,7 +81,7 @@ jobs:
           fi
           echo "TERMUX_PREFIX=$REAL_PREFIX" >> $GITHUB_ENV
 
-      # [수정] pkg-config가 termuxfs 내부의 안드로이드 라이브러리를 찾도록 환경 설정을 주입합니다.
+      # 1. 크로스 파일에 pkg-config 정상화 및 과거 성공 플래그 녹여내기
       - name: Create Android Cross File
         run: |
           NDK_ROOT=$ANDROID_NDK/toolchains/llvm/prebuilt/linux-x86_64
@@ -107,27 +107,32 @@ jobs:
           sysroot = '$SYSROOT'
 
           [built-in options]
+          # termuxfs의 include 경로와 과거 성공했던 플래그들을 결합
           c_args = ['-D__TERMUX__', '-D__USE_GNU', '-fPIC', '-I$TERMUX_PREFIX/include']
           cpp_args = ['-D__TERMUX__', '-D__USE_GNU', '-fPIC', '-I$TERMUX_PREFIX/include']
           c_link_args = ['-L$TERMUX_PREFIX/lib', '-landroid-shmem', '-latomic']
           cpp_link_args = ['-L$TERMUX_PREFIX/lib', '-landroid-shmem', '-latomic']
 
-          # [핵심 추가] pkg-config가 검색할 디렉토리를 termuxfs 내부로 고정합니다.
-          [constants]
-          termux_pkg_config_path = '$TERMUX_PREFIX/lib/pkgconfig:$TERMUX_PREFIX/share/pkgconfig'
-
+          # pkg-config가 termuxfs 내부를 바라보도록 강제 조정
           [env]
-          PKG_CONFIG_PATH = 'termux_pkg_config_path'
+          PKG_CONFIG_PATH = '$TERMUX_PREFIX/lib/pkgconfig:$TERMUX_PREFIX/share/pkgconfig'
           PKG_CONFIG_LIBDIR = '$TERMUX_PREFIX/lib/pkgconfig'
           PKG_CONFIG_SYSROOT_DIR = '$TERMUX_PREFIX'
           EOF
 
+      # 2. Configure Mesa 스텝에 과거 성공했던 환경변수 직접 주입
       - name: Configure Mesa
         run: |
           cd mesa-src
 
+          # [핵심] 과거에 성공하셨던 X11 관련 수동 주입 환경변수를 선언합니다.
+          export X_CFLAGS="-I$TERMUX_PREFIX/include"
+          export X_LIBS="-L$TERMUX_PREFIX/lib -landroid-shmem -latomic"
+          
+          # 기본 컴파일/링크 플래그도 한 번 더 단단히 고정
+          export CFLAGS="$CFLAGS -march=armv8-a -I$TERMUX_PREFIX/include"
+          export CXXFLAGS="$CXXFLAGS -march=armv8-a -I$TERMUX_PREFIX/include"
           export LDFLAGS="-L$TERMUX_PREFIX/lib -landroid-shmem -latomic"
-          export CFLAGS="$CFLAGS -march=armv8-a"
 
           meson setup build \
             --cross-file /tmp/android-cross.ini \
