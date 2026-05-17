@@ -19,7 +19,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      # [교정] 소스 코드를 클론한 후, 안드로이드에서 memfd_create를 강제로 막는 구식 코드를 완전히 제거(패치)합니다.
+      # [교정] Meson의 방해를 우회하기 위해 구식 syscall 호출을 순정 memfd_create 호출로 직접 치환합니다.
       - name: Clone Mesa Wrapper
         run: |
           git clone --depth 1 \
@@ -27,8 +27,8 @@ jobs:
             https://gitlab.freedesktop.org/Pipetto-crypto/mesa.git \
             mesa-src
           
-          # anon_file.c에서 안드로이드 차단 로직 제거
-          sed -i 's/&& !defined(__ANDROID__)//g' mesa-src/src/util/anon_file.c
+          # 구식 시스템 콜 코드를 안드로이드 API 30 표준 함수로 강제 변경
+          sed -i 's/syscall(SYS_memfd_create,/memfd_create(/g' mesa-src/src/util/anon_file.c
 
       - name: Setup Python
         uses: actions/setup-python@v5
@@ -80,7 +80,7 @@ jobs:
           # Termux 내부 깊숙한 진짜 usr 경로 지정
           echo "TERMUX_PREFIX=$HOME/termuxfs/aarch64/data/data/com.termux/files/usr" >> $GITHUB_ENV
 
-      # [교정] 복잡한 매크로 우회 대신, 순정 함수를 쓰도록 HAVE_MEMFD_CREATE 만 깔끔하게 전달합니다.
+      # [정돈] 불필요한 매크로 우회 플래그들을 지우고 크로스 파일을 깨끗하게 유지합니다.
       - name: Create Android Cross File
         run: |
           NDK_ROOT=$ANDROID_NDK/toolchains/llvm/prebuilt/linux-x86_64
@@ -106,9 +106,8 @@ jobs:
           sysroot = '$SYSROOT'
 
           [built-in options]
-          # 정상적으로 순정 memfd_create 함수를 타도록 플래그를 정돈했습니다.
-          c_args = ['-D__TERMUX__', '-D__USE_GNU', '-fPIC', '-DHAVE_MEMFD_CREATE']
-          cpp_args = ['-D__TERMUX__', '-D__USE_GNU', '-fPIC', '-DHAVE_MEMFD_CREATE']
+          c_args = ['-D__TERMUX__', '-D__USE_GNU', '-fPIC']
+          cpp_args = ['-D__TERMUX__', '-D__USE_GNU', '-fPIC']
           c_link_args = ['-L$TERMUX_PREFIX/lib', '-landroid-shmem', '-latomic']
           cpp_link_args = ['-L$TERMUX_PREFIX/lib', '-landroid-shmem', '-latomic']
 
