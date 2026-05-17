@@ -83,7 +83,7 @@ jobs:
           TOOLCHAIN=$NDK_ROOT/bin
           SYSROOT=$NDK_ROOT/sysroot
 
-          cat > /tmp/android-cross.ini <<EOF
+          cat > /tmp/android-cross.ini << 'EOF'
           [host_machine]
           system = 'android'
           cpu_family = 'aarch64'
