@@ -1,4 +1,4 @@
-name: Build Android Vulkan Wrapper
+name: Build Android Vulkan Wrapper on macOS
 
 on:
   push:
@@ -9,17 +9,17 @@ permissions:
 
 jobs:
   build-wrapper:
-    runs-on: ubuntu-24.04
+    runs-on: macos-latest
 
     env:
-      ANDROID_NDK_VERSION: r27c
+      ANDROID_NDK_VERSION: r29
       API_LEVEL: 30
 
     steps:
-      - name: Checkout
+      - name: Checkout Workspace
         uses: actions/checkout@v4
 
-      - name: Clone Mesa Wrapper
+      - name: Clone Mesa Wrapper Source
         run: |
           git clone --depth 1 \
             --branch wrapper-25 \
@@ -31,57 +31,56 @@ jobs:
         with:
           python-version: "3.11"
 
-      - name: Install Dependencies
+      - name: Install Python Tools
         run: |
-          sudo apt update
-
-          sudo apt install -y \
-            git \
-            wget \
-            unzip \
-            pkg-config \
-            ninja-build \
-            cmake \
-            bison \
-            flex \
-            python3-dev \
-            libx11-dev \
-            libxext-dev \
-            libxcb1-dev \
-            libxrandr-dev \
-            libxfixes-dev \
-            libxshmfence-dev \
-            libdrm-dev \
-            zlib1g-dev \
-            libzstd-dev \
-            glslang-tools
-
           python -m pip install --upgrade pip
-
           python -m pip install \
             meson \
             mako \
             pyyaml \
             ninja
 
+      - name: Install macOS Dependencies
+        run: |
+          brew update
+
+          brew install \
+            bison \
+            flex \
+            pkg-config \
+            ninja \
+            glslang
+
       - name: Download Android NDK
         run: |
           cd /tmp
 
-          wget -q \
-            https://dl.google.com/android/repository/android-ndk-${ANDROID_NDK_VERSION}-linux.zip
+          curl -L -o android-ndk.zip \
+            https://dl.google.com/android/repository/android-ndk-${ANDROID_NDK_VERSION}-darwin.dmg
 
-          unzip -q android-ndk-${ANDROID_NDK_VERSION}-linux.zip
+          mkdir ndk_mount
+
+          hdiutil attach android-ndk.zip -mountpoint ndk_mount
+
+          INNER_DIR=$(find /Volumes -maxdepth 1 -name "AndroidNDK*" | head -n 1)
+
+          cp -R "$INNER_DIR" /tmp/android-ndk-${ANDROID_NDK_VERSION}
+
+          hdiutil detach "$INNER_DIR"
 
           echo "ANDROID_NDK=/tmp/android-ndk-${ANDROID_NDK_VERSION}" >> $GITHUB_ENV
 
-      - name: Create Android Cross File
+      - name: Create Meson Cross File
         run: |
-          NDK_ROOT=$ANDROID_NDK/toolchains/llvm/prebuilt/linux-x86_64
-          TOOLCHAIN=$NDK_ROOT/bin
-          SYSROOT=$NDK_ROOT/sysroot
+          TOOLCHAIN="$ANDROID_NDK/toolchains/llvm/prebuilt/darwin-x86_64/bin"
 
-          cat > /tmp/android-cross.ini <<EOF
+          if [ ! -d "$TOOLCHAIN" ]; then
+            TOOLCHAIN="$ANDROID_NDK/toolchains/llvm/prebuilt/darwin-arm64/bin"
+          fi
+
+          echo "Using toolchain: $TOOLCHAIN"
+
+          cat > mesa-src/android-aarch64.cross <<EOF
           [host_machine]
           system = 'android'
           cpu_family = 'aarch64'
@@ -97,60 +96,11 @@ jobs:
 
           [properties]
           needs_exe_wrapper = true
-          sysroot = '$SYSROOT'
 
           [built-in options]
-          c_args = ['-D__TERMUX__', '-D__USE_GNU', '-fPIC']
-          cpp_args = ['-D__TERMUX__', '-D__USE_GNU', '-fPIC']
+          c_args = ['-D__TERMUX__', '-D__USE_GNU', '-U__ANDROID__', '-fPIC']
+          cpp_args = ['-D__TERMUX__', '-D__USE_GNU', '-U__ANDROID__', '-fPIC']
           EOF
 
-      - name: Configure Mesa
-        run: |
-          cd mesa-src
-
-          export LDFLAGS="-landroid-shmem"
-
-          meson setup build \
-            --cross-file /tmp/android-cross.ini \
-            -Dcpp_rtti=false \
-            -Dopengl=false \
-            -Degl=disabled \
-            -Dgbm=disabled \
-            -Dllvm=disabled \
-            -Dshared-llvm=disabled \
-            -Dxmlconfig=disabled \
-            -Dbuild-tests=false \
-            -Dinstall-intel-gpu-tests=false \
-            -Dgallium-drivers= \
-            -Dvulkan-drivers=wrapper \
-            -Dvulkan-layers= \
-            -Dplatforms=x11 \
-            -Dzstd=disabled \
-            -Dvideo-codecs= \
-            -Dbuildtype=release \
-            --prefix=/usr
-
-      - name: Build
-        run: |
-          cd mesa-src
-
-          ninja -C build -v 2>&1 | tee build.log
-
-      - name: Install
-        run: |
-          cd mesa-src
-
-          DESTDIR=$PWD/install ninja -C build install
-
-      - name: Show Files
-        run: |
-          echo "=== Installed Files ==="
-          find mesa-src/install -type f
-
-      - name: Upload
-        uses: actions/upload-artifact@v4
-        with:
-          name: vulkan-wrapper
-          path: |
-            mesa-src/build.log
-            mesa-src/install
+      - name: Configure Mesa Wrapper
+        run:
