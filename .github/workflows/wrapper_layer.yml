@@ -19,7 +19,6 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      # [교정] Meson의 방해를 우회하기 위해 구식 syscall 호출을 순정 memfd_create 호출로 직접 치환합니다.
       - name: Clone Mesa Wrapper
         run: |
           git clone --depth 1 \
@@ -77,10 +76,11 @@ jobs:
           wget -q https://github.com/ziad9267/termux-on-gha/releases/download/test/termuxfs.tar
           tar -xf termuxfs.tar
           
-          # Termux 내부 깊숙한 진짜 usr 경로 지정
+          # Termux 내부 진짜 경로 지정 및 pkg-config용 베이스 시스루트 환경변수 확보
           echo "TERMUX_PREFIX=$HOME/termuxfs/aarch64/data/data/com.termux/files/usr" >> $GITHUB_ENV
+          echo "TERMUX_SYSROOT=$HOME/termuxfs/aarch64" >> $GITHUB_ENV
 
-      # [정돈] 불필요한 매크로 우회 플래그들을 지우고 크로스 파일을 깨끗하게 유지합니다.
+      # [교정 완료] -idirafter 및 PKG_CONFIG_SYSROOT_DIR 정밀 튜닝
       - name: Create Android Cross File
         run: |
           NDK_ROOT=$ANDROID_NDK/toolchains/llvm/prebuilt/linux-x86_64
@@ -106,15 +106,16 @@ jobs:
           sysroot = '$SYSROOT'
 
           [built-in options]
-          c_args = ['-D__TERMUX__', '-D__USE_GNU', '-fPIC']
-          cpp_args = ['-D__TERMUX__', '-D__USE_GNU', '-fPIC']
+          # -idirafter를 사용하여 NDK 표준 헤더 탐색이 끝난 뒤 최종적으로 Termux 헤더를 안전하게 찾도록 유도합니다.
+          c_args = ['-D__TERMUX__', '-D__USE_GNU', '-fPIC', '-idirafter$TERMUX_PREFIX/include']
+          cpp_args = ['-D__TERMUX__', '-D__USE_GNU', '-fPIC', '-idirafter$TERMUX_PREFIX/include']
           c_link_args = ['-L$TERMUX_PREFIX/lib', '-landroid-shmem', '-latomic']
           cpp_link_args = ['-L$TERMUX_PREFIX/lib', '-landroid-shmem', '-latomic']
 
           [env]
           PKG_CONFIG_PATH = '$TERMUX_PREFIX/lib/pkgconfig:$TERMUX_PREFIX/share/pkgconfig'
           PKG_CONFIG_LIBDIR = '$TERMUX_PREFIX/lib/pkgconfig'
-          PKG_CONFIG_SYSROOT_DIR = '$TERMUX_PREFIX'
+          PKG_CONFIG_SYSROOT_DIR = '$TERMUX_SYSROOT'
           EOF
 
       - name: Configure Mesa
@@ -123,13 +124,14 @@ jobs:
 
           export PKG_CONFIG_PATH="$TERMUX_PREFIX/lib/pkgconfig:$TERMUX_PREFIX/share/pkgconfig"
           export PKG_CONFIG_LIBDIR="$TERMUX_PREFIX/lib/pkgconfig"
-          export PKG_CONFIG_SYSROOT_DIR="$TERMUX_PREFIX"
+          export PKG_CONFIG_SYSROOT_DIR="$TERMUX_SYSROOT"
 
           export X_CFLAGS="-I$TERMUX_PREFIX/include"
           export X_LIBS="-L$TERMUX_PREFIX/lib -landroid-shmem"
           
-          export CFLAGS="-march=armv8-a"
-          export CXXFLAGS="-march=armv8-a"
+          # 전역 플래그에도 안전망으로 idirafter 주입
+          export CFLAGS="-march=armv8-a -idirafter $TERMUX_PREFIX/include"
+          export CXXFLAGS="-march=armv8-a -idirafter $TERMUX_PREFIX/include"
           export LDFLAGS="-L$TERMUX_PREFIX/lib -landroid-shmem -latomic"
 
           meson setup build \
