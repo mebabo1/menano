@@ -75,27 +75,42 @@ jobs:
 
           echo "ANDROID_NDK=/tmp/android-ndk-${ANDROID_NDK_VERSION}" >> $GITHUB_ENV
 
-      - name: Create fake libatomic
+      # [통합 및 수정] fake libatomic 생성 및 libandroid-shmem 빌드를 한 번에 처리합니다.
+      - name: Build External Dependencies (Atomic & Shmem)
         run: |
-          mkdir -p /tmp/fake-atomic
+          NDK_ROOT=$ANDROID_NDK/toolchains/llvm/prebuilt/linux-x86_64
+          TOOLCHAIN=$NDK_ROOT/bin
+          
+          # 의존성 파일들을 모아둘 전용 디렉토리 생성
+          mkdir -p /tmp/ndk-deps/lib /tmp/ndk-deps/include/sys
 
-          cat > /tmp/fake-atomic/empty.c <<EOF
+          # 1. 가짜 libatomic.a 생성
+          cat > /tmp/fake-atomic.c <<EOF
           void __atomic_fetch_add_8() {}
           void __atomic_fetch_sub_8() {}
           void __atomic_load_8() {}
           void __atomic_store_8() {}
           EOF
 
-          TOOLCHAIN=$ANDROID_NDK/toolchains/llvm/prebuilt/linux-x86_64/bin
+          $TOOLCHAIN/aarch64-linux-android${API_LEVEL}-clang -c /tmp/fake-atomic.c -o /tmp/fake-atomic.o
+          $TOOLCHAIN/llvm-ar rcs /tmp/ndk-deps/lib/libatomic.a /tmp/fake-atomic.o
 
-          $TOOLCHAIN/aarch64-linux-android${API_LEVEL}-clang \
-            -c /tmp/fake-atomic/empty.c \
-            -o /tmp/fake-atomic/empty.o
+          # 2. libandroid-shmem 다운로드 및 빌드 (Bionic libc 누락 매크로 패치 포함)
+          git clone --depth 1 https://github.com/termux/libandroid-shmem.git /tmp/libandroid-shmem
+          cd /tmp/libandroid-shmem
+          
+          echo '#define _PATH_TMP "/tmp/"' > shmem.c.new
+          cat shmem.c >> shmem.c.new
+          mv shmem.c.new shmem.c
 
-          $TOOLCHAIN/llvm-ar rcs \
-            /tmp/fake-atomic/libatomic.a \
-            /tmp/fake-atomic/empty.o
+          export CC="$TOOLCHAIN/aarch64-linux-android${API_LEVEL}-clang"
+          make
+          
+          # 결과를 통합 디렉토리로 이동
+          cp libandroid-shmem.so /tmp/ndk-deps/lib/
+          cp shm.h /tmp/ndk-deps/include/sys/
 
+      # [수정] 크로스 파일에 생성한 의존성 라이브러리 경로(-I, -L)를 바인딩합니다.
       - name: Create Android Cross File
         run: |
           NDK_ROOT=$ANDROID_NDK/toolchains/llvm/prebuilt/linux-x86_64
@@ -121,15 +136,18 @@ jobs:
           sysroot = '$SYSROOT'
 
           [built-in options]
-          c_args = ['-D__TERMUX__', '-D__USE_GNU', '-fPIC']
-          cpp_args = ['-D__TERMUX__', '-D__USE_GNU', '-fPIC']
+          c_args = ['-D__TERMUX__', '-D__USE_GNU', '-fPIC', '-I/tmp/ndk-deps/include']
+          cpp_args = ['-D__TERMUX__', '-D__USE_GNU', '-fPIC', '-I/tmp/ndk-deps/include']
+          c_link_args = ['-L$SYSROOT/usr/lib/aarch64-linux-android', '-L/tmp/ndk-deps/lib', '-landroid-shmem', '-latomic']
+          cpp_link_args = ['-L$SYSROOT/usr/lib/aarch64-linux-android', '-L/tmp/ndk-deps/lib', '-landroid-shmem', '-latomic']
           EOF
 
+      # [수정] LDFLAGS 환경변수 경로를 통합 디렉토리 타겟으로 정렬합니다.
       - name: Configure Mesa
         run: |
           cd mesa-src
 
-          export LDFLAGS="-landroid-shmem -static-libgcc"
+          export LDFLAGS="-L/tmp/ndk-deps/lib -landroid-shmem -latomic -static-libgcc"
           export CFLAGS="$CFLAGS -march=armv8-a"
 
           meson setup build \
