@@ -12,7 +12,7 @@ jobs:
     runs-on: ubuntu-24.04
 
     env:
-      ANDROID_NDK_VERSION: r27c
+      ANDROID_NDK_VERSION: r29
       API_LEVEL: 30
 
     steps:
