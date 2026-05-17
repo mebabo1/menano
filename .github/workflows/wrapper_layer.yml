@@ -1,4 +1,4 @@
-name: Build Android Vulkan Wrapper on macOS
+name: Build Android Vulkan Wrapper
 
 on:
   push:
@@ -9,11 +9,11 @@ permissions:
 
 jobs:
   build-wrapper:
-    runs-on: macos-14
+    runs-on: ubuntu-24.04
 
     env:
-      API_LEVEL: 30
       ANDROID_NDK_VERSION: r27
+      API_LEVEL: 30
 
     steps:
       - name: Checkout
@@ -33,62 +33,54 @@ jobs:
 
       - name: Install Dependencies
         run: |
-          brew update
+          sudo apt update
 
-          brew install \
-            meson \
-            ninja \
+          sudo apt install -y \
+            git \
+            wget \
+            unzip \
             pkg-config \
+            ninja-build \
+            cmake \
             bison \
             flex \
-            glslang
+            python3-dev \
+            libx11-dev \
+            libxext-dev \
+            libxcb1-dev \
+            libxrandr-dev \
+            libxfixes-dev \
+            libxshmfence-dev \
+            libdrm-dev \
+            zlib1g-dev \
+            libzstd-dev \
+            glslang-tools
 
           python -m pip install --upgrade pip
-          python -m pip install mako pyyaml
+
+          python -m pip install \
+            meson \
+            mako \
+            pyyaml \
+            ninja
 
       - name: Download Android NDK
         run: |
           cd /tmp
-          # macOS용 NDK는 .zip으로 다운로드해야 합니다.
-          curl -LO \
-            https://dl.google.com/android/repository/android-ndk-${ANDROID_NDK_VERSION}-darwin.zip
 
-          # 압축 해제
-          unzip -q android-ndk-${ANDROID_NDK_VERSION}-darwin.zip
+          wget -q \
+            https://dl.google.com/android/repository/android-ndk-${ANDROID_NDK_VERSION}-linux.zip
+
+          unzip -q android-ndk-${ANDROID_NDK_VERSION}-linux.zip
 
           echo "ANDROID_NDK=/tmp/android-ndk-${ANDROID_NDK_VERSION}" >> $GITHUB_ENV
 
-      - name: Detect NDK Toolchain
+      - name: Create Android Cross File
         run: |
-          # macOS 환경에서 NDK 툴체인 경로는 'darwin-x86_64'로 고정됩니다.
-          TOOLCHAIN=$ANDROID_NDK/toolchains/llvm/prebuilt/darwin-x86_64
-          SYSROOT=$TOOLCHAIN/sysroot
-          
-          # 환경 변수로 내보내기
-          echo "TOOLCHAIN=$TOOLCHAIN" >> $GITHUB_ENV
-          echo "SYSROOT=$SYSROOT" >> $GITHUB_ENV
+          NDK_ROOT=$ANDROID_NDK/toolchains/llvm/prebuilt/linux-x86_64
+          TOOLCHAIN=$NDK_ROOT/bin
+          SYSROOT=$NDK_ROOT/sysroot
 
-          echo "Detected toolchain: $TOOLCHAIN"
-          echo "Detected sysroot: $SYSROOT"
-
-      # 순정 NDK에 없는 Termux 전용 shmem 라이브러리를 직접 빌드하여 주입합니다.
-      - name: Build and Install libandroid-shmem
-        run: |
-          git clone --depth 1 https://github.com/termux/libandroid-shmem.git /tmp/libandroid-shmem
-          cd /tmp/libandroid-shmem
-          
-          # NDK Clang을 사용하여 가짜 shmem 라이브러리 컴파일
-          export CC="$TOOLCHAIN/bin/aarch64-linux-android${API_LEVEL}-clang"
-          make
-          
-          # Mesa 빌드가 참조할 수 있도록 임시 디렉토리에 배치
-          mkdir -p /tmp/termux-deps/include/sys /tmp/termux-deps/lib
-          cp libandroid-shmem.so /tmp/termux-deps/lib/
-          cp shm.h /tmp/termux-deps/include/sys/
-
-      # -latomic을 제거하고 가짜 shmem 헤더/라이브러리 경로를 추가했습니다.
-      - name: Create Cross File
-        run: |
           cat > /tmp/android-cross.ini <<EOF
           [host_machine]
           system = 'android'
@@ -97,10 +89,10 @@ jobs:
           endian = 'little'
 
           [binaries]
-          c = '$TOOLCHAIN/bin/aarch64-linux-android${API_LEVEL}-clang'
-          cpp = '$TOOLCHAIN/bin/aarch64-linux-android${API_LEVEL}-clang++'
-          ar = '$TOOLCHAIN/bin/llvm-ar'
-          strip = '$TOOLCHAIN/bin/llvm-strip'
+          c = '$TOOLCHAIN/aarch64-linux-android${API_LEVEL}-clang'
+          cpp = '$TOOLCHAIN/aarch64-linux-android${API_LEVEL}-clang++'
+          ar = '$TOOLCHAIN/llvm-ar'
+          strip = '$TOOLCHAIN/llvm-strip'
           pkgconfig = 'pkg-config'
 
           [properties]
@@ -108,18 +100,16 @@ jobs:
           sysroot = '$SYSROOT'
 
           [built-in options]
-          c_args = ['-D__TERMUX__', '-D__USE_GNU', '-U__ANDROID__', '-fPIC', '-I/tmp/termux-deps/include']
-          cpp_args = ['-D__TERMUX__', '-D__USE_GNU', '-U__ANDROID__', '-fPIC', '-I/tmp/termux-deps/include']
-          c_link_args = ['-L$SYSROOT/usr/lib/aarch64-linux-android', '-L/tmp/termux-deps/lib', '-landroid-shmem']
-          cpp_link_args = ['-L$SYSROOT/usr/lib/aarch64-linux-android', '-L/tmp/termux-deps/lib', '-landroid-shmem']
+          c_args = ['-D__TERMUX__', '-D__USE_GNU', '-fPIC']
+          cpp_args = ['-D__TERMUX__', '-D__USE_GNU', '-fPIC']
           EOF
 
-      # LDFLAGS 환경변수에서도 -latomic을 제거하고 빌드 경로를 연결했습니다.
       - name: Configure Mesa
         run: |
           cd mesa-src
 
-          export LDFLAGS="-L/tmp/termux-deps/lib -landroid-shmem"
+          export LDFLAGS="-landroid-shmem -static-libgcc"
+          export CFLAGS="$CFLAGS -march=armv8-a"
 
           meson setup build \
             --cross-file /tmp/android-cross.ini \
@@ -137,6 +127,7 @@ jobs:
             -Dvulkan-layers= \
             -Dplatforms=x11 \
             -Dzstd=disabled \
+            -Dvideo-codecs= \
             -Dbuildtype=release \
             --prefix=/usr
 
@@ -144,7 +135,7 @@ jobs:
         run: |
           cd mesa-src
 
-          ninja -C build 2>&1 | tee build.log
+          ninja -C build -v 2>&1 | tee build.log
 
       - name: Install
         run: |
@@ -154,12 +145,13 @@ jobs:
 
       - name: Show Files
         run: |
+          echo "=== Installed Files ==="
           find mesa-src/install -type f
 
       - name: Upload
         uses: actions/upload-artifact@v4
         with:
-          name: vulkan-wrapper-macos
+          name: vulkan-wrapper
           path: |
             mesa-src/build.log
             mesa-src/install
