@@ -9,18 +9,17 @@ permissions:
 
 jobs:
   build-wrapper:
-    # 최신 Apple Silicon GitHub Runner
-    runs-on: macos-15
+    runs-on: macos-14
 
     env:
       API_LEVEL: 30
       ANDROID_NDK_VERSION: r29
 
     steps:
-      - name: Checkout Workspace
+      - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Clone Mesa Wrapper Source
+      - name: Clone Mesa Wrapper
         run: |
           git clone --depth 1 \
             --branch wrapper-25 \
@@ -32,76 +31,58 @@ jobs:
         with:
           python-version: "3.11"
 
-      - name: Install Python Tools
-        run: |
-          python -m pip install --upgrade pip
-          python -m pip install \
-            meson \
-            mako \
-            pyyaml \
-            ninja
-
-      - name: Install macOS Dependencies
+      - name: Install Dependencies
         run: |
           brew update
 
           brew install \
+            meson \
+            ninja \
+            pkg-config \
             bison \
             flex \
-            pkg-config \
-            ninja \
             glslang
 
-      # ------------------------------------------------------------
-      # Android NDK 다운로드 및 안전 추출
-      # ------------------------------------------------------------
+          python -m pip install --upgrade pip
+          python -m pip install mako pyyaml
+
       - name: Download Android NDK
         run: |
           cd /tmp
 
-          curl -L -o android-ndk.dmg \
+          curl -LO \
             https://dl.google.com/android/repository/android-ndk-${ANDROID_NDK_VERSION}-darwin.dmg
 
-      - name: Mount and Extract NDK
-        run: |
-          cd /tmp
+          mkdir -p /tmp/ndk_mount
 
-          mkdir -p ndk_mount
+          hdiutil attach \
+            android-ndk-${ANDROID_NDK_VERSION}-darwin.dmg \
+            -mountpoint /tmp/ndk_mount
 
-          hdiutil attach android-ndk.dmg \
-            -mountpoint /tmp/ndk_mount \
-            -nobrowse \
-            -readonly
+          INNER_DIR=$(find /tmp/ndk_mount -maxdepth 1 -type d | tail -n 1)
 
-          echo "=== Mounted Files ==="
-          ls -la /tmp/ndk_mount
-
-          INNER_DIR=$(find /tmp/ndk_mount -mindepth 1 -maxdepth 1 -type d | head -n 1)
-
-          echo "Detected NDK Dir: $INNER_DIR"
-
-          mkdir -p /tmp/android-ndk-${ANDROID_NDK_VERSION}
-
-          cp -R "$INNER_DIR"/. /tmp/android-ndk-${ANDROID_NDK_VERSION}/
+          cp -R "$INNER_DIR" /tmp/android-ndk-${ANDROID_NDK_VERSION}
 
           hdiutil detach /tmp/ndk_mount
 
           echo "ANDROID_NDK=/tmp/android-ndk-${ANDROID_NDK_VERSION}" >> $GITHUB_ENV
 
-      # ------------------------------------------------------------
-      # Android Cross File 생성
-      # ------------------------------------------------------------
-      - name: Create Meson Cross File
+      - name: Detect NDK Toolchain
         run: |
-          TOOLCHAIN=$ANDROID_NDK/toolchains/llvm/prebuilt/darwin-x86_64/bin
+          TOOLCHAIN=$(find \
+            $ANDROID_NDK/toolchains/llvm/prebuilt \
+            -type d \
+            | grep darwin \
+            | head -n 1)
 
-          if [ ! -d "$TOOLCHAIN" ]; then
-            TOOLCHAIN=$ANDROID_NDK/toolchains/llvm/prebuilt/darwin-arm64/bin
-          fi
+          echo "TOOLCHAIN=$TOOLCHAIN" >> $GITHUB_ENV
 
-          echo "Using toolchain: $TOOLCHAIN"
+          echo "Detected toolchain:"
+          echo $TOOLCHAIN
 
-          cat > mesa-src/android-aarch64.cross <<EOF
+      - name: Create Cross File
+        run: |
+          cat > /tmp/android-cross.ini <<EOF
           [host_machine]
           system = 'android'
           cpu_family = 'aarch64'
@@ -109,10 +90,10 @@ jobs:
           endian = 'little'
 
           [binaries]
-          c = '$TOOLCHAIN/aarch64-linux-android${API_LEVEL}-clang'
-          cpp = '$TOOLCHAIN/aarch64-linux-android${API_LEVEL}-clang++'
-          ar = '$TOOLCHAIN/llvm-ar'
-          strip = '$TOOLCHAIN/llvm-strip'
+          c = '$TOOLCHAIN/bin/aarch64-linux-android${API_LEVEL}-clang'
+          cpp = '$TOOLCHAIN/bin/aarch64-linux-android${API_LEVEL}-clang++'
+          ar = '$TOOLCHAIN/bin/llvm-ar'
+          strip = '$TOOLCHAIN/bin/llvm-strip'
           pkgconfig = 'pkg-config'
 
           [properties]
@@ -123,27 +104,20 @@ jobs:
           cpp_args = ['-D__TERMUX__', '-D__USE_GNU', '-U__ANDROID__', '-fPIC']
           EOF
 
-      # ------------------------------------------------------------
-      # Mesa Configure
-      # ------------------------------------------------------------
-      - name: Configure Mesa Wrapper
+      - name: Configure Mesa
         run: |
           cd mesa-src
-
-          rm -rf build
 
           export LDFLAGS="-landroid-shmem -latomic"
 
           meson setup build \
-            --cross-file android-aarch64.cross \
+            --cross-file /tmp/android-cross.ini \
             -Dcpp_rtti=false \
             -Dopengl=false \
             -Degl=disabled \
             -Dgbm=disabled \
-            -Dglx=disabled \
             -Dllvm=disabled \
             -Dshared-llvm=disabled \
-            -Dshared-glapi=enabled \
             -Dxmlconfig=disabled \
             -Dbuild-tests=false \
             -Dinstall-intel-gpu-tests=false \
@@ -155,41 +129,26 @@ jobs:
             -Dbuildtype=release \
             --prefix=/usr
 
-      # ------------------------------------------------------------
-      # Build
-      # ------------------------------------------------------------
-      - name: Build Vulkan Wrapper
+      - name: Build
         run: |
           cd mesa-src
 
           ninja -C build 2>&1 | tee build.log
 
-      # ------------------------------------------------------------
-      # Install
-      # ------------------------------------------------------------
-      - name: Install Build
+      - name: Install
         run: |
           cd mesa-src
 
           DESTDIR=$PWD/install ninja -C build install
 
-      # ------------------------------------------------------------
-      # Output 확인
-      # ------------------------------------------------------------
       - name: Show Files
         run: |
-          find mesa-src/install -type f || true
+          find mesa-src/install -type f
 
-      # ------------------------------------------------------------
-      # Artifact Upload
-      # ------------------------------------------------------------
-      - name: Upload Artifact
-        if: always()
+      - name: Upload
         uses: actions/upload-artifact@v4
         with:
-          name: android-wrapper-build-macos
+          name: vulkan-wrapper-macos
           path: |
             mesa-src/build.log
-            mesa-src/build/meson-logs/
-            mesa-src/install/
-          retention-days: 5
+            mesa-src/install
