@@ -108,7 +108,7 @@ jobs:
         run: |
           cd mesa-src
 
-          export LDFLAGS="-landroid-shmem"
+          export LDFLAGS="-landroid-shmem -static-libgcc"
           export CFLAGS="$CFLAGS -march=armv8-a"
 
           meson setup build \
@@ -129,7 +129,6 @@ jobs:
             -Dzstd=disabled \
             -Dvideo-codecs= \
             -Dbuildtype=release \
-            -Datomic=disabled \
             --prefix=/usr
 
       - name: Build
