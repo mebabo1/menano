@@ -72,6 +72,7 @@ jobs:
           echo "Detected sysroot: $SYSROOT"
 
       - name: Create Cross File
+      - name: Create Cross File
         run: |
           cat > /tmp/android-cross.ini <<EOF
           [host_machine]
@@ -94,6 +95,9 @@ jobs:
           [built-in options]
           c_args = ['-D__TERMUX__', '-D__USE_GNU', '-U__ANDROID__', '-fPIC']
           cpp_args = ['-D__TERMUX__', '-D__USE_GNU', '-U__ANDROID__', '-fPIC']
+          # 아래 링크 인자(link_args)들을 추가하여 Meson이 내부 체크 시 무조건 참조하도록 합니다.
+          c_link_args = ['-L$SYSROOT/usr/lib/aarch64-linux-android', '-landroid-shmem', '-latomic']
+          cpp_link_args = ['-L$SYSROOT/usr/lib/aarch64-linux-android', '-landroid-shmem', '-latomic']
           EOF
 
       - name: Configure Mesa
