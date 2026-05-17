@@ -12,7 +12,7 @@ jobs:
     runs-on: ubuntu-22.04
 
     env:
-      ANDROID_NDK_VERSION: r27
+      ANDROID_NDK_VERSION: r26b
       API_LEVEL: 30
 
     steps:
@@ -103,8 +103,8 @@ jobs:
 
           [built-in options]
           # Meson 배열 내부의 $ 마크가 깨지지 않도록 \$ 로 안전하게 이스케이프 처리했습니다.
-          c_args = ['-D__TERMUX__', '-D__USE_GNU', '-fPIC', '-DHAVE_MEMFD_CREATE']
-          cpp_args = ['-D__TERMUX__', '-D__USE_GNU', '-fPIC', '-DHAVE_MEMFD_CREATE']
+          c_args = ['-D__TERMUX__', '-D__USE_GNU', '-fPIC', '-DHAVE_MEMFD_CREATE', '-DSYS_memfd_create=279']
+          cpp_args = ['-D__TERMUX__', '-D__USE_GNU', '-fPIC', '-DHAVE_MEMFD_CREATE', '-DSYS_memfd_create=279']
           c_link_args = ['-L$TERMUX_PREFIX/lib', '-landroid-shmem', '-latomic']
           cpp_link_args = ['-L$TERMUX_PREFIX/lib', '-landroid-shmem', '-latomic']
 
@@ -113,10 +113,6 @@ jobs:
           PKG_CONFIG_LIBDIR = '$TERMUX_PREFIX/lib/pkgconfig'
           PKG_CONFIG_SYSROOT_DIR = '$TERMUX_PREFIX'
           EOF
-
-      - name: Patch memfd_create
-        run: |
-          sed -i 's/syscall(SYS_memfd_create/memfd_create/g' mesa-src/src/util/anon_file.c
 
       - name: Configure Mesa
         run: |
