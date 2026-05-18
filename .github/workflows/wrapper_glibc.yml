@@ -28,47 +28,29 @@ jobs:
           python-version: "3.11"
 
       # [교정 완료] 기존 소스 리스트를 amd64 전용으로 고정하고, arm64 전용 ports 서버를 명확하게 분리 등록합니다.
-      - name: Install Cross Compiler and Multiarch Dependencies
+      - name: 安装系统依赖
         run: |
-          sudo dpkg --add-architecture arm64
-          
-          # 1. 기존 기본 리포지토리를 오직 [arch=amd64] 전용으로 재작성
-          sudo cat > /etc/apt/sources.list << 'EOF'
-          deb [arch=amd64] http://archive.ubuntu.com/ubuntu/ jammy main restricted universe multiverse
-          deb [arch=amd64] http://archive.ubuntu.com/ubuntu/ jammy-updates main restricted universe multiverse
-          deb [arch=amd64] http://archive.ubuntu.com/ubuntu/ jammy-backports main restricted universe multiverse
-          deb [arch=amd64] http://security.ubuntu.com/ubuntu/ jammy-security main restricted universe multiverse
-          EOF
-
-          # 2. arm64 패키지를 가져올 전용 ports 서버를 [arch=arm64] 전용으로 추가
-          echo "deb [arch=arm64] http://ports.ubuntu.com/ubuntu-ports jammy main restricted universe multiverse" | sudo tee -a /etc/apt/sources.list
-          echo "deb [arch=arm64] http://ports.ubuntu.com/ubuntu-ports jammy-updates main restricted universe multiverse" | sudo tee -a /etc/apt/sources.list
-          echo "deb [arch=arm64] http://ports.ubuntu.com/ubuntu-ports jammy-backports main restricted universe multiverse" | sudo tee -a /etc/apt/sources.list
-          echo "deb [arch=arm64] http://ports.ubuntu.com/ubuntu-ports jammy-security main restricted universe multiverse" | sudo tee -a /etc/apt/sources.list
-
-          # 3. 패키지 목록 업데이트 및 빌드 의존성 라이브러리 설치
+          sudo sed -i "s/^Types: deb$/Types: deb deb-src/" /etc/apt/sources.list.d/ubuntu.sources
           sudo apt update
-          sudo apt install -y \
-            gcc-aarch64-linux-gnu \
-            g++-aarch64-linux-gnu \
-            pkg-config \
-            ninja-build \
-            cmake \
-            bison \
-            flex \
-            glslang-tools \
-            libx11-dev:arm64 \
-            libxext-dev:arm64 \
-            libxcb1-dev:arm64 \
-            libxrandr-dev:arm64 \
-            libxfixes-dev:arm64 \
-            libxshmfence-dev:arm64 \
-            libdrm-dev:arm64 \
-            zlib1g-dev:arm64 \
-            libzstd-dev:arm64
+          sudo apt install -y glslang-tools libxrandr-dev libxxf86vm-dev libxcb-shm0-dev libxcb-glx0-dev \
+              libxext-dev llvm-19 libx11-dev libx11-xcb-dev libxcb1-dev libxcb-dri3-dev libxcb-present-dev \
+              libxcb-randr0-dev libxcb-sync-dev libxcb-xfixes0-dev libxshmfence-dev libdrm-dev \
+              libgbm-dev libegl1-mesa-dev libexpat1-dev libwayland-dev python3-pip \
+              python3-setuptools python3-wheel ninja-build
 
-          python -m pip install --upgrade pip
-          python -m pip install meson mako pyyaml ninja
+      - name: 安装 Python 构建工具
+        run: |
+          # 使用系统级的 pip 安装，避免用户级安装的路径问题
+          #sudo pip3 install --upgrade pip
+          sudo pip3 install meson mako
+        
+          # 验证安装
+          echo "检查安装的 meson 版本:"
+          meson --version
+          python3 -c "import mesonbuild; print('mesonbuild 模块路径:', mesonbuild.__file__)"
+        
+          # 设置环境变量，确保能找到所有工具
+          echo "$HOME/.local/bin" >> $GITHUB_PATH
 
       - name: Create Linux glibc Cross File
         run: |
