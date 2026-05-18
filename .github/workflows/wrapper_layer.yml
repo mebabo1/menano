@@ -25,7 +25,7 @@ jobs:
             --branch wrapper-25 \
             https://gitlab.freedesktop.org/Pipetto-crypto/mesa.git \
             mesa-src
-
+            
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
@@ -75,8 +75,9 @@ jobs:
           
           echo "TERMUX_PREFIX=$HOME/termuxfs/aarch64/data/data/com.termux/files/usr" >> $GITHUB_ENV
           echo "TERMUX_SYSROOT=$HOME/termuxfs/aarch64" >> $GITHUB_ENV
-          echo "RUNTIME_PATH="/data/data/com.termux/files/usr"" >> $GITHUB_ENV
+          echo "RUNTIME_PATH=/data/data/com.termux/files/usr" >> $GITHUB_ENV
 
+      # [교정 완료] 성공한 유저의 핵심 3대 플래그(-U__ANDROID__, --target, -landroid-shmem)를 크로스 파일 빌드 옵션에 주입
       - name: Create Android Cross File
         run: |
           NDK_ROOT=$ANDROID_NDK/toolchains/llvm/prebuilt/linux-x86_64
@@ -102,10 +103,10 @@ jobs:
           sysroot = '$SYSROOT'
 
           [built-in options]
-          c_args = ['-D__TERMUX__', '-D__USE_GNU', '-U__ANDROID__', '-fPIC', '-idirafter$TERMUX_PREFIX/include', '-include', 'fcntl.h', '-include', 'unistd.h']
-          cpp_args = ['-D__TERMUX__', '-D__USE_GNU', '-U__ANDROID__', '-fPIC', '-idirafter$TERMUX_PREFIX/include', '-include', 'fcntl.h', '-include', 'unistd.h']
-          c_link_args = ['-L$TERMUX_PREFIX/lib', '-Wl,-rpath=$RUNTIME_PATH/lib', '-landroid-shmem']
-          cpp_link_args = ['-L$TERMUX_PREFIX/lib', '-Wl,-rpath=$RUNTIME_PATH/lib', '-landroid-shmem']
+          c_args = ['-D__TERMUX__', '-D__USE_GNU', '-U__ANDROID__', '--target=aarch64-linux-android30', '-fPIC', '-idirafter$TERMUX_PREFIX/include', '-include', 'fcntl.h', '-include', 'unistd.h']
+          cpp_args = ['-D__TERMUX__', '-D__USE_GNU', '-U__ANDROID__', '--target=aarch64-linux-android30', '-fPIC', '-idirafter$TERMUX_PREFIX/include', '-include', 'fcntl.h', '-include', 'unistd.h']
+          c_link_args = ['--target=aarch64-linux-android30', '-L$TERMUX_PREFIX/lib', '-Wl,-rpath=$RUNTIME_PATH/lib', '-landroid-shmem']
+          cpp_link_args = ['--target=aarch64-linux-android30', '-L$TERMUX_PREFIX/lib', '-Wl,-rpath=$RUNTIME_PATH/lib', '-landroid-shmem']
 
           [env]
           PKG_CONFIG_PATH = '$TERMUX_PREFIX/lib/pkgconfig:$TERMUX_PREFIX/share/pkgconfig'
@@ -113,6 +114,7 @@ jobs:
           PKG_CONFIG_SYSROOT_DIR = '$TERMUX_SYSROOT'
           EOF
 
+      # [교정 완료] 런타임 환경변수 빌드 플래그에도 동일한 제어 플래그 전면 적용 및 -Dplatforms=x11 복귀
       - name: Configure Mesa
         run: |
           cd mesa-src
@@ -124,9 +126,9 @@ jobs:
           export X_CFLAGS="-I$TERMUX_PREFIX/include"
           export X_LIBS="-L$TERMUX_PREFIX/lib -landroid-shmem"
           
-          export CFLAGS="-I$TERMUX_PREFIX/include -include fcntl.h -include unistd.h"
-          export CXXFLAGS="-I$TERMUX_PREFIX/include -include fcntl.h -include unistd.h"
-          export LDFLAGS="-L$TERMUX_PREFIX/lib -Wl,-rpath=$RUNTIME_PATH/lib -landroid-shmem"
+          export CFLAGS="-U__ANDROID__ --target=aarch64-linux-android30 -I$TERMUX_PREFIX/include -include fcntl.h -include unistd.h"
+          export CXXFLAGS="-U__ANDROID__ --target=aarch64-linux-android30 -I$TERMUX_PREFIX/include -include fcntl.h -include unistd.h"
+          export LDFLAGS="--target=aarch64-linux-android30 -L$TERMUX_PREFIX/lib -Wl,-rpath=$RUNTIME_PATH/lib -landroid-shmem"
 
           meson setup build \
             --cross-file /tmp/android-cross.ini \
@@ -151,10 +153,32 @@ jobs:
           cd mesa-src
           DESTDIR=$PWD/install ninja -C build install
 
+      - name: Process ICD JSON for Termux
+        run: |
+          mkdir -p output
+          cp mesa-src/install/data/data/com.termux/files/usr/lib/libvulkan_wrapper.so output/ 2>/dev/null || cp $(find mesa-src/install -name "libvulkan_wrapper.so") output/
+          
+          ORIGINAL_JSON=$(find mesa-src/install -name "*.json" | head -n 1)
+          if [ -f "$ORIGINAL_JSON" ]; then
+            sed 's|"library_path": ".*"|"library_path": "/data/data/com.termux/files/usr/lib/libvulkan_wrapper.so"|g' "$ORIGINAL_JSON" > output/wrapper_icd.aarch64.json
+          else
+            cat > output/wrapper_icd.aarch64.json << 'EOF'
+          {
+              "file_format_version": "1.0.0",
+              "ICD": {
+                  "library_path": "/data/data/com.termux/files/usr/lib/libvulkan_wrapper.so",
+                  "api_version": "1.3.255"
+              }
+          }
+          EOF
+          fi
+
       - name: Show Files
         run: |
           echo "=== Installed Files ==="
           find mesa-src/install -type f
+          echo "=== Output Folder ==="
+          ls -l output/
 
       - name: Upload
         uses: actions/upload-artifact@v4
@@ -162,4 +186,4 @@ jobs:
           name: vulkan-wrapper
           path: |
             mesa-src/build.log
-            mesa-src/install
+            output/
