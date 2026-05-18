@@ -85,7 +85,7 @@ jobs:
 
           cat > /tmp/android-cross.ini << EOF
           [host_machine]
-          system = 'android'
+          system = 'linux'
           cpu_family = 'aarch64'
           cpu = 'aarch64'
           endian = 'little'
