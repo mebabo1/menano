@@ -27,16 +27,26 @@ jobs:
         with:
           python-version: "3.11"
 
-      # [변경] Android NDK 대신 Ubuntu 자체 멀티아키텍처 아키텍처를 활성화하여 
-      # 순수 리눅스 glibc 기반 aarch64 크로스 컴파일러 및 의존성 라이브러리를 설치합니다.
+      # [교정 완료] 기존 소스 리스트를 amd64 전용으로 고정하고, arm64 전용 ports 서버를 명확하게 분리 등록합니다.
       - name: Install Cross Compiler and Multiarch Dependencies
         run: |
           sudo dpkg --add-architecture arm64
-          sudo sed -i 's/deb http/deb [arch=amd64] http/g' /etc/apt/sources.list
           
+          # 1. 기존 기본 리포지토리를 오직 [arch=amd64] 전용으로 재작성
+          sudo cat > /etc/apt/sources.list << 'EOF'
+          deb [arch=amd64] http://archive.ubuntu.com/ubuntu/ jammy main restricted universe multiverse
+          deb [arch=amd64] http://archive.ubuntu.com/ubuntu/ jammy-updates main restricted universe multiverse
+          deb [arch=amd64] http://archive.ubuntu.com/ubuntu/ jammy-backports main restricted universe multiverse
+          deb [arch=amd64] http://security.ubuntu.com/ubuntu/ jammy-security main restricted universe multiverse
+          EOF
+
+          # 2. arm64 패키지를 가져올 전용 ports 서버를 [arch=arm64] 전용으로 추가
           echo "deb [arch=arm64] http://ports.ubuntu.com/ubuntu-ports jammy main restricted universe multiverse" | sudo tee -a /etc/apt/sources.list
           echo "deb [arch=arm64] http://ports.ubuntu.com/ubuntu-ports jammy-updates main restricted universe multiverse" | sudo tee -a /etc/apt/sources.list
-          
+          echo "deb [arch=arm64] http://ports.ubuntu.com/ubuntu-ports jammy-backports main restricted universe multiverse" | sudo tee -a /etc/apt/sources.list
+          echo "deb [arch=arm64] http://ports.ubuntu.com/ubuntu-ports jammy-security main restricted universe multiverse" | sudo tee -a /etc/apt/sources.list
+
+          # 3. 패키지 목록 업데이트 및 빌드 의존성 라이브러리 설치
           sudo apt update
           sudo apt install -y \
             gcc-aarch64-linux-gnu \
@@ -60,8 +70,6 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install meson mako pyyaml ninja
 
-      # [변경] 안드로이드용 오버라이드 설정을 전부 걷어내고, 
-      # 표준 리눅스(system = 'linux') 및 gnu-gcc 컴파일러 진입점을 정의합니다.
       - name: Create Linux glibc Cross File
         run: |
           cat > /tmp/linux-cross.ini << 'EOF'
