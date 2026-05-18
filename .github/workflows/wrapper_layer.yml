@@ -104,7 +104,6 @@ jobs:
           sysroot = '$SYSROOT'
 
           [built-in options]
-          # '-include', 'fcntl.h', '-include', 'unistd.h' 를 추가하여 모든 컴파일 대상 파일에 파일 제어 헤더를 강제 주입합니다.
           c_args = ['-D__TERMUX__', '-D__USE_GNU', '-fPIC', '-idirafter$TERMUX_PREFIX/include', '-include', 'fcntl.h', '-include', 'unistd.h']
           cpp_args = ['-D__TERMUX__', '-D__USE_GNU', '-fPIC', '-idirafter$TERMUX_PREFIX/include', '-include', 'fcntl.h', '-include', 'unistd.h']
           c_link_args = ['-L$TERMUX_PREFIX/lib', '-landroid-shmem', '-latomic']
