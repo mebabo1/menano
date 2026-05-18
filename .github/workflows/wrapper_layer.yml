@@ -92,7 +92,7 @@ jobs:
 
           [binaries]
           c = ['$TOOLCHAIN/aarch64-linux-android${API_LEVEL}-clang', '-D__TERMUX__', '-D__USE_GNU', '-U__ANDROID__', '--target=aarch64-linux-android30']
-          cpp = '$TOOLCHAIN/aarch64-linux-android${API_LEVEL}-clang++', '-D__TERMUX__', '-D__USE_GNU', '-U__ANDROID__', '--target=aarch64-linux-android30']
+          cpp = ['$TOOLCHAIN/aarch64-linux-android${API_LEVEL}-clang++', '-D__TERMUX__', '-D__USE_GNU', '-U__ANDROID__', '--target=aarch64-linux-android30']
           ar = '$TOOLCHAIN/llvm-ar'
           strip = '$TOOLCHAIN/llvm-strip'
           pkgconfig = 'pkg-config'
