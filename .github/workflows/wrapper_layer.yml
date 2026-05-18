@@ -84,11 +84,6 @@ jobs:
           SYSROOT=$NDK_ROOT/sysroot
 
           cat > /tmp/android-cross.ini << EOF
-          [host_machine]
-          system = 'linux'
-          cpu_family = 'aarch64'
-          cpu = 'aarch64'
-          endian = 'little'
 
           [binaries]
           c = '$TOOLCHAIN/aarch64-linux-android${API_LEVEL}-clang'
