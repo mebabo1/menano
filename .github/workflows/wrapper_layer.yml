@@ -76,11 +76,9 @@ jobs:
           wget -q https://github.com/ziad9267/termux-on-gha/releases/download/test/termuxfs.tar
           tar -xf termuxfs.tar
           
-          # Termux 내부 진짜 경로 지정 및 pkg-config용 베이스 시스루트 환경변수 확보
           echo "TERMUX_PREFIX=$HOME/termuxfs/aarch64/data/data/com.termux/files/usr" >> $GITHUB_ENV
           echo "TERMUX_SYSROOT=$HOME/termuxfs/aarch64" >> $GITHUB_ENV
 
-      # [교정 완료] 강제 헤더 인클루드 플래그를 심어 open, O_RDONLY 에러를 완벽하게 차단합니다.
       - name: Create Android Cross File
         run: |
           NDK_ROOT=$ANDROID_NDK/toolchains/llvm/prebuilt/linux-x86_64
@@ -122,6 +120,7 @@ jobs:
         run: |
           cd mesa-src
 
+          export RUNTIME_PATH="/data/data/com.termux/files/usr"
           export PKG_CONFIG_PATH="$TERMUX_PREFIX/lib/pkgconfig:$TERMUX_PREFIX/share/pkgconfig"
           export PKG_CONFIG_LIBDIR="$TERMUX_PREFIX/lib/pkgconfig"
           export PKG_CONFIG_SYSROOT_DIR="$TERMUX_SYSROOT"
@@ -129,10 +128,9 @@ jobs:
           export X_CFLAGS="-I$TERMUX_PREFIX/include"
           export X_LIBS="-L$TERMUX_PREFIX/lib -landroid-shmem"
           
-          # 환경변수 빌드 플래그 라인에도 동일하게 강제 인클루드를 세팅하여 안전망을 만듭니다.
           export CFLAGS="-march=armv8-a -idirafter $TERMUX_PREFIX/include -include fcntl.h -include unistd.h"
           export CXXFLAGS="-march=armv8-a -idirafter $TERMUX_PREFIX/include -include fcntl.h -include unistd.h"
-          export LDFLAGS="-L$TERMUX_PREFIX/lib -landroid-shmem -latomic"
+          export LDFLAGS="-L$TERMUX_PREFIX/lib -Wl,-rpath=$RUNTIME_PATH/lib -landroid-shmem -latomic"
 
           meson setup build \
             --cross-file /tmp/android-cross.ini \
@@ -152,7 +150,7 @@ jobs:
             -Dzstd=disabled \
             -Dvideo-codecs= \
             -Dbuildtype=release \
-            --prefix=/usr
+            --prefix=/data/data/com.termux/files/usr
 
       - name: Build
         run: |
