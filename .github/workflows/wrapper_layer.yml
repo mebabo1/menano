@@ -84,6 +84,11 @@ jobs:
           SYSROOT=$NDK_ROOT/sysroot
 
           cat > /tmp/android-cross.ini << EOF
+          [host_machine]
+          system = 'android'
+          cpu_family = 'aarch64'
+          cpu = 'aarch64'
+          endian = 'little'
 
           [binaries]
           c = '$TOOLCHAIN/aarch64-linux-android${API_LEVEL}-clang'
@@ -97,8 +102,8 @@ jobs:
           sysroot = '$SYSROOT'
 
           [built-in options]
-          c_args = ['-D__TERMUX__', '-D__USE_GNU', '-U__ANDROID__']
-          cpp_args = ['-D__TERMUX__', '-D__USE_GNU', '-U__ANDROID__']
+          c_args = ['-D__TERMUX__', '-D__USE_GNU', '-U__ANDROID__', '-fPIC', '-idirafter$TERMUX_PREFIX/include', '-include', 'fcntl.h', '-include', 'unistd.h']
+          cpp_args = ['-D__TERMUX__', '-D__USE_GNU', '-U__ANDROID__', '-fPIC', '-idirafter$TERMUX_PREFIX/include', '-include', 'fcntl.h', '-include', 'unistd.h']
           c_link_args = ['-L$TERMUX_PREFIX/lib', '-Wl,-rpath=$RUNTIME_PATH/lib', '-landroid-shmem']
           cpp_link_args = ['-L$TERMUX_PREFIX/lib', '-Wl,-rpath=$RUNTIME_PATH/lib', '-landroid-shmem']
 
