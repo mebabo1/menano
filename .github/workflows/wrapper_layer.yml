@@ -127,9 +127,9 @@ jobs:
           export X_CFLAGS="-I$TERMUX_PREFIX/include"
           export X_LIBS="-L$TERMUX_PREFIX/lib -landroid-shmem"
           
-          export CFLAGS="$TERMUX_PREFIX/include -include fcntl.h -include unistd.h"
-          export CXXFLAGS="$TERMUX_PREFIX/include -include fcntl.h -include unistd.h"
-          export LDFLAGS="-L$TERMUX_PREFIX/include -Wl,-rpath=$RUNTIME_PATH/lib -landroid-shmem -latomic"
+          export CFLAGS="-I$TERMUX_PREFIX/include -include fcntl.h -include unistd.h"
+          export CXXFLAGS="-I$TERMUX_PREFIX/include -include fcntl.h -include unistd.h"
+          export LDFLAGS="-L$TERMUX_PREFIX/lib -Wl,-rpath=$RUNTIME_PATH/lib -landroid-shmem -latomic"
 
           meson setup build \
             --cross-file /tmp/android-cross.ini \
