@@ -26,7 +26,7 @@ jobs:
             https://gitlab.freedesktop.org/Pipetto-crypto/mesa.git \
             mesa-src
 
-          sed -i 's/syscall(SYS_memfd_create,/memfd_create(/g' mesa-src/src/util/anon_file.c
+          # sed -i 's/syscall(SYS_memfd_create,/memfd_create(/g' mesa-src/src/util/anon_file.c
 
       - name: Setup Python
         uses: actions/setup-python@v5
