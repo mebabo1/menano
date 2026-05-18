@@ -25,8 +25,7 @@ jobs:
             --branch wrapper-25 \
             https://gitlab.freedesktop.org/Pipetto-crypto/mesa.git \
             mesa-src
-          
-          # anon_file.c의 시스템 콜 코드만 안정적으로 치환해 둡니다.
+
           sed -i 's/syscall(SYS_memfd_create,/memfd_create(/g' mesa-src/src/util/anon_file.c
 
       - name: Setup Python
