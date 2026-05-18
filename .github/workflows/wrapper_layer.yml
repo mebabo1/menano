@@ -26,9 +26,9 @@ jobs:
             https://gitlab.freedesktop.org/Pipetto-crypto/mesa.git \
             mesa-src
 
-          echo "=== Patching Wrapper to use Termux Turnip ==="
-          find mesa-src/ -type f \( -name "*.c" -o -name "*.cpp" -o -name "*.h" \) -exec sed -i 's|/system/lib64/libvulkan.so|/data/data/com.termux/files/usr/lib/libvulkan.so|g' {} +
-          find mesa-src/ -type f \( -name "*.c" -o -name "*.cpp" -o -name "*.h" \) -exec sed -i 's|/system/lib/libvulkan.so|/data/data/com.termux/files/usr/lib/libvulkan.so|g' {} +
+          TARGET_FILE="mesa-src/src/vulkan/wrapper/wrapper_instance.c"          
+          sed -i 's|/system/lib64/libvulkan.so|/data/data/com.termux/files/usr/lib/libvulkan.so|g' "$TARGET_FILE"
+          sed -i 's|/system/lib/libvulkan.so|/data/data/com.termux/files/usr/lib/libvulkan.so|g' "$TARGET_FILE"
 
       - name: Setup Python
         uses: actions/setup-python@v5
