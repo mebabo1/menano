@@ -1,0 +1,132 @@
+name: Build Linux glibc Vulkan Wrapper
+
+on:
+  push:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-wrapper:
+    runs-on: ubuntu-22.04
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Clone Mesa Wrapper
+        run: |
+          git clone --depth 1 \
+            --branch wrapper-25 \
+            https://gitlab.freedesktop.org/Pipetto-crypto/mesa.git \
+            mesa-src
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      # [변경] Android NDK 대신 Ubuntu 자체 멀티아키텍처 아키텍처를 활성화하여 
+      # 순수 리눅스 glibc 기반 aarch64 크로스 컴파일러 및 의존성 라이브러리를 설치합니다.
+      - name: Install Cross Compiler and Multiarch Dependencies
+        run: |
+          sudo dpkg --add-architecture arm64
+          sudo sed -i 's/deb http/deb [arch=amd64] http/g' /etc/apt/sources.list
+          
+          echo "deb [arch=arm64] http://ports.ubuntu.com/ubuntu-ports jammy main restricted universe multiverse" | sudo tee -a /etc/apt/sources.list
+          echo "deb [arch=arm64] http://ports.ubuntu.com/ubuntu-ports jammy-updates main restricted universe multiverse" | sudo tee -a /etc/apt/sources.list
+          
+          sudo apt update
+          sudo apt install -y \
+            gcc-aarch64-linux-gnu \
+            g++-aarch64-linux-gnu \
+            pkg-config \
+            ninja-build \
+            cmake \
+            bison \
+            flex \
+            glslang-tools \
+            libx11-dev:arm64 \
+            libxext-dev:arm64 \
+            libxcb1-dev:arm64 \
+            libxrandr-dev:arm64 \
+            libxfixes-dev:arm64 \
+            libxshmfence-dev:arm64 \
+            libdrm-dev:arm64 \
+            zlib1g-dev:arm64 \
+            libzstd-dev:arm64
+
+          python -m pip install --upgrade pip
+          python -m pip install meson mako pyyaml ninja
+
+      # [변경] 안드로이드용 오버라이드 설정을 전부 걷어내고, 
+      # 표준 리눅스(system = 'linux') 및 gnu-gcc 컴파일러 진입점을 정의합니다.
+      - name: Create Linux glibc Cross File
+        run: |
+          cat > /tmp/linux-cross.ini << 'EOF'
+          [host_machine]
+          system = 'linux'
+          cpu_family = 'aarch64'
+          cpu = 'aarch64'
+          endian = 'little'
+
+          [binaries]
+          c = 'aarch64-linux-gnu-gcc'
+          cpp = 'aarch64-linux-gnu-g++'
+          ar = 'aarch64-linux-gnu-ar'
+          strip = 'aarch64-linux-gnu-strip'
+          pkgconfig = 'pkg-config'
+
+          [built-in options]
+          c_args = ['-fPIC']
+          cpp_args = ['-fPIC']
+          c_link_args = []
+          cpp_link_args = []
+
+          [env]
+          PKG_CONFIG_PATH = '/usr/lib/aarch64-linux-gnu/pkgconfig:/usr/share/pkgconfig'
+          PKG_CONFIG_LIBDIR = '/usr/lib/aarch64-linux-gnu/pkgconfig'
+          EOF
+
+      # [변경] 복잡한 안드로이드 패스 버퍼(LDFLAGS 등)를 제거하고 
+      # termux-glibc 표준 경로 prefix를 선언합니다.
+      - name: Configure Mesa
+        run: |
+          cd mesa-src
+
+          meson setup build \
+            --cross-file /tmp/linux-cross.ini \
+            -Dcpp_rtti=false \
+            -Dopengl=false \
+            -Dgbm=disabled \
+            -Dllvm=disabled \
+            -Dshared-llvm=disabled \
+            -Dxmlconfig=disabled \
+            -Dgallium-drivers= \
+            -Dvulkan-drivers=wrapper \
+            -Dplatforms=x11 \
+            --prefix=/data/data/com.termux/files/usr/glibc
+
+      - name: Build
+        run: |
+          cd mesa-src
+          ninja -C build -v 2>&1 | tee build.log
+
+      - name: Install
+        run: |
+          cd mesa-src
+          DESTDIR=$PWD/install ninja -C build install
+
+      - name: Show Files
+        run: |
+          echo "=== Installed Files ==="
+          find mesa-src/install -type f
+
+      - name: Upload
+        uses: actions/upload-artifact@v4
+        with:
+          name: vulkan-wrapper-glibc
+          path: |
+            mesa-src/build.log
+            mesa-src/install
