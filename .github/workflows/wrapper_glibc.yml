@@ -33,9 +33,10 @@ jobs:
           sudo sed -i "s/^Types: deb$/Types: deb deb-src/" /etc/apt/sources.list.d/ubuntu.sources
           sudo apt update
           sudo apt install -y glslang-tools libxrandr-dev libxxf86vm-dev libxcb-shm0-dev libxcb-glx0-dev \
-              libxext-dev llvm-19 libx11-dev libx11-cb-dev libxcb1-dev libxcb-dri3-dev libxcb-present-dev \
+              libxext-dev llvm-19 libx11-dev libx11-xcb-dev libxcb1-dev libxcb-dri3-dev libxcb-present-dev \
               libxcb-randr0-dev libxcb-sync-dev libxcb-xfixes0-dev libxshmfence-dev libdrm-dev \
-              libgbm-dev libegl1-mesa-dev libexpat1-dev libwayland-dev ninja-build
+              libgbm-dev libegl1-mesa-dev libexpat1-dev libwayland-dev python3-pip \
+              python3-setuptools python3-wheel ninja-build
 
       # [교정 완료] sudo를 제거하여 setup-python(3.11) 환경 내부에 안전하게 빌드 도구를 격리 설치합니다.
       - name: 安装 Python 构建工具
