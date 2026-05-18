@@ -26,10 +26,11 @@ jobs:
             https://gitlab.freedesktop.org/Pipetto-crypto/mesa.git \
             mesa-src
 
-          TARGET_FILE="mesa-src/src/vulkan/wrapper/wrapper_instance.c"          
-          sed -i 's|/system/lib64/libvulkan.so|/data/data/com.termux/files/usr/lib/libvulkan.so|g' "$TARGET_FILE"
-          sed -i 's|/system/lib/libvulkan.so|/data/data/com.termux/files/usr/lib/libvulkan.so|g' "$TARGET_FILE"
-
+          TARGET_FILE="mesa-src/src/vulkan/wrapper/wrapper_instance.c"
+          
+          # [정밀 교정] 중개자(로더)가 아닌, 진짜 Turnip 드라이버(libvulkan_freedreno.so)를 직접 링크하도록 패치합니다.
+          sed -i 's|/system/lib64/libvulkan.so|/data/data/com.termux/files/usr/lib/libvulkan_freedreno.so|g' "$TARGET_FILE"
+          sed -i 's|/system/lib/libvulkan.so|/data/data/com.termux/files/usr/lib/libvulkan_freedreno.so|g' "$TARGET_FILE"
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
