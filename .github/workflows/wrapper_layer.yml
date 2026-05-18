@@ -104,8 +104,8 @@ jobs:
           sysroot = '$SYSROOT'
 
           [built-in options]
-          c_args = ['-D__TERMUX__', '-D__USE_GNU', '-fPIC', '-idirafter$TERMUX_PREFIX/include', '-include', 'fcntl.h', '-include', 'unistd.h']
-          cpp_args = ['-D__TERMUX__', '-D__USE_GNU', '-fPIC', '-idirafter$TERMUX_PREFIX/include', '-include', 'fcntl.h', '-include', 'unistd.h']
+          c_args = ['-D__TERMUX__', '-D__USE_GNU', '-U__ANDROID__', '-fPIC', '-idirafter$TERMUX_PREFIX/include', '-include', 'fcntl.h', '-include', 'unistd.h']
+          cpp_args = ['-D__TERMUX__', '-D__USE_GNU', '-U__ANDROID__', '-fPIC', '-idirafter$TERMUX_PREFIX/include', '-include', 'fcntl.h', '-include', 'unistd.h']
           c_link_args = ['-L$TERMUX_PREFIX/lib', '-Wl,-rpath=$RUNTIME_PATH/lib', '-landroid-shmem', '-latomic']
           cpp_link_args = ['-L$TERMUX_PREFIX/lib', '-Wl,-rpath=$RUNTIME_PATH/lib', '-landroid-shmem', '-latomic']
 
