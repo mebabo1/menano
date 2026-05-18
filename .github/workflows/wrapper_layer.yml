@@ -26,8 +26,6 @@ jobs:
             https://gitlab.freedesktop.org/Pipetto-crypto/mesa.git \
             mesa-src
 
-          # sed -i 's/syscall(SYS_memfd_create,/memfd_create(/g' mesa-src/src/util/anon_file.c
-
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
@@ -104,8 +102,8 @@ jobs:
           sysroot = '$SYSROOT'
 
           [built-in options]
-          c_args = ['-D__TERMUX__', '-D__USE_GNU', '-U__ANDROID__']
-          cpp_args = ['-D__TERMUX__', '-D__USE_GNU', '-U__ANDROID__']
+          c_args = ['-D__TERMUX__', '-D__USE_GNU', '-U__ANDROID__', '-fPIC', '-idirafter$TERMUX_PREFIX/include', '-include', 'fcntl.h', '-include', 'unistd.h']
+          cpp_args = ['-D__TERMUX__', '-D__USE_GNU', '-U__ANDROID__', '-fPIC', '-idirafter$TERMUX_PREFIX/include', '-include', 'fcntl.h', '-include', 'unistd.h']
           c_link_args = ['-L$TERMUX_PREFIX/lib', '-Wl,-rpath=$RUNTIME_PATH/lib', '-landroid-shmem']
           cpp_link_args = ['-L$TERMUX_PREFIX/lib', '-Wl,-rpath=$RUNTIME_PATH/lib', '-landroid-shmem']
 
@@ -128,7 +126,7 @@ jobs:
           
           export CFLAGS="-I$TERMUX_PREFIX/include -include fcntl.h -include unistd.h"
           export CXXFLAGS="-I$TERMUX_PREFIX/include -include fcntl.h -include unistd.h"
-          export LDFLAGS="-L$TERMUX_PREFIX/lib -Wl,-rpath=$RUNTIME_PATH/lib -landroid-shmem -latomic"
+          export LDFLAGS="-L$TERMUX_PREFIX/lib -Wl,-rpath=$RUNTIME_PATH/lib -landroid-shmem"
 
           meson setup build \
             --cross-file /tmp/android-cross.ini \
