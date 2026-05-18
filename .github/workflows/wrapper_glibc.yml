@@ -9,6 +9,7 @@ permissions:
 
 jobs:
   build-wrapper:
+    # ARM64 네이티브 가상 머신 사용 (aarch64 코드가 기본으로 컴파일됨)
     runs-on: ubuntu-24.04-arm
 
     steps:
@@ -27,66 +28,39 @@ jobs:
         with:
           python-version: "3.11"
 
-      # [교정 완료] 기존 소스 리스트를 amd64 전용으로 고정하고, arm64 전용 ports 서버를 명확하게 분리 등록합니다.
       - name: 安装系统依赖
         run: |
           sudo sed -i "s/^Types: deb$/Types: deb deb-src/" /etc/apt/sources.list.d/ubuntu.sources
           sudo apt update
           sudo apt install -y glslang-tools libxrandr-dev libxxf86vm-dev libxcb-shm0-dev libxcb-glx0-dev \
-              libxext-dev llvm-19 libx11-dev libx11-xcb-dev libxcb1-dev libxcb-dri3-dev libxcb-present-dev \
+              libxext-dev llvm-19 libx11-dev libx11-cb-dev libxcb1-dev libxcb-dri3-dev libxcb-present-dev \
               libxcb-randr0-dev libxcb-sync-dev libxcb-xfixes0-dev libxshmfence-dev libdrm-dev \
-              libgbm-dev libegl1-mesa-dev libexpat1-dev libwayland-dev python3-pip \
-              python3-setuptools python3-wheel ninja-build
+              libgbm-dev libegl1-mesa-dev libexpat1-dev libwayland-dev ninja-build
 
+      # [교정 완료] sudo를 제거하여 setup-python(3.11) 환경 내부에 안전하게 빌드 도구를 격리 설치합니다.
       - name: 安装 Python 构建工具
         run: |
-          # 使用系统级的 pip 安装，避免用户级安装的路径问题
-          #sudo pip3 install --upgrade pip
-          sudo pip3 install meson mako
+          python -m pip install --upgrade pip
+          python -m pip install meson mako
         
-          # 验证安装
+          # 验证 설치 상태 확인
           echo "检查安装的 meson 版本:"
           meson --version
           python3 -c "import mesonbuild; print('mesonbuild 模块路径:', mesonbuild.__file__)"
-        
-          # 设置环境变量，确保能找到所有工具
-          echo "$HOME/.local/bin" >> $GITHUB_PATH
 
-      - name: Create Linux glibc Cross File
-        run: |
-          cat > /tmp/linux-cross.ini << 'EOF'
-          [host_machine]
-          system = 'linux'
-          cpu_family = 'aarch64'
-          cpu = 'aarch64'
-          endian = 'little'
+      # [네이티브 최적화] 호스트가 이미 ARM64이므로 크로스 파일 생성 스텝은 통째로 생략합니다.
 
-          [binaries]
-          c = 'aarch64-linux-gnu-gcc'
-          cpp = 'aarch64-linux-gnu-g++'
-          ar = 'aarch64-linux-gnu-ar'
-          strip = 'aarch64-linux-gnu-strip'
-          pkgconfig = 'pkg-config'
-
-          [built-in options]
-          c_args = ['-fPIC']
-          cpp_args = ['-fPIC']
-          c_link_args = []
-          cpp_link_args = []
-
-          [env]
-          PKG_CONFIG_PATH = '/usr/lib/aarch64-linux-gnu/pkgconfig:/usr/share/pkgconfig'
-          PKG_CONFIG_LIBDIR = '/usr/lib/aarch64-linux-gnu/pkgconfig'
-          EOF
-
-      # [변경] 복잡한 안드로이드 패스 버퍼(LDFLAGS 등)를 제거하고 
-      # termux-glibc 표준 경로 prefix를 선언합니다.
+      # [변경] 크로스 파일 설정을 빼고 순수하게 Meson에게 환경변수 아키텍처 인자를 넘겨 빌드를 구성합니다.
       - name: Configure Mesa
         run: |
           cd mesa-src
 
+          # 컴파일러가 PIC(위치 독립 코드)를 사용하도록 표준 환경변수 주입
+          export CFLAGS="-fPIC"
+          export CXXFLAGS="-fPIC"
+
+          # --cross-file 인자를 제거하여 네이티브 ARM64 컴파일을 유도합니다.
           meson setup build \
-            --cross-file /tmp/linux-cross.ini \
             -Dcpp_rtti=false \
             -Dopengl=false \
             -Dgbm=disabled \
