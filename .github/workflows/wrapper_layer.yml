@@ -78,6 +78,7 @@ jobs:
           
           echo "TERMUX_PREFIX=$HOME/termuxfs/aarch64/data/data/com.termux/files/usr" >> $GITHUB_ENV
           echo "TERMUX_SYSROOT=$HOME/termuxfs/aarch64" >> $GITHUB_ENV
+          echo "RUNTIME_PATH="/data/data/com.termux/files/usr"" >> $GITHUB_ENV
 
       - name: Create Android Cross File
         run: |
@@ -106,8 +107,8 @@ jobs:
           [built-in options]
           c_args = ['-D__TERMUX__', '-D__USE_GNU', '-fPIC', '-idirafter$TERMUX_PREFIX/include', '-include', 'fcntl.h', '-include', 'unistd.h']
           cpp_args = ['-D__TERMUX__', '-D__USE_GNU', '-fPIC', '-idirafter$TERMUX_PREFIX/include', '-include', 'fcntl.h', '-include', 'unistd.h']
-          c_link_args = ['-L$TERMUX_PREFIX/lib', '-latomic']
-          cpp_link_args = ['-L$TERMUX_PREFIX/lib', '-latomic']
+          c_link_args = ['-L$TERMUX_PREFIX/lib', '-landroid-shmem', '-latomic']
+          cpp_link_args = ['-L$TERMUX_PREFIX/lib', '-landroid-shmem', '-latomic']
 
           [env]
           PKG_CONFIG_PATH = '$TERMUX_PREFIX/lib/pkgconfig:$TERMUX_PREFIX/share/pkgconfig'
@@ -129,7 +130,7 @@ jobs:
           
           export CFLAGS="$TERMUX_PREFIX/include -include fcntl.h -include unistd.h"
           export CXXFLAGS="$TERMUX_PREFIX/include -include fcntl.h -include unistd.h"
-          export LDFLAGS="-L$TERMUX_PREFIX/lib -Wl,-rpath=$RUNTIME_PATH/lib -landroid-shmem -latomic"
+          export LDFLAGS="-L$TERMUX_PREFIX/include -Wl,-rpath=$RUNTIME_PATH/lib -landroid-shmem -latomic"
 
           meson setup build \
             --cross-file /tmp/android-cross.ini \
