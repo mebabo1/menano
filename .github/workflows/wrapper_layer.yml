@@ -12,7 +12,7 @@ jobs:
     runs-on: ubuntu-22.04
 
     env:
-      ANDROID_NDK_VERSION: r26b
+      ANDROID_NDK_VERSION: r27
       API_LEVEL: 30
 
     steps:
@@ -25,10 +25,6 @@ jobs:
             --branch wrapper-25 \
             https://gitlab.freedesktop.org/Pipetto-crypto/mesa.git \
             mesa-src
-
-          TARGET_FILE="mesa-src/src/vulkan/wrapper/wrapper_instance.c"
-          
-          sed -i 's|/system/lib64/libvulkan.so|/data/data/com.termux/files/usr/lib/libvulkan.so|g' "$TARGET_FILE"
           
       - name: Setup Python
         uses: actions/setup-python@v5
