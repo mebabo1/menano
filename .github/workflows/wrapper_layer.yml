@@ -150,7 +150,7 @@ jobs:
             -Dzstd=disabled \
             -Dvideo-codecs= \
             -Dbuildtype=release \
-            --prefix=/usr
+            --prefix=/data/data/com.termux/files/usr
 
       - name: Build
         run: |
