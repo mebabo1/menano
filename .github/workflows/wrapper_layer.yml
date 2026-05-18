@@ -89,7 +89,7 @@ jobs:
           [host_machine]
           system = 'android'
           cpu_family = 'aarch64'
-          cpu = 'armv8'
+          cpu = 'aarch64'
           endian = 'little'
 
           [binaries]
@@ -127,8 +127,8 @@ jobs:
           export X_CFLAGS="-I$TERMUX_PREFIX/include"
           export X_LIBS="-L$TERMUX_PREFIX/lib -landroid-shmem"
           
-          export CFLAGS="-march=armv8-a -idirafter $TERMUX_PREFIX/include -include fcntl.h -include unistd.h"
-          export CXXFLAGS="-march=armv8-a -idirafter $TERMUX_PREFIX/include -include fcntl.h -include unistd.h"
+          export CFLAGS="$TERMUX_PREFIX/include -include fcntl.h -include unistd.h"
+          export CXXFLAGS="$TERMUX_PREFIX/include -include fcntl.h -include unistd.h"
           export LDFLAGS="-L$TERMUX_PREFIX/lib -Wl,-rpath=$RUNTIME_PATH/lib -landroid-shmem -latomic"
 
           meson setup build \
