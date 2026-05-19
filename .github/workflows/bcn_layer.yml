@@ -19,22 +19,21 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup Vulkan SDK
-        uses: humbletim/setup-vulkan-sdk@v1
-        with:
-          vulkan-query-version: 1.3.290.0
-          vulkan-components: shaderc
-          vulkan-use-cache: true
-
       - name: Clone bcn_layer
         run: |
           git clone --depth 1 https://github.com/Pipetto-crypto/bcn_layer.git layer-src
 
-      # 호스트용 빌드 도구 설치 (쉐이더 컴파일용 glslc 및 xxd 포함)
+      # [수정 사항] 말썽을 부리던 외부 액션을 삭제하고, 공식 레포지토리 등록 방식으로 변경
       - name: Install Host Dependencies
         run: |
+          # 1. LunarG 공식 Vulkan 레포지토리 서명 키 및 소스 리스트 등록 (Ubuntu 22.04 jammy용)
+          wget -qO- https://packages.lunarg.com/lunarg-signing-key-pub.asc | sudo tee /etc/apt/trusted.gpg.d/lunarg.asc
+          sudo wget -qO /etc/apt/sources.list.d/lunarg-vulkan-jammy.list http://packages.lunarg.com/vulkan/lunarg-vulkan-jammy.list
+          
           sudo apt update
-          sudo apt install -y git wget unzip pkg-config make glslang-tools xxd
+          
+          # 2. glslc가 포함된 정식 vulkan-sdk와 필수 도구들 한번에 설치
+          sudo apt install -y git wget unzip pkg-config make xxd vulkan-sdk
 
       # 크로스 컴파일러로 사용할 Android NDK 다운로드
       - name: Download Android NDK
@@ -55,7 +54,7 @@ jobs:
           # 다음 스텝에서 참조할 환경변수 등록
           echo "TERMUX_PREFIX=$HOME/termuxfs/aarch64/data/data/com.termux/files/usr" >> $GITHUB_ENV
 
-      # [핵심] Makefile의 인자들을 대치하여 Android NDK 컴파일러와 Termux 라이브러리를 바인딩합니다.
+      # Makefile의 인자들을 대치하여 Android NDK 컴파일러와 Termux 라이브러리를 바인딩합니다.
       - name: Build Layer Via Make Overrides
         run: |
           cd layer-src
@@ -63,7 +62,7 @@ jobs:
           NDK_ROOT=$ANDROID_NDK/toolchains/llvm/prebuilt/linux-x86_64
           TOOLCHAIN=$NDK_ROOT/bin
           
-          # 1. 쉐이더 빌드 및 헤더 생성 (호스트 도구 사용)
+          # 1. 쉐이더 빌드 및 헤더 생성 (공식 리포지토리에서 받은 glslc 도구 사용)
           make src/s3tc_spv.h src/s3tc_iv_spv.h src/rgtc_spv.h src/rgtc_iv_spv.h src/bc6_spv.h src/bc6_iv_spv.h src/bc7_spv.h src/bc7_iv_spv.h
 
           # 2. 오버라이드 인자를 주입하여 Termux용 .so 파일 컴파일
