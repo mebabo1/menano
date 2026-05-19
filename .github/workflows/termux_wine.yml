@@ -473,21 +473,6 @@ jobs:
               echo "✔ wine.inf integrated patch applied."
           fi
 
-          # 8. Vulkan VRAM Faking 적용
-          FILE="dlls/winevulkan/vulkan.c"
-          if [ -f "$FILE" ] && ! grep -q 'WINE_VRAM_SIZE' "$FILE" ; then
-            echo "Applying VRAM faking to winevulkan..."
-            sed -i '/p_vkGetPhysicalDeviceMemoryProperties(host_physical_device, \&object->memory_properties);/a \
-              { \
-                  const char *v = getenv("WINE_VRAM_SIZE"); \
-                  uint64_t s = v ? (uint64_t)atoll(v)*1024*1024 : (uint64_t)2048*1024*1024; \
-                  uint32_t k; \
-                  for (k=0; k<object->memory_properties.memoryHeapCount; k++) \
-                      if (object->memory_properties.memoryHeaps[k].flags \& VK_MEMORY_HEAP_DEVICE_LOCAL_BIT) \
-                          object->memory_properties.memoryHeaps[k].size = s; \
-              }' "$FILE"
-          fi
-
           FILE_PULSE_MK="dlls/winepulse.drv/Makefile.in"
           if [ -f "$FILE_PULSE_MK" ]; then
             echo "Adding -lpulse to $FILE_PULSE_MK..."
@@ -511,7 +496,7 @@ jobs:
 
           export PATCH_BASE="https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/path"
 
-          PATCH_FILES="1.patch 2.patch 3.patch 4.patch 5.patch 6.patch 7.patch 8.patch"
+          PATCH_FILES="1.patch 2.patch 3.patch 4.patch 5.patch 6.patch 7.patch 8.patch 9.patch"
           echo "Applying external patches from $PATCH_BASE..."
           for FILE in $PATCH_FILES; do
             URL="${PATCH_BASE}/${FILE}"
@@ -589,27 +574,23 @@ jobs:
             --enable-archs=arm64ec,aarch64,i386 \
             --with-wine-tools=/opt/wine64-native \
             --enable-wineandroid_drv=no \
-            --enable-win64 \
             --disable-win16 \
-            --disable-tests \
             --with-vulkan \
-            --with-gstreamer \
             --enable-nls \
-            --without-pulse \
+            --with-pulse \
+            --disable-win16 \
+            --with-gstreamer \
+            --with-pthread \
             --without-ffmpeg \
-            --disable-winemenubuilder \
-            --disable-amd_ags_x64 \
-            --without-osmesa \
             --disable-opencl \
-            --without-capi \
-            --without-coreaudio \
+            --disable-tests \
+            --disable-winemenubuilder \
             --without-cups \
             --without-dbus \
             --without-gphoto \
             --without-gssapi \
             --without-krb5 \
             --without-alsa \
-            --without-netapi \
             --without-oss \
             --without-pcap \
             --without-pcsclite \
@@ -618,7 +599,7 @@ jobs:
             --without-usb \
             --without-v4l2 \
             --without-wayland \
-            --without-xinerama \
+            --without-inotify \
             --with-xshm \
             --without-xxf86vm
             
