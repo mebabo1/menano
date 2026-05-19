@@ -1,0 +1,86 @@
+name: Build bcn_layer for Termux aarch64
+
+on:
+  push:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-layer:
+    runs-on: ubuntu-22.04
+
+    env:
+      ANDROID_NDK_VERSION: r26b
+      API_LEVEL: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # Pipetto의 bcn_layer 소스 코드 클론
+      - name: Clone bcn_layer
+        run: |
+          git clone --depth 1 https://github.com/Pipetto-crypto/bcn_layer.git layer-src
+
+      # 호스트용 빌드 도구 설치 (쉐이더 컴파일용 glslc 및 xxd 포함)
+      - name: Install Host Dependencies
+        run: |
+          sudo apt update
+          sudo apt install -y git wget unzip pkg-config make glslang-tools xxd
+
+      # 크로스 컴파일러로 사용할 Android NDK 다운로드
+      - name: Download Android NDK
+        run: |
+          cd /tmp
+          wget -q https://dl.google.com/android/repository/android-ndk-${ANDROID_NDK_VERSION}-linux.zip
+          unzip -q android-ndk-${ANDROID_NDK_VERSION}-linux.zip
+          echo "ANDROID_NDK=/tmp/android-ndk-${ANDROID_NDK_VERSION}" >> $GITHUB_ENV
+
+      # 질문자님의 혜안인 termuxfs sysroot 주입 스텝
+      - name: Download and extract termuxfs for aarch64
+        run: |
+          mkdir -p $HOME/termuxfs/aarch64
+          cd $HOME/termuxfs/aarch64
+          wget -q https://github.com/ziad9267/termux-on-gha/releases/download/test/termuxfs.tar
+          tar -xf termuxfs.tar
+          
+          # 다음 스텝에서 참조할 환경변수 등록
+          echo "TERMUX_PREFIX=$HOME/termuxfs/aarch64/data/data/com.termux/files/usr" >> $GITHUB_ENV
+
+      # [핵심] Makefile의 인자들을 대치하여 Android NDK 컴파일러와 Termux 라이브러리를 바인딩합니다.
+      - name: Build Layer Via Make Overrides
+        run: |
+          cd layer-src
+          
+          NDK_ROOT=$ANDROID_NDK/toolchains/llvm/prebuilt/linux-x86_64
+          TOOLCHAIN=$NDK_ROOT/bin
+          
+          # 1. 쉐이더 빌드 및 헤더 생성 (호스트 도구 사용)
+          make src/s3tc_spv.h src/s3tc_iv_spv.h src/rgtc_spv.h src/rgtc_iv_spv.h src/bc6_spv.h src/bc6_iv_spv.h src/bc7_spv.h src/bc7_iv_spv.h
+
+          # 2. 오버라이드 인자를 주입하여 Termux용 .so 파일 컴파일
+          make \
+            CXX="$TOOLCHAIN/aarch64-linux-android${API_LEVEL}-clang++" \
+            CXXFLAGS="-std=c++17 -fPIC --target=aarch64-linux-android30 -D__TERMUX__ -D__USE_GNU -U__ANDROID__ -idirafter$TERMUX_PREFIX/include -include fcntl.h -include unistd.h" \
+            LDFLAGS="-shared --target=aarch64-linux-android30 -L$TERMUX_PREFIX/lib -landroid-shmem"
+
+      # Termux 환경에 맞는 아티팩트 패키징 및 JSON 경로 수정
+      - name: Packaging and Patching JSON
+        run: |
+          cd layer-src
+          mkdir -p output/vulkan/implicit_layer.d
+          
+          # 컴파일된 레이어 .so 복사
+          cp libbcn_layer.so output/
+          
+          # Vulkan 로더가 인식할 수 있도록 JSON 내부의 library_path를 Termux 절대 경로로 치환
+          sed 's|"library_path": ".*"|"library_path": "/data/data/com.termux/files/usr/lib/libbcn_layer.so"|g' libbcn_layer.json > output/vulkan/implicit_layer.d/libbcn_layer.json
+
+      # 최종 결과물 업로드
+      - name: Upload Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: vulkan-bcn-layer
+          path: layer-src/output/
