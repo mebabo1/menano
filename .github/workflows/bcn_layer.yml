@@ -53,6 +53,7 @@ jobs:
           
           # 다음 스텝에서 참조할 환경변수 등록
           echo "TERMUX_PREFIX=$HOME/termuxfs/aarch64/data/data/com.termux/files/usr" >> $GITHUB_ENV
+          echo "RUNTIME_PATH="/data/data/com.termux/files/usr"" >> $GITHUB_ENV
 
       # Makefile의 인자들을 대치하여 Android NDK 컴파일러와 Termux 라이브러리를 바인딩합니다.
       - name: Build Layer Via Make Overrides
@@ -69,7 +70,7 @@ jobs:
           make \
             CXX="$TOOLCHAIN/aarch64-linux-android${API_LEVEL}-clang++" \
             CXXFLAGS="-std=c++17 -fPIC --target=aarch64-linux-android30 -D__TERMUX__ -D__USE_GNU -U__ANDROID__ -idirafter$TERMUX_PREFIX/include -include fcntl.h -include unistd.h" \
-            LDFLAGS="-shared --target=aarch64-linux-android30 -L$TERMUX_PREFIX/lib -landroid-shmem"
+            LDFLAGS="-shared --target=aarch64-linux-android30 -L$TERMUX_PREFIX/lib -Wl,-rpath=$RUNTIME_PATH/lib -landroid-shmem"
 
       # Termux 환경에 맞는 아티팩트 패키징 및 JSON 경로 수정
       - name: Packaging and Patching JSON
