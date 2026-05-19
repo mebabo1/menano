@@ -19,7 +19,13 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      # Pipetto의 bcn_layer 소스 코드 클론
+      - name: Setup Vulkan SDK
+        uses: humbletim/setup-vulkan-sdk@v1
+        with:
+          vulkan-query-version: 1.3.290.0
+          vulkan-components: shaderc
+          vulkan-use-cache: true
+
       - name: Clone bcn_layer
         run: |
           git clone --depth 1 https://github.com/Pipetto-crypto/bcn_layer.git layer-src
