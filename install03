@@ -1,5 +1,5 @@
 #!/bin/bash
-
+pkg install jq -y
 wget https://github.com/mebabo1/menano/releases/download/Box/bin.tar.gz  >/dev/null 2>&1
 tar xf bin.tar.gz
 rm -rf bin.tar.gz
