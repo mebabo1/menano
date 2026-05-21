@@ -131,7 +131,7 @@ jobs:
           meson setup build \
             --cross-file /tmp/android-cross.ini \
             -Dcpp_rtti=false \
-            -Dopengl=true \
+            -Dopengl=false \
             -Dgbm=disabled \
             -Dllvm=disabled \
             -Dshared-llvm=disabled \
