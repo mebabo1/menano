@@ -45,16 +45,24 @@ jobs:
           echo "TERMUX_PREFIX=$HOME/termuxfs/aarch64/data/data/com.termux/files/usr" >> $GITHUB_ENV
           echo "RUNTIME_PATH=/data/data/com.termux/files/usr" >> $GITHUB_ENV
 
-      # ⭐️ [새로 추가된 핵심 스텝] NDK 헤더 대신 Termux의 Mesa 그래픽 헤더를 바라보도록 격리 폴더 생성
-      - name: Setup Isolated Graphics Headers
+      # ⭐️ [핵심 해결책] Android NDK에서 누락된 EGL 1.5 핵심 함수 포인터 타입을 소스에 강제 주입합니다.
+      - name: Patch EGLWrapper Source Code
         run: |
-          mkdir -p /tmp/graphics-includes
-          # NDK에 없는 고성능 EGL/GLES 타입들을 Termux sysroot에서 강제로 링크 걸어옵니다.
-          ln -s $TERMUX_PREFIX/include/EGL /tmp/graphics-includes/EGL
-          ln -s $TERMUX_PREFIX/include/GLES /tmp/graphics-includes/GLES
-          ln -s $TERMUX_PREFIX/include/GLES2 /tmp/graphics-includes/GLES2
-          ln -s $TERMUX_PREFIX/include/GLES3 /tmp/graphics-includes/GLES3
-          ln -s $TERMUX_PREFIX/include/KHR /tmp/graphics-includes/KHR
+          cat << 'EOF' > /tmp/egl_patch.hpp
+          #pragma once
+          #include <EGL/egl.h>
+          #include <EGL/eglext.h>
+          
+          // Android NDK 환경에서 에러를 뿜던 미등록 함수 포인터 타입들 정의
+          typedef EGLContext (EGLAPIENTRYP PFNEGLGETCURRENTCONTEXTPROC) (void);
+          typedef EGLDisplay (EGLAPIENTRYP PFNEGLGETCURRENTDISPLAYPROC) (void);
+          typedef EGLSurface (EGLAPIENTRYP PFNEGLGETCURRENTSURFACEPROC) (EGLint readdraw);
+          typedef __eglMustCastToProperFunctionPointerType (EGLAPIENTRYP PFNEGLGETPROCADDRESSPROC) (const char *procname);
+          EOF
+          
+          # 기존 egl_table.hpp 파일 맨 위에 패치 헤더 코드를 합쳐서 덮어씁니다.
+          cat /tmp/egl_patch.hpp wrapper-src/src/egl_table.hpp > /tmp/patched.hpp
+          mv /tmp/patched.hpp wrapper-src/src/egl_table.hpp
 
       - name: Build Wrapper Via Make Overrides
         run: |
@@ -63,10 +71,10 @@ jobs:
           NDK_ROOT=$ANDROID_NDK/toolchains/llvm/prebuilt/linux-x86_64
           TOOLCHAIN=$NDK_ROOT/bin
           
-          # ⭐️ CXXFLAGS 맨 앞에 [-I/tmp/graphics-includes]를 추가하여 NDK의 불량 헤더를 덮어씁니다.
+          # CXXFLAGS에 -DEGL_EGLEXT_PROTOTYPES 플래그를 추가하여 확장 기능 프로토타입도 명시적으로 활성화합니다.
           make \
             CXX="$TOOLCHAIN/aarch64-linux-android${API_LEVEL}-clang++" \
-            CXXFLAGS="-std=c++17 -fPIC --target=aarch64-linux-android${API_LEVEL} -D__TERMUX__ -D__USE_GNU -U__ANDROID__ -I/tmp/graphics-includes -idirafter$TERMUX_PREFIX/include -include fcntl.h -include unistd.h" \
+            CXXFLAGS="-std=c++17 -fPIC --target=aarch64-linux-android${API_LEVEL} -D__TERMUX__ -D__USE_GNU -U__ANDROID__ -DEGL_EGLEXT_PROTOTYPES -idirafter$TERMUX_PREFIX/include -include fcntl.h -include unistd.h" \
             LDFLAGS="-shared --target=aarch64-linux-android${API_LEVEL} -nostdlib++ -L$TERMUX_PREFIX/lib -Wl,-rpath=/system/lib64:$RUNTIME_PATH/lib -landroid-shmem -lc++_shared -lxcb -lxcb-sync -lxcb-present -lxcb-dri3 -lX11 -lX11-xcb -landroid"
 
       - name: Packaging Clean Symlinks
