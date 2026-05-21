@@ -1,4 +1,4 @@
-name: Build bcn_layer for Termux aarch64
+name: Build EGLWrapper for Termux aarch64
 
 on:
   push:
@@ -8,7 +8,7 @@ permissions:
   contents: read
 
 jobs:
-  build-layer:
+  build-wrapper:
     runs-on: ubuntu-22.04
 
     env:
@@ -19,23 +19,18 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Clone bcn_layer
+      # 1. 깃허브에서 EGLWrapper 소스코드 클론
+      - name: Clone EGLWrapper
         run: |
-          git clone --depth 1 https://github.com/Pipetto-crypto/bcn_layer.git layer-src
+          git clone --depth 1 https://github.com/Pipetto-crypto/EGLWrapper.git wrapper-src
 
-      # [수정 사항] 말썽을 부리던 외부 액션을 삭제하고, 공식 레포지토리 등록 방식으로 변경
+      # 2. 호스트 환경에는 빌드에 필요한 최소한의 도구만 설치 (Vulkan SDK 제거로 속도 향상)
       - name: Install Host Dependencies
         run: |
-          # 1. LunarG 공식 Vulkan 레포지토리 서명 키 및 소스 리스트 등록 (Ubuntu 22.04 jammy용)
-          wget -qO- https://packages.lunarg.com/lunarg-signing-key-pub.asc | sudo tee /etc/apt/trusted.gpg.d/lunarg.asc
-          sudo wget -qO /etc/apt/sources.list.d/lunarg-vulkan-jammy.list http://packages.lunarg.com/vulkan/lunarg-vulkan-jammy.list
-          
           sudo apt update
-          
-          # 2. glslc가 포함된 정식 vulkan-sdk와 필수 도구들 한번에 설치
-          sudo apt install -y git wget unzip pkg-config make xxd vulkan-sdk
+          sudo apt install -y git wget unzip pkg-config make
 
-      # 크로스 컴파일러로 사용할 Android NDK 다운로드
+      # 3. 크로스 컴파일러로 사용할 Android NDK 다운로드
       - name: Download Android NDK
         run: |
           cd /tmp
@@ -43,7 +38,7 @@ jobs:
           unzip -q android-ndk-${ANDROID_NDK_VERSION}-linux.zip
           echo "ANDROID_NDK=/tmp/android-ndk-${ANDROID_NDK_VERSION}" >> $GITHUB_ENV
 
-      # 질문자님의 혜안인 termuxfs sysroot 주입 스텝
+      # 4. Termux용 X11/XCB 라이브러리가 포함된 sysroot 주입
       - name: Download and extract termuxfs for aarch64
         run: |
           mkdir -p $HOME/termuxfs/aarch64
@@ -51,42 +46,41 @@ jobs:
           wget -q https://github.com/ziad9267/termux-on-gha/releases/download/test/termuxfs.tar
           tar -xf termuxfs.tar
           
-          # 다음 스텝에서 참조할 환경변수 등록
           echo "TERMUX_PREFIX=$HOME/termuxfs/aarch64/data/data/com.termux/files/usr" >> $GITHUB_ENV
-          echo "RUNTIME_PATH="/data/data/com.termux/files/usr"" >> $GITHUB_ENV
+          echo "RUNTIME_PATH=/data/data/com.termux/files/usr" >> $GITHUB_ENV
 
-      # Makefile의 인자들을 대치하여 Android NDK 컴파일러와 Termux 라이브러리를 바인딩합니다.
-      - name: Build Layer Via Make Overrides
+      # 5. Makefile 인자 오버라이드를 통해 Termux 환경에 완벽 결합된 libEGL.so 컴파일
+      - name: Build Wrapper Via Make Overrides
         run: |
-          cd layer-src
+          cd wrapper-src
           
           NDK_ROOT=$ANDROID_NDK/toolchains/llvm/prebuilt/linux-x86_64
           TOOLCHAIN=$NDK_ROOT/bin
           
-          # 1. 쉐이더 빌드 및 헤더 생성 (공식 리포지토리에서 받은 glslc 도구 사용)
-          make src/s3tc_spv.h src/s3tc_iv_spv.h src/rgtc_spv.h src/rgtc_iv_spv.h src/bc6_spv.h src/bc6_iv_spv.h src/bc7_spv.h src/bc7_iv_spv.h
-
-          # 2. 오버라이드 인자를 주입하여 Termux용 .so 파일 컴파일
+          # 오리지널 Makefile의 변수들을 NDK 컴파일러와 하이브리드 링크 옵션으로 덮어씁니다.
           make \
             CXX="$TOOLCHAIN/aarch64-linux-android${API_LEVEL}-clang++" \
-            CXXFLAGS="-std=c++17 -fPIC --target=aarch64-linux-android30 -D__TERMUX__ -D__USE_GNU -U__ANDROID__ -idirafter$TERMUX_PREFIX/include -include fcntl.h -include unistd.h" \
-            LDFLAGS="-shared --target=aarch64-linux-android30 -L$TERMUX_PREFIX/lib -Wl,-rpath=$RUNTIME_PATH/lib -landroid-shmem"
+            CXXFLAGS="-std=c++17 -fPIC --target=aarch64-linux-android${API_LEVEL} -D__TERMUX__ -D__USE_GNU -U__ANDROID__ -idirafter$TERMUX_PREFIX/include -include fcntl.h -include unistd.h" \
+            LDFLAGS="-shared --target=aarch64-linux-android${API_LEVEL} -nostdlib++ -L$TERMUX_PREFIX/lib -Wl,-rpath=/system/lib64:$RUNTIME_PATH/lib -landroid-shmem -lc++_shared -lxcb -lxcb-sync -lxcb-present -lxcb-dri3 -lX11 -lX11-xcb -landroid"
 
-      # Termux 환경에 맞는 아티팩트 패키징 및 JSON 경로 수정
-      - name: Packaging and Patching JSON
+      # 6. 스마트폰(Termux) 환경에서 오작동하지 않도록 상대경로 심볼릭 링크 패키징
+      - name: Packaging Clean Symlinks
         run: |
-          cd layer-src
-          mkdir -p output/vulkan/implicit_layer.d
+          cd wrapper-src
+          mkdir -p output/lib
           
-          # 컴파일된 레이어 .so 복사
-          cp libbcn_layer.so output/
+          # 컴파일된 원본 바이너리 복사
+          cp libEGL.so.1.0.0 output/lib/
           
-          # Vulkan 로더가 인식할 수 있도록 JSON 내부의 library_path를 Termux 절대 경로로 치환
-          sed 's|"library_path": ".*"|"library_path": "/data/data/com.termux/files/usr/lib/libbcn_layer.so"|g' libbcn_layer.json > output/vulkan/implicit_layer.d/libbcn_layer.json
+          # 🚨 중요: Makefile 내부의 install은 호스트 PC 경로를 오염시키므로, 
+          # Termux 내에서 정상 작동할 수 있게 상대 경로로 심볼릭 링크를 수동 생성합니다.
+          cd output/lib
+          ln -sf libEGL.so.1.0.0 libEGL.so.1
+          ln -sf libEGL.so.1.0.0 libEGL.so
 
-      # 최종 결과물 업로드
+      # 7. 최종 결과물 업로드 (libEGL.so, libEGL.so.1, libEGL.so.1.0.0 포함)
       - name: Upload Artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: vulkan-bcn-layer
-          path: layer-src/output/
+          name: termux-egl-wrapper
+          path: wrapper-src/output/
