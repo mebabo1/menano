@@ -19,18 +19,15 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      # 1. 깃허브에서 EGLWrapper 소스코드 클론
       - name: Clone EGLWrapper
         run: |
           git clone --depth 1 https://github.com/Pipetto-crypto/EGLWrapper.git wrapper-src
 
-      # 2. 호스트 환경에는 빌드에 필요한 최소한의 도구만 설치 (Vulkan SDK 제거로 속도 향상)
       - name: Install Host Dependencies
         run: |
           sudo apt update
           sudo apt install -y git wget unzip pkg-config make
 
-      # 3. 크로스 컴파일러로 사용할 Android NDK 다운로드
       - name: Download Android NDK
         run: |
           cd /tmp
@@ -38,7 +35,6 @@ jobs:
           unzip -q android-ndk-${ANDROID_NDK_VERSION}-linux.zip
           echo "ANDROID_NDK=/tmp/android-ndk-${ANDROID_NDK_VERSION}" >> $GITHUB_ENV
 
-      # 4. Termux용 X11/XCB 라이브러리가 포함된 sysroot 주입
       - name: Download and extract termuxfs for aarch64
         run: |
           mkdir -p $HOME/termuxfs/aarch64
@@ -49,7 +45,17 @@ jobs:
           echo "TERMUX_PREFIX=$HOME/termuxfs/aarch64/data/data/com.termux/files/usr" >> $GITHUB_ENV
           echo "RUNTIME_PATH=/data/data/com.termux/files/usr" >> $GITHUB_ENV
 
-      # 5. Makefile 인자 오버라이드를 통해 Termux 환경에 완벽 결합된 libEGL.so 컴파일
+      # ⭐️ [새로 추가된 핵심 스텝] NDK 헤더 대신 Termux의 Mesa 그래픽 헤더를 바라보도록 격리 폴더 생성
+      - name: Setup Isolated Graphics Headers
+        run: |
+          mkdir -p /tmp/graphics-includes
+          # NDK에 없는 고성능 EGL/GLES 타입들을 Termux sysroot에서 강제로 링크 걸어옵니다.
+          ln -s $TERMUX_PREFIX/include/EGL /tmp/graphics-includes/EGL
+          ln -s $TERMUX_PREFIX/include/GLES /tmp/graphics-includes/GLES
+          ln -s $TERMUX_PREFIX/include/GLES2 /tmp/graphics-includes/GLES2
+          ln -s $TERMUX_PREFIX/include/GLES3 /tmp/graphics-includes/GLES3
+          ln -s $TERMUX_PREFIX/include/KHR /tmp/graphics-includes/KHR
+
       - name: Build Wrapper Via Make Overrides
         run: |
           cd wrapper-src
@@ -57,28 +63,22 @@ jobs:
           NDK_ROOT=$ANDROID_NDK/toolchains/llvm/prebuilt/linux-x86_64
           TOOLCHAIN=$NDK_ROOT/bin
           
-          # 오리지널 Makefile의 변수들을 NDK 컴파일러와 하이브리드 링크 옵션으로 덮어씁니다.
+          # ⭐️ CXXFLAGS 맨 앞에 [-I/tmp/graphics-includes]를 추가하여 NDK의 불량 헤더를 덮어씁니다.
           make \
             CXX="$TOOLCHAIN/aarch64-linux-android${API_LEVEL}-clang++" \
-            CXXFLAGS="-std=c++17 -fPIC --target=aarch64-linux-android${API_LEVEL} -D__TERMUX__ -D__USE_GNU -U__ANDROID__ -idirafter$TERMUX_PREFIX/include -include fcntl.h -include unistd.h" \
+            CXXFLAGS="-std=c++17 -fPIC --target=aarch64-linux-android${API_LEVEL} -D__TERMUX__ -D__USE_GNU -U__ANDROID__ -I/tmp/graphics-includes -idirafter$TERMUX_PREFIX/include -include fcntl.h -include unistd.h" \
             LDFLAGS="-shared --target=aarch64-linux-android${API_LEVEL} -nostdlib++ -L$TERMUX_PREFIX/lib -Wl,-rpath=/system/lib64:$RUNTIME_PATH/lib -landroid-shmem -lc++_shared -lxcb -lxcb-sync -lxcb-present -lxcb-dri3 -lX11 -lX11-xcb -landroid"
 
-      # 6. 스마트폰(Termux) 환경에서 오작동하지 않도록 상대경로 심볼릭 링크 패키징
       - name: Packaging Clean Symlinks
         run: |
           cd wrapper-src
           mkdir -p output/lib
-          
-          # 컴파일된 원본 바이너리 복사
           cp libEGL.so.1.0.0 output/lib/
           
-          # 🚨 중요: Makefile 내부의 install은 호스트 PC 경로를 오염시키므로, 
-          # Termux 내에서 정상 작동할 수 있게 상대 경로로 심볼릭 링크를 수동 생성합니다.
           cd output/lib
           ln -sf libEGL.so.1.0.0 libEGL.so.1
           ln -sf libEGL.so.1.0.0 libEGL.so
 
-      # 7. 최종 결과물 업로드 (libEGL.so, libEGL.so.1, libEGL.so.1.0.0 포함)
       - name: Upload Artifacts
         uses: actions/upload-artifact@v4
         with:
