@@ -139,15 +139,6 @@ jobs:
             -Dgallium-drivers= \
             -Dvulkan-drivers=wrapper \
             -Dplatforms=x11 \
-            -Degl=disabled \
-            -Dglx=disabled \
-            -Dgles1=disabled \
-            -Dgles2=disabled \
-            -Dglvnd=disabled \
-            -Dvulkan-layers= \
-            -Dlibunwind=disabled \
-            -Dlmsensors=disabled \
-            -Dvalgrind=disabled \
             --prefix=/data/data/com.termux/files/usr
 
       - name: Build
