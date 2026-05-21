@@ -139,6 +139,7 @@ jobs:
             -Dgallium-drivers= \
             -Dvulkan-drivers=wrapper \
             -Dplatforms=x11 \
+            -Dzstd=disabled \
             --prefix=/data/data/com.termux/files/usr
 
       - name: Build
