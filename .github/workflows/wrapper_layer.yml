@@ -145,9 +145,6 @@ jobs:
             -Dgles2=disabled \
             -Dglvnd=disabled \
             -Dvulkan-layers= \
-            -Dtools= \
-            -Dvideo-codecs= \
-            -Dtests=false \
             -Dlibunwind=disabled \
             -Dlmsensors=disabled \
             -Dvalgrind=disabled \
