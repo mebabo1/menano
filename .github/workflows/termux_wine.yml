@@ -242,20 +242,6 @@ jobs:
           find . -name "loader.c" -exec sed -i 's|"/tmp"|"/data/data/com.termux/files/usr/tmp"|g' {} + 2>/dev/null || true
           find . -name "server.c" -exec sed -i 's|"/tmp"|"/data/data/com.termux/files/usr/tmp"|g' {} + 2>/dev/null || true
 
-          FILE_LOADER="dlls/ntdll/loader.c"
-          if [ -f "$FILE_LOADER" ]; then
-            echo "Applying combined patches to loader.c..."
-            if grep -q 'ULONG buffer\[16\];' "$FILE_LOADER"; then
-              echo "  - Increasing loader buffer size to 32"
-              sed -i 's/ULONG buffer\[16\];/ULONG buffer\[32\];/g' "$FILE_LOADER"
-            fi
-            if grep -q 'base = (char \*)nt->OptionalHeader.ImageBase;' "$FILE_LOADER"; then
-              echo "  - Patching ImageBase logic for WOW64 (with UINT_PTR cast)"
-              sed -i 's/base = (char \*)nt->OptionalHeader.ImageBase;/if (nt->OptionalHeader.Magic == IMAGE_NT_OPTIONAL_HDR64_MAGIC) base = (char *)((const IMAGE_NT_HEADERS64 *)nt)->OptionalHeader.ImageBase; else base = (char *)(UINT_PTR)((const IMAGE_NT_HEADERS32 *)nt)->OptionalHeader.ImageBase;/g' "$FILE_LOADER"
-            fi                      
-            echo "✔ All loader.c patches applied."
-          fi
-
           FILE_LOADER="dlls/ntdll/unix/loader.c"
           if [ -f "$FILE_LOADER" ]; then
             echo "Removing M_PERTURB calls from $FILE_LOADER..."
@@ -277,20 +263,6 @@ jobs:
               echo "✔ wine.inf integrated patch applied."
           fi
 
-          FILE_PULSE_MK="dlls/winepulse.drv/Makefile.in"
-          if [ -f "$FILE_PULSE_MK" ]; then
-            echo "Adding -lpulse to $FILE_PULSE_MK..."
-            sed -i 's/UNIX_LIBS    = $(PULSE_LIBS) $(PTHREAD_LIBS) -lm/UNIX_LIBS    = $(PULSE_LIBS) $(PTHREAD_LIBS) -lm -lpulse/' "$FILE_PULSE_MK"
-          fi
-
-          # 2. winex11.drv Makefile 패치
-          FILE_X11_MK="dlls/winex11.drv/Makefile.in"
-          if [ -f "$FILE_X11_MK" ]; then
-            echo "Adding -landroid-shmem to $FILE_X11_MK..."
-            # 기존 라인 뒤에 -landroid-shmem 추가
-            sed -i 's/$(PTHREAD_LIBS) -lm/$(PTHREAD_LIBS) -lm -landroid-shmem/' "$FILE_X11_MK"
-          fi
-
           find . -type f \( -name "*.c" -o -name "*.h" \) \
             -exec sed -i 's/xtajit64\.dll/libarm64ecfex.dll/g' {} +
           find . -type f \( -name "*.c" -o -name "*.h" \) \
@@ -300,7 +272,7 @@ jobs:
 
           export PATCH_BASE="https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/path"
 
-          PATCH_FILES="1.patch 2.patch"
+          PATCH_FILES="2.patch"
           echo "Applying external patches from $PATCH_BASE..."
           for FILE in $PATCH_FILES; do
             URL="${PATCH_BASE}/${FILE}"
