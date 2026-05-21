@@ -242,57 +242,6 @@ jobs:
           find . -name "loader.c" -exec sed -i 's|"/tmp"|"/data/data/com.termux/files/usr/tmp"|g' {} + 2>/dev/null || true
           find . -name "server.c" -exec sed -i 's|"/tmp"|"/data/data/com.termux/files/usr/tmp"|g' {} + 2>/dev/null || true
 
-          FILE="dlls/atiadlxx/atiadlxx_main.c"
-          if [ -f "$FILE" ]; then
-            if grep -q 'InterlockedOr(&dummy, 0)' "$FILE"; then
-              sed -i 's/LONG dummy/long dummy/g' "$FILE"
-              sed -i 's|InterlockedOr(&dummy, 0)|_InterlockedOr((long volatile *)\&dummy, 0)|g' "$FILE"
-              echo "✔ InterlockedOr patched with explicit casting"
-            else
-              echo "✔ InterlockedOr already patched or not found"
-            fi
-          fi
-
-          FILE3="dlls/wdscore/wdscore.spec"
-          if [ -f "$FILE3" ]; then
-            if grep -q '@ stub' "$FILE3"; then
-              echo "Cleaning wdscore.spec stubs..."
-              sed -i '/CDynamicArray/d' "$FILE3"
-              echo "✔ wdscore stubs cleaned"
-            else
-              echo "✔ wdscore already cleaned or not found"
-            fi
-          fi
-
-          FILE="dlls/ntdll/unix/virtual.c"
-          if [ -f "$FILE" ]; then
-            if grep -q 'unsigned int vprot, sec_flags;' "$FILE"; then
-              echo "Fixing uninitialized vprot in virtual.c..."
-              sed -i 's/unsigned int vprot, sec_flags;/unsigned int vprot = 0, sec_flags = 0;/g' "$FILE"
-            fi
-            if grep -q '0x7fffffff0000' "$FILE"; then
-              echo "Patching address_space_limit in virtual.c..."
-              sed -i 's/_limit.*0x7fffffff0000/_limit = (void *)0x7fffff0000/g' "$FILE"
-            fi
-            if grep -q 'use_kernel_writewatch = 1;' "$FILE"; then
-              echo "Disabling kernel writewatch for Android compatibility..."
-              sed -i 's/use_kernel_writewatch = 1;/use_kernel_writewatch = 0;/g' "$FILE"
-            fi
-          fi
-
-          FILE_VIRTUAL="dlls/ntdll/unix/virtual.c"
-          if [ -f "$FILE_VIRTUAL" ]; then
-            echo "Patching shm_open for Termux with safe delimiters..."
-            sed -i "s@fd = shm_open( buf, oflag, S_IRWXU | S_IRWXG | S_IRWXO );@char shm_p[256]; snprintf(shm_p, 256, \"/data/data/com.termux/files/usr/tmp/wine_shm_%s\", buf); fd = open(shm_p, oflag, S_IRWXU | S_IRWXG | S_IRWXO);@g" "$FILE_VIRTUAL"
-          fi
-
-          FILE_VIRTUAL="dlls/ntdll/unix/virtual.c"
-          if [ -f "$FILE_VIRTUAL" ]; then
-            echo "Patching $FILE_VIRTUAL: Completely neutralizing userfaultfd..."
-            sed -i 's/uffd_fd = syscall( __NR_userfaultfd/uffd_fd = -1; \/\/ syscall( __NR_userfaultfd/g' "$FILE_VIRTUAL"
-            sed -i '/static void kernel_writewatch_init(void)/{n;s/^{/{\n    return;/}' "$FILE_VIRTUAL"
-          fi
-
           FILE_LOADER="dlls/ntdll/loader.c"
           if [ -f "$FILE_LOADER" ]; then
             echo "Applying combined patches to loader.c..."
