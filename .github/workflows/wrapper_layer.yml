@@ -105,7 +105,7 @@ jobs:
           c_args = ['-fPIC', '-idirafter$TERMUX_PREFIX/include', '-include', 'fcntl.h', '-include', 'unistd.h']
           cpp_args = ['-fPIC', '-idirafter$TERMUX_PREFIX/include', '-include', 'fcntl.h', '-include', 'unistd.h']
           c_link_args = ['--target=aarch64-linux-android30', '-L$TERMUX_PREFIX/lib', '-Wl,-rpath=/system/lib64:$RUNTIME_PATH/lib', '-Wl,--no-as-needed', '-lEGL', '-landroid-shmem']
-          cpp_link_args = ['--target=aarch64-linux-android30', '-L$TERMUX_PREFIX/lib', '-Wl,-rpath=/system/lib64:$RUNTIME_PATH/lib', '-Wl,--no-as-needed', '-lEGL', '-landroid-shmem']
+          cpp_link_args = ['--target=aarch64-linux-android30', '-L$TERMUX_PREFIX/lib', '-Wl,-rpath=/system/lib64:$RUNTIME_PATH/lib', '-Wl,--no-as-needed', '-lEGL', '-landroid-shmem', '-static-libstdc++']
 
           [env]
           PKG_CONFIG_PATH = '$TERMUX_PREFIX/lib/pkgconfig:$TERMUX_PREFIX/share/pkgconfig'
@@ -126,7 +126,7 @@ jobs:
           
           export CFLAGS="-I$TERMUX_PREFIX/include -include fcntl.h -include unistd.h"
           export CXXFLAGS="-I$TERMUX_PREFIX/include -include fcntl.h -include unistd.h"
-          export LDFLAGS="-L$TERMUX_PREFIX/lib -Wl,-rpath=$RUNTIME_PATH/lib -landroid-shmem"
+          export LDFLAGS="-L$TERMUX_PREFIX/lib -Wl,-rpath=$RUNTIME_PATH/lib -landroid-shmem -static-libstdc++"
 
           meson setup build \
             --cross-file /tmp/android-cross.ini \
@@ -139,7 +139,6 @@ jobs:
             -Dgallium-drivers= \
             -Dvulkan-drivers=wrapper \
             -Dplatforms=x11 \
-            -Dzstd=disabled \
             --prefix=/data/data/com.termux/files/usr
 
       - name: Build
