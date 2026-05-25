@@ -317,6 +317,7 @@ jobs:
             --without-wayland \
             --without-inotify \
             --with-xshm \
+            --with-vkd3d \
             --without-xxf86vm
             
           make -j$(nproc) > /dev/null
