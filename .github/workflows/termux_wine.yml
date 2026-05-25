@@ -393,6 +393,9 @@ jobs:
             --without-wayland \
             --without-inotify \
             --with-xshm \
+            --with-vkd3d \
+            --with-xinput \
+            --with-xinput2 \
             --without-xxf86vm
             
           make -j$(nproc) > build.log 2>&1 || (tail -n 100 build.log && exit 1)
