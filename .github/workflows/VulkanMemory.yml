@@ -18,10 +18,12 @@ jobs:
     - name: Install Build Tools & ARM64 Cross-Compiler
       run: |
         sudo apt-get update
-        sudo apt-get install -y cmake ninja-build gcc-aarch64-linux-gnu g++-aarch64-linux-gnu vulkan-headers libvulkan-dev
+        # vulkan-headers 제거하고 libvulkan-dev만 설치
+        sudo apt-get install -y cmake ninja-build gcc-aarch64-linux-gnu g++-aarch64-linux-gnu libvulkan-dev
 
     - name: Termux glibc path patches
       run: |
+        # /tmp 경로를 Termux glibc 내부 임시 폴더 경로로 일치화
         find . -type f \( -name "*.cpp" -o -name "*.hpp" -o -name "*.in" -o -name "*.spec" \) -exec grep -l "/tmp" {} \; 2>/dev/null | xargs sed -i 's|/tmp/|/data/data/com.termux/files/usr/tmp/|g' 2>/dev/null || true
   
     - name: Configure lsfg-vk for Termux glibc
