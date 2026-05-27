@@ -1,4 +1,4 @@
-name: Build lsfg-vk ARM64 (Termux glibc)
+name: Build lsfg-vk ARM64 (Termux glibc - Specific Commit)
 
 on:
   workflow_dispatch:
@@ -10,15 +10,14 @@ jobs:
     - name: Checkout lsfg-vk repository
       uses: actions/checkout@v4
       with:
-        repository: PancakeTAS/lsfg-vk
-        ref: develop
+        repository: PancakeTAS/lsfg-vk.
+        ref: ff1a0f72a7d6d08b84d58b7b4dc5f05c9f904f98
         fetch-depth: 0
         submodules: recursive
 
     - name: Install Build Tools & ARM64 Cross-Compiler
       run: |
         sudo apt-get update
-        # vulkan-headers 제거하고 libvulkan-dev만 설치
         sudo apt-get install -y cmake ninja-build gcc-aarch64-linux-gnu g++-aarch64-linux-gnu libvulkan-dev
 
     - name: Termux glibc path patches
@@ -42,6 +41,8 @@ jobs:
           -DLSFGVK_BUILD_CLI=OFF \
           -DLSFGVK_INSTALL_XDG_FILES=OFF \
           -DLSFGVK_LAYER_LIBRARY_PATH="/data/data/com.termux/files/usr/glibc/lib/liblsfg-vk-layer.so" \
+          -DCMAKE_SHARED_LINKER_FLAGS="-Wl,--allow-shlib-undefined -Wl,-rpath,/data/data/com.termux/files/usr/glibc/lib" \
+          -DCMAKE_EXE_LINKER_FLAGS="-Wl,--allow-shlib-undefined -Wl,-rpath,/data/data/com.termux/files/usr/glibc/lib"
 
     - name: Build
       run: cmake --build build --parallel $(nproc)
