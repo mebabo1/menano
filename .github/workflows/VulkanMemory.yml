@@ -18,7 +18,7 @@ jobs:
     - name: Install Build Tools & ARM64 Cross-Compiler
       run: |
         sudo apt-get update
-        sudo apt-get install -y cmake ninja-build gcc-aarch64-linux-gnu g++-aarch64-linux-gnu vulkan-headers
+        sudo apt-get install -y cmake ninja-build gcc-aarch64-linux-gnu g++-aarch64-linux-gnu vulkan-headers libvulkan-dev
 
     - name: Termux glibc path patches
       run: |
