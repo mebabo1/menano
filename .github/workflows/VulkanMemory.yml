@@ -11,7 +11,7 @@ jobs:
       uses: actions/checkout@v4
       with:
         repository: PancakeTAS/lsfg-vk
-        ref: ff1a0f72a7d6d08b84d58b7b4dc5f05c9f904f98
+        ref: develop
         fetch-depth: 0
         submodules: recursive
 
