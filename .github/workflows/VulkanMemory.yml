@@ -11,7 +11,7 @@ jobs:
       uses: actions/checkout@v4
       with:
         repository: PancakeTAS/lsfg-vk
-        ref: develop
+        ref: ff1a0f72a7d6d08b84d58b7b4dc5f05c9f904f98
         fetch-depth: 0
         submodules: recursive
 
@@ -34,16 +34,12 @@ jobs:
           -DCMAKE_C_COMPILER=aarch64-linux-gnu-gcc \
           -DCMAKE_CXX_COMPILER=aarch64-linux-gnu-g++ \
           -DCMAKE_BUILD_TYPE=Release \
-          -DCMAKE_CXX_STANDARD=20 \
-          -DCMAKE_CXX_STANDARD_REQUIRED=ON \
           -DCMAKE_INSTALL_PREFIX=./target \
           -DLSFGVK_BUILD_VK_LAYER=ON \
           -DLSFGVK_BUILD_UI=OFF \
           -DLSFGVK_BUILD_CLI=OFF \
           -DLSFGVK_INSTALL_XDG_FILES=OFF \
           -DLSFGVK_LAYER_LIBRARY_PATH="/data/data/com.termux/files/usr/glibc/lib/liblsfg-vk-layer.so" \
-          -DCMAKE_SHARED_LINKER_FLAGS="-Wl,--allow-shlib-undefined -Wl,-rpath,/data/data/com.termux/files/usr/glibc/lib" \
-          -DCMAKE_EXE_LINKER_FLAGS="-Wl,--allow-shlib-undefined -Wl,-rpath,/data/data/com.termux/files/usr/glibc/lib"
 
     - name: Build
       run: cmake --build build --parallel $(nproc)
