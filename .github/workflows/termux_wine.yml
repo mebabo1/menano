@@ -251,7 +251,7 @@ jobs:
           find . -name "loader.c" -exec sed -i 's|"/tmp"|"/data/data/com.termux/files/usr/tmp"|g' {} + 2>/dev/null || true
           find . -name "server.c" -exec sed -i 's|"/tmp"|"/data/data/com.termux/files/usr/tmp"|g' {} + 2>/dev/null || true
 
-          sed -i '1s/^/#include "esync.h"\n/' dlls/ntdll/unix/server.c
+          sed -i '/#include "config.h"/a #include "esync.h"' dlls/ntdll/unix/server.c
 
           FILE_LOADER="dlls/ntdll/unix/loader.c"
           if [ -f "$FILE_LOADER" ]; then
