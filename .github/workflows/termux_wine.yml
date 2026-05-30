@@ -338,25 +338,18 @@ jobs:
           echo "--------------------------------------------"
           echo "✔ All patch processes completed"
 
-          sed -i 's/ESYNC_/FSYNC_/g' dlls/ntdll/unix/esync.c
-          sed -i 's/enum esync_type/enum fsync_type/g' dlls/ntdll/unix/esync.c
-          sed -i 's/sync_shm_idx/fsync_shm_idx/g' dlls/ntdll/unix/fsync.c
-          sed -i 's/sync_shm_idx/fsync_shm_idx/g' dlls/ntdll/unix/esync.c
-          sed -i 's/ESYNC_USED_BY_SERVER/FSYNC_USED_BY_SERVER/g' dlls/ntdll/unix/server.c
-          sed -i 's/ESYNC_/FSYNC_/g' dlls/ntdll/unix/sync.c
-          sed -i 's/sync_shm_idx/fsync_shm_idx/g' dlls/ntdll/unix/sync.c
           sed -i 's/shm_open/open/g' dlls/ntdll/unix/virtual.c
           sed -i 's/shm_unlink/unlink/g' dlls/ntdll/unix/virtual.c
-          sed -i 's/ESYNC_/FSYNC_/g' server/esync.c
-          sed -i 's/enum esync_type/enum fsync_type/g' server/esync.c
-          sed -i 's/sync_shm_idx/fsync_shm_idx/g' server/esync.c 2>/dev/null || true         
-          sed -i 's/ESYNC_/FSYNC_/g' server/fsync.c
-          sed -i 's/sync_shm_idx/fsync_shm_idx/g' server/fsync.c 2>/dev/null || true
-          sed -i 's/ESYNC_/FSYNC_/g' server/inproc_sync.c
-          sed -i 's/sync_shm_idx/fsync_shm_idx/g' server/inproc_sync.c
-          sed -i 's/ESYNC_/FSYNC_/g' server/thread.c
-          sed -i 's/sync_shm_idx/fsync_shm_idx/g' server/thread.c
-          find dlls/ntdll/unix/ -type f -name "*.c" -exec sed -i '/wine_server_ptr_handle(fd_handle) == handle/d' {} +
+          if [ -f dlls/ntdll/unix/esync.c ]; then
+              sed -i 's/ESYNC_/FSYNC_/g' dlls/ntdll/unix/esync.c
+              sed -i 's/enum esync_type/enum fsync_type/g' dlls/ntdll/unix/esync.c
+              sed -i 's/sync_shm_idx/fsync_shm_idx/g' dlls/ntdll/unix/esync.c
+          fi
+          if [ -f server/esync.c ]; then
+              sed -i 's/ESYNC_/FSYNC_/g' server/esync.c
+              sed -i 's/enum esync_type/enum fsync_type/g' server/esync.c
+              sed -i 's/sync_shm_idx/fsync_shm_idx/g' server/esync.c
+          fi
 
           if [ ! -f "configure" ]; then
             ./autogen.sh
