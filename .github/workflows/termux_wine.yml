@@ -231,25 +231,6 @@ jobs:
           fi
           echo "复制后 locale.nls 存在，大小: $(wc -c < /opt/wine64-native/nls/locale.nls) 字节"
 
-      - name: Create Custom Android SysV SHM Header
-        run: |
-          cd ${{ env.WINE_SOURCE_DIR }}/source
-          mkdir -p android/shm_utils
-          mkdir -p android/android_sysvshm/sys
-          curl -L https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/path/shm_utils.h -o android/shm_utils/shm_utils.h
-          curl -L https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/path/shm.h -o android/android_sysvshm/sys/shm.h
-          curl -L https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/dlls/ntdll/unix/fsync.h -o dlls/ntdll/unix/fsync.h
-          curl -L https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/dlls/ntdll/unix/fsync.c -o dlls/ntdll/unix/fsync.c
-          curl -L https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/dlls/ntdll/unix/esync.h -o dlls/ntdll/unix/esync.h
-          curl -L https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/dlls/ntdll/unix/esync.c -o dlls/ntdll/unix/esync.c
-          curl -L https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/server/fsync.h -o server/fsync.h
-          curl -L https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/server/fsync.c -o server/fsync.c
-          curl -L https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/server/esync.h -o server/esync.h
-          curl -L https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/server/esync.c -o server/esync.c
-          if [ ! -f "configure" ]; then
-            ./autogen.sh
-          fi
-          
       - name: Termux
         run: |
           cd ${{ env.WINE_SOURCE_DIR }}/source
@@ -314,7 +295,7 @@ jobs:
 
           export PATCH_BASE="https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/path"
 
-          PATCH_FILES="1.patch 2.patch 3.patch 4.patch 5.patch 6.patch 7.patch 8.patch 9.patch 10.patch 11.patch 12.patch 13.patch 14.patch 15.patch 16.patch 17.patch"
+          PATCH_FILES="1.patch 2.patch"
           echo "Applying external patches from $PATCH_BASE..."
           for FILE in $PATCH_FILES; do
             URL="${PATCH_BASE}/${FILE}"
@@ -337,44 +318,6 @@ jobs:
           done
           echo "--------------------------------------------"
           echo "✔ All patch processes completed"
-
-          sed -i 's/shm_open/open/g' dlls/ntdll/unix/virtual.c
-          sed -i 's/shm_unlink/unlink/g' dlls/ntdll/unix/virtual.c
-
-          # 3. Wine 코어는 건드리지 않고, 패치 파일들만 최신 Wine 규격에 맞게 개조
-          # 클라이언트 측 Esync 파일 수정
-          if [ -f dlls/ntdll/unix/esync.c ]; then
-              sed -i 's/ESYNC_/FSYNC_/g' dlls/ntdll/unix/esync.c
-              sed -i 's/enum esync_type/enum fsync_type/g' dlls/ntdll/unix/esync.c
-              sed -i 's/sync_shm_idx/fsync_shm_idx/g' dlls/ntdll/unix/esync.c
-          fi
-
-          # [추가됨] 클라이언트 측 Fsync 파일 수정 (이번 에러 해결)
-          if [ -f dlls/ntdll/unix/fsync.c ]; then
-              sed -i 's/sync_shm_idx/fsync_shm_idx/g' dlls/ntdll/unix/fsync.c
-          fi
-
-          # 서버 측 Esync 파일 수정
-          if [ -f server/esync.c ]; then
-              sed -i 's/ESYNC_/FSYNC_/g' server/esync.c
-              sed -i 's/enum esync_type/enum fsync_type/g' server/esync.c
-              sed -i 's/sync_shm_idx/fsync_shm_idx/g' server/esync.c
-          fi
-          if [ -f dlls/ntdll/unix/server.c ]; then
-              sed -i 's/ESYNC_USED_BY_SERVER/FSYNC_USED_BY_SERVER/g' dlls/ntdll/unix/server.c
-          fi
-          if [ -f dlls/ntdll/unix/sync.c ]; then
-              sed -i 's/ESYNC_/FSYNC_/g' dlls/ntdll/unix/sync.c
-              sed -i 's/sync_shm_idx/fsync_shm_idx/g' dlls/ntdll/unix/sync.c
-          fi
-          if [ -f server/inproc_sync.c ]; then
-              sed -i 's/ESYNC_/FSYNC_/g' server/inproc_sync.c
-              sed -i 's/sync_shm_idx/fsync_shm_idx/g' server/inproc_sync.c
-          fi
-          if [ -f server/thread.c ]; then
-              sed -i 's/ESYNC_/FSYNC_/g' server/thread.c
-              sed -i 's/sync_shm_idx/fsync_shm_idx/g' server/thread.c
-          fi
 
           if [ ! -f "configure" ]; then
             ./autogen.sh
