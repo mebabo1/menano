@@ -352,6 +352,8 @@ jobs:
           sed -i 's/sync_shm_idx/fsync_shm_idx/g' server/esync.c 2>/dev/null || true         
           sed -i 's/ESYNC_/FSYNC_/g' server/fsync.c
           sed -i 's/sync_shm_idx/fsync_shm_idx/g' server/fsync.c 2>/dev/null || true
+          sed -i 's/ESYNC_/FSYNC_/g' server/inproc_sync.c
+          sed -i 's/sync_shm_idx/fsync_shm_idx/g' server/inproc_sync.c
 
           if [ ! -f "configure" ]; then
             ./autogen.sh
