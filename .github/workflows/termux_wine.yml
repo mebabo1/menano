@@ -342,6 +342,7 @@ jobs:
           sed -i 's/enum esync_type/enum fsync_type/g' dlls/ntdll/unix/esync.c
           sed -i 's/sync_shm_idx/fsync_shm_idx/g' dlls/ntdll/unix/fsync.c
           sed -i 's/sync_shm_idx/fsync_shm_idx/g' dlls/ntdll/unix/esync.c
+          sed -i 's/ESYNC_USED_BY_SERVER/FSYNC_USED_BY_SERVER/g' dlls/ntdll/unix/server.c
 
           if [ ! -f "configure" ]; then
             ./autogen.sh
