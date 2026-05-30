@@ -340,11 +340,21 @@ jobs:
 
           sed -i 's/shm_open/open/g' dlls/ntdll/unix/virtual.c
           sed -i 's/shm_unlink/unlink/g' dlls/ntdll/unix/virtual.c
+
+          # 3. Wine 코어는 건드리지 않고, 패치 파일들만 최신 Wine 규격에 맞게 개조
+          # 클라이언트 측 Esync 파일 수정
           if [ -f dlls/ntdll/unix/esync.c ]; then
               sed -i 's/ESYNC_/FSYNC_/g' dlls/ntdll/unix/esync.c
               sed -i 's/enum esync_type/enum fsync_type/g' dlls/ntdll/unix/esync.c
               sed -i 's/sync_shm_idx/fsync_shm_idx/g' dlls/ntdll/unix/esync.c
           fi
+
+          # [추가됨] 클라이언트 측 Fsync 파일 수정 (이번 에러 해결)
+          if [ -f dlls/ntdll/unix/fsync.c ]; then
+              sed -i 's/sync_shm_idx/fsync_shm_idx/g' dlls/ntdll/unix/fsync.c
+          fi
+
+          # 서버 측 Esync 파일 수정
           if [ -f server/esync.c ]; then
               sed -i 's/ESYNC_/FSYNC_/g' server/esync.c
               sed -i 's/enum esync_type/enum fsync_type/g' server/esync.c
