@@ -347,6 +347,11 @@ jobs:
           sed -i 's/sync_shm_idx/fsync_shm_idx/g' dlls/ntdll/unix/sync.c
           sed -i 's/shm_open/open/g' dlls/ntdll/unix/virtual.c
           sed -i 's/shm_unlink/unlink/g' dlls/ntdll/unix/virtual.c
+          sed -i 's/ESYNC_/FSYNC_/g' server/esync.c
+          sed -i 's/enum esync_type/enum fsync_type/g' server/esync.c
+          sed -i 's/sync_shm_idx/fsync_shm_idx/g' server/esync.c 2>/dev/null || true         
+          sed -i 's/ESYNC_/FSYNC_/g' server/fsync.c
+          sed -i 's/sync_shm_idx/fsync_shm_idx/g' server/fsync.c 2>/dev/null || true
 
           if [ ! -f "configure" ]; then
             ./autogen.sh
