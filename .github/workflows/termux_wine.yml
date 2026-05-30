@@ -149,7 +149,7 @@ jobs:
             proton)
               echo "Processing Proton branch"
 
-              git clone -b "proton_11.0" https://github.com/WinNative-Emu/proton-wine.git source
+              git clone -b "proton_11.0" https://github.com/ValveSoftware/wine.git source
               cd source
               git config advice.detachedHead false
               if [ "$WINE_VERSION" != "latest" ]; then
@@ -234,8 +234,18 @@ jobs:
       - name: Create Custom Android SysV SHM Header
         run: |
           cd ${{ env.WINE_SOURCE_DIR }}/source
+          mkdir -p android/shm_utils
+          mkdir -p android/android_sysvshm/sys
           curl -L https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/path/shm_utils.h -o android/shm_utils/shm_utils.h
           curl -L https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/path/shm.h -o android/android_sysvshm/sys/shm.h
+          curl -L https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/dlls/ntdll/unix/fsync.h -o dlls/ntdll/unix/fsync.h
+          curl -L https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/dlls/ntdll/unix/fsync.c -o dlls/ntdll/unix/fsync.c
+          curl -L https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/dlls/ntdll/unix/esync.h -o dlls/ntdll/unix/esync.h
+          curl -L https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/dlls/ntdll/unix/esync.c -o dlls/ntdll/unix/esync.c
+          curl -L https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/server/fsync.h -o server/fsync.h
+          curl -L https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/server/fsync.c -o server/fsync.c
+          curl -L https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/server/esync.h -o server/esync.h
+          curl -L https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/server/esync.c -o server/esync.c
           if [ ! -f "configure" ]; then
             ./autogen.sh
           fi
