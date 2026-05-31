@@ -277,6 +277,7 @@ jobs:
             echo "Patching $FILE_VIRTUAL: Completely neutralizing userfaultfd..."
             sed -i 's/uffd_fd = syscall( __NR_userfaultfd/uffd_fd = -1; \/\/ syscall( __NR_userfaultfd/g' "$FILE_VIRTUAL"
             sed -i '/static void kernel_writewatch_init(void)/{n;s/^{/{\n    return;/}' "$FILE_VIRTUAL"
+            sed -i '/WINE_DEFAULT_DEBUG_CHANNEL(virtual);/a #include "../../android/shm_utils/shm_utils.h"' "$FILE_VIRTUAL"
           fi
 
           FILE_PULSE_MK="dlls/winepulse.drv/Makefile.in"
@@ -302,7 +303,7 @@ jobs:
 
           export PATCH_BASE="https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/path"
 
-          PATCH_FILES="1.patch 2.patch 4.patch 7.patch 15.patch"
+          PATCH_FILES="1.patch 2.patch 4.patch 7.patch"
           echo "Applying external patches from $PATCH_BASE..."
           for FILE in $PATCH_FILES; do
             URL="${PATCH_BASE}/${FILE}"
