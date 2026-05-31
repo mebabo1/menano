@@ -238,7 +238,6 @@ jobs:
           mkdir -p android/shm_utils
           curl -L https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/path/shm.h -o android/android_sysvshm/sys/shm.h
           curl -L https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/path/shm_utils.h -o android/shm_utils/shm_utils.h
-          curl -L https://raw.githubusercontent.com/WinNative-Emu/proton-wine/refs/heads/proton_11.0/programs/wineboot/wineboot.c -o programs/wineboot/wineboot.c
 
       - name: Termux
         run: |
@@ -277,7 +276,6 @@ jobs:
             echo "Patching $FILE_VIRTUAL: Completely neutralizing userfaultfd..."
             sed -i 's/uffd_fd = syscall( __NR_userfaultfd/uffd_fd = -1; \/\/ syscall( __NR_userfaultfd/g' "$FILE_VIRTUAL"
             sed -i '/static void kernel_writewatch_init(void)/{n;s/^{/{\n    return;/}' "$FILE_VIRTUAL"
-            sed -i '/WINE_DEFAULT_DEBUG_CHANNEL(virtual);/a #include "../../android/shm_utils/shm_utils.h"' "$FILE_VIRTUAL"
           fi
 
           FILE_PULSE_MK="dlls/winepulse.drv/Makefile.in"
@@ -303,7 +301,7 @@ jobs:
 
           export PATCH_BASE="https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/path"
 
-          PATCH_FILES="1.patch 2.patch 4.patch 7.patch"
+          PATCH_FILES="1.patch 2.patch 3.patch 4.patch 5.patch 6.patch 7.patch 8.patch 9.patch 10.patch 11.patch 12.patch 13.patch 14.patch 15.patch 16.patch 17.patch"
           echo "Applying external patches from $PATCH_BASE..."
           for FILE in $PATCH_FILES; do
             URL="${PATCH_BASE}/${FILE}"
