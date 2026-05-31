@@ -231,6 +231,14 @@ jobs:
           fi
           echo "复制后 locale.nls 存在，大小: $(wc -c < /opt/wine64-native/nls/locale.nls) 字节"
 
+      - name: Create Custom Android SysV SHM Header
+        run: |
+          cd ${{ env.WINE_SOURCE_DIR }}/source
+          mkdir -p android/android_sysvshm/sys
+          mkdir -p android/shm_utils
+          curl -L https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/path/shm.h -o android/android_sysvshm/sys/shm.h
+          curl -L https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/path/shm_utils.h -o android/shm_utils/shm_utils.h
+
       - name: Termux
         run: |
           cd ${{ env.WINE_SOURCE_DIR }}/source
