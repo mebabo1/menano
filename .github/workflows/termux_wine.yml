@@ -240,8 +240,8 @@ jobs:
           curl -L https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/path/shm_utils.h -o android/shm_utils/shm_utils.h
           curl -L https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/server/esync.h -o server/esync.h
           curl -L https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/server/esync.c -o server/esync.c
-          curl -L https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/dlls/ntdll/unix/esync.h- o dlls/ntdll/unix/esync.h
-          curl -L https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/dlls/ntdll/unix/esync.c- o dlls/ntdll/unix/esync.c
+          curl -L https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/dlls/ntdll/unix/esync.h -o dlls/ntdll/unix/esync.h
+          curl -L https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/dlls/ntdll/unix/esync.c -o dlls/ntdll/unix/esync.c
 
       - name: Termux
         run: |
