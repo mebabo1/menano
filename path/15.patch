@@ -1,4 +1,5 @@
 diff --git a/server/protocol.def b/server/protocol.def
+index 03565fe4d53..c3f23a85119 100644
 --- a/server/protocol.def
 +++ b/server/protocol.def
 @@ -4214,6 +4214,18 @@
