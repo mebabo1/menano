@@ -159,6 +159,10 @@ index abcdef1..2345678 100644
      hr = InternalCreateObjectFromURL(url, flags, props, object, activate);
  
      if (FAILED(hr))
+         return hr;
+ 
+     return S_OK;
+ }
 diff --git a/dlls/winegstreamer/audioconvert.c b/dlls/winegstreamer/audioconvert.c
 index bcdef12..3456789 100644
 --- a/dlls/winegstreamer/audioconvert.c
