@@ -37,4 +37,3 @@ index 03565fe4d53..c3f23a85119 100644
 -    unsigned int fsync_shm_idx;
 +    unsigned int sync_shm_idx;
  @END
-
