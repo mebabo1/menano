@@ -238,8 +238,6 @@ jobs:
           mkdir -p android/shm_utils
           curl -L https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/path/shm.h -o android/android_sysvshm/sys/shm.h
           curl -L https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/path/shm_utils.h -o android/shm_utils/shm_utils.h
-          curl -L https://raw.githubusercontent.com/WinNative-Emu/proton-wine/refs/heads/proton_11.0/server/protocol.def -o server/protocol.def
-          curl -L https://raw.githubusercontent.com/WinNative-Emu/proton-wine/refs/heads/proton_11.0/dlls/ntdll/unix/virtual.c -o dlls/ntdll/unix/virtual.c
 
       - name: Termux
         run: |
@@ -251,8 +249,6 @@ jobs:
           find . -name "file.c" -exec sed -i 's|"/tmp"|"/data/data/com.termux/files/usr/tmp"|g' {} + 2>/dev/null || true
           find . -name "loader.c" -exec sed -i 's|"/tmp"|"/data/data/com.termux/files/usr/tmp"|g' {} + 2>/dev/null || true
           find . -name "server.c" -exec sed -i 's|"/tmp"|"/data/data/com.termux/files/usr/tmp"|g' {} + 2>/dev/null || true
-
-          sed -i '/#include "wine\/debug.h"/a #include "esync.h"' dlls/ntdll/unix/server.c
                     
           FILE_LOADER="dlls/ntdll/unix/loader.c"
           if [ -f "$FILE_LOADER" ]; then
@@ -305,7 +301,7 @@ jobs:
 
           export PATCH_BASE="https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/path"
 
-          PATCH_FILES="1.patch 2.patch 3.patch 4.patch 5.patch 6.patch 7.patch 8.patch 9.patch 10.patch 11.patch 12.patch 13.patch 14.patch 16.patch 17.patch"
+          PATCH_FILES="1.patch 2.patch"
           echo "Applying external patches from $PATCH_BASE..."
           for FILE in $PATCH_FILES; do
             URL="${PATCH_BASE}/${FILE}"
