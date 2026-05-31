@@ -246,6 +246,8 @@ jobs:
           curl -L https://raw.githubusercontent.com/ValveSoftware/wine/refs/heads/proton_10.0/server/fsync.h -o server/fsync.h
           curl -L https://raw.githubusercontent.com/ValveSoftware/wine/refs/heads/proton_10.0/dlls/ntdll/unix/fsync.c -o dlls/ntdll/unix/fsync.c
           curl -L https://raw.githubusercontent.com/ValveSoftware/wine/refs/heads/proton_10.0/dlls/ntdll/unix/fsync.h -o dlls/ntdll/unix/fsync.h
+          curl -L https://raw.githubusercontent.com/ValveSoftware/wine/refs/heads/proton_11.0/server/ntsync_tmp.h -o server/ntsync_tmp.h
+          curl -L https://raw.githubusercontent.com/ValveSoftware/wine/refs/heads/proton_11.0/dlls/ntdll/unix/ntsync_tmp.h -o dlls/ntdll/unix/ntsync_tmp.h
 
       - name: Termux
         run: |
