@@ -380,6 +380,8 @@ jobs:
             --with-pthread \
             --without-ffmpeg \
             --without-unwind \
+            --without-coreaudio \
+            --with-gettextpo=no \
             --disable-opencl \
             --disable-tests \
             --disable-winemenubuilder \
