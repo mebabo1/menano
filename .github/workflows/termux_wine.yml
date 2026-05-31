@@ -259,7 +259,20 @@ jobs:
           find . -name "file.c" -exec sed -i 's|"/tmp"|"/data/data/com.termux/files/usr/tmp"|g' {} + 2>/dev/null || true
           find . -name "loader.c" -exec sed -i 's|"/tmp"|"/data/data/com.termux/files/usr/tmp"|g' {} + 2>/dev/null || true
           find . -name "server.c" -exec sed -i 's|"/tmp"|"/data/data/com.termux/files/usr/tmp"|g' {} + 2>/dev/null || true
-                    
+
+          FILE_MAKEFILE="dlls/ntdll/Makefile.in"
+          if [ -f "$FILE_MAKEFILE" ]; then
+            echo "Patching $FILE_MAKEFILE: Checking for missing unix files..."
+            if ! grep -q "unix/file.c" "$FILE_MAKEFILE"; then
+              echo "-> unix/file.c 이 없으므로 추가합니다."
+              sed -i 's|unix/debug.c *\\|unix/debug.c \\\n\tunix/file.c \\|' "$FILE_MAKEFILE"
+            fi
+            if ! grep -q "unix/esync.c" "$FILE_MAKEFILE"; then
+              echo "-> unix/esync.c 가 없으므로 추가합니다."
+              sed -i 's|unix/debug.c *\\|unix/debug.c \\\n\tunix/esync.c \\|' "$FILE_MAKEFILE"
+            fi
+          fi
+
           FILE_LOADER="dlls/ntdll/unix/loader.c"
           if [ -f "$FILE_LOADER" ]; then
             echo "Removing M_PERTURB calls from $FILE_LOADER..."
@@ -311,7 +324,7 @@ jobs:
 
           export PATCH_BASE="https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/path"
 
-          PATCH_FILES="1.patch 3.patch 4.patch 7.patch 10.patch 11.patch 12.patch 13.patch 14.patch 15.patch 16.patch 17.patch gstreamer.patch"
+          PATCH_FILES="1.patch 3.patch 4.patch 7.patch 10.patch 12.patch 13.patch 14.patch 15.patch 16.patch 17.patch gstreamer.patch"
           echo "Applying external patches from $PATCH_BASE..."
           for FILE in $PATCH_FILES; do
             URL="${PATCH_BASE}/${FILE}"
