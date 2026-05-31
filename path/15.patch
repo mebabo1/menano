@@ -1,39 +1,50 @@
-diff --git a/server/protocol.def b/server/protocol.def
-index 03565fe4d53..c3f23a85119 100644
---- a/server/protocol.def
-+++ b/server/protocol.def
-@@ -4214,6 +4214,18 @@ struct handle_info
-     int enable;                /* previous state of auto-repeat enable */
- @END
+diff --git a/dlls/ntdll/unix/virtual.c b/dlls/ntdll/unix/virtual.c
+index 6e1697720f0..c12be9ba401 100644
+--- a/dlls/ntdll/unix/virtual.c
++++ b/dlls/ntdll/unix/virtual.c
+@@ -100,6 +100,10 @@
+ #include "unix_private.h"
+ #include "wine/debug.h"
 
-+#define ESYNC_USED_BY_SERVER 0x7eadeeee
++#ifdef __ANDROID__
++#include "../../android/shm_utils/shm_utils.h"
++#endif
 +
-+enum esync_type
-+{
-+    ESYNC_SEMAPHORE = 1,
-+    ESYNC_AUTO_EVENT,
-+    ESYNC_MANUAL_EVENT,
-+    ESYNC_MUTEX,
-+    ESYNC_AUTO_SERVER,
-+    ESYNC_MANUAL_SERVER,
-+    ESYNC_QUEUE,
-+};
-
- enum inproc_sync_type
+ WINE_DEFAULT_DEBUG_CHANNEL(virtual);
+ WINE_DECLARE_DEBUG_CHANNEL(module);
+ WINE_DECLARE_DEBUG_CHANNEL(virtual_ranges);
+@@ -314,9 +318,15 @@ static void *address_space_start = (void *)0x110000; /* keep DOS area clear */
+ static void *address_space_start = (void *)0x10000;
+ #endif
+ #ifdef _WIN64
++#ifdef __ANDROID__
++static void *address_space_limit = (void *)0x7fffff0000;  /* top of the total available address space */
++static void *user_space_limit    = (void *)0x7fffff0000;  /* top of the user address space */
++static void *working_set_limit   = (void *)0x7fffff0000;  /* top of the current working set */
++#else
+ static void *address_space_limit = (void *)0x7fffffff0000;  /* top of the total available address space */
+ static void *user_space_limit    = (void *)0x7fffffff0000;  /* top of the user address space */
+ static void *working_set_limit   = (void *)0x7fffffff0000;  /* top of the current working set */
++#endif
+ #else
+ static void *address_space_limit = (void *)0xc0000000;
+ static void *user_space_limit    = (void *)0x7fff0000;
+@@ -418,6 +428,7 @@ void *anon_mmap_alloc( size_t size, int prot )
+ #ifdef USE_UFFD_WRITEWATCH
+ static void kernel_writewatch_init(void)
  {
-@@ -4230,7 +4242,7 @@ enum inproc_sync_type
- @REPLY
-     int           type;         /* inproc sync type */
-     unsigned int access;        /* handle access rights */
--    unsigned int fsync_shm_idx;
-+    unsigned int sync_shm_idx;
- @END
++#ifndef __ANDROID__
+     struct uffdio_api uffdio_api;
 
+     uffd_fd = syscall( __NR_userfaultfd, O_CLOEXEC | O_NONBLOCK | UFFD_USER_MODE_ONLY );
+@@ -439,6 +450,10 @@ static void kernel_writewatch_init(void)
+     }
+     use_kernel_writewatch = 1;
+     TRACE( "Using kernel write watches.\n" );
++#else
++    TRACE( "Kernel writewatches are not supported on Android\n" );
++    use_kernel_writewatch = 0;
++#endif
+ }
 
-@@ -4238,7 +4250,7 @@ enum inproc_sync_type
- @REQ(get_inproc_alert_fd)
- @REPLY
-     obj_handle_t handle;        /* alert fd is in flight with this handle */
--    unsigned int fsync_shm_idx;
-+    unsigned int sync_shm_idx;
- @END
+ static void kernel_writewatch_reset( void *start, SIZE_T len )
