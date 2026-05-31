@@ -86,15 +86,6 @@ index 74a0c93319c..07d0e395e24 100644
 
      if (inproc_device_fd < 0) return STATUS_NOT_IMPLEMENTED;
      if ((ret = get_inproc_sync( handle, INPROC_SYNC_MUTEX, MUTANT_QUERY_STATE, &stack, &sync ))) return ret;
-@@ -907,7 +921,7 @@ int get_inproc_alert_fd(void)
-         {
-             if (!server_call_unlocked( req ))
-             {
--                if (do_fsync()) data->alert_fd = fd = reply->fsync_shm_idx;
-+                if (do_fsync()) data->alert_fd = fd = reply->sync_shm_idx;
-                 else
-                 {
-                     data->alert_fd = fd = wine_server_receive_fd( &token );
 @@ -931,6 +945,7 @@ static NTSTATUS inproc_wait( DWORD count, const HANDLE *handles, WAIT_TYPE type,
      NTSTATUS ret;
 
