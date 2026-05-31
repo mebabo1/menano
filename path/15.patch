@@ -6,7 +6,7 @@ index 03565fe4d53..c3f23a85119 100644
  @REPLY
      int enable;                /* previous state of auto-repeat enable */
  @END
- 
++
 +#define ESYNC_USED_BY_SERVER 0x7eadeeee
 +
 +enum esync_type
