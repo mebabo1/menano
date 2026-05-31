@@ -2,10 +2,10 @@ diff --git a/server/protocol.def b/server/protocol.def
 index 03565fe4d53..c3f23a85119 100644
 --- a/server/protocol.def
 +++ b/server/protocol.def
-@@ -4214,6 +4214,18 @@ struct handle_info
+@@ -4214,6 +4214,18 @@
      int enable;                /* previous state of auto-repeat enable */
  @END
-
+ 
 +#define ESYNC_USED_BY_SERVER 0x7eadeeee
 +
 +enum esync_type
@@ -18,7 +18,7 @@ index 03565fe4d53..c3f23a85119 100644
 +    ESYNC_MANUAL_SERVER,
 +    ESYNC_QUEUE,
 +};
-
+ 
  enum inproc_sync_type
  {
 @@ -4230,7 +4242,7 @@ enum inproc_sync_type
