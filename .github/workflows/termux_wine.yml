@@ -238,6 +238,7 @@ jobs:
           mkdir -p android/shm_utils
           curl -L https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/path/shm.h -o android/android_sysvshm/sys/shm.h
           curl -L https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/path/shm_utils.h -o android/shm_utils/shm_utils.h
+          curl -L https://raw.githubusercontent.com/WinNative-Emu/proton-wine/refs/heads/proton_11.0/programs/wineboot/wineboot.c -o programs/wineboot/wineboot.c
 
       - name: Termux
         run: |
