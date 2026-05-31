@@ -29,22 +29,3 @@ index 6e1697720f0..c12be9ba401 100644
  #else
  static void *address_space_limit = (void *)0xc0000000;
  static void *user_space_limit    = (void *)0x7fff0000;
-@@ -418,6 +428,7 @@ void *anon_mmap_alloc( size_t size, int prot )
- #ifdef USE_UFFD_WRITEWATCH
- static void kernel_writewatch_init(void)
- {
-+#ifndef __ANDROID__
-     struct uffdio_api uffdio_api;
-
-     uffd_fd = syscall( __NR_userfaultfd, O_CLOEXEC | O_NONBLOCK | UFFD_USER_MODE_ONLY );
-@@ -439,6 +450,10 @@ static void kernel_writewatch_init(void)
-     }
-     use_kernel_writewatch = 1;
-     TRACE( "Using kernel write watches.\n" );
-+#else
-+    TRACE( "Kernel writewatches are not supported on Android\n" );
-+    use_kernel_writewatch = 0;
-+#endif
- }
-
- static void kernel_writewatch_reset( void *start, SIZE_T len )
