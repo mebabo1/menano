@@ -1,22 +1,11 @@
 diff --git a/programs/wineboot/wineboot.c b/programs/wineboot/wineboot.c
-index 6b5d3d26f85..1215bfa516d 100644
+index 636b6d7..72d361a 100644
 --- a/programs/wineboot/wineboot.c
 +++ b/programs/wineboot/wineboot.c
-@@ -306,6 +306,10 @@ static UINT64 read_tsc_frequency(void)
-     return freq;
- }
-
-+static void initialize_xstate_features(struct _KUSER_SHARED_DATA *data)
-+{
-+}
-+
- #elif defined(__aarch64__)
-
- #define FEX_TSC_SCALE_MAXIMUM 1000000000
-@@ -323,6 +327,25 @@ static UINT64 read_tsc_frequency(void)
+@@ -387,6 +387,25 @@ static UINT64 read_tsc_frequency(void)
      return tsc_frequency;
  }
-
+ 
 +static void initialize_xstate_features(struct _KUSER_SHARED_DATA *data)
 +{
 +    XSTATE_CONFIGURATION *xstate = &data->XState;
@@ -37,24 +26,5 @@ index 6b5d3d26f85..1215bfa516d 100644
 +}
 +
  #else
-
- static UINT64 read_tsc_frequency(void)
-@@ -330,6 +353,10 @@ static UINT64 read_tsc_frequency(void)
-     return 0;
- }
-
-+static void initialize_xstate_features(struct _KUSER_SHARED_DATA *data)
-+{
-+}
-+
- #endif
-
- static void create_user_shared_data(void)
-@@ -366,6 +393,8 @@ static void create_user_shared_data(void)
-     data->SuiteMask                   = version.wSuiteMask;
-     wcscpy( data->NtSystemRoot, L"C:\\windows" );
-
-+    initialize_xstate_features( data );
-+
-     UnmapViewOfFile( data );
- }
+ 
+ static void initialize_xstate_features(struct _KUSER_SHARED_DATA *data)
