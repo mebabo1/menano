@@ -404,6 +404,8 @@ jobs:
             --with-vkd3d \
             --with-xinput \
             --with-xinput2 \
+            --with-xrender \
+            --with-opengl \
             --without-xxf86vm
             
           make -j$(nproc) > build.log 2>&1 || (tail -n 100 build.log && exit 1)
