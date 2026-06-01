@@ -2,7 +2,7 @@ diff --git a/dlls/ntdll/unix/virtual.c b/dlls/ntdll/unix/virtual.c
 index 6e1697720f0..c12be9ba401 100644
 --- a/dlls/ntdll/unix/virtual.c
 +++ b/dlls/ntdll/unix/virtual.c
-@@ -314,9 +318,15 @@ static void *address_space_start = (void *)0x110000; /* keep DOS area clear */
+@@ -186,10 +186,16 @@ static void *address_space_start = (void *)0x110000; /* keep DOS area clear */
  static void *address_space_start = (void *)0x10000;
  #endif
  #ifdef _WIN64
