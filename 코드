@@ -1,38 +1,8 @@
-    - name: Android Turnip patches
-      run: |
-        find . -type f \( -name "*.cpp" -o -name "*.hpp" \) | while read f; do
-          sed -i 's/VK_PRESENT_MODE_MAILBOX_KHR/VK_PRESENT_MODE_FIFO_KHR/g' "$f"
-        done
-        
-        DEVICE_FILE="framegen/src/core/device.cpp"
-
-        if [ -f "$DEVICE_FILE" ]; then
-          sed -i '/VK_KHR_present_wait/d' "$DEVICE_FILE"
-          sed -i '/VK_KHR_present_id/d' "$DEVICE_FILE"
-        fi
-
-        VOLK_FILE="framegen/src/thirdparty/volk.c"
-
-        if [ -f "$VOLK_FILE" ]; then
-          sed -i 's/vkWaitForPresentKHR = (PFN_vkWaitForPresentKHR)load(context, "vkWaitForPresentKHR");/vkWaitForPresentKHR = NULL;/g' "$VOLK_FILE"
-          sed -i 's/table->vkWaitForPresentKHR = (PFN_vkWaitForPresentKHR)load(context, "vkWaitForPresentKHR");/table->vkWaitForPresentKHR = NULL;/g' "$VOLK_FILE"
-        fi
-        
-        HOOKS_FILE="src/hooks.cpp"
-
-        if [ -f "$HOOKS_FILE" ]; then
-          sed -i 's/createInfo.minImageCount = createInfo.minImageCount + 1/createInfo.minImageCount = 3/g' "$HOOKS_FILE"
-        fi
-        
-        find . -type f \( -name "*.cpp" -o -name "*.hpp" \) | while read f; do
-          sed -i 's/VK_EXTERNAL_SEMAPHORE_HANDLE_TYPE_OPAQUE_FD_BIT/VK_EXTERNAL_SEMAPHORE_HANDLE_TYPE_SYNC_FD_BIT/g' "$f"
-        done
-        curl -L https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/include/mini/semaphore.hpp -o include/mini/semaphore.hpp
-        curl -L https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/path/semaphore.cpp -o src/mini/semaphore.cpp
-        curl -L https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/path/device.cpp -o framegen/src/core/device.cpp
-        # curl -L https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/include/utils/utils.hpp -o include/utils/utils.hpp
-        # curl -L https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/src/utils/utils.cpp -o src/utils/utils.cpp
-        curl -L https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/include/context.hpp -o include/context.hpp
-        curl -L https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/src/context.cpp -o src/context.cpp
-        curl -L https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/framegen/v3.1_src/lsfg.cpp -o framegen/v3.1_src/lsfg.cpp
-        curl -L https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/framegen/v3.1p_src/lsfg.cpp -o framegen/v3.1p_src/lsfg.cpp
+      - name: Create Custom Android SysV SHM Header
+        run: |
+          cd ${{ env.WINE_SOURCE_DIR }}/source
+          mkdir -p android/android_sysvshm/sys
+          mkdir -p android/shm_utils
+          curl -L https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/path/shm.h -o android/android_sysvshm/sys/shm.h
+          curl -L https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/path/shm_utils.h -o android/shm_utils/shm_utils.h
+          curl -L https://raw.githubusercontent.com/Pipetto-crypto/wine/refs/heads/proton-9.0-arm64ec/server/unicode.c -o server/unicode.c
