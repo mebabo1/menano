@@ -2,7 +2,7 @@ diff --git a/programs/wineboot/wineboot.c b/programs/wineboot/wineboot.c
 index 636b6d7..72d361a 100644
 --- a/programs/wineboot/wineboot.c
 +++ b/programs/wineboot/wineboot.c
-@@ -387,6 +387,25 @@ static UINT64 read_tsc_frequency(void)
+@@ -305,6 +305,25 @@ static UINT64 read_tsc_frequency(void)
      return tsc_frequency;
  }
  
@@ -27,4 +27,4 @@ index 636b6d7..72d361a 100644
 +
  #else
  
- static void initialize_xstate_features(struct _KUSER_SHARED_DATA *data)
+ static UINT64 read_tsc_frequency(void)
