@@ -258,6 +258,31 @@ jobs:
             sed -i 's/^[[:space:]]*mallopt( M_PERTURB,/\/\/ mallopt( M_PERTURB,/g' "$FILE_LOADER"
           fi
 
+          export PATCH_BASE="https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/path"
+
+          PATCH_FILES="2.patch gstreamer01.patch"
+          echo "Applying external patches from $PATCH_BASE..."
+          for FILE in $PATCH_FILES; do
+            URL="${PATCH_BASE}/${FILE}"
+            PATCH_FILE="$FILE"           
+            echo "--------------------------------------------"
+            echo "Downloading $PATCH_FILE..."
+            wget -q -O "$PATCH_FILE" "$URL"
+            
+            if git apply --check "$PATCH_FILE" > /dev/null 2>&1; then
+                echo "✔ $PATCH_FILE can be applied cleanly"
+                git apply --whitespace=fix "$PATCH_FILE"
+            elif git apply --3way --check "$PATCH_FILE" > /dev/null 2>&1; then
+                echo "⚠ Applying $PATCH_FILE with 3-way merge"
+                git apply --3way --whitespace=fix "$PATCH_FILE"
+            else
+                echo "❌ $PATCH_FILE failed, generating rejects"
+                patch -p1 --forward --reject-file=/dev/null < "$PATCH_FILE" || true
+            fi
+          done
+          echo "--------------------------------------------"
+          echo "✔ All patch processes completed"
+
       - name: configure
         run: |
           cd ${{ env.WINE_SOURCE_DIR }}/source
