@@ -310,8 +310,7 @@ jobs:
                 git apply --3way --whitespace=fix "$PATCH_FILE"
             else
                 echo "❌ $PATCH_FILE failed, generating rejects"
-                git apply --reject --whitespace=fix "$PATCH_FILE" || true
-                find . -name "*.rej"
+                patch -p1 --forward --reject-file=/dev/null < "$PATCH_FILE" || true
             fi
           done
           echo "--------------------------------------------"
