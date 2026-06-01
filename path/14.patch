@@ -8,7 +8,7 @@ index bb39b55e50c..9106835eb67 100644
      }
 +    if (!fd && getenv("XDG_DATA_DIRS")) {
 +        char *share_dir = getenv("XDG_DATA_DIRS");
-+        char *path = malloc(strlen(share_dir) + strlen("/wine/nls/l_intl.nls") + 1);
++        char *path = malloc(strlen(share_dir) + strlen("/l_intl.nls") + 1);
 +        sprintf(path, "%s/%s", share_dir, "wine/nls/l_intl.nls");
 +        fd = open_fd( NULL, path, nt_name, O_RDONLY, &mode, FILE_READ_DATA,
 +                      FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
