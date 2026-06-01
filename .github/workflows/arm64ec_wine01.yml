@@ -246,8 +246,6 @@ jobs:
           find . -name "loader.c" -exec sed -i 's|"/tmp"|"/data/data/com.termux/files/usr/tmp"|g' {} + 2>/dev/null || true
           find . -name "server.c" -exec sed -i 's|"/tmp"|"/data/data/com.termux/files/usr/tmp"|g' {} + 2>/dev/null || true
 
-          sed -i '/#include "wine\/debug.h"/a #include "esync.h"' dlls/ntdll/unix/server.c
-
           FILE3="dlls/wdscore/wdscore.spec"
           if [ -f "$FILE3" ]; then
             if grep -q '@ stub' "$FILE3"; then
