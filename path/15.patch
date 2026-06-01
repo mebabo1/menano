@@ -2,17 +2,6 @@ diff --git a/dlls/ntdll/unix/virtual.c b/dlls/ntdll/unix/virtual.c
 index 6e1697720f0..c12be9ba401 100644
 --- a/dlls/ntdll/unix/virtual.c
 +++ b/dlls/ntdll/unix/virtual.c
-@@ -100,6 +100,10 @@
- #include "unix_private.h"
- #include "wine/debug.h"
-
-+#ifdef __ANDROID__
-+#include "../../android/shm_utils/shm_utils.h"
-+#endif
-+
- WINE_DEFAULT_DEBUG_CHANNEL(virtual);
- WINE_DECLARE_DEBUG_CHANNEL(module);
- WINE_DECLARE_DEBUG_CHANNEL(virtual_ranges);
 @@ -314,9 +318,15 @@ static void *address_space_start = (void *)0x110000; /* keep DOS area clear */
  static void *address_space_start = (void *)0x10000;
  #endif
