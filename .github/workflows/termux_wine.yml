@@ -231,11 +231,6 @@ jobs:
           fi
           echo "复制后 locale.nls 存在，大小: $(wc -c < /opt/wine64-native/nls/locale.nls) 字节"
 
-      - name: Create Custom Android SysV SHM Header
-        run: |
-          cd ${{ env.WINE_SOURCE_DIR }}/source
-          curl -L https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/server/unicode.c -o server/unicode.c
-
       - name: Termux
         run: |
           cd ${{ env.WINE_SOURCE_DIR }}/source
@@ -298,7 +293,7 @@ jobs:
 
           export PATCH_BASE="https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/path"
 
-          PATCH_FILES="1.patch 2.patch 15.patch gstreamer.patch looser.patch"
+          PATCH_FILES="1.patch 2.patch 14.patch 15.patch gstreamer.patch looser.patch"
           echo "Applying external patches from $PATCH_BASE..."
           for FILE in $PATCH_FILES; do
             URL="${PATCH_BASE}/${FILE}"
