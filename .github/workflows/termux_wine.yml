@@ -234,11 +234,8 @@ jobs:
       - name: Create Custom Android SysV SHM Header
         run: |
           cd ${{ env.WINE_SOURCE_DIR }}/source
-          curl -L https://raw.githubusercontent.com/Pipetto-crypto/wine/refs/heads/proton-9.0-arm64ec/server/unicode.c -o server/unicode.c
-          
-          if [ ! -f "configure" ]; then
-            ./autogen.sh
-          fi
+          curl -L https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/server/unicode.c -o server/unicode.c
+
       - name: Termux
         run: |
           cd ${{ env.WINE_SOURCE_DIR }}/source
@@ -249,7 +246,6 @@ jobs:
           find . -name "file.c" -exec sed -i 's|"/tmp"|"/data/data/com.termux/files/usr/tmp"|g' {} + 2>/dev/null || true
           find . -name "loader.c" -exec sed -i 's|"/tmp"|"/data/data/com.termux/files/usr/tmp"|g' {} + 2>/dev/null || true
           find . -name "server.c" -exec sed -i 's|"/tmp"|"/data/data/com.termux/files/usr/tmp"|g' {} + 2>/dev/null || true
-          sed -i -e 's|BIN_TO_NLSDIR|"../share/wine/nls"|g' -e 's|NLSDIR|"/data/data/com.termux/files/opt/wine/share/wine/nls"|g' server/unicode.c
 
           FILE_LOADER="dlls/ntdll/unix/loader.c"
           if [ -f "$FILE_LOADER" ]; then
