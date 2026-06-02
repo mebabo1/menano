@@ -333,7 +333,7 @@ struct fd *load_intl_file(void)
     static const struct unicode_str nt_name = { nt_pathW, sizeof(nt_pathW) };
     unsigned int i, offset, size;
     unsigned short data;
-    char *path;
+    char *path = NULL; // NULL로 안전하게 초기화
     struct fd *fd = NULL;
     int unix_fd;
     mode_t mode = 0600;
@@ -349,18 +349,28 @@ struct fd *load_intl_file(void)
                            FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
                            FILE_NON_DIRECTORY_FILE | FILE_SYNCHRONOUS_IO_NONALERT ))) break;
         free( path );
+        path = NULL; // 실패 시 매번 안전하게 NULL 처리
     }
+    
+    // ★ 핵심 수정: 루프 내에서 파일을 못 찾았다면 주소값을 확실히 지워줍니다.
+    if (!fd) path = NULL; 
+
     if (!fd && getenv("XDG_DATA_DIRS")) {
-    	char *share_dir = getenv("XDG_DATA_DIRS");
-    	char *path = malloc(strlen(share_dir) + strlen("/l_intl.nls") + 1);
-    	sprintf(path, "%s/%s", share_dir, "wine/nls/l_intl.nls");
-    	fd = open_fd( NULL, path, nt_name, O_RDONLY, &mode, FILE_READ_DATA,
-    	              FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
-    	              FILE_NON_DIRECTORY_FILE | FILE_SYNCHRONOUS_IO_NONALERT );
-    	free ( path );
+        char *share_dir = getenv("XDG_DATA_DIRS");
+        // 변수 이름이 겹치지 않도록 xdg_path로 변경하여 혼선 방지
+        char *xdg_path = malloc(strlen(share_dir) + strlen("/l_intl.nls") + 1);
+        if (xdg_path) {
+            sprintf(xdg_path, "%s/%s", share_dir, "wine/nls/l_intl.nls");
+            fd = open_fd( NULL, xdg_path, nt_name, O_RDONLY, &mode, FILE_READ_DATA,
+                          FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
+                          FILE_NON_DIRECTORY_FILE | FILE_SYNCHRONOUS_IO_NONALERT );
+            free( xdg_path );
+        }
     }
+    
     if (!fd) fatal_error( "failed to load l_intl.nls\n" );
     unix_fd = get_unix_fd( fd );
+    
     /* read initial offset */
     if (pread( unix_fd, &data, sizeof(data), 0 ) != sizeof(data) || !data) goto failed;
     offset = data;
@@ -374,9 +384,12 @@ struct fd *load_intl_file(void)
     /* read lowercase table */
     if (!(casemap = malloc( size * 2 ))) goto failed;
     if (pread( unix_fd, casemap, size * 2, offset * 2 ) != size * 2) goto failed;
-    free( path );
+    
+    // ★ 유효한 path가 남아있을 때만 (상단 루프가 break로 성공했을 때만) 해제합니다.
+    if (path) free( path ); 
     return fd;
 
 failed:
-    fatal_error( "invalid format for casemap table %s\n", path );
+    if (path) free( path );
+    fatal_error( "invalid format for casemap table\n" );
 }
