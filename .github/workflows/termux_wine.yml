@@ -231,6 +231,11 @@ jobs:
           fi
           echo "复制后 locale.nls 存在，大小: $(wc -c < /opt/wine64-native/nls/locale.nls) 字节"
 
+      - name: Create Custom Android SysV SHM Header
+        run: |
+          cd ${{ env.WINE_SOURCE_DIR }}/source
+          curl -L https://raw.githubusercontent.com/Pipetto-crypto/wine/refs/heads/proton-9.0-arm64ec/server/unicode.c -o server/unicode.c
+
       - name: Termux
         run: |
           cd ${{ env.WINE_SOURCE_DIR }}/source
