@@ -934,6 +934,48 @@ void init_environment(void)
 {
     USHORT *case_table;
 
+#ifdef __ANDROID__
+    all = getenv( "LC_ALL" );
+    if (!all)
+        all = "C.UTF-8";
+
+    if (!unix_to_win_locale( all, system_locale )) system_locale[0] = 0;
+    TRACE_(nls)( "Unix LC_ALL is %s, setting system locale to %s\n", debugstr_a(all), debugstr_a(system_locale) );
+
+    if (main_argc > 1 && strstr(main_argv[1], "start_protected_game.exe"))
+    {
+        FIXME( "HACK setting EN locale.\n" );
+        all = "en_US.UTF-8";
+    }
+        
+    if (!unix_to_win_locale( all, user_locale )) user_locale[0] = 0;
+    TRACE_(nls)( "Unix LC_ALL is %s, user system locale to %s\n", debugstr_a(all), debugstr_a(user_locale) );
+
+    fprintf(stderr, "wine: warning: ld.so or libc.so locale subsystem not fully matched. Bypassing native loader.\n");
+
+#else
+    if (!unix_to_win_locale ( all, user_locale )) user_locale[0] = 0;     
+    
+    if (!(all = setlocale( LC_ALL, "" )) && (all = getenv( "LC_ALL" )))
+        FIXME_(nls)( "Failed to set LC_ALL to %s, is the locale supported?\n", debugstr_a(all) );
+    if (!(ctype = setlocale( LC_CTYPE, "" )) && (ctype = getenv( "LC_CTYPE" )))
+        FIXME_(nls)( "Failed to set LC_CTYPE to %s, is the locale supported?\n", debugstr_a(ctype) );
+    if (!(messages = setlocale( LC_MESSAGES, "" )) && (messages = getenv( "LC_MESSAGES" )))
+        FIXME_(nls)( "Failed to set LC_MESSAGES to %s, is the locale supported?\n", debugstr_a(messages) );
+
+    if (!unix_to_win_locale( ctype, system_locale )) system_locale[0] = 0;
+    TRACE_(nls)( "Unix LC_CTYPE is %s, setting system locale to %s\n", debugstr_a(ctype), debugstr_a(user_locale) );
+
+    if (main_argc > 1 && strstr(main_argv[1], "start_protected_game.exe"))
+    {
+        FIXME( "HACK setting EN locale.\n" );
+        messages = "en-US";
+    }
+
+    if (!unix_to_win_locale( messages, user_locale )) user_locale[0] = 0;
+    TRACE_(nls)( "Unix LC_MESSAGES is %s, user system locale to %s\n", debugstr_a(messages), debugstr_a(user_locale) );
+#endif
+  
     init_unix_codepage();
     init_locale();
 
