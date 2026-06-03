@@ -231,6 +231,11 @@ jobs:
           fi
           echo "复制后 locale.nls 存在，大小: $(wc -c < /opt/wine64-native/nls/locale.nls) 字节"
 
+      - name: Create Custom Android SysV SHM Header
+        run: |
+          cd ${{ env.WINE_SOURCE_DIR }}/source
+          curl -L https://raw.githubusercontent.com/Pipetto-crypto/wine/refs/heads/proton-9.0-arm64ec/dlls/ntdll/unix/env.c -o dlls/ntdll/unix/env.c
+
       - name: Termux
         run: |
           cd ${{ env.WINE_SOURCE_DIR }}/source
@@ -241,7 +246,6 @@ jobs:
           find . -name "file.c" -exec sed -i 's|"/tmp"|"/data/data/com.termux/files/usr/tmp"|g' {} + 2>/dev/null || true
           find . -name "loader.c" -exec sed -i 's|"/tmp"|"/data/data/com.termux/files/usr/tmp"|g' {} + 2>/dev/null || true
           find . -name "server.c" -exec sed -i 's|"/tmp"|"/data/data/com.termux/files/usr/tmp"|g' {} + 2>/dev/null || true
-          sed -i 's|unicode_EXTRADEFS = -DNLSDIR="\\"\\${nlsdir}\\"\\" -DBIN_TO_NLSDIR=\\"`\\${MAKEDEP} -R \\${bindir} \\${nlsdir}`\\"|unicode_EXTRADEFS = -DNLSDIR="\\"/data/data/com.termux/files/usr/opt/wine/share/wine/nls\\"" -DBIN_TO_NLSDIR="\\"../share/wine/nls\\""|' server/Makefile.in
           
           FILE_LOADER="dlls/ntdll/unix/loader.c"
           if [ -f "$FILE_LOADER" ]; then
