@@ -738,10 +738,6 @@ static void init_locale(void)
             all = "C.UTF-8";
 
         if (!unix_to_win_locale( all, system_locale )) system_locale[0] = 0;
-        
-        // 👈 컴파일 에러를 뿜는 TRACE_(nls) 대신 일반 표준 출력(fprintf)으로 대체합니다.
-        // TRACE_(nls)( "Unix LC_ALL is %s...", ... ); 
-        fprintf(stderr, "wine: Unix LC_ALL is %s, setting system locale to %s\n", all, system_locale);
 
         if (main_argc > 1 && strstr(main_argv[1], "start_protected_game.exe"))
         {
@@ -750,10 +746,7 @@ static void init_locale(void)
         }
             
         if (!unix_to_win_locale( all, user_locale )) user_locale[0] = 0;
-        
-        // 👈 마찬가지로 컴파일 에러 유발 구문을 안전하게 덮어씁니다.
-        // TRACE_(nls)( "Unix LC_ALL is %s...", ... );
-        fprintf(stderr, "wine: Unix LC_ALL is %s, user system locale to %s\n", all, user_locale);
+
     }
 #else
     if (!unix_to_win_locale ( all, user_locale )) user_locale[0] = 0;     
