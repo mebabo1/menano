@@ -18,20 +18,22 @@
  * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA
  */
 
-#ifndef __WINE_SERVER_ESYNC_H
-#define __WINE_SERVER_ESYNC_H
-
 #include <unistd.h>
-#include "thread.h"
 
 extern int do_esync(void);
 void esync_init(void);
+int esync_create_fd( int initval, int flags );
+void esync_wake_fd( int fd );
+void esync_wake_up( struct object *obj );
+void esync_clear( int fd );
 
-int esync_get_shm_fd(void);
+struct esync;
 
-unsigned int esync_alloc_shm( int fd, enum inproc_sync_type type, int initval, int max );
-void esync_set_event( int fd, unsigned int shm_idx, enum inproc_sync_type type );
-void esync_reset_event( int fd, unsigned int shm_idx, enum inproc_sync_type type );
-void esync_abandon_mutex( int fd, unsigned int shm_idx, thread_id_t tid );
+extern const struct object_ops esync_ops;
+void esync_set_event( struct esync *esync );
+void esync_reset_event( struct esync *esync );
+void esync_abandon_mutexes( struct thread *thread );
 
-#endif /* __WINE_SERVER_ESYNC_H */
+struct esync *create_esync( struct object *root, const struct unicode_str *name,
+                            unsigned int attr, int initval, int max, enum esync_type type,
+                            const struct security_descriptor *sd );
