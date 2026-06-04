@@ -1263,8 +1263,8 @@ static const char *init_server_dir( dev_t dev, ino_t ino )
 {
     char *dir = NULL;
 
-#ifdef __ANDROID__  /* there's no /tmp dir on Android */
-    asprintf( &dir, "%s/.wineserver/server-%llx-%llx", config_dir, (unsigned long long)dev, (unsigned long long)ino );
+#ifdef __ANDROID__  /* Termux 고유 임시 디렉토리(/usr/tmp) 경로 적용 */
+    asprintf( &dir, "/data/data/com.termux/files/usr/tmp/.wine-%u/server-%llx-%llx", getuid(), (unsigned long long)dev, (unsigned long long)ino );
 #else
     asprintf( &dir, "/tmp/.wine-%u/server-%llx-%llx", getuid(), (unsigned long long)dev, (unsigned long long)ino );
 #endif
