@@ -19,7 +19,7 @@
  */
 
 extern int do_esync(void);
-extern void esync_init(int fd);
+extern void esync_init(void);
 extern NTSTATUS esync_close( HANDLE handle );
 
 extern NTSTATUS esync_create_semaphore(HANDLE *handle, ACCESS_MASK access,
@@ -43,7 +43,7 @@ extern NTSTATUS esync_create_mutex( HANDLE *handle, ACCESS_MASK access,
 extern NTSTATUS esync_open_mutex( HANDLE *handle, ACCESS_MASK access,
     const OBJECT_ATTRIBUTES *attr );
 extern NTSTATUS esync_query_mutex( HANDLE handle, void *info, ULONG *ret_len );
-extern NTSTATUS esync_release_mutex( HANDLE handle, LONG *prev );
+extern NTSTATUS esync_release_mutex( HANDLE *handle, LONG *prev );
 
 extern NTSTATUS esync_wait_objects( DWORD count, const HANDLE *handles, BOOLEAN wait_any,
                                     BOOLEAN alertable, const LARGE_INTEGER *timeout );
