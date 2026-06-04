@@ -235,7 +235,18 @@ jobs:
         run: |
           cd ${{ env.WINE_SOURCE_DIR }}/source
           # curl -L https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/dlls/ntdll/unix/env.c -o dlls/ntdll/unix/env.c
-          curl -L https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/dlls/ntdll/unix/09env.c -o dlls/ntdll/unix/env.c
+          # curl -L https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/dlls/ntdll/unix/09env.c -o dlls/ntdll/unix/env.c
+          curl -L https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/server/fsync.c -o server/fsync.c
+          curl -L https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/server/esync.c -o server/esync.c
+          curl -L https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/dlls/ntdll/unix/virtual.c -o dlls/ntdll/unix/virtual.c
+          curl -L https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/dlls/ntdll/unix/server.c -o dlls/ntdll/unix/server.c
+          curl -L https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/dlls/ntdll/unix/fsync.c -o dlls/ntdll/unix/fsync.c
+          curl -L https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/dlls/ntdll/unix/esync.c -o dlls/ntdll/unix/esync.c
+          curl -L https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/dlls/ntdll/unix/env_pro10.c -o dlls/ntdll/unix/env_pro10.c
+
+          if [ ! -f "configure" ]; then
+            ./autogen.sh
+          fi
 
       - name: Termux
         run: |
