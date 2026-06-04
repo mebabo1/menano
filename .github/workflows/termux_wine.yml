@@ -258,7 +258,18 @@ jobs:
           find . -name "file.c" -exec sed -i 's|"/tmp"|"/data/data/com.termux/files/usr/tmp"|g' {} + 2>/dev/null || true
           find . -name "loader.c" -exec sed -i 's|"/tmp"|"/data/data/com.termux/files/usr/tmp"|g' {} + 2>/dev/null || true
           find . -name "server.c" -exec sed -i 's|"/tmp"|"/data/data/com.termux/files/usr/tmp"|g' {} + 2>/dev/null || true
-          
+
+          FILE3="dlls/wdscore/wdscore.spec"
+          if [ -f "$FILE3" ]; then
+            if grep -q '@ stub' "$FILE3"; then
+              echo "Cleaning wdscore.spec stubs..."
+              sed -i '/CDynamicArray/d' "$FILE3"
+              echo "✔ wdscore stubs cleaned"
+            else
+              echo "✔ wdscore already cleaned or not found"
+            fi
+          fi
+
           FILE_LOADER="dlls/ntdll/unix/loader.c"
           if [ -f "$FILE_LOADER" ]; then
             echo "Removing M_PERTURB calls from $FILE_LOADER..."
