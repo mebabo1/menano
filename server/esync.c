@@ -45,6 +45,31 @@
 #include "esync.h"
 #include "fsync.h"
 
+#ifdef __ANDROID__
+static int shm_open(const char *name, int oflag, mode_t mode) {
+	char *tmpdir;
+	char *fname;
+	
+	tmpdir = getenv("TMPDIR");
+	if (!tmpdir) {
+		tmpdir = "/tmp";
+	}
+	asprintf(&fname, "%s/%s", tmpdir, name);
+	return open(fname, oflag, mode);
+}
+static int shm_unlink(const char *name) {
+	char *tmpdir;
+	char *fname;
+	
+	tmpdir = getenv("TMPDIR");
+	if (!tmpdir) {
+		tmpdir = "/tmp";
+	}
+	asprintf(&fname, "%s/%s", tmpdir, name);
+	return unlink(fname);
+}
+#endif
+
 int do_esync(void)
 {
 #ifdef HAVE_SYS_EVENTFD_H
