@@ -84,6 +84,20 @@ struct timespec64
     long long tv_nsec;
 };
 
+#ifdef __ANDROID__
+static int shm_open(const char *name, int oflag, mode_t mode) {
+	char *tmpdir;
+	char *fname;
+	
+	tmpdir = getenv("TMPDIR");
+	if (!tmpdir) {
+		tmpdir = "/tmp";
+	}
+	asprintf(&fname, "%s/%s", tmpdir, name);
+	return open(fname, oflag, mode);
+}
+#endif
+
 static LONGLONG nt_time_from_ts( struct timespec *ts )
 {
     return ticks_from_time_t( ts->tv_sec ) + (ts->tv_nsec + 50) / 100;
