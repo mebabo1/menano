@@ -2,7 +2,6 @@
  * futex-based synchronization objects
  *
  * Copyright (C) 2018 Zebediah Figura
- * Copyright (C) 2025 Paul Gofman for CodeWeavers
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -52,17 +51,18 @@
 #define __NR_futex_waitv 449
 #endif
 
-#ifdef __ANDROID__
-#include "../android/shm_utils/shm_utils.h"
-#endif
-
-int do_fsync_cached = -1;
-
-int fsync_check_support(void)
+int do_fsync(void)
 {
-#if defined(__linux__) && !defined(__ANDROID__)
-    syscall( __NR_futex_waitv, 0, 0, 0, 0, 0 );
-    return getenv( "WINEFSYNC" ) && atoi(getenv( "WINEFSYNC" )) && errno != ENOSYS && errno != EPERM;
+#ifdef __linux__
+    static int do_fsync_cached = -1;
+
+    if (do_fsync_cached == -1)
+    {
+        syscall( __NR_futex_waitv, 0, 0, 0, 0, 0);
+        do_fsync_cached = getenv("WINEFSYNC") && atoi(getenv("WINEFSYNC")) && errno != ENOSYS && errno != EPERM;
+    }
+
+    return do_fsync_cached;
 #else
     return 0;
 #endif
@@ -136,6 +136,69 @@ struct fsync
     enum fsync_type type;
     struct list     mutex_entry;
 };
+
+static void fsync_dump( struct object *obj, int verbose );
+static unsigned int fsync_get_fsync_idx( struct object *obj, enum fsync_type *type );
+static unsigned int fsync_map_access( struct object *obj, unsigned int access );
+static void fsync_destroy( struct object *obj );
+
+const struct object_ops fsync_ops =
+{
+    sizeof(struct fsync),      /* size */
+    &no_type,                  /* type */
+    fsync_dump,                /* dump */
+    no_add_queue,              /* add_queue */
+    NULL,                      /* remove_queue */
+    NULL,                      /* signaled */
+    NULL,                      /* get_esync_fd */
+    fsync_get_fsync_idx,       /* get_fsync_idx */
+    NULL,                      /* satisfied */
+    no_signal,                 /* signal */
+    no_get_fd,                 /* get_fd */
+    fsync_map_access,          /* map_access */
+    default_get_sd,            /* get_sd */
+    default_set_sd,            /* set_sd */
+    default_get_full_name,     /* get_full_name */
+    no_lookup_name,            /* lookup_name */
+    directory_link_name,       /* link_name */
+    default_unlink_name,       /* unlink_name */
+    no_open_file,              /* open_file */
+    no_kernel_obj_list,        /* get_kernel_obj_list */
+    no_close_handle,           /* close_handle */
+    fsync_destroy              /* destroy */
+};
+
+static void fsync_dump( struct object *obj, int verbose )
+{
+    struct fsync *fsync = (struct fsync *)obj;
+    assert( obj->ops == &fsync_ops );
+    fprintf( stderr, "fsync idx=%d\n", fsync->shm_idx );
+}
+
+static unsigned int fsync_get_fsync_idx( struct object *obj, enum fsync_type *type)
+{
+    struct fsync *fsync = (struct fsync *)obj;
+    *type = fsync->type;
+    return fsync->shm_idx;
+}
+
+static unsigned int fsync_map_access( struct object *obj, unsigned int access )
+{
+    /* Sync objects have the same flags. */
+    if (access & GENERIC_READ)    access |= STANDARD_RIGHTS_READ | EVENT_QUERY_STATE;
+    if (access & GENERIC_WRITE)   access |= STANDARD_RIGHTS_WRITE | EVENT_MODIFY_STATE;
+    if (access & GENERIC_EXECUTE) access |= STANDARD_RIGHTS_EXECUTE | SYNCHRONIZE;
+    if (access & GENERIC_ALL)     access |= STANDARD_RIGHTS_ALL | EVENT_QUERY_STATE | EVENT_MODIFY_STATE;
+    return access & ~(GENERIC_READ | GENERIC_WRITE | GENERIC_EXECUTE | GENERIC_ALL);
+}
+
+static void fsync_destroy( struct object *obj )
+{
+    struct fsync *fsync = (struct fsync *)obj;
+    if (fsync->type == FSYNC_MUTEX)
+        list_remove( &fsync->mutex_entry );
+    fsync_free_shm_idx( fsync->shm_idx );
+}
 
 static void *get_shm( unsigned int idx )
 {
@@ -254,8 +317,8 @@ void fsync_free_shm_idx( int shm_idx )
     uint64_t mask;
     int *shm;
 
-    if (!shm_idx) return;
-    assert( shm_idx > 0 && shm_idx < shm_idx_free_map_size * BITS_IN_FREE_MAP_WORD );
+    assert( shm_idx );
+    assert( shm_idx < shm_idx_free_map_size * BITS_IN_FREE_MAP_WORD );
 
     shm = get_shm( shm_idx );
     if (shm[2] <= 0)
@@ -303,13 +366,53 @@ void fsync_cleanup_process_shm_indices( process_id_t id )
     }
 }
 
-int fsync_grab_shm_idx( unsigned int shm_idx )
+static int type_matches( enum fsync_type type1, enum fsync_type type2 )
 {
-    int *shm;
+    return (type1 == type2) ||
+           ((type1 == FSYNC_AUTO_EVENT || type1 == FSYNC_MANUAL_EVENT) &&
+            (type2 == FSYNC_AUTO_EVENT || type2 == FSYNC_MANUAL_EVENT));
+}
 
-    shm = get_shm( shm_idx );
-    __atomic_add_fetch( &shm[2], 1, __ATOMIC_SEQ_CST );
-    return shm_idx;
+struct fsync *create_fsync( struct object *root, const struct unicode_str *name,
+    unsigned int attr, int low, int high, enum fsync_type type,
+    const struct security_descriptor *sd )
+{
+#ifdef __linux__
+    struct fsync *fsync;
+
+    if ((fsync = create_named_object( root, &fsync_ops, name, attr, sd )))
+    {
+        if (get_error() != STATUS_OBJECT_NAME_EXISTS)
+        {
+            /* initialize it if it didn't already exist */
+
+            /* Initialize the shared memory portion. We want to do this on the
+             * server side to avoid a potential though unlikely race whereby
+             * the same object is opened and used between the time it's created
+             * and the time its shared memory portion is initialized. */
+
+            fsync->shm_idx = fsync_alloc_shm( low, high );
+            fsync->type = type;
+            if (type == FSYNC_MUTEX)
+                list_add_tail( &mutex_list, &fsync->mutex_entry );
+        }
+        else
+        {
+            /* validate the type */
+            if (!type_matches( type, fsync->type ))
+            {
+                release_object( &fsync->obj );
+                set_error( STATUS_OBJECT_TYPE_MISMATCH );
+                return NULL;
+            }
+        }
+    }
+
+    return fsync;
+#else
+    set_error( STATUS_NOT_IMPLEMENTED );
+    return NULL;
+#endif
 }
 
 static inline int futex_wake( int *addr, int val )
@@ -326,17 +429,70 @@ struct fsync_event
     int last_pid;
 };
 
-void fsync_set_event( unsigned int shm_idx )
+void fsync_wake_futex( unsigned int shm_idx )
 {
-    struct fsync_event *event = get_shm( shm_idx );
+    struct fsync_event *event;
+
+    if (debug_level)
+        fprintf( stderr, "fsync_wake_futex: index %u\n", shm_idx );
+
+    if (!shm_idx)
+        return;
+
+    event = get_shm( shm_idx );
+    if (!__atomic_exchange_n( &event->signaled, 1, __ATOMIC_SEQ_CST ))
+        futex_wake( &event->signaled, INT_MAX );
+}
+
+void fsync_wake_up( struct object *obj )
+{
+    enum fsync_type type;
+
+    if (debug_level)
+        fprintf( stderr, "fsync_wake_up: object %p\n", obj );
+
+    if (obj->ops->get_fsync_idx)
+        fsync_wake_futex( obj->ops->get_fsync_idx( obj, &type ) );
+}
+
+void fsync_clear_futex( unsigned int shm_idx )
+{
+    struct fsync_event *event;
+
+    if (debug_level)
+        fprintf( stderr, "fsync_clear_futex: index %u\n", shm_idx );
+
+    if (!shm_idx)
+        return;
+
+    event = get_shm( shm_idx );
+    __atomic_store_n( &event->signaled, 0, __ATOMIC_SEQ_CST );
+}
+
+void fsync_clear( struct object *obj )
+{
+    enum fsync_type type;
+
+    if (debug_level)
+        fprintf( stderr, "fsync_clear: object %p\n", obj );
+
+    if (obj->ops->get_fsync_idx)
+        fsync_clear_futex( obj->ops->get_fsync_idx( obj, &type ) );
+}
+
+void fsync_set_event( struct fsync *fsync )
+{
+    struct fsync_event *event = get_shm( fsync->shm_idx );
+    assert( fsync->obj.ops == &fsync_ops );
 
     if (!__atomic_exchange_n( &event->signaled, 1, __ATOMIC_SEQ_CST ))
         futex_wake( &event->signaled, INT_MAX );
 }
 
-void fsync_reset_event( unsigned int shm_idx )
+void fsync_reset_event( struct fsync *fsync )
 {
-    struct fsync_event *event = get_shm( shm_idx );
+    struct fsync_event *event = get_shm( fsync->shm_idx );
+    assert( fsync->obj.ops == &fsync_ops );
 
     __atomic_store_n( &event->signaled, 0, __ATOMIC_SEQ_CST );
 }
@@ -347,18 +503,120 @@ struct mutex
     int count;  /* recursion count */
 };
 
-void fsync_abandon_mutex( unsigned int shm_idx, thread_id_t tid )
+void fsync_abandon_mutexes( struct thread *thread )
 {
-    struct mutex *mutex = get_shm( shm_idx );
+    struct fsync *fsync;
 
-    if (mutex->tid != tid) return;
+    LIST_FOR_EACH_ENTRY( fsync, &mutex_list, struct fsync, mutex_entry )
+    {
+        struct mutex *mutex = get_shm( fsync->shm_idx );
 
-    if (debug_level)
-        fprintf( stderr, "fsync_abandon_mutexes() idx=%d\n", shm_idx );
+        if (mutex->tid == thread->id)
+        {
+            if (debug_level)
+                fprintf( stderr, "fsync_abandon_mutexes() idx=%d\n", fsync->shm_idx );
+            mutex->tid = ~0;
+            mutex->count = 0;
+            futex_wake( &mutex->tid, INT_MAX );
+        }
+    }
+}
 
-    mutex->tid = ~0;
-    mutex->count = 0;
-    futex_wake( &mutex->tid, INT_MAX );
+DECL_HANDLER(create_fsync)
+{
+    struct fsync *fsync;
+    struct unicode_str name;
+    struct object *root;
+    const struct security_descriptor *sd;
+    const struct object_attributes *objattr = get_req_object_attributes( &sd, &name, &root );
+
+    if (!do_fsync())
+    {
+        set_error( STATUS_NOT_IMPLEMENTED );
+        return;
+    }
+
+    if (!objattr) return;
+
+    if ((fsync = create_fsync( root, &name, objattr->attributes, req->low,
+                               req->high, req->type, sd )))
+    {
+        if (get_error() == STATUS_OBJECT_NAME_EXISTS)
+            reply->handle = alloc_handle( current->process, fsync, req->access, objattr->attributes );
+        else
+            reply->handle = alloc_handle_no_access_check( current->process, fsync,
+                                                          req->access, objattr->attributes );
+
+        reply->shm_idx = fsync->shm_idx;
+        reply->type = fsync->type;
+        release_object( fsync );
+    }
+
+    if (root) release_object( root );
+}
+
+DECL_HANDLER(open_fsync)
+{
+    struct unicode_str name = get_req_unicode_str();
+
+    reply->handle = open_object( current->process, req->rootdir, req->access,
+                                 &fsync_ops, &name, req->attributes );
+
+    if (reply->handle)
+    {
+        struct fsync *fsync;
+
+        if (!(fsync = (struct fsync *)get_handle_obj( current->process, reply->handle,
+                                                      0, &fsync_ops )))
+            return;
+
+        if (!type_matches( req->type, fsync->type ))
+        {
+            set_error( STATUS_OBJECT_TYPE_MISMATCH );
+            release_object( fsync );
+            return;
+        }
+
+        reply->type = fsync->type;
+        reply->shm_idx = fsync->shm_idx;
+        release_object( fsync );
+    }
+}
+
+/* Retrieve the index of a shm section which will be signaled by the server. */
+DECL_HANDLER(get_fsync_idx)
+{
+    struct object *obj;
+    enum fsync_type type;
+
+    if (!(obj = get_handle_obj( current->process, req->handle, SYNCHRONIZE, NULL )))
+        return;
+
+    if (obj->ops->get_fsync_idx)
+    {
+        int *shm;
+
+        reply->shm_idx = obj->ops->get_fsync_idx( obj, &type );
+        reply->type = type;
+        shm = get_shm( reply->shm_idx );
+        __atomic_add_fetch( &shm[2], 1, __ATOMIC_SEQ_CST );
+    }
+    else
+    {
+        if (debug_level)
+        {
+            fprintf( stderr, "%04x: fsync: can't wait on object: ", current->id );
+            obj->ops->dump( obj, 0 );
+        }
+        set_error( STATUS_NOT_IMPLEMENTED );
+    }
+
+    release_object( obj );
+}
+
+DECL_HANDLER(get_fsync_apc_idx)
+{
+    reply->shm_idx = current->fsync_apc_idx;
 }
 
 DECL_HANDLER(fsync_free_shm_idx)
