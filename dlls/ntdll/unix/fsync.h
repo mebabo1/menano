@@ -18,17 +18,30 @@
  * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA
  */
 
-extern void fsync_init( DWORD pid );
+extern int do_fsync(void);
+extern void fsync_init(void);
 extern NTSTATUS fsync_close( HANDLE handle );
 
+extern NTSTATUS fsync_create_semaphore(HANDLE *handle, ACCESS_MASK access,
+    const OBJECT_ATTRIBUTES *attr, LONG initial, LONG max);
 extern NTSTATUS fsync_release_semaphore( HANDLE handle, ULONG count, ULONG *prev );
-extern NTSTATUS fsync_query_semaphore( HANDLE handle, void *info );
+extern NTSTATUS fsync_open_semaphore( HANDLE *handle, ACCESS_MASK access,
+    const OBJECT_ATTRIBUTES *attr );
+extern NTSTATUS fsync_query_semaphore( HANDLE handle, void *info, ULONG *ret_len );
+extern NTSTATUS fsync_create_event( HANDLE *handle, ACCESS_MASK access,
+    const OBJECT_ATTRIBUTES *attr, EVENT_TYPE type, BOOLEAN initial );
+extern NTSTATUS fsync_open_event( HANDLE *handle, ACCESS_MASK access,
+    const OBJECT_ATTRIBUTES *attr );
 extern NTSTATUS fsync_set_event( HANDLE handle, LONG *prev );
 extern NTSTATUS fsync_reset_event( HANDLE handle, LONG *prev );
 extern NTSTATUS fsync_pulse_event( HANDLE handle, LONG *prev );
-extern NTSTATUS fsync_query_event( HANDLE handle, void *info );
+extern NTSTATUS fsync_query_event( HANDLE handle, void *info, ULONG *ret_len );
+extern NTSTATUS fsync_create_mutex( HANDLE *handle, ACCESS_MASK access,
+    const OBJECT_ATTRIBUTES *attr, BOOLEAN initial );
+extern NTSTATUS fsync_open_mutex( HANDLE *handle, ACCESS_MASK access,
+    const OBJECT_ATTRIBUTES *attr );
 extern NTSTATUS fsync_release_mutex( HANDLE handle, LONG *prev );
-extern NTSTATUS fsync_query_mutex( HANDLE handle, void *info );
+extern NTSTATUS fsync_query_mutex( HANDLE handle, void *info, ULONG *ret_len );
 
 extern NTSTATUS fsync_wait_objects( DWORD count, const HANDLE *handles, BOOLEAN wait_any,
                                     BOOLEAN alertable, const LARGE_INTEGER *timeout );
@@ -39,9 +52,3 @@ extern NTSTATUS fsync_signal_and_wait( HANDLE signal, HANDLE wait,
  * called from NtClose() doesn't race with get_fsync_idx(), add_to_list() sequence called
  * from get_object(). */
 extern pthread_mutex_t fd_cache_mutex;
-
-extern int fsync_enabled;
-static inline int do_fsync(void)
-{
-    return fsync_enabled;
-}
