@@ -404,6 +404,9 @@ static void kernel_writewatch_softdirty_init(void)
 
 static void kernel_writewatch_init(void)
 {
+#ifdef __ANDROID__
+    use_kernel_writewatch = 0;
+#else    
     struct uffdio_api uffdio_api;
 
     uffd_fd = syscall( __NR_userfaultfd, O_CLOEXEC | O_NONBLOCK | UFFD_USER_MODE_ONLY );
@@ -429,6 +432,7 @@ static void kernel_writewatch_init(void)
         return;
     }
     use_kernel_writewatch = 1;
+#endif
 }
 
 static void kernel_writewatch_reset( void *start, SIZE_T len )
