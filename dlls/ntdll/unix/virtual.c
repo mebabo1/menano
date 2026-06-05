@@ -92,6 +92,20 @@ WINE_DECLARE_DEBUG_CHANNEL(module);
 WINE_DECLARE_DEBUG_CHANNEL(virtual_ranges);
 WINE_DECLARE_DEBUG_CHANNEL(virtstat);
 
+#ifdef __ANDROID__
+static int shm_open(const char *name, int oflag, mode_t mode) {
+	char *tmpdir;
+	char *fname;
+	
+	tmpdir = getenv("TMPDIR");
+	if (!tmpdir) {
+		tmpdir = "/data/data/com.termux/files/usr/tmp";
+	}
+	asprintf(&fname, "%s/%s", tmpdir, name);
+	return open(fname, oflag, mode);
+}
+#endif
+
 /* Gdb integration, in loader/main.c */
 static struct r_debug *wine_r_debug;
 
