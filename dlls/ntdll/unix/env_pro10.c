@@ -807,24 +807,27 @@ static void init_locale(void)
     const NLS_LOCALE_DATA *locale;
     char *p;
 #ifdef __ANDROID__
-    all = getenv( "LC_ALL" );
-    if (!all)
-        all = "C.UTF-8";
-
-    if (!unix_to_win_locale( all, system_locale )) system_locale[0] = 0;
-    TRACE_(nls)( "Unix LC_ALL is %s, setting system locale to %s\n", debugstr_a(all), debugstr_a(system_locale) );
-
-    if (main_argc > 1 && strstr(main_argv[1], "start_protected_game.exe"))
     {
-        FIXME( "HACK setting EN locale.\n" );
-        all = "en_US.UTF-8";
-    }
-        
-    if (!unix_to_win_locale( all, user_locale )) user_locale[0] = 0;
-    TRACE_(nls)( "Unix LC_ALL is %s, user system locale to %s\n", debugstr_a(all), debugstr_a(user_locale) );
-#else
-    if (!unix_to_win_locale ( all, user_locale )) user_locale[0] = 0;
+        const char *all; // 👈 'all' 변수가 없다고 하니 내부 블록에서 직접 선언합니다.
 
+        all = getenv( "LC_ALL" );
+        if (!all)
+            all = "C.UTF-8";
+
+        if (!unix_to_win_locale( all, system_locale )) system_locale[0] = 0;
+
+        if (main_argc > 1 && strstr(main_argv[1], "start_protected_game.exe"))
+        {
+            FIXME( "HACK setting EN locale.\n" );
+            all = "en_US.UTF-8";
+        }
+            
+        if (!unix_to_win_locale( all, user_locale )) user_locale[0] = 0;
+
+    }
+#else
+    if (!unix_to_win_locale ( all, user_locale )) user_locale[0] = 0;     
+    
     if (!(all = setlocale( LC_ALL, "" )) && (all = getenv( "LC_ALL" )))
         FIXME_(nls)( "Failed to set LC_ALL to %s, is the locale supported?\n", debugstr_a(all) );
     if (!(ctype = setlocale( LC_CTYPE, "" )) && (ctype = getenv( "LC_CTYPE" )))
