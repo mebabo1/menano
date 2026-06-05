@@ -238,9 +238,6 @@ jobs:
           # curl -L https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/dlls/ntdll/unix/09env.c -o dlls/ntdll/unix/env.c
           curl -L https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/dlls/ntdll/unix/virtual.c -o dlls/ntdll/unix/virtual.c
           curl -L https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/dlls/ntdll/unix/env_pro10.c -o dlls/ntdll/unix/env.c
-          git clone --depth 1 -b proton-9.0-arm64ec https://github.com/Pipetto-crypto/wine.git temp_pipetto
-          cp -r temp_pipetto/libs/vkd3d/* libs/vkd3d/
-          rm -rf temp_pipetto
 
       - name: Termux
         run: |
