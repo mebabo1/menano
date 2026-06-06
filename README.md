@@ -37,7 +37,9 @@ curl -o update https://raw.githubusercontent.com/mebabo1/menano/File/update && c
 # run x11
 run openbox mode
 
-[How do I run the game?](https://youtu.be/DBPj19-0SX4?si=LxD0XJEPEBy1-CoH)
+[How do I run the game? glibc](https://youtu.be/DBPj19-0SX4?si=LxD0XJEPEBy1-CoH)
+
+[How do I run the game? Bionic](https://youtube.com/shorts/hqaXWjpbClo?si=9UMTplsLcGkEp7Ob)
 
 After installing Wine and DXVK, you can run the game through the file manager
 Language default value: Korean
