@@ -58,13 +58,6 @@ jobs:
           
           echo "Vulkan XCB/Xlib headers injected successfully into $TARGET_VULKAN_DIR"
 
-      - name: Patch DisplayX Source Codes
-        run: |
-          cd displayx-src
-          sed -i 's/AHARDWAREBUFFER_USAGE_GPU_COLOR_OUTPUT;/AHARDWAREBUFFER_USAGE_GPU_COLOR_OUTPUT | AHARDWAREBUFFER_USAGE_CPU_READ_RARELY | AHARDWAREBUFFER_USAGE_CPU_WRITE_RARELY;/g' src/displayx_layer.cpp
-          sed -i 's/dev->table.QueueSubmit(q->handle, 1, \&submitInfo, fence);/if(q \&\& q->handle) dev->table.QueueSubmit(q->handle, 1, \&submitInfo, fence);/g' src/displayx_layer.cpp        
-          echo "DisplayX source level bugfixes applied successfully."
-
       - name: Build DisplayX Via Make Overrides
         run: |
           cd displayx-src
