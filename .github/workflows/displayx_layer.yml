@@ -19,10 +19,21 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      # 1. 깃허브 저장소를 DisplayX로 변경
       - name: Clone DisplayX
         run: |
           git clone --depth 1 https://github.com/Pipetto-crypto/DisplayX.git displayx-src
+
+      - name: Download Missing Vulkan XCB Headers
+        run: |
+          TARGET_VULKAN_DIR="$TERMUX_PREFIX/include/vulkan"
+          mkdir -p "$TARGET_VULKAN_DIR"
+          
+          # 공식 Khronos Vulkan-Headers 레포지토리에서 리눅스/X11 연동에 필요한 핵심 헤더 3종 다운로드
+          wget -q https://raw.githubusercontent.com/KhronosGroup/Vulkan-Headers/main/include/vulkan/vulkan_xcb.h -O "$TARGET_VULKAN_DIR/vulkan_xcb.h"
+          wget -q https://raw.githubusercontent.com/KhronosGroup/Vulkan-Headers/main/include/vulkan/vulkan_xlib.h -O "$TARGET_VULKAN_DIR/vulkan_xlib.h"
+          wget -q https://raw.githubusercontent.com/KhronosGroup/Vulkan-Headers/main/include/vulkan/vulkan_xlib_xrandr.h -O "$TARGET_VULKAN_DIR/vulkan_xlib_xrandr.h"
+          
+          echo "Vulkan XCB/Xlib headers injected successfully into $TARGET_VULKAN_DIR"
 
       - name: Install Host Dependencies
         run: |
