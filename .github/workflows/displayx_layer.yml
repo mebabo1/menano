@@ -1,0 +1,78 @@
+name: Build DisplayX Layer for Termux aarch64
+
+on:
+  push:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-displayx:
+    runs-on: ubuntu-22.04
+
+    env:
+      ANDROID_NDK_VERSION: r26b
+      API_LEVEL: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # 1. 깃허브 저장소를 DisplayX로 변경
+      - name: Clone DisplayX
+        run: |
+          git clone --depth 1 https://github.com/Pipetto-crypto/DisplayX.git displayx-src
+
+      - name: Install Host Dependencies
+        run: |
+          sudo apt update
+          sudo apt install -y git wget unzip pkg-config make
+
+      - name: Download Android NDK
+        run: |
+          cd /tmp
+          wget -q https://dl.google.com/android/repository/android-ndk-${ANDROID_NDK_VERSION}-linux.zip
+          unzip -q android-ndk-${ANDROID_NDK_VERSION}-linux.zip
+          echo "ANDROID_NDK=/tmp/android-ndk-${ANDROID_NDK_VERSION}" >> $GITHUB_ENV
+
+      - name: Download and extract termuxfs for aarch64
+        run: |
+          mkdir -p $HOME/termuxfs/aarch64
+          cd $HOME/termuxfs/aarch64
+          wget -q https://github.com/ziad9267/termux-on-gha/releases/download/test/termuxfs.tar
+          tar -xf termuxfs.tar
+          
+          echo "TERMUX_PREFIX=$HOME/termuxfs/aarch64/data/data/com.termux/files/usr" >> $GITHUB_ENV
+          echo "RUNTIME_PATH=/data/data/com.termux/files/usr" >> $GITHUB_ENV
+
+      # 2. DisplayX 소스 구조 및 Makefile 타겟에 맞춰 컴파일 옵션 변경
+      - name: Build DisplayX Via Make Overrides
+        run: |
+          cd displayx-src
+          
+          NDK_ROOT=$ANDROID_NDK/toolchains/llvm/prebuilt/linux-x86_64
+          TOOLCHAIN=$NDK_ROOT/bin
+          
+          # DisplayX의 Makefile 변수(CXX, CXXFLAGS, LDFLAGS)를 강제 주입(Override)합니다.
+          make \
+            CXX="$TOOLCHAIN/aarch64-linux-android${API_LEVEL}-clang++" \
+            CXXFLAGS="-std=c++17 -fPIC --target=aarch64-linux-android${API_LEVEL} -D__TERMUX__ -D__USE_GNU -U__ANDROID__ -idirafter$TERMUX_PREFIX/include -include fcntl.h -include unistd.h" \
+            LDFLAGS="-shared --target=aarch64-linux-android${API_LEVEL} -nostdlib++ -L$TERMUX_PREFIX/lib -Wl,-rpath=/system/lib64:$RUNTIME_PATH/lib -landroid-shmem -lc++_shared -lX11-xcb -lxcb -landroid"
+
+      # 3. 산출물(.so) 및 불칸 레이어 설정 파일(.json) 패키징
+      - name: Packaging Output
+        run: |
+          cd displayx-src
+          mkdir -p output/lib
+          mkdir -p output/json
+          
+          # 빌드된 디바이스 레이어 바이너리와 JSON 설정 파일 복사
+          cp displayx_layer.so output/lib/
+          cp displayx_layer.json output/json/
+
+      - name: Upload Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: termux-displayx-layer
+          path: displayx-src/output/
