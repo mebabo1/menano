@@ -301,7 +301,7 @@ jobs:
 
           export PATCH_BASE="https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/path"
 
-          PATCH_FILES="1.patch 2.patch 3.patch gstreamer.patch looser.patch"
+          PATCH_FILES="1.patch 2.patch gstreamer.patch looser.patch"
           echo "Applying external patches from $PATCH_BASE..."
           for FILE in $PATCH_FILES; do
             URL="${PATCH_BASE}/${FILE}"
@@ -412,8 +412,6 @@ jobs:
             --with-vkd3d \
             --with-xinput \
             --with-xinput2 \
-            --with-xrender \
-            --with-opengl \
             --without-xxf86vm
             
           make -j$(nproc) > build.log 2>&1 || (tail -n 100 build.log && exit 1)
