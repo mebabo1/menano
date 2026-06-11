@@ -115,36 +115,6 @@ jobs:
           PKG_CONFIG_SYSROOT_DIR = '$TERMUX_SYSROOT'
           EOF
 
-      # 🌟 [연쇄 에러 해결] SPIRV-Tools 본체와 최적화 도구 검증을 통째로 밀어버리는 최종 패치
-      # 🌟 [완벽 해결] 미정의 변수 에러까지 완전히 방어하는 최종 마스터 패치
-      - name: Patch Meson Build for SPIRV-Tools
-        run: |
-          cd mesa-src
-          
-          TARGET_FILE="src/vulkan/wrapper/meson.build"
-          
-          if [ -f "$TARGET_FILE" ]; then
-            echo "=== Patching $TARGET_FILE ==="
-            
-            # 1. 시스템을 직접 뒤져서 에러를 내던 SPIRV-Tools 라인들을 전부 주석(#) 처리
-            sed -i "s/.*SPIRV-Tools.*/# &/g" $TARGET_FILE
-            
-            # 2. [치명적 해결책] 메손이 "이 변수 어디 갔어?"라고 물어볼 만한 변수명들을 
-            # 전부 파일 맨 밑바닥에 '아무것도 안 들어있는 빈 객체'로 강제 선언해 둡니다.
-            echo "" >> $TARGET_FILE
-            echo "dep_spirv_tools_opt = dependency('', required : false)" >> $TARGET_FILE
-            echo "dep_spirv_tools = dependency('', required : false)" >> $TARGET_FILE
-            echo "spirv_tools_opt_lib = dependency('', required : false)" >> $TARGET_FILE
-            echo "spirv_tools_lib = dependency('', required : false)" >> $TARGET_FILE
-            
-            echo "=== Patch Applied Successfully ==="
-            # 변수들이 잘 들어갔는지 파일 맨 밑바닥 15줄 확인
-            tail -n 15 $TARGET_FILE
-          else
-            echo "❌ Error: $TARGET_FILE not found!"
-            exit 1
-          fi
-
       - name: Configure Mesa
         run: |
           cd mesa-src
@@ -171,6 +141,7 @@ jobs:
             -Dgallium-drivers= \
             -Dvulkan-drivers=wrapper \
             -Dplatforms=x11 \
+            --wrap-mode=nofallback \
             --prefix=/data/data/com.termux/files/usr
 
       - name: Build
