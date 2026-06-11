@@ -141,7 +141,8 @@ jobs:
             -Dgallium-drivers= \
             -Dvulkan-drivers=wrapper \
             -Dplatforms=x11 \
-            --wrap-mode=nofallback \
+            Dspirv-to-dxil=false \
+            -Dopencl-spirv=false \
             --prefix=/data/data/com.termux/files/usr
 
       - name: Build
