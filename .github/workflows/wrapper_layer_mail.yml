@@ -19,16 +19,14 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      # 🌟 1. 소스코드 레포지토리를 leegao의 bionic-vulkan-wrapper로 전격 교체
       - name: Clone Bionic Vulkan Wrapper
         run: |
           git clone --depth 1 https://github.com/leegao/bionic-vulkan-wrapper.git wrapper-src
           
-      # 🌟 2. 툴체인 및 빌드에 필요한 핵심 도구만 설치 (Meson, Python 종속성 제거)
       - name: Install Dependencies
         run: |
           sudo apt update
-          sudo apt install -y git wget unzip pkg-config cmake ninja-build build-essential
+          sudo apt install -y git wget unzip pkg-config build-essential
 
       - name: Download Android NDK
         run: |
@@ -47,47 +45,32 @@ jobs:
           echo "TERMUX_PREFIX=$HOME/termuxfs/aarch64/data/data/com.termux/files/usr" >> $GITHUB_ENV
           echo "RUNTIME_PATH=/data/data/com.termux/files/usr" >> $GITHUB_ENV
 
-      # 🌟 3. CMake 구동 및 Android NDK 크로스 컴파일러 연결
-      - name: Configure CMake
+      # 🌟 [수정] CMake 대신 ndk-build를 사용하여 프로젝트 본래 규격대로 빌드합니다.
+      - name: Build with NDK-Build
         run: |
           cd wrapper-src
-          mkdir build && cd build
           
-          # NDK 내부의 표준 android.toolchain.cmake를 활용하여 가장 안정적인 빌드 환경을 잡습니다.
-          cmake .. \
-            -G Ninja \
-            -DCMAKE_TOOLCHAIN_FILE=$ANDROID_NDK/build/cmake/android.toolchain.cmake \
-            -DANDROID_ABI=arm64-v8a \
-            -DANDROID_PLATFORM=android-${API_LEVEL} \
-            -DCMAKE_BUILD_TYPE=Release \
-            -DCMAKE_CXX_FLAGS="-D__TERMUX__ -D__USE_GNU -U__ANDROID__ -idirafter$TERMUX_PREFIX/include" \
-            -DCMAKE_C_FLAGS="-D__TERMUX__ -D__USE_GNU -U__ANDROID__ -idirafter$TERMUX_PREFIX/include" \
-            -DCMAKE_SHARED_LINKER_FLAGS="-L$TERMUX_PREFIX/lib -Wl,-rpath=$RUNTIME_PATH/lib -landroid-shmem" \
-            -DCMAKE_INSTALL_PREFIX=$PWD/install_output
+          # NDK 내부의 ndk-build 실행 파일 경로 지정
+          NDK_BUILD=$ANDROID_NDK/ndk-build
+          
+          # Termux 전용 컴파일 옵션 및 링크 옵션을 ndk-build 인자로 직접 주입합니다.
+          $NDK_BUILD \
+            APP_ABI=arm64-v8a \
+            APP_PLATFORM=android-${API_LEVEL} \
+            APP_BUILD_SCRIPT=./Android.mk \
+            NDK_PROJECT_PATH=. \
+            TARGET_CFLAGS="-D__TERMUX__ -D__USE_GNU -U__ANDROID__ -idirafter$TERMUX_PREFIX/include" \
+            TARGET_LDFLAGS="-L$TERMUX_PREFIX/lib -Wl,-rpath=$RUNTIME_PATH/lib -landroid-shmem" \
+            V=1
 
-      # 🌟 4. 빌드 및 산출물 추출
-      - name: Build
+      - name: Show Built Files
         run: |
-          cd wrapper-src/build
-          ninja -v 2>&1 | tee build.log
-
-      - name: Install
-        run: |
-          cd wrapper-src/build
-          ninja install
-
-      - name: Show Files
-        run: |
-          echo "=== Installed Files ==="
-          find wrapper-src/build/install_output -type f || true
-          echo "=== All Built .so Files ==="
-          find wrapper-src/build -name "*.so"
+          echo "=== All Built Files ==="
+          find wrapper-src/libs -type f || true
 
       - name: Upload
         uses: actions/upload-artifact@v4
         with:
           name: bionic-vulkan-wrapper
           path: |
-            wrapper-src/build/build.log
-            wrapper-src/build/*.so
-            wrapper-src/build/install_output
+            wrapper-src/libs/arm64-v8a/*.so
