@@ -19,14 +19,44 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Clone Bionic Vulkan Wrapper
+      - name: Clone Mesa Wrapper
         run: |
-          git clone --depth 1 https://github.com/leegao/bionic-vulkan-wrapper.git wrapper-src
+          git clone --depth 1 \
+            https://github.com/leegao/bionic-vulkan-wrapper.git \
+            mesa-src
           
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
       - name: Install Dependencies
         run: |
           sudo apt update
-          sudo apt install -y git wget unzip pkg-config build-essential
+
+          sudo apt install -y \
+            git \
+            wget \
+            unzip \
+            pkg-config \
+            ninja-build \
+            cmake \
+            bison \
+            flex \
+            python3-dev \
+            libx11-dev \
+            libxext-dev \
+            libxcb1-dev \
+            libxrandr-dev \
+            libxfixes-dev \
+            libxshmfence-dev \
+            libdrm-dev \
+            zlib1g-dev \
+            libzstd-dev \
+            glslang-tools
+
+          python -m pip install --upgrade pip
+          python -m pip install meson mako pyyaml ninja
 
       - name: Download Android NDK
         run: |
@@ -43,34 +73,92 @@ jobs:
           tar -xf termuxfs.tar
           
           echo "TERMUX_PREFIX=$HOME/termuxfs/aarch64/data/data/com.termux/files/usr" >> $GITHUB_ENV
+          echo "TERMUX_SYSROOT=$HOME/termuxfs/aarch64" >> $GITHUB_ENV
           echo "RUNTIME_PATH=/data/data/com.termux/files/usr" >> $GITHUB_ENV
 
-      # 🌟 [수정] CMake 대신 ndk-build를 사용하여 프로젝트 본래 규격대로 빌드합니다.
-      - name: Build with NDK-Build
+      - name: Create Android Cross File
         run: |
-          cd wrapper-src
-          
-          # NDK 내부의 ndk-build 실행 파일 경로 지정
-          NDK_BUILD=$ANDROID_NDK/ndk-build
-          
-          # Termux 전용 컴파일 옵션 및 링크 옵션을 ndk-build 인자로 직접 주입합니다.
-          $NDK_BUILD \
-            APP_ABI=arm64-v8a \
-            APP_PLATFORM=android-${API_LEVEL} \
-            APP_BUILD_SCRIPT=./Android.mk \
-            NDK_PROJECT_PATH=. \
-            TARGET_CFLAGS="-D__TERMUX__ -D__USE_GNU -U__ANDROID__ -idirafter$TERMUX_PREFIX/include" \
-            TARGET_LDFLAGS="-L$TERMUX_PREFIX/lib -Wl,-rpath=$RUNTIME_PATH/lib -landroid-shmem" \
-            V=1
+          NDK_ROOT=$ANDROID_NDK/toolchains/llvm/prebuilt/linux-x86_64
+          TOOLCHAIN=$NDK_ROOT/bin
+          SYSROOT=$NDK_ROOT/sysroot
 
-      - name: Show Built Files
+          cat > /tmp/android-cross.ini << EOF
+          [host_machine]
+          system = 'android'
+          cpu_family = 'aarch64'
+          cpu = 'aarch64'
+          endian = 'little'
+
+          [binaries]
+          c = ['$TOOLCHAIN/aarch64-linux-android${API_LEVEL}-clang', '-D__TERMUX__', '-D__USE_GNU', '-U__ANDROID__', '--target=aarch64-linux-android30']
+          cpp = ['$TOOLCHAIN/aarch64-linux-android${API_LEVEL}-clang++', '-D__TERMUX__', '-D__USE_GNU', '-U__ANDROID__', '--target=aarch64-linux-android30']
+          ar = '$TOOLCHAIN/llvm-ar'
+          strip = '$TOOLCHAIN/llvm-strip'
+          pkgconfig = 'pkg-config'
+
+          [properties]
+          needs_exe_wrapper = true
+          sysroot = '$SYSROOT'
+
+          [built-in options]
+          c_args = ['-fPIC', '-idirafter$TERMUX_PREFIX/include', '-include', 'fcntl.h', '-include', 'unistd.h']
+          cpp_args = ['-fPIC', '-idirafter$TERMUX_PREFIX/include', '-include', 'fcntl.h', '-include', 'unistd.h']
+          c_link_args = ['--target=aarch64-linux-android30', '-L$TERMUX_PREFIX/lib', '-Wl,-rpath=/system/lib64:$RUNTIME_PATH/lib', '-Wl,--no-as-needed', '-lEGL', '-landroid-shmem']
+          cpp_link_args = ['--target=aarch64-linux-android30', '-L$TERMUX_PREFIX/lib', '-Wl,-rpath=/system/lib64:$RUNTIME_PATH/lib', '-Wl,--no-as-needed', '-lEGL', '-landroid-shmem', '-static-libstdc++']
+
+          [env]
+          PKG_CONFIG_PATH = '$TERMUX_PREFIX/lib/pkgconfig:$TERMUX_PREFIX/share/pkgconfig'
+          PKG_CONFIG_LIBDIR = '$TERMUX_PREFIX/lib/pkgconfig'
+          PKG_CONFIG_SYSROOT_DIR = '$TERMUX_SYSROOT'
+          EOF
+
+      - name: Configure Mesa
         run: |
-          echo "=== All Built Files ==="
-          find wrapper-src/libs -type f || true
+          cd mesa-src
+
+          export PKG_CONFIG_PATH="$TERMUX_PREFIX/lib/pkgconfig:$TERMUX_PREFIX/share/pkgconfig"
+          export PKG_CONFIG_LIBDIR="$TERMUX_PREFIX/lib/pkgconfig"
+          export PKG_CONFIG_SYSROOT_DIR="$TERMUX_SYSROOT"
+
+          export X_CFLAGS="-I$TERMUX_PREFIX/include"
+          export X_LIBS="-L$TERMUX_PREFIX/lib -landroid-shmem"
+          
+          export CFLAGS="-I$TERMUX_PREFIX/include -include fcntl.h -include unistd.h"
+          export CXXFLAGS="-I$TERMUX_PREFIX/include -include fcntl.h -include unistd.h"
+          export LDFLAGS="-L$TERMUX_PREFIX/lib -Wl,-rpath=$RUNTIME_PATH/lib -landroid-shmem -static-libstdc++"
+
+          meson setup build \
+            --cross-file /tmp/android-cross.ini \
+            -Dcpp_rtti=false \
+            -Dopengl=false \
+            -Dgbm=disabled \
+            -Dllvm=disabled \
+            -Dshared-llvm=disabled \
+            -Dxmlconfig=disabled \
+            -Dgallium-drivers= \
+            -Dvulkan-drivers=wrapper \
+            -Dplatforms=x11 \
+            --prefix=/data/data/com.termux/files/usr
+
+      - name: Build
+        run: |
+          cd mesa-src
+          ninja -C build -v 2>&1 | tee build.log
+
+      - name: Install
+        run: |
+          cd mesa-src
+          DESTDIR=$PWD/install ninja -C build install
+
+      - name: Show Files
+        run: |
+          echo "=== Installed Files ==="
+          find mesa-src/install -type f
 
       - name: Upload
         uses: actions/upload-artifact@v4
         with:
-          name: bionic-vulkan-wrapper
+          name: vulkan-wrapper
           path: |
-            wrapper-src/libs/arm64-v8a/*.so
+            mesa-src/build.log
+            mesa-src/install
