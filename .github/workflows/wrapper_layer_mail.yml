@@ -116,6 +116,7 @@ jobs:
           EOF
 
       # 🌟 [연쇄 에러 해결] SPIRV-Tools 본체와 최적화 도구 검증을 통째로 밀어버리는 최종 패치
+      # 🌟 [완벽 해결] 미정의 변수 에러까지 완전히 방어하는 최종 마스터 패치
       - name: Patch Meson Build for SPIRV-Tools
         run: |
           cd mesa-src
@@ -125,17 +126,20 @@ jobs:
           if [ -f "$TARGET_FILE" ]; then
             echo "=== Patching $TARGET_FILE ==="
             
-            # 1. 파일 내부에 'SPIRV-Tools'가 들어간 모든 라인(본체 및 -opt 포함)의 맨 앞에 #을 붙여 주석 처리합니다.
+            # 1. 시스템을 직접 뒤져서 에러를 내던 SPIRV-Tools 라인들을 전부 주석(#) 처리
             sed -i "s/.*SPIRV-Tools.*/# &/g" $TARGET_FILE
             
-            # 2. 주석 처리로 인해 메손 빌드가 변수가 없다고 화내지 않도록, 맨 밑바닥에 유령 변수들을 선언해 둡니다.
+            # 2. [치명적 해결책] 메손이 "이 변수 어디 갔어?"라고 물어볼 만한 변수명들을 
+            # 전부 파일 맨 밑바닥에 '아무것도 안 들어있는 빈 객체'로 강제 선언해 둡니다.
             echo "" >> $TARGET_FILE
             echo "dep_spirv_tools_opt = dependency('', required : false)" >> $TARGET_FILE
             echo "dep_spirv_tools = dependency('', required : false)" >> $TARGET_FILE
+            echo "spirv_tools_opt_lib = dependency('', required : false)" >> $TARGET_FILE
+            echo "spirv_tools_lib = dependency('', required : false)" >> $TARGET_FILE
             
             echo "=== Patch Applied Successfully ==="
-            # 패치 적용 결과를 확인하기 위해 에러 유발 구역 주변(180~220줄)을 로그에 출력
-            sed -n '180,220p' $TARGET_FILE || true
+            # 변수들이 잘 들어갔는지 파일 맨 밑바닥 15줄 확인
+            tail -n 15 $TARGET_FILE
           else
             echo "❌ Error: $TARGET_FILE not found!"
             exit 1
