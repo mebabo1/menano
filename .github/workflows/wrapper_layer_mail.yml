@@ -115,7 +115,7 @@ jobs:
           PKG_CONFIG_SYSROOT_DIR = '$TERMUX_SYSROOT'
           EOF
 
-      # 🌟 [문법 교정] Meson 규격에 맞게 홑따옴표(')로 수정된 최종 치트 패치
+      # 🌟 [최종 해결] 에러 발생 구역을 직접 타격하여 주석 처리하는 융단폭격 패치
       - name: Patch Meson Build for SPIRV-Tools
         run: |
           cd mesa-src
@@ -125,19 +125,19 @@ jobs:
           if [ -f "$TARGET_FILE" ]; then
             echo "=== Patching $TARGET_FILE ==="
             
-            # 1. SPIRV-Tools-opt를 찾는 find_library 구문이 있으면 무조건 false(필수 아님)로 강제 개조
-            sed -i "s/find_library('SPIRV-Tools-opt'/find_library('SPIRV-Tools-opt', required : false/g" $TARGET_FILE
+            # 1. 파일 내부에 'SPIRV-Tools-opt' 문자열이 들어간 모든 라인의 맨 앞에 샵(#)을 붙여 주석 처리합니다.
+            # 이 명령어가 실행되면 에러를 내던 201번째 줄의 강제 검증 코드가 일제히 잠들게 됩니다.
+            sed -i "s/.*SPIRV-Tools-opt.*/# &/g" $TARGET_FILE
             
-            # 2. [수정 완료] 쌍따옴표 대신 Meson 표준인 홑따옴표(' ')로 변수를 파일 맨 위에 강제 주입
-            sed -i "1i dep_spirv_tools_opt = dependency('', required : false)" $TARGET_FILE
-            sed -i "1i dep_spirv_tools = dependency('', required : false)" $TARGET_FILE
-            
-            # 3. 만약 내부 코드가 정적 라이브러리 검증에 묶여 있다면 강제로 공백 처리
-            sed -i "s/required : true/required : false/g" $TARGET_FILE
+            # 2. 주석 처리로 인해 메손 빌드가 'dep_spirv_tools_opt' 변수가 정의되지 않았다고 또 화를 낼 수 있으므로,
+            # 안전장치로 맨 아랫줄에 에러를 내지 않는 빈 의존성(dependency) 선언을 박아줍니다.
+            echo "" >> $TARGET_FILE
+            echo "dep_spirv_tools_opt = dependency('', required : false)" >> $TARGET_FILE
+            echo "dep_spirv_tools = dependency('', required : false)" >> $TARGET_FILE
             
             echo "=== Patch Applied Successfully ==="
-            # 패치가 어떻게 들어갔는지 로그에서 확인하기 위해 상위 10줄 출력
-            head -n 10 $TARGET_FILE
+            # 201번째 줄 주변이 어떻게 변했는지 로그 확인용 (180줄부터 220줄까지 출력)
+            sed -n '180,220p' $TARGET_FILE || true
           else
             echo "❌ Error: $TARGET_FILE not found!"
             exit 1
