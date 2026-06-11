@@ -54,8 +54,9 @@ jobs:
             zlib1g-dev \
             libzstd-dev \
             glslang-tools \
+            glslang-dev \
             spirv-tools \
-            libspirv-tools-dev
+            libvulkan-dev
 
           python -m pip install --upgrade pip
           python -m pip install meson mako pyyaml ninja
