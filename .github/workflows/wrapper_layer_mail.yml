@@ -141,7 +141,7 @@ jobs:
             -Dgallium-drivers= \
             -Dvulkan-drivers=wrapper \
             -Dplatforms=x11 \
-            Dspirv-to-dxil=false \
+            -Dspirv-to-dxil=false \
             -Dopencl-spirv=false \
             --prefix=/data/data/com.termux/files/usr
 
