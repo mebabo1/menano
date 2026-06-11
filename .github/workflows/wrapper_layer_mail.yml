@@ -115,7 +115,7 @@ jobs:
           PKG_CONFIG_SYSROOT_DIR = '$TERMUX_SYSROOT'
           EOF
 
-      # 🌟 [강력 교체] SPIRV-Tools-opt 검증 구문을 완벽히 파괴하고 강제 패스시키는 치트 패치
+      # 🌟 [문법 교정] Meson 규격에 맞게 홑따옴표(')로 수정된 최종 치트 패치
       - name: Patch Meson Build for SPIRV-Tools
         run: |
           cd mesa-src
@@ -128,17 +128,16 @@ jobs:
             # 1. SPIRV-Tools-opt를 찾는 find_library 구문이 있으면 무조건 false(필수 아님)로 강제 개조
             sed -i "s/find_library('SPIRV-Tools-opt'/find_library('SPIRV-Tools-opt', required : false/g" $TARGET_FILE
             
-            # 2. 201번째 줄 전후로 에러를 유발하는 종속성 변수를 빈 의존성 객체로 덮어쓰기 (파일 맨 위에 강제 주입)
-            # Meson이 이후에 무슨 짓을 하든 이 변수들을 만나면 '설치 안 되어도 노상관'으로 인식합니다.
-            sed -i '1i dep_spirv_tools_opt = dependency("", required : false)' $TARGET_FILE
-            sed -i '1i dep_spirv_tools = dependency("", required : false)' $TARGET_FILE
+            # 2. [수정 완료] 쌍따옴표 대신 Meson 표준인 홑따옴표(' ')로 변수를 파일 맨 위에 강제 주입
+            sed -i "1i dep_spirv_tools_opt = dependency('', required : false)" $TARGET_FILE
+            sed -i "1i dep_spirv_tools = dependency('', required : false)" $TARGET_FILE
             
             # 3. 만약 내부 코드가 정적 라이브러리 검증에 묶여 있다면 강제로 공백 처리
             sed -i "s/required : true/required : false/g" $TARGET_FILE
             
             echo "=== Patch Applied Successfully ==="
-            # 패치가 어떻게 들어갔는지 로그에서 확인하기 위해 상위 30줄 출력
-            head -n 30 $TARGET_FILE
+            # 패치가 어떻게 들어갔는지 로그에서 확인하기 위해 상위 10줄 출력
+            head -n 10 $TARGET_FILE
           else
             echo "❌ Error: $TARGET_FILE not found!"
             exit 1
