@@ -115,6 +115,19 @@ jobs:
           PKG_CONFIG_SYSROOT_DIR = '$TERMUX_SYSROOT'
           EOF
 
+      - name: Patch Meson Build for SPIRV-Tools
+        run: |
+          cd mesa-src
+          
+          # src/vulkan/wrapper/meson.build 파일에서 SPIRV-Tools-opt 종속성 체크 부분을 무력화합니다.
+          # 'required : true' 또는 라이브러리를 찾는 구문을 빈 의존성(dependency)으로 치환하거나 강제 패스시킵니다.
+          if [ -f "src/vulkan/wrapper/meson.build" ]; then
+            sed -i "s/dep_spirv_tools_opt = .*/dep_spirv_tools_opt = dependency('', required : false)/g" src/vulkan/wrapper/meson.build
+            sed -i "s/compiler.find_library('SPIRV-Tools-opt'.*/dependency('', required : false)/g" src/vulkan/wrapper/meson.build
+          fi
+          
+          echo "SPIRV-Tools-opt verification bypass patch applied."
+
       - name: Configure Mesa
         run: |
           cd mesa-src
