@@ -128,11 +128,18 @@ jobs:
           PKG_CONFIG_SYSROOT_DIR = '$TERMUX_SYSROOT'
           EOF
 
-      # 🌟 실제 Mesa 소스코드가 들어있는 'mesa_bionic' 진입점으로 이동하여 빌드를 세팅합니다.
-      # 내장된 서브모듈(SPIRV-Tools)을 강제 활용하도록 forcefallback 플래그를 유지합니다.
       - name: Configure Mesa
         run: |
-          cd mesa-src/mesa_bionic
+          cd mesa-src
+
+          # 🌟 [디버깅 & 추적] 저장소 내부에 meson.build가 어디에 숨어있는지 정확히 찾아냅니다.
+          echo "=== Searching for meson.build locations ==="
+          find . -name "meson.build"
+          
+          # 진짜 설계도가 있는 폴더를 자동으로 탐색하여 변수에 저장합니다.
+          # 만약 여러 개가 나온다면 vulkan/wrapper가 포함된 Mesa 본체 폴더를 조준합니다.
+          MESA_SRC_DIR=$(find $PWD -name "meson.build" | grep -v "subprojects" | head -n 1 | xargs dirname)
+          echo "🎯 Real Source Directory Found: $MESA_SRC_DIR"
 
           export PKG_CONFIG_PATH="$TERMUX_PREFIX/lib/pkgconfig:$TERMUX_PREFIX/share/pkgconfig"
           export PKG_CONFIG_LIBDIR="$TERMUX_PREFIX/lib/pkgconfig"
@@ -145,7 +152,9 @@ jobs:
           export CXXFLAGS="-I$TERMUX_PREFIX/include -include fcntl.h -include unistd.h"
           export LDFLAGS="-L$TERMUX_PREFIX/lib -Wl,-rpath=$RUNTIME_PATH/lib -landroid-shmem -static-libstdc++"
 
-          meson setup build \
+          # [수정 완료] 메손에게 '진짜 소스코드 폴더($MESA_SRC_DIR)'의 위치를 마지막 인자로 명시합니다.
+          # 독립된 빌드 환경을 위해 빌드 디렉토리는 /tmp/build로 안전하게 격리합니다.
+          meson setup /tmp/build \
             --cross-file /tmp/android-cross.ini \
             --wrap-mode=forcefallback \
             -Dcpp_rtti=false \
@@ -157,27 +166,27 @@ jobs:
             -Dgallium-drivers= \
             -Dvulkan-drivers=wrapper \
             -Dplatforms=x11 \
-            --prefix=/data/data/com.termux/files/usr
+            --prefix=/data/data/com.termux/files/usr \
+            "$MESA_SRC_DIR"
 
+      # 🌟 빌드 경로가 /tmp/build로 변경되었으므로 하단 Build, Install 단계의 경로도 일치시켜 줍니다.
       - name: Build
         run: |
-          cd mesa-src/mesa_bionic
-          ninja -C build -v 2>&1 | tee build.log
+          ninja -C /tmp/build -v 2>&1 | tee /tmp/build.log
 
       - name: Install
         run: |
-          cd mesa-src/mesa_bionic
-          DESTDIR=$PWD/install ninja -C build install
+          DESTDIR=$HOME/install ninja -C /tmp/build install
 
       - name: Show Files
         run: |
           echo "=== Installed Files ==="
-          find mesa-src/mesa_bionic/install -type f
+          find $HOME/install -type f || true
 
       - name: Upload
         uses: actions/upload-artifact@v4
         with:
           name: vulkan-wrapper
           path: |
-            mesa-src/mesa_bionic/build.log
-            mesa-src/mesa_bionic/install
+            /tmp/build.log
+            $HOME/install
