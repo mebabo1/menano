@@ -1,4 +1,4 @@
-name: Build Android Vulkan Wrapper mail
+name: Build Android Vulkan Wrapper
 
 on:
   push:
@@ -22,17 +22,20 @@ jobs:
       - name: Clone Mesa Wrapper
         run: |
           git clone --depth 1 \
-            --branch wrapper-25 \
-            https://gitlab.freedesktop.org/Pipetto-crypto/mesa.git \
+            https://github.com/leegao/bionic-vulkan-wrapper.git \
             mesa-src
-
-      # 🌟 [기능 확장용 추가] etc2_encode 저장소를 Mesa 내부의 wrapper 소스 하위 폴더로 다운로드
-      - name: Clone ETC2/ASTC Encoder Extension
-        run: |
-          git clone --depth 1 \
-            https://github.com/leegao/etc2_encode.git \
-            mesa-src/src/vulkan/wrapper/etc2_encode
           
+      # 🌟 [핵심 추가] 부족했던 SPIRV-Tools 라이브러리를 Meson 서브프로젝트 규격에 맞게 주입합니다.
+      # 특정 커밋(80627fead34917eda8d0a84872376e73e8978c55) 버전을 정확히 타겟팅하여 클론합니다.
+      - name: Clone SPIRV-Tools Subproject
+        run: |
+          mkdir -p mesa-src/subprojects/SPIRV-Tools
+          cd mesa-src/subprojects/SPIRV-Tools
+          git init
+          git remote add origin https://github.com/leegao/SPIRV-Tools.git
+          git fetch --depth 1 origin 80627fead34917eda8d0a84872376e73e8978c55
+          git checkout FETCH_HEAD
+
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
@@ -41,10 +44,27 @@ jobs:
       - name: Install Dependencies
         run: |
           sudo apt update
+
           sudo apt install -y \
-            git wget unzip pkg-config ninja-build cmake bison flex python3-dev \
-            libx11-dev libxext-dev libxcb1-dev libxrandr-dev libxfixes-dev \
-            libxshmfence-dev libdrm-dev zlib1g-dev libzstd-dev glslang-tools
+            git \
+            wget \
+            unzip \
+            pkg-config \
+            ninja-build \
+            cmake \
+            bison \
+            flex \
+            python3-dev \
+            libx11-dev \
+            libxext-dev \
+            libxcb1-dev \
+            libxrandr-dev \
+            libxfixes-dev \
+            libxshmfence-dev \
+            libdrm-dev \
+            zlib1g-dev \
+            libzstd-dev \
+            glslang-tools
 
           python -m pip install --upgrade pip
           python -m pip install meson mako pyyaml ninja
@@ -62,6 +82,7 @@ jobs:
           cd $HOME/termuxfs/aarch64
           wget -q https://github.com/ziad9267/termux-on-gha/releases/download/test/termuxfs.tar
           tar -xf termuxfs.tar
+          
           echo "TERMUX_PREFIX=$HOME/termuxfs/aarch64/data/data/com.termux/files/usr" >> $GITHUB_ENV
           echo "TERMUX_SYSROOT=$HOME/termuxfs/aarch64" >> $GITHUB_ENV
           echo "RUNTIME_PATH=/data/data/com.termux/files/usr" >> $GITHUB_ENV
@@ -117,8 +138,11 @@ jobs:
           export CXXFLAGS="-I$TERMUX_PREFIX/include -include fcntl.h -include unistd.h"
           export LDFLAGS="-L$TERMUX_PREFIX/lib -Wl,-rpath=$RUNTIME_PATH/lib -landroid-shmem -static-libstdc++"
 
+          # 🌟 시스템에 라이브러리가 없어도 서브프로젝트를 강제로 자동 빌드하여 병합하도록
+          # '--wrap-mode=forcefallback' 옵션을 추가해 줍니다.
           meson setup build \
             --cross-file /tmp/android-cross.ini \
+            --wrap-mode=forcefallback \
             -Dcpp_rtti=false \
             -Dopengl=false \
             -Dgbm=disabled \
