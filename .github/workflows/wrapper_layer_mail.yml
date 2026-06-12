@@ -117,7 +117,6 @@ jobs:
           export CXXFLAGS="-I$TERMUX_PREFIX/include -include fcntl.h -include unistd.h"
           export LDFLAGS="-L$TERMUX_PREFIX/lib -Wl,-rpath=$RUNTIME_PATH/lib -landroid-shmem -static-libstdc++"
 
-          # 문법 에러가 수정된 명시적 옵션 적용
           meson setup build \
             --cross-file /tmp/android-cross.ini \
             -Dcpp_rtti=false \
@@ -129,9 +128,6 @@ jobs:
             -Dgallium-drivers= \
             -Dvulkan-drivers=wrapper \
             -Dplatforms=x11 \
-            -Dspirv-to-dxil=false \
-            -Dopencl-spirv=false \
-            -Dstatic-libclc=[] \
             --prefix=/data/data/com.termux/files/usr
 
       - name: Build
