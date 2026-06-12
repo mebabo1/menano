@@ -19,28 +19,21 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      # 🌟 [최종 우회] 문제가 되는 폴더를 제외하고 SPIRV-Tools만 수동 조준하여 가져오는 단계
+      # 1. leegao의 패키지 빌드 허브를 클론합니다. (서브모듈은 수동으로 처리하므로 기본 클론)
       - name: Clone Vulkan Wrapper Packages Hub
         run: |
-          # 1. 서브모듈 없이 메인 구조만 안전하게 클론합니다.
           git clone --depth 1 \
             https://github.com/leegao/vulkan_wrapper_termux-packages.git \
             mesa-src
-          
+
+      # 2. 권한 오류를 막기 위해 SPIRV-Tools 주소를 HTTPS로 바꾸고 수동 업데이트합니다.
+      - name: Initialize SPIRV-Tools Submodule
+        run: |
           cd mesa-src
-          
-          # 2. 전체 서브모듈 업데이트를 돌리면 'mesa_bionic' 주소가 없다고 터지므로,
-          # 문제가 없는 'SPIRV-Tools'만 콕 집어서 HTTPS 주소로 초기화 및 등록합니다.
-          echo "=== Manually initializing SPIRV-Tools ==="
           git submodule init SPIRV-Tools
-          
-          # 3. 깃 설정 내부의 SSH 주소를 HTTPS 주소로 안전하게 강제 덮어쓰기 합니다.
           git config submodule.SPIRV-Tools.url "https://github.com/leegao/SPIRV-Tools.git"
-          
-          # 4. 이제 SPIRV-Tools 하나만 타겟팅하여 안전하게 원격 소스코드를 긁어옵니다.
-          echo "=== Fetching SPIRV-Tools source ==="
           git submodule update --depth 1 SPIRV-Tools
-          
+
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
@@ -49,27 +42,10 @@ jobs:
       - name: Install Dependencies
         run: |
           sudo apt update
-
           sudo apt install -y \
-            git \
-            wget \
-            unzip \
-            pkg-config \
-            ninja-build \
-            cmake \
-            bison \
-            flex \
-            python3-dev \
-            libx11-dev \
-            libxext-dev \
-            libxcb1-dev \
-            libxrandr-dev \
-            libxfixes-dev \
-            libxshmfence-dev \
-            libdrm-dev \
-            zlib1g-dev \
-            libzstd-dev \
-            glslang-tools
+            git wget unzip pkg-config ninja-build cmake bison flex python3-dev \
+            libx11-dev libxext-dev libxcb1-dev libxrandr-dev libxfixes-dev \
+            libxshmfence-dev libdrm-dev zlib1g-dev libzstd-dev glslang-tools
 
           python -m pip install --upgrade pip
           python -m pip install meson mako pyyaml ninja
@@ -90,103 +66,34 @@ jobs:
           
           echo "TERMUX_PREFIX=$HOME/termuxfs/aarch64/data/data/com.termux/files/usr" >> $GITHUB_ENV
           echo "TERMUX_SYSROOT=$HOME/termuxfs/aarch64" >> $GITHUB_ENV
-          echo "RUNTIME_PATH=/data/data/com.termux/files/usr" >> $GITHUB_ENV
 
-      - name: Create Android Cross File
-        run: |
-          NDK_ROOT=$ANDROID_NDK/toolchains/llvm/prebuilt/linux-x86_64
-          TOOLCHAIN=$NDK_ROOT/bin
-          SYSROOT=$NDK_ROOT/sysroot
-
-          cat > /tmp/android-cross.ini << EOF
-          [host_machine]
-          system = 'android'
-          cpu_family = 'aarch64'
-          cpu = 'aarch64'
-          endian = 'little'
-
-          [binaries]
-          c = ['$TOOLCHAIN/aarch64-linux-android${API_LEVEL}-clang', '-D__TERMUX__', '-D__USE_GNU', '-U__ANDROID__', '--target=aarch64-linux-android30']
-          cpp = ['$TOOLCHAIN/aarch64-linux-android${API_LEVEL}-clang++', '-D__TERMUX__', '-D__USE_GNU', '-U__ANDROID__', '--target=aarch64-linux-android30']
-          ar = '$TOOLCHAIN/llvm-ar'
-          strip = '$TOOLCHAIN/llvm-strip'
-          pkgconfig = 'pkg-config'
-
-          [properties]
-          needs_exe_wrapper = true
-          sysroot = '$SYSROOT'
-
-          [built-in options]
-          c_args = ['-fPIC', '-idirafter$TERMUX_PREFIX/include', '-include', 'fcntl.h', '-include', 'unistd.h']
-          cpp_args = ['-fPIC', '-idirafter$TERMUX_PREFIX/include', '-include', 'fcntl.h', '-include', 'unistd.h']
-          c_link_args = ['--target=aarch64-linux-android30', '-L$TERMUX_PREFIX/lib', '-Wl,-rpath=/system/lib64:$RUNTIME_PATH/lib', '-Wl,--no-as-needed', '-lEGL', '-landroid-shmem']
-          cpp_link_args = ['--target=aarch64-linux-android30', '-L$TERMUX_PREFIX/lib', '-Wl,-rpath=/system/lib64:$RUNTIME_PATH/lib', '-Wl,--no-as-needed', '-lEGL', '-landroid-shmem', '-static-libstdc++']
-
-          [env]
-          PKG_CONFIG_PATH = '$TERMUX_PREFIX/lib/pkgconfig:$TERMUX_PREFIX/share/pkgconfig'
-          PKG_CONFIG_LIBDIR = '$TERMUX_PREFIX/lib/pkgconfig'
-          PKG_CONFIG_SYSROOT_DIR = '$TERMUX_SYSROOT'
-          EOF
-
-      - name: Configure Mesa
+      # 🌟 [핵심 변경] 우리가 직접 세팅하지 않고, 내장된 빌드 스크립트를 실행합니다.
+      # 스크립트가 요구하는 환경변수(NDK 경로 등)만 정확히 수동으로 찔러넣어 줍니다.
+      - name: Build Vulkan Wrapper via Official Script
         run: |
           cd mesa-src
-
-          # 🌟 [디버깅 & 추적] 저장소 내부에 meson.build가 어디에 숨어있는지 정확히 찾아냅니다.
-          echo "=== Searching for meson.build locations ==="
-          find . -name "meson.build"
           
-          # 진짜 설계도가 있는 폴더를 자동으로 탐색하여 변수에 저장합니다.
-          # 만약 여러 개가 나온다면 vulkan/wrapper가 포함된 Mesa 본체 폴더를 조준합니다.
-          MESA_SRC_DIR=$(find $PWD -name "meson.build" | grep -v "subprojects" | head -n 1 | xargs dirname)
-          echo "🎯 Real Source Directory Found: $MESA_SRC_DIR"
-
-          export PKG_CONFIG_PATH="$TERMUX_PREFIX/lib/pkgconfig:$TERMUX_PREFIX/share/pkgconfig"
-          export PKG_CONFIG_LIBDIR="$TERMUX_PREFIX/lib/pkgconfig"
-          export PKG_CONFIG_SYSROOT_DIR="$TERMUX_SYSROOT"
-
-          export X_CFLAGS="-I$TERMUX_PREFIX/include"
-          export X_LIBS="-L$TERMUX_PREFIX/lib -landroid-shmem"
+          # 스크립트가 실행될 수 있도록 실행 권한 부여
+          chmod +x *.sh
           
-          export CFLAGS="-I$TERMUX_PREFIX/include -include fcntl.h -include unistd.h"
-          export CXXFLAGS="-I$TERMUX_PREFIX/include -include fcntl.h -include unistd.h"
-          export LDFLAGS="-L$TERMUX_PREFIX/lib -Wl,-rpath=$RUNTIME_PATH/lib -landroid-shmem -static-libstdc++"
+          # 환경변수 동기화
+          export ANDROID_NDK="$ANDROID_NDK"
+          export TERMUX_STANDALONE_TOOLCHAIN="$ANDROID_NDK/toolchains/llvm/prebuilt/linux-x86_64"
+          
+          # 저장소 전용 빌드 스크립트 구동 (wrapper 또는 mesa 패키지 타겟팅)
+          # ./build-package.sh가 내부적으로 소스를 받고 패치한 뒤 SPIRV-Tools까지 결합하여 자동 빌드합니다.
+          ./build-package.sh wrapper || ./build-package.sh mesa_bionic
 
-          # [수정 완료] 메손에게 '진짜 소스코드 폴더($MESA_SRC_DIR)'의 위치를 마지막 인자로 명시합니다.
-          # 독립된 빌드 환경을 위해 빌드 디렉토리는 /tmp/build로 안전하게 격리합니다.
-          meson setup /tmp/build \
-            --cross-file /tmp/android-cross.ini \
-            --wrap-mode=forcefallback \
-            -Dcpp_rtti=false \
-            -Dopengl=false \
-            -Dgbm=disabled \
-            -Dllvm=disabled \
-            -Dshared-llvm=disabled \
-            -Dxmlconfig=disabled \
-            -Dgallium-drivers= \
-            -Dvulkan-drivers=wrapper \
-            -Dplatforms=x11 \
-            --prefix=/data/data/com.termux/files/usr \
-            "$MESA_SRC_DIR"
-
-      # 🌟 빌드 경로가 /tmp/build로 변경되었으므로 하단 Build, Install 단계의 경로도 일치시켜 줍니다.
-      - name: Build
+      # 3. 빌드가 완료되면 생성된 템플릿 파일(.deb 또는 .so)들을 아티팩트로 수집합니다.
+      - name: Show and Gather Files
         run: |
-          ninja -C /tmp/build -v 2>&1 | tee /tmp/build.log
+          echo "=== Built Packages ==="
+          find mesa-src/debs mesa-src/packages -type f || true
 
-      - name: Install
-        run: |
-          DESTDIR=$HOME/install ninja -C /tmp/build install
-
-      - name: Show Files
-        run: |
-          echo "=== Installed Files ==="
-          find $HOME/install -type f || true
-
-      - name: Upload
+      - name: Upload Artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: vulkan-wrapper
+          name: vulkan-wrapper-packages
           path: |
-            /tmp/build.log
-            $HOME/install
+            mesa-src/debs/
+            mesa-src/packages/
