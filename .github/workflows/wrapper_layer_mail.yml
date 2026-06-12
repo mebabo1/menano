@@ -19,26 +19,27 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      # 🌟 [보강 완료] SSH 권한 거부 에러를 HTTPS 치환으로 완벽하게 우회하는 단계
+      # 🌟 [최종 우회] 문제가 되는 폴더를 제외하고 SPIRV-Tools만 수동 조준하여 가져오는 단계
       - name: Clone Vulkan Wrapper Packages Hub
         run: |
-          # 1. 서브모듈 없이 메인 저장소만 먼저 가볍게 클론합니다.
+          # 1. 서브모듈 없이 메인 구조만 안전하게 클론합니다.
           git clone --depth 1 \
             https://github.com/leegao/vulkan_wrapper_termux-packages.git \
             mesa-src
           
           cd mesa-src
           
-          # 2. [핵심] 권한 에러를 일으키는 git@github.com 주소를 public HTTPS 주소로 강제 개조합니다.
-          if [ -f ".gitmodules" ]; then
-            echo "=== Fixing SSH Submodule URLs to HTTPS ==="
-            sed -i 's|git@github.com:|https://github.com/|g' .gitmodules
-            cat .gitmodules # 변경이 잘 되었는지 로그로 확인
-          fi
+          # 2. 전체 서브모듈 업데이트를 돌리면 'mesa_bionic' 주소가 없다고 터지므로,
+          # 문제가 없는 'SPIRV-Tools'만 콕 집어서 HTTPS 주소로 초기화 및 등록합니다.
+          echo "=== Manually initializing SPIRV-Tools ==="
+          git submodule init SPIRV-Tools
           
-          # 3. 주소가 변경된 상태에서 안전하게 서브모듈 초기화 및 다운로드를 수행합니다.
-          git submodule init
-          git submodule update --depth 1
+          # 3. 깃 설정 내부의 SSH 주소를 HTTPS 주소로 안전하게 강제 덮어쓰기 합니다.
+          git config submodule.SPIRV-Tools.url "https://github.com/leegao/SPIRV-Tools.git"
+          
+          # 4. 이제 SPIRV-Tools 하나만 타겟팅하여 안전하게 원격 소스코드를 긁어옵니다.
+          echo "=== Fetching SPIRV-Tools source ==="
+          git submodule update --depth 1 SPIRV-Tools
           
       - name: Setup Python
         uses: actions/setup-python@v5
