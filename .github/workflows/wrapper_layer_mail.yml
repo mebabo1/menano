@@ -11,60 +11,168 @@ jobs:
   build-wrapper:
     runs-on: ubuntu-22.04
 
+    env:
+      ANDROID_NDK_VERSION: r27
+      API_LEVEL: 30
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      # 1. leegao의 통합 빌드 패키지 허브를 가져옵니다.
-      - name: Clone Vulkan Wrapper Packages Hub
+      - name: Clone Mesa Wrapper
         run: |
           git clone --depth 1 \
-            https://github.com/leegao/vulkan_wrapper_termux-packages.git \
-            termux-packages
-
-      # 2. 인증 에러를 우회하여 SPIRV-Tools 서브모듈을 HTTPS로 동기화합니다.
-      - name: Initialize SPIRV-Tools Submodule
+            https://github.com/leegao/bionic-vulkan-wrapper.git \
+            mesa-src
+          
+      # 🌟 [보강] SPIRV-Tools의 폴더명을 Meson이 내부 스크립트(subprojects.unwrap)에서 
+      # 매핑하는 규격에 맞춰 정확하게 소문자/대문자를 구분하여 이식합니다.
+      - name: Clone SPIRV-Tools Subproject
         run: |
-          cd termux-packages
-          git submodule init SPIRV-Tools
-          git config submodule.SPIRV-Tools.url "https://github.com/leegao/SPIRV-Tools.git"
-          git submodule update --depth 1 SPIRV-Tools
+          mkdir -p mesa-src/subprojects/SPIRV-Tools
+          cd mesa-src/subprojects/SPIRV-Tools
+          git init
+          git remote add origin https://github.com/leegao/SPIRV-Tools.git
+          git fetch --depth 1 origin 80627fead34917eda8d0a84872376e73e8978c55
+          git checkout FETCH_HEAD
 
-      # 3. Termux 전용 공식 도커 환경 빌드 스크립트 구동
-      # 이 저장소의 공식 빌드법은 ./run-docker.sh를 이용해 도커 내부에서 패키지를 빌드하는 것입니다.
-      - name: Build Packages inside Termux Docker
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install Dependencies
         run: |
-          cd termux-packages
-          
-          # 실행 권한 부여
-          chmod +x *.sh scripts/*.sh
-          
-          # [핵심] 도커 컨테이너를 띄우고, 컨테이너 안에서 build-package.sh를 실행하도록 명령을 내립니다.
-          # -a aarch64 옵션으로 안드로이드용(ARM64) 크로스 컴파일을 강제 지정합니다.
-          echo "=== Starting Termux Docker Build ==="
-          
-          # packages 폴더 내부를 뒤져서 순서대로 도커 빌드 환경에 밀어 넣습니다.
-          for pkg in $(ls packages/); do
-            echo "🎯 Building $pkg inside Docker container..."
-            ./run-docker.sh ./build-package.sh -a aarch64 "$pkg" || echo "⚠️ $pkg build encountered an issue, continuing..."
-          done
+          sudo apt update
 
-      # 4. 도커 환경 내부에서 최종 생성된 아웃풋 빌드 파일(.deb)들을 수집합니다.
-      - name: Show and Gather Compiled Libraries
+          sudo apt install -y \
+            git \
+            wget \
+            unzip \
+            pkg-config \
+            ninja-build \
+            cmake \
+            bison \
+            flex \
+            python3-dev \
+            libx11-dev \
+            libxext-dev \
+            libxcb1-dev \
+            libxrandr-dev \
+            libxfixes-dev \
+            libxshmfence-dev \
+            libdrm-dev \
+            zlib1g-dev \
+            libzstd-dev \
+            glslang-tools
+
+          python -m pip install --upgrade pip
+          python -m pip install meson mako pyyaml ninja
+
+      - name: Download Android NDK
         run: |
-          echo "=== Compiled Debian Packages (.deb) ==="
-          find termux-packages/debs -type f -name "*.deb" || true
-          
-          # 만약 압축 해제된 순수 .so 라이브러리 파일이 필요할 경우를 대비해 packages 트리 내부도 검색합니다.
-          echo "=== Compiled Dynamic Libraries (.so) ==="
-          find termux-packages/packages -type f -name "*.so" || true
+          cd /tmp
+          wget -q https://dl.google.com/android/repository/android-ndk-${ANDROID_NDK_VERSION}-linux.zip
+          unzip -q android-ndk-${ANDROID_NDK_VERSION}-linux.zip
+          echo "ANDROID_NDK=/tmp/android-ndk-${ANDROID_NDK_VERSION}" >> $GITHUB_ENV
 
-      # 5. 최종 추출된 .deb 패키지와 바이너리 파일들을 GitHub Artifact로 업로드합니다.
-      - name: Upload Artifacts
+      - name: Download and extract termuxfs for aarch64
+        run: |
+          mkdir -p $HOME/termuxfs/aarch64
+          cd $HOME/termuxfs/aarch64
+          wget -q https://github.com/ziad9267/termux-on-gha/releases/download/test/termuxfs.tar
+          tar -xf termuxfs.tar
+          
+          echo "TERMUX_PREFIX=$HOME/termuxfs/aarch64/data/data/com.termux/files/usr" >> $GITHUB_ENV
+          echo "TERMUX_SYSROOT=$HOME/termuxfs/aarch64" >> $GITHUB_ENV
+          echo "RUNTIME_PATH=/data/data/com.termux/files/usr" >> $GITHUB_ENV
+
+      - name: Create Android Cross File
+        run: |
+          NDK_ROOT=$ANDROID_NDK/toolchains/llvm/prebuilt/linux-x86_64
+          TOOLCHAIN=$NDK_ROOT/bin
+          SYSROOT=$NDK_ROOT/sysroot
+
+          cat > /tmp/android-cross.ini << EOF
+          [host_machine]
+          system = 'android'
+          cpu_family = 'aarch64'
+          cpu = 'aarch64'
+          endian = 'little'
+
+          [binaries]
+          c = ['$TOOLCHAIN/aarch64-linux-android${API_LEVEL}-clang', '-D__TERMUX__', '-D__USE_GNU', '-U__ANDROID__', '--target=aarch64-linux-android30']
+          cpp = ['$TOOLCHAIN/aarch64-linux-android${API_LEVEL}-clang++', '-D__TERMUX__', '-D__USE_GNU', '-U__ANDROID__', '--target=aarch64-linux-android30']
+          ar = '$TOOLCHAIN/llvm-ar'
+          strip = '$TOOLCHAIN/llvm-strip'
+          pkgconfig = 'pkg-config'
+
+          [properties]
+          needs_exe_wrapper = true
+          sysroot = '$SYSROOT'
+
+          [built-in options]
+          c_args = ['-fPIC', '-idirafter$TERMUX_PREFIX/include', '-include', 'fcntl.h', '-include', 'unistd.h']
+          cpp_args = ['-fPIC', '-idirafter$TERMUX_PREFIX/include', '-include', 'fcntl.h', '-include', 'unistd.h']
+          c_link_args = ['--target=aarch64-linux-android30', '-L$TERMUX_PREFIX/lib', '-Wl,-rpath=/system/lib64:$RUNTIME_PATH/lib', '-Wl,--no-as-needed', '-lEGL', '-landroid-shmem']
+          cpp_link_args = ['--target=aarch64-linux-android30', '-L$TERMUX_PREFIX/lib', '-Wl,-rpath=/system/lib64:$RUNTIME_PATH/lib', '-Wl,--no-as-needed', '-lEGL', '-landroid-shmem', '-static-libstdc++']
+
+          [env]
+          PKG_CONFIG_PATH = '$TERMUX_PREFIX/lib/pkgconfig:$TERMUX_PREFIX/share/pkgconfig'
+          PKG_CONFIG_LIBDIR = '$TERMUX_PREFIX/lib/pkgconfig'
+          PKG_CONFIG_SYSROOT_DIR = '$TERMUX_SYSROOT'
+          EOF
+
+      - name: Configure Mesa
+        run: |
+          cd mesa-src
+
+          export PKG_CONFIG_PATH="$TERMUX_PREFIX/lib/pkgconfig:$TERMUX_PREFIX/share/pkgconfig"
+          export PKG_CONFIG_LIBDIR="$TERMUX_PREFIX/lib/pkgconfig"
+          export PKG_CONFIG_SYSROOT_DIR="$TERMUX_SYSROOT"
+
+          export X_CFLAGS="-I$TERMUX_PREFIX/include"
+          export X_LIBS="-L$TERMUX_PREFIX/lib -landroid-shmem"
+          
+          export CFLAGS="-I$TERMUX_PREFIX/include -include fcntl.h -include unistd.h"
+          export CXXFLAGS="-I$TERMUX_PREFIX/include -include fcntl.h -include unistd.h"
+          export LDFLAGS="-L$TERMUX_PREFIX/lib -Wl,-rpath=$RUNTIME_PATH/lib -landroid-shmem -static-libstdc++"
+
+          # 🌟 [설정 반영] Meson 빌드 선언 시 외부 의존성(SPIRV-Tools) 검증 실패 시 
+          # 강제로 내장된 subprojects 폴더를 컴파일해서 연동하도록 '--wrap-mode=forcefallback'를 적용합니다.
+          meson setup build \
+            --cross-file /tmp/android-cross.ini \
+            --wrap-mode=forcefallback \
+            -Dcpp_rtti=false \
+            -Dopengl=false \
+            -Dgbm=disabled \
+            -Dllvm=disabled \
+            -Dshared-llvm=disabled \
+            -Dxmlconfig=disabled \
+            -Dgallium-drivers= \
+            -Dvulkan-drivers=wrapper \
+            -Dplatforms=x11 \
+            --prefix=/data/data/com.termux/files/usr
+
+      - name: Build
+        run: |
+          cd mesa-src
+          ninja -C build -v 2>&1 | tee build.log
+
+      - name: Install
+        run: |
+          cd mesa-src
+          DESTDIR=$PWD/install ninja -C build install
+
+      - name: Show Files
+        run: |
+          echo "=== Installed Files ==="
+          find mesa-src/install -type f
+
+      - name: Upload
         uses: actions/upload-artifact@v4
         with:
-          name: vulkan-wrapper-final-binaries
+          name: vulkan-wrapper-with-spirv
           path: |
-            termux-packages/debs/
-            termux-packages/packages/**/*.so
-          if-no-files-found: error
+            mesa-src/build.log
+            mesa-src/install
