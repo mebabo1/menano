@@ -67,24 +67,29 @@ jobs:
           echo "TERMUX_PREFIX=$HOME/termuxfs/aarch64/data/data/com.termux/files/usr" >> $GITHUB_ENV
           echo "TERMUX_SYSROOT=$HOME/termuxfs/aarch64" >> $GITHUB_ENV
 
-      # 🌟 [핵심 변경] 우리가 직접 세팅하지 않고, 내장된 빌드 스크립트를 실행합니다.
-      # 스크립트가 요구하는 환경변수(NDK 경로 등)만 정확히 수동으로 찔러넣어 줍니다.
       - name: Build Vulkan Wrapper via Official Script
         run: |
           cd mesa-src
           
-          # 스크립트가 실행될 수 있도록 실행 권한 부여
-          chmod +x *.sh
+          # 1. 스크립트 실행 권한 부여
+          chmod +x *.sh scripts/*.sh
           
-          # 환경변수 동기화
+          # 2. [추적] packages 폴더 안에 진짜 무슨 패키지 이름이 숨어있는지 확인합니다.
+          echo "=== Available Packages in this repository ==="
+          ls -l packages/
+          
+          # 3. 환경변수 등록 (Termux 빌드 시스템이 요구하는 규격)
           export ANDROID_NDK="$ANDROID_NDK"
           export TERMUX_STANDALONE_TOOLCHAIN="$ANDROID_NDK/toolchains/llvm/prebuilt/linux-x86_64"
+          export TERMUX_ARCH="aarch64"
           
-          # 저장소 전용 빌드 스크립트 구동 (wrapper 또는 mesa 패키지 타겟팅)
-          # ./build-package.sh가 내부적으로 소스를 받고 패치한 뒤 SPIRV-Tools까지 결합하여 자동 빌드합니다.
-          ./build-package.sh wrapper || ./build-package.sh mesa_bionic
-
-      # 3. 빌드가 완료되면 생성된 템플릿 파일(.deb 또는 .so)들을 아티팩트로 수집합니다.
+          # 4. [자동 저격 빌드] packages/ 폴더 아래에 있는 핵심 패키지명을 알아서 추출하여 빌드를 먹입니다.
+          # 일반적으로 mesa, libvulkan, vulkan-loader 등이 타겟입니다.
+          for pkg in $(ls packages/); do
+            echo "🎯 Found package recipe: $pkg. Trying to build..."
+            ./build-package.sh "$pkg" || echo "⚠️ Failed to build $pkg, trying next..."
+          done
+          
       - name: Show and Gather Files
         run: |
           echo "=== Built Packages ==="
