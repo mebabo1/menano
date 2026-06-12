@@ -1,4 +1,4 @@
-name: Build Android Vulkan Wrapper
+name: Build Android Vulkan Wrapper mail
 
 on:
   push:
