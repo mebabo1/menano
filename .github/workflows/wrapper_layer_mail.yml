@@ -1,4 +1,4 @@
-name: Build Android Vulkan Wrapper mail
+name: Build Android Vulkan Wrapper
 
 on:
   push:
@@ -19,23 +19,14 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Clone Mesa Wrapper
+      # 🌟 [교체 완료] leegao의 전용 패키지 통합 저장소로 타겟을 변경합니다.
+      # 내장된 SPIRV-Tools 및 하위 모듈들을 통째로 긁어오기 위해 --recursive 플래그를 붙여줍니다.
+      - name: Clone Vulkan Wrapper Packages Hub
         run: |
-          git clone --depth 1 \
-            https://github.com/leegao/bionic-vulkan-wrapper.git \
+          git clone --depth 1 --recursive \
+            https://github.com/leegao/vulkan_wrapper_termux-packages.git \
             mesa-src
           
-      # 🌟 [핵심 추가] 부족했던 SPIRV-Tools 라이브러리를 Meson 서브프로젝트 규격에 맞게 주입합니다.
-      # 특정 커밋(80627fead34917eda8d0a84872376e73e8978c55) 버전을 정확히 타겟팅하여 클론합니다.
-      - name: Clone SPIRV-Tools Subproject
-        run: |
-          mkdir -p mesa-src/subprojects/SPIRV-Tools
-          cd mesa-src/subprojects/SPIRV-Tools
-          git init
-          git remote add origin https://github.com/leegao/SPIRV-Tools.git
-          git fetch --depth 1 origin 80627fead34917eda8d0a84872376e73e8978c55
-          git checkout FETCH_HEAD
-
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
@@ -123,9 +114,11 @@ jobs:
           PKG_CONFIG_SYSROOT_DIR = '$TERMUX_SYSROOT'
           EOF
 
+      # 🌟 실제 Mesa 소스코드가 들어있는 'mesa_bionic' 진입점으로 이동하여 빌드를 세팅합니다.
+      # 내장된 서브모듈(SPIRV-Tools)을 강제 활용하도록 forcefallback 플래그를 유지합니다.
       - name: Configure Mesa
         run: |
-          cd mesa-src
+          cd mesa-src/mesa_bionic
 
           export PKG_CONFIG_PATH="$TERMUX_PREFIX/lib/pkgconfig:$TERMUX_PREFIX/share/pkgconfig"
           export PKG_CONFIG_LIBDIR="$TERMUX_PREFIX/lib/pkgconfig"
@@ -138,8 +131,6 @@ jobs:
           export CXXFLAGS="-I$TERMUX_PREFIX/include -include fcntl.h -include unistd.h"
           export LDFLAGS="-L$TERMUX_PREFIX/lib -Wl,-rpath=$RUNTIME_PATH/lib -landroid-shmem -static-libstdc++"
 
-          # 🌟 시스템에 라이브러리가 없어도 서브프로젝트를 강제로 자동 빌드하여 병합하도록
-          # '--wrap-mode=forcefallback' 옵션을 추가해 줍니다.
           meson setup build \
             --cross-file /tmp/android-cross.ini \
             --wrap-mode=forcefallback \
@@ -156,23 +147,23 @@ jobs:
 
       - name: Build
         run: |
-          cd mesa-src
+          cd mesa-src/mesa_bionic
           ninja -C build -v 2>&1 | tee build.log
 
       - name: Install
         run: |
-          cd mesa-src
+          cd mesa-src/mesa_bionic
           DESTDIR=$PWD/install ninja -C build install
 
       - name: Show Files
         run: |
           echo "=== Installed Files ==="
-          find mesa-src/install -type f
+          find mesa-src/mesa_bionic/install -type f
 
       - name: Upload
         uses: actions/upload-artifact@v4
         with:
           name: vulkan-wrapper
           path: |
-            mesa-src/build.log
-            mesa-src/install
+            mesa-src/mesa_bionic/build.log
+            mesa-src/mesa_bionic/install
