@@ -22,8 +22,16 @@ jobs:
       - name: Clone Mesa Wrapper
         run: |
           git clone --depth 1 \
-            https://github.com/leegao/bionic-vulkan-wrapper.git \
+            --branch wrapper-25 \
+            https://gitlab.freedesktop.org/Pipetto-crypto/mesa.git \
             mesa-src
+
+      # 🌟 [기능 확장용 추가] etc2_encode 저장소를 Mesa 내부의 wrapper 소스 하위 폴더로 다운로드
+      - name: Clone ETC2/ASTC Encoder Extension
+        run: |
+          git clone --depth 1 \
+            https://github.com/leegao/etc2_encode.git \
+            mesa-src/src/vulkan/wrapper/etc2_encode
           
       - name: Setup Python
         uses: actions/setup-python@v5
@@ -33,30 +41,10 @@ jobs:
       - name: Install Dependencies
         run: |
           sudo apt update
-
           sudo apt install -y \
-            git \
-            wget \
-            unzip \
-            pkg-config \
-            ninja-build \
-            cmake \
-            bison \
-            flex \
-            python3-dev \
-            libx11-dev \
-            libxext-dev \
-            libxcb1-dev \
-            libxrandr-dev \
-            libxfixes-dev \
-            libxshmfence-dev \
-            libdrm-dev \
-            zlib1g-dev \
-            libzstd-dev \
-            glslang-tools \
-            glslang-dev \
-            spirv-tools \
-            libvulkan-dev
+            git wget unzip pkg-config ninja-build cmake bison flex python3-dev \
+            libx11-dev libxext-dev libxcb1-dev libxrandr-dev libxfixes-dev \
+            libxshmfence-dev libdrm-dev zlib1g-dev libzstd-dev glslang-tools
 
           python -m pip install --upgrade pip
           python -m pip install meson mako pyyaml ninja
@@ -74,7 +62,6 @@ jobs:
           cd $HOME/termuxfs/aarch64
           wget -q https://github.com/ziad9267/termux-on-gha/releases/download/test/termuxfs.tar
           tar -xf termuxfs.tar
-          
           echo "TERMUX_PREFIX=$HOME/termuxfs/aarch64/data/data/com.termux/files/usr" >> $GITHUB_ENV
           echo "TERMUX_SYSROOT=$HOME/termuxfs/aarch64" >> $GITHUB_ENV
           echo "RUNTIME_PATH=/data/data/com.termux/files/usr" >> $GITHUB_ENV
@@ -130,6 +117,7 @@ jobs:
           export CXXFLAGS="-I$TERMUX_PREFIX/include -include fcntl.h -include unistd.h"
           export LDFLAGS="-L$TERMUX_PREFIX/lib -Wl,-rpath=$RUNTIME_PATH/lib -landroid-shmem -static-libstdc++"
 
+          # 문법 에러가 수정된 명시적 옵션 적용
           meson setup build \
             --cross-file /tmp/android-cross.ini \
             -Dcpp_rtti=false \
@@ -143,6 +131,7 @@ jobs:
             -Dplatforms=x11 \
             -Dspirv-to-dxil=false \
             -Dopencl-spirv=false \
+            -Dstatic-libclc=[] \
             --prefix=/data/data/com.termux/files/usr
 
       - name: Build
