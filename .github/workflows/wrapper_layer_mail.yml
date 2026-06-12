@@ -19,13 +19,26 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      # 🌟 [교체 완료] leegao의 전용 패키지 통합 저장소로 타겟을 변경합니다.
-      # 내장된 SPIRV-Tools 및 하위 모듈들을 통째로 긁어오기 위해 --recursive 플래그를 붙여줍니다.
+      # 🌟 [보강 완료] SSH 권한 거부 에러를 HTTPS 치환으로 완벽하게 우회하는 단계
       - name: Clone Vulkan Wrapper Packages Hub
         run: |
-          git clone --depth 1 --recursive \
+          # 1. 서브모듈 없이 메인 저장소만 먼저 가볍게 클론합니다.
+          git clone --depth 1 \
             https://github.com/leegao/vulkan_wrapper_termux-packages.git \
             mesa-src
+          
+          cd mesa-src
+          
+          # 2. [핵심] 권한 에러를 일으키는 git@github.com 주소를 public HTTPS 주소로 강제 개조합니다.
+          if [ -f ".gitmodules" ]; then
+            echo "=== Fixing SSH Submodule URLs to HTTPS ==="
+            sed -i 's|git@github.com:|https://github.com/|g' .gitmodules
+            cat .gitmodules # 변경이 잘 되었는지 로그로 확인
+          fi
+          
+          # 3. 주소가 변경된 상태에서 안전하게 서브모듈 초기화 및 다운로드를 수행합니다.
+          git submodule init
+          git submodule update --depth 1
           
       - name: Setup Python
         uses: actions/setup-python@v5
