@@ -107,8 +107,6 @@ jobs:
 
       - name: Configure Gamescope
         run: |
-      - name: Configure Gamescope
-        run: |
           cd gamescope-src
 
           export PKG_CONFIG_PATH="$TERMUX_PREFIX/lib/pkgconfig:$TERMUX_PREFIX/share/pkgconfig"
@@ -118,7 +116,6 @@ jobs:
           sudo mkdir -p /data/data/com.termux/files/usr/bin
           sudo ln -sf $TERMUX_PREFIX/bin/wayland-scanner /data/data/com.termux/files/usr/bin/wayland-scanner
 
-          # 🌟 명시적으로 호스트(우분투)의 메손을 실행하도록 강제하여 타겟 메손과의 충돌을 원천 차단합니다.
           /usr/local/bin/meson setup build \
             --cross-file /tmp/gamescope-cross.ini \
             -Dinput_emulation=disabled \
