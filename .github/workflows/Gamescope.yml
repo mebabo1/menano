@@ -198,8 +198,15 @@ jobs:
           export PKG_CONFIG_LIBDIR="$TERMUX_PREFIX/lib/pkgconfig"
           export PKG_CONFIG_SYSROOT_DIR="$TERMUX_SYSROOT"
 
+          # 🌟 [완벽 교정] 호스트 시스템과 크로스 환경 경로 세팅
+          # 안드로이드용 arm64 웨일랜드 스캐너는 우분투에서 실행할 수 없으므로 잠시 이름을 바꿉니다.
+          mv $TERMUX_PREFIX/bin/wayland-scanner $TERMUX_PREFIX/bin/wayland-scanner-android || true
+          
+          # 호스트 우분투 빌드 서버 전용 가상 디렉토리 생성 및 순정 x86_64 스캐너 배치
           sudo mkdir -p /data/data/com.termux/files/usr/bin
-          sudo ln -sf $TERMUX_PREFIX/bin/wayland-scanner /data/data/com.termux/files/usr/bin/wayland-scanner
+          sudo ln -sf /usr/bin/wayland-scanner /data/data/com.termux/files/usr/bin/wayland-scanner
+          
+          # Xwayland는 빌드 중 직접 실행하는 것이 아니라 위치만 체크하므로 기존 셋팅 유지
           sudo ln -sf $TERMUX_PREFIX/bin/Xwayland /data/data/com.termux/files/usr/bin/Xwayland || true
 
           meson setup build \
