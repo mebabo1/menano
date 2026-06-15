@@ -72,6 +72,16 @@ jobs:
           # 이전 에러 지점이었던 덤프파일(XML)이 제자리에 잘 풀렸는지 검증합니다.
           ls -la $TERMUX_PREFIX/share/wayland-protocols/stable/linux-dmabuf/linux-dmabuf-v1.xml
 
+      - name: Inject Target XRes Dependency
+        run: |
+          mkdir -p /tmp/xres-pkg && cd /tmp/xres-pkg
+          wget -q https://mirrors.tuna.tsinghua.edu.cn/termux/termux-main/pool/main/libx/libxres/libxres_1.2.2_aarch64.deb
+          ar x libxres_1.2.2_aarch64.deb
+          tar -xf data.tar.xz
+          cp -r data/data/com.termux/files/usr/* $TERMUX_PREFIX/
+          echo "=== Injected XRes Check ==="
+          ls -la $TERMUX_PREFIX/lib/pkgconfig/xres.pc
+
       - name: Create Gamescope Android Cross File
         run: |
           NDK_ROOT=$ANDROID_NDK/toolchains/llvm/prebuilt/linux-x86_64
