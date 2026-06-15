@@ -59,16 +59,9 @@ jobs:
 
       - name: Inject Target Wayland Scanner
         run: |
-          # 1. -L 플래그를 추가하여 GitHub의 다운로드 리다이렉션 링크를 끝까지 추적해서 진짜 파일을 받아옵니다.
           wget -qL https://github.com/mebabo1/menano/releases/download/Box/wayland_scanner.tar.gz -O /tmp/wayland_scanner.tar.gz
-          
-          # 2. -z를 빼고 -xf만 사용하여 내부 포맷이 일반 tar든 gzip이든 상관없이 자동으로 풀리도록 합니다.
           tar -xf /tmp/wayland_scanner.tar.gz -C $TERMUX_PREFIX/../
-          
-          # 3. 실행 권한 강제 부여
           chmod +x $TERMUX_PREFIX/bin/wayland-scanner
-          
-          # 4. 주입 확인용 디버깅 로그
           echo "=== Injected Wayland Scanner Check ==="
           ls -la $TERMUX_PREFIX/bin/wayland-scanner
 
@@ -92,8 +85,9 @@ jobs:
           strip = '$TOOLCHAIN/llvm-strip'
           pkgconfig = 'pkg-config'
           
-          # 🌟 빌드 머신이 프로토콜 제네레이터로 사용할 호스트 우분투용 스캐너 경로 고정
+          # 🌟 메손이 요구하는 빌드 타겟/호스트 이정표를 완벽하게 가둡니다.
           wayland-scanner = '/usr/bin/wayland-scanner'
+          wayland-scanner_for_build = '/usr/bin/wayland-scanner'
 
           [properties]
           needs_exe_wrapper = true
@@ -118,6 +112,11 @@ jobs:
           export PKG_CONFIG_PATH="$TERMUX_PREFIX/lib/pkgconfig:$TERMUX_PREFIX/share/pkgconfig"
           export PKG_CONFIG_LIBDIR="$TERMUX_PREFIX/lib/pkgconfig"
           export PKG_CONFIG_SYSROOT_DIR="$TERMUX_SYSROOT"
+          
+          # 🌟 [최종 트릭] 주입한 파일 경로를 호스트 시스템 PATH에 직접 물려주고 가짜 링크를 걸어 속입니다.
+          export PATH="$TERMUX_PREFIX/bin:$PATH"
+          sudo mkdir -p /data/data/com.termux/files/usr/bin
+          sudo ln -sf $TERMUX_PREFIX/bin/wayland-scanner /data/data/com.termux/files/usr/bin/wayland-scanner
 
           meson setup build \
             --cross-file /tmp/gamescope-cross.ini \
