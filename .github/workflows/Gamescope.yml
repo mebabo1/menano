@@ -80,7 +80,7 @@ jobs:
           mkdir -p $TERMUX_PREFIX/include/luajit-2.1
           mkdir -p $TERMUX_PREFIX/include
 
-          # 1. 가짜 xres 명세서 및 헤더 (대소문자 및 경로 완벽 방어)
+          # 1. 가짜 xres 명세서 및 헤더 (대소문자 완벽 가드 및 문법 교정)
           cat > $TERMUX_PREFIX/lib/pkgconfig/xres.pc << 'EOF'
           prefix=/data/data/com.termux/files/usr
           exec_prefix=${prefix}
@@ -93,33 +93,26 @@ jobs:
           Libs: -L${libdir}
           EOF
           
-          # 어떤 대소문자로 참조하든 깨지지 않도록 대/소문자 버전을 둘 다 만듭니다.
+          # 기본 헤더 베이스 생성
           cat > $TERMUX_PREFIX/include/X11/extensions/XRes.h << 'EOF'
           #ifndef XRES_H
           #define XRES_H
           #endif
           EOF
           
+          # 대소문자 우회 및 루트 경로 복사본 배치
           cp $TERMUX_PREFIX/include/X11/extensions/XRes.h $TERMUX_PREFIX/include/X11/extensions/Xres.h
-          
-          # 혹시 몰라 상위 X11 폴더와 include 루트 폴더에도 복사해 둡니다.
           cp $TERMUX_PREFIX/include/X11/extensions/XRes.h $TERMUX_PREFIX/include/XRes.h
           cp $TERMUX_PREFIX/include/X11/extensions/XRes.h $TERMUX_PREFIX/include/Xres.h
-          
-          cat > $TERMUX_PREFIX/include/X11/extensions/XRes.h << 'EOF'
-          #ifndef XRES_H
-          #define XRES_H
-          #endif
-          EOF
 
-          # 2. 가짜 libudev 명세서 및 [내용 보강] 헤더 파일 생성
-          # wlroots/backend/session/session.c 에서 터진 udev_device 관련 에러를 원천 차단합니다.
+          # 2. 가짜 libudev 명세서 및 헤더 파일 생성
           cat > $TERMUX_PREFIX/lib/pkgconfig/libudev.pc << 'EOF'
           prefix=/data/data/com.termux/files/usr
           exec_prefix=${prefix}
           libdir=${exec_prefix}/lib
           includedir=${prefix}/include
           Name: libudev
+          Description: udev mockup library config for Termux
           Version: 255
           Cflags: -I${includedir}
           Libs: -L${libdir}
@@ -141,8 +134,7 @@ jobs:
           #endif
           EOF
 
-          # 3. 가짜 libinput 명세서 및 [내용 보강] 헤더 파일 생성
-          # wlroots/include/backend/libinput.h 에서 발생한 가시성(visibility) 에러들을 차단합니다.
+          # 3. 가짜 libinput 명세서 및 헤더 파일 생성
           cat > $TERMUX_PREFIX/lib/pkgconfig/libinput.pc << 'EOF'
           prefix=/data/data/com.termux/files/usr
           exec_prefix=${prefix}
@@ -179,7 +171,8 @@ jobs:
           touch $TERMUX_PREFIX/include/luajit-2.1/lauxlib.h
           touch $TERMUX_PREFIX/include/luajit-2.1/luajit.h
 
-          echo "=== Sophisticated Mock Assets Successfully Injected ==="
+          echo "=== All Mock Dependencies Cleansed & Injected ==="
+          ls -la $TERMUX_PREFIX/lib/pkgconfig/
           
       - name: Create Gamescope Android Cross File
         run: |
