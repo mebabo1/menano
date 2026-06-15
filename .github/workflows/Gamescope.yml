@@ -107,18 +107,19 @@ jobs:
 
       - name: Configure Gamescope
         run: |
+      - name: Configure Gamescope
+        run: |
           cd gamescope-src
 
           export PKG_CONFIG_PATH="$TERMUX_PREFIX/lib/pkgconfig:$TERMUX_PREFIX/share/pkgconfig"
           export PKG_CONFIG_LIBDIR="$TERMUX_PREFIX/lib/pkgconfig"
           export PKG_CONFIG_SYSROOT_DIR="$TERMUX_SYSROOT"
-          
-          # 🌟 [최종 트릭] 주입한 파일 경로를 호스트 시스템 PATH에 직접 물려주고 가짜 링크를 걸어 속입니다.
-          export PATH="$TERMUX_PREFIX/bin:$PATH"
+
           sudo mkdir -p /data/data/com.termux/files/usr/bin
           sudo ln -sf $TERMUX_PREFIX/bin/wayland-scanner /data/data/com.termux/files/usr/bin/wayland-scanner
 
-          meson setup build \
+          # 🌟 명시적으로 호스트(우분투)의 메손을 실행하도록 강제하여 타겟 메손과의 충돌을 원천 차단합니다.
+          /usr/local/bin/meson setup build \
             --cross-file /tmp/gamescope-cross.ini \
             -Dinput_emulation=disabled \
             -Denable_openvr_support=false \
