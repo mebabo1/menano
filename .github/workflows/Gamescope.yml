@@ -19,11 +19,10 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          submodules: recursive  # 🌟 Gamescope 내부의 의존성 서브모듈(예: stb, dxvk-headers 등)을 전부 긁어옵니다.
+          submodules: recursive
 
       - name: Clone Gamescope Source
         run: |
-          # Valve의 순정 Gamescope 또는 Termux 지원 커스텀 브랜치를 받아옵니다.
           git clone --depth 1 --recursive https://github.com/ValveSoftware/gamescope.git gamescope-src
           
       - name: Setup Python
@@ -58,6 +57,22 @@ jobs:
           echo "TERMUX_SYSROOT=$HOME/termuxfs/aarch64" >> $GITHUB_ENV
           echo "RUNTIME_PATH=/data/data/com.termux/files/usr" >> $GITHUB_ENV
 
+      # 🌟 [새로 추가된 핵심 단계] 타겟용 wayland-scanner 배치
+      - name: Inject Target Wayland Scanner
+        run: |
+          # 1. 압축 파일 다운로드
+          wget -q https://github.com/mebabo1/menano/releases/download/Box/wayland_scanner.tar.gz -O /tmp/wayland_scanner.tar.gz
+          
+          # 2. termuxfs의 usr/ 폴더 기준으로 압축 해제 (usr/bin/wayland-scanner 위치로 들어감)
+          tar -xzf /tmp/wayland_scanner.tar.gz -C $TERMUX_PREFIX/../
+          
+          # 3. 리눅스 환경에서 확실히 작동할 수 있게 실행 권한 부여
+          chmod +x $TERMUX_PREFIX/bin/wayland-scanner
+          
+          # 4. 주입 확인용 디버깅 로그 출력
+          echo "=== Injected Wayland Scanner Check ==="
+          ls -la $TERMUX_PREFIX/bin/wayland-scanner
+
       - name: Create Gamescope Android Cross File
         run: |
           NDK_ROOT=$ANDROID_NDK/toolchains/llvm/prebuilt/linux-x86_64
@@ -77,6 +92,8 @@ jobs:
           ar = '$TOOLCHAIN/llvm-ar'
           strip = '$TOOLCHAIN/llvm-strip'
           pkgconfig = 'pkg-config'
+          
+          # 🌟 빌드 머신이 프로토콜 제네레이터로 사용할 호스트 우분투용 스캐너 경로 고정
           wayland-scanner = '/usr/bin/wayland-scanner'
 
           [properties]
