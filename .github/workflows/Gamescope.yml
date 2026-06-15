@@ -74,11 +74,24 @@ jobs:
 
       - name: Inject Target XRes Dependency
         run: |
-          mkdir -p /tmp/xres-pkg && cd /tmp/xres-pkg
-          wget -q https://mirrors.tuna.tsinghua.edu.cn/termux/termux-main/pool/main/libx/libxres/libxres_1.2.2_aarch64.deb
-          ar x libxres_1.2.2_aarch64.deb
-          tar -xf data.tar.xz
-          cp -r data/data/com.termux/files/usr/* $TERMUX_PREFIX/
+          # 1. 임시 작업 폴더 생성
+          mkdir -p /tmp/xres-pkg
+          
+          # 2. Termux 패키지 저장소에서 실시간으로 libxres 패키지의 최신 다운로드 주소를 긁어옵니다.
+          # (버전이 올라가도 404 에러가 나지 않도록 자동화하는 트릭입니다)
+          XRES_URL=$(curl -s https://mirrors.tuna.tsinghua.edu.cn/termux/termux-main/dists/stable/main/binary-aarch64/Packages | grep -E "Filename:.*libxres_" | awk '{print "https://mirrors.tuna.tsinghua.edu.cn/termux/termux-main/"$2}' | head -n 1)
+          
+          echo "Downloading from: $XRES_URL"
+          wget -q "$XRES_URL" -O /tmp/xres-pkg/libxres.deb
+          
+          # 3. 절대 경로를 명시하여 압축 해제 진행
+          ar x /tmp/xres-pkg/libxres.deb --output=/tmp/xres-pkg
+          tar -xf /tmp/xres-pkg/data.tar.xz -C /tmp/xres-pkg
+          
+          # 4. 해제된 파일들을 termuxfs 내부($TERMUX_PREFIX)로 안전하게 복사
+          cp -r /tmp/xres-pkg/data/data/com.termux/files/usr/* $TERMUX_PREFIX/
+          
+          # 5. 주입 확인용 디버깅 로그
           echo "=== Injected XRes Check ==="
           ls -la $TERMUX_PREFIX/lib/pkgconfig/xres.pc
 
