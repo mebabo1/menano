@@ -57,19 +57,21 @@ jobs:
           echo "TERMUX_SYSROOT=$HOME/termuxfs/aarch64" >> $GITHUB_ENV
           echo "RUNTIME_PATH=/data/data/com.termux/files/usr" >> $GITHUB_ENV
 
-      - name: Inject Target Wayland Scanner & Protocols
+      - name: Inject Target Assets (Scanner, Protocols, XWayland)
         run: |
-          # 1. 사용자가 직접 업로드한 커스텀 스캐너 및 프로토콜 압축 파일 다운로드
+          # 1. XWayland 실물이 통합 패키징된 tar.gz 다운로드 및 해제
           wget -qL https://github.com/mebabo1/menano/releases/download/Box/wayland_scanner.tar.gz -O /tmp/wayland_scanner.tar.gz
-          
-          # 2. termuxfs 구조에 맞게 복사 해제 및 권한 부여
           tar -xf /tmp/wayland_scanner.tar.gz -C $TERMUX_PREFIX/../
+          
+          # 2. 실행 파일들 권한 부여
           chmod +x $TERMUX_PREFIX/bin/wayland-scanner
+          chmod +x $TERMUX_PREFIX/bin/Xwayland || chmod +x $TERMUX_PREFIX/bin/Xxwayland || true
           
           echo "=== Injected Files & Protocols Check ==="
           ls -la $TERMUX_PREFIX/bin/wayland-scanner
+          ls -la $TERMUX_PREFIX/bin/Xwayland || echo "⚠️ Xwayland 바이너리가 usr/bin에 없습니다!"
           ls -la $TERMUX_PREFIX/share/pkgconfig/wayland-protocols.pc
-          ls -la $TERMUX_PREFIX/share/wayland-protocols/stable/linux-dmabuf/linux-dmabuf-v1.xml
+          ls -la $TERMUX_PREFIX/lib/pkgconfig/xwayland.pc || ls -la $TERMUX_PREFIX/share/pkgconfig/xwayland.pc || echo "⚠️ xwayland.pc 파일이 없습니다!"
 
       - name: Mock Target XRes, Libudev & Libinput Dependency (Fix for Termux)
         run: |
@@ -174,6 +176,7 @@ jobs:
 
           sudo mkdir -p /data/data/com.termux/files/usr/bin
           sudo ln -sf $TERMUX_PREFIX/bin/wayland-scanner /data/data/com.termux/files/usr/bin/wayland-scanner
+          sudo ln -sf $TERMUX_PREFIX/bin/Xwayland /data/data/com.termux/files/usr/bin/Xwayland || true
 
           meson setup build \
             --cross-file /tmp/gamescope-cross.ini \
