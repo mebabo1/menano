@@ -86,69 +86,86 @@ jobs:
           exec_prefix=${prefix}
           libdir=${exec_prefix}/lib
           includedir=${prefix}/include
-
           Name: XRes
-          Description: X11 Resource extension based mockup for Termux
           Version: 1.2.2
           Cflags: -I${includedir}
           Libs: -L${libdir}
           EOF
-          touch $TERMUX_PREFIX/include/X11/extensions/XRes.h
+          
+          cat > $TERMUX_PREFIX/include/X11/extensions/XRes.h << 'EOF'
+          #ifndef XRES_H
+          #define XRES_H
+          #endif
+          EOF
 
-          # 2. 가짜 libudev 명세서 및 헤더
+          # 2. 가짜 libudev 명세서 및 [내용 보강] 헤더 파일 생성
+          # wlroots/backend/session/session.c 에서 터진 udev_device 관련 에러를 원천 차단합니다.
           cat > $TERMUX_PREFIX/lib/pkgconfig/libudev.pc << 'EOF'
           prefix=/data/data/com.termux/files/usr
           exec_prefix=${prefix}
           libdir=${exec_prefix}/lib
           includedir=${prefix}/include
-
           Name: libudev
-          Description: udev mockup library config for Termux (Android Cross-Build)
           Version: 255
           Cflags: -I${includedir}
           Libs: -L${libdir}
           EOF
-          touch $TERMUX_PREFIX/include/libudev.h
+          
+          cat > $TERMUX_PREFIX/include/libudev.h << 'EOF'
+          #ifndef LIBUDEV_H
+          #define LIBUDEV_H
+          #include <sys/types.h>
+          struct udev;
+          struct udev_device;
+          struct udev_monitor;
+          static inline const char *udev_device_get_property_value(struct udev_device *d, const char *p) { return ""; }
+          static inline const char *udev_device_get_sysname(struct udev_device *d) { return ""; }
+          static inline const char *udev_device_get_devnode(struct udev_device *d) { return ""; }
+          static inline const char *udev_device_get_action(struct udev_device *d) { return ""; }
+          static inline dev_t udev_device_get_devnum(struct udev_device *d) { return 0; }
+          static inline struct udev_device *udev_monitor_receive_device(struct udev_monitor *m) { return (void*)0; }
+          #endif
+          EOF
 
-          # 3. 가짜 libinput 명세서 및 헤더
+          # 3. 가짜 libinput 명세서 및 [내용 보강] 헤더 파일 생성
+          # wlroots/include/backend/libinput.h 에서 발생한 가시성(visibility) 에러들을 차단합니다.
           cat > $TERMUX_PREFIX/lib/pkgconfig/libinput.pc << 'EOF'
           prefix=/data/data/com.termux/files/usr
           exec_prefix=${prefix}
           libdir=${exec_prefix}/lib
           includedir=${prefix}/include
-
           Name: libinput
-          Description: libinput mockup library config for Termux (Android Cross-Build)
           Version: 1.26.0
           Cflags: -I${includedir}
           Libs: -L${libdir}
           EOF
-          touch $TERMUX_PREFIX/include/libinput.h
+          
+          cat > $TERMUX_PREFIX/include/libinput.h << 'EOF'
+          #ifndef LIBINPUT_H
+          #define LIBINPUT_H
+          struct libinput_event;
+          struct libinput_device;
+          #endif
+          EOF
 
-          # 4. 🌟 [완벽 교정] 가짜 luajit.pc 파일 생성
+          # 4. 가짜 luajit 명세서 및 헤더 파일 생성
           cat > $TERMUX_PREFIX/lib/pkgconfig/luajit.pc << 'EOF'
           prefix=/data/data/com.termux/files/usr
           exec_prefix=${prefix}
           libdir=${exec_prefix}/lib
           includedir=${prefix}/include/luajit-2.1
-
           Name: LuaJIT
-          Description: Just-In-Time Compiler for Lua (Mockup for Termux)
           Version: 2.1.0-beta3
           Libs: -L${libdir}
           Cflags: -I${includedir}
           EOF
 
-          # Gamescope 소스코드가 요구하는 LuaJIT 핵심 더미 헤더 생성
           touch $TERMUX_PREFIX/include/luajit-2.1/lua.h
           touch $TERMUX_PREFIX/include/luajit-2.1/lualib.h
           touch $TERMUX_PREFIX/include/luajit-2.1/lauxlib.h
           touch $TERMUX_PREFIX/include/luajit-2.1/luajit.h
 
-          # 5. 최종 정상 생성 여부 확인 로그
-          echo "=== All Mock Dependencies Injected ==="
-          ls -la $TERMUX_PREFIX/lib/pkgconfig/luajit.pc
-          ls -la $TERMUX_PREFIX/include/luajit-2.1/
+          echo "=== Sophisticated Mock Assets Successfully Injected ==="
           
       - name: Create Gamescope Android Cross File
         run: |
@@ -217,8 +234,6 @@ jobs:
             -Drt_cap=disabled \
             -Dbenchmark=disabled \
             -Denable_tests=false \
-            -Dwlroots:libinput=disabled \
-            -Dwlroots:session=disabled \
             --prefix=/data/data/com.termux/files/usr
 
       - name: Build Gamescope
