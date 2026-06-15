@@ -116,7 +116,7 @@ jobs:
           sudo mkdir -p /data/data/com.termux/files/usr/bin
           sudo ln -sf $TERMUX_PREFIX/bin/wayland-scanner /data/data/com.termux/files/usr/bin/wayland-scanner
 
-          /usr/local/bin/meson setup build \
+          meson setup build \
             --cross-file /tmp/gamescope-cross.ini \
             -Dinput_emulation=disabled \
             -Denable_openvr_support=false \
