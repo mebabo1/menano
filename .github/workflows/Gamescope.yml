@@ -80,17 +80,31 @@ jobs:
           mkdir -p $TERMUX_PREFIX/include/luajit-2.1
           mkdir -p $TERMUX_PREFIX/include
 
-          # 1. 가짜 xres 명세서 및 헤더
+          # 1. 가짜 xres 명세서 및 헤더 (대소문자 및 경로 완벽 방어)
           cat > $TERMUX_PREFIX/lib/pkgconfig/xres.pc << 'EOF'
           prefix=/data/data/com.termux/files/usr
           exec_prefix=${prefix}
           libdir=${exec_prefix}/lib
           includedir=${prefix}/include
           Name: XRes
+          Description: X11 Resource extension mockup for Termux
           Version: 1.2.2
-          Cflags: -I${includedir}
+          Cflags: -I${includedir} -I${includedir}/X11 -I${includedir}/X11/extensions
           Libs: -L${libdir}
           EOF
+          
+          # 어떤 대소문자로 참조하든 깨지지 않도록 대/소문자 버전을 둘 다 만듭니다.
+          cat > $TERMUX_PREFIX/include/X11/extensions/XRes.h << 'EOF'
+          #ifndef XRES_H
+          #define XRES_H
+          #endif
+          EOF
+          
+          cp $TERMUX_PREFIX/include/X11/extensions/XRes.h $TERMUX_PREFIX/include/X11/extensions/Xres.h
+          
+          # 혹시 몰라 상위 X11 폴더와 include 루트 폴더에도 복사해 둡니다.
+          cp $TERMUX_PREFIX/include/X11/extensions/XRes.h $TERMUX_PREFIX/include/XRes.h
+          cp $TERMUX_PREFIX/include/X11/extensions/XRes.h $TERMUX_PREFIX/include/Xres.h
           
           cat > $TERMUX_PREFIX/include/X11/extensions/XRes.h << 'EOF'
           #ifndef XRES_H
