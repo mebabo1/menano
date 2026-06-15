@@ -121,10 +121,19 @@ jobs:
           EOF
           touch $TERMUX_PREFIX/include/libinput.h
 
-          echo "=== Fake XRes, Libudev, Libinput Injection Complete ==="
-          ls -la $TERMUX_PREFIX/lib/pkgconfig/xres.pc
-          ls -la $TERMUX_PREFIX/lib/pkgconfig/libudev.pc
-          ls -la $TERMUX_PREFIX/lib/pkgconfig/libinput.pc
+          Name: LuaJIT
+          Description: Just-In-Time Compiler for Lua (Mockup for Termux)
+          Version: 2.1.0-beta3
+          Libs: -L${libdir}
+          Cflags: -I${includedir}
+          EOF
+
+          # Gamescope 소스코드가 컴파일 중 요구할 수 있는 Lua 핵심 헤더 파일들을 공백으로 만들어 둡니다.
+          touch $TERMUX_PREFIX/include/luajit-2.1/lua.h
+          touch $TERMUX_PREFIX/include/luajit-2.1/lualib.h
+          touch $TERMUX_PREFIX/include/luajit-2.1/lauxlib.h
+          touch $TERMUX_PREFIX/include/luajit-2.1/luajit.h
+
           
       - name: Create Gamescope Android Cross File
         run: |
