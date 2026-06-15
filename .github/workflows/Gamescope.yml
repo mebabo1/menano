@@ -73,12 +73,14 @@ jobs:
           ls -la $TERMUX_PREFIX/share/pkgconfig/wayland-protocols.pc
           ls -la $TERMUX_PREFIX/lib/pkgconfig/xwayland.pc || ls -la $TERMUX_PREFIX/share/pkgconfig/xwayland.pc || echo "⚠️ xwayland.pc 파일이 없습니다!"
 
-      - name: Mock Target XRes, Libudev & Libinput Dependency (Fix for Termux)
+      - name: Mock Target Missing Dependencies (XRes, Libudev, Libinput, LuaJIT)
         run: |
           mkdir -p $TERMUX_PREFIX/lib/pkgconfig
           mkdir -p $TERMUX_PREFIX/include/X11/extensions
+          mkdir -p $TERMUX_PREFIX/include/luajit-2.1
           mkdir -p $TERMUX_PREFIX/include
 
+          # 1. 가짜 xres 명세서 및 헤더
           cat > $TERMUX_PREFIX/lib/pkgconfig/xres.pc << 'EOF'
           prefix=/data/data/com.termux/files/usr
           exec_prefix=${prefix}
@@ -93,6 +95,7 @@ jobs:
           EOF
           touch $TERMUX_PREFIX/include/X11/extensions/XRes.h
 
+          # 2. 가짜 libudev 명세서 및 헤더
           cat > $TERMUX_PREFIX/lib/pkgconfig/libudev.pc << 'EOF'
           prefix=/data/data/com.termux/files/usr
           exec_prefix=${prefix}
@@ -107,6 +110,7 @@ jobs:
           EOF
           touch $TERMUX_PREFIX/include/libudev.h
 
+          # 3. 가짜 libinput 명세서 및 헤더
           cat > $TERMUX_PREFIX/lib/pkgconfig/libinput.pc << 'EOF'
           prefix=/data/data/com.termux/files/usr
           exec_prefix=${prefix}
@@ -121,6 +125,13 @@ jobs:
           EOF
           touch $TERMUX_PREFIX/include/libinput.h
 
+          # 4. 🌟 [완벽 교정] 가짜 luajit.pc 파일 생성
+          cat > $TERMUX_PREFIX/lib/pkgconfig/luajit.pc << 'EOF'
+          prefix=/data/data/com.termux/files/usr
+          exec_prefix=${prefix}
+          libdir=${exec_prefix}/lib
+          includedir=${prefix}/include/luajit-2.1
+
           Name: LuaJIT
           Description: Just-In-Time Compiler for Lua (Mockup for Termux)
           Version: 2.1.0-beta3
@@ -128,12 +139,16 @@ jobs:
           Cflags: -I${includedir}
           EOF
 
-          # Gamescope 소스코드가 컴파일 중 요구할 수 있는 Lua 핵심 헤더 파일들을 공백으로 만들어 둡니다.
+          # Gamescope 소스코드가 요구하는 LuaJIT 핵심 더미 헤더 생성
           touch $TERMUX_PREFIX/include/luajit-2.1/lua.h
           touch $TERMUX_PREFIX/include/luajit-2.1/lualib.h
           touch $TERMUX_PREFIX/include/luajit-2.1/lauxlib.h
           touch $TERMUX_PREFIX/include/luajit-2.1/luajit.h
 
+          # 5. 최종 정상 생성 여부 확인 로그
+          echo "=== All Mock Dependencies Injected ==="
+          ls -la $TERMUX_PREFIX/lib/pkgconfig/luajit.pc
+          ls -la $TERMUX_PREFIX/include/luajit-2.1/
           
       - name: Create Gamescope Android Cross File
         run: |
