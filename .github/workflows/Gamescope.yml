@@ -75,26 +75,32 @@ jobs:
         run: |
           mkdir -p /tmp/xres-pkg
           
-          # 🌟 [공식 저장소 전환 트릭] 
-          # Termux 공식 X11 패키지 인덱스(Packages)에서 'libxres'의 가장 최신 버전 파일명을 실시간 추적합니다.
-          OFFICIAL_X11_BASE="https://packages-cf.termux.dev/apt/termux-x11"
+          # 1. 🌟 Termux 공식 서버의 정확한 엔드포인트를 선언합니다.
+          OFFICIAL_ROOT="https://packages-cf.termux.dev/apt"
+          OFFICIAL_X11_BASE="${OFFICIAL_ROOT}/termux-x11"
           
-          # 패키지 명세표를 긁어와서 libxres 패키지의 실제 경로(Filename)를 파싱합니다.
-          XRES_PATH=$(curl -s "${OFFICIAL_X11_BASE}/dists/stable/main/binary-aarch64/Packages" | grep -E "Filename:.*libxres_" | awk '{print $2}' | head -n 1)
+          # 2. 패키지 파일 명세 리스트를 다운로드한 후, libxres의 상대 경로(pool/main/...)를 안전하게 파싱합니다.
+          XRES_PATH=$(curl -s "${OFFICIAL_X11_BASE}/dists/stable/main/binary-aarch64/Packages" | grep -E "^Filename:.*libxres_" | awk '{print $2}' | head -n 1)
           
-          # 최종 공식 다운로드 주소 조립
-          XRES_URL="${OFFICIAL_X11_BASE}/${XRES_PATH}"
+          # 3. 🌟 [핵심 수정] 루트 주소와 상대 경로를 오차 없이 정밀 조립합니다.
+          XRES_URL="${OFFICIAL_ROOT}/${XRES_PATH}"
           
-          echo "Downloading libxres from Official Mirror: $XRES_URL"
+          echo "Downloading from exact URL: $XRES_URL"
           wget -q "$XRES_URL" -O /tmp/xres-pkg/libxres.deb
           
-          # 3. .deb 패키지 압축 내부 해제 작업
-          ar x /tmp/xres-pkg/libxres.deb --output=/tmp/xres-pkg
-          tar -xf /tmp/xres-pkg/data.tar.xz -C /tmp/xres-pkg
-          cp -r /tmp/xres-pkg/data/data/com.termux/files/usr/* $TERMUX_PREFIX/
+          # 다운로드된 파일이 진짜 데비안 패키지인지 텍스트인지 검증하는 디버깅 로그
+          file /tmp/xres-pkg/libxres.deb
+          
+          # 4. 'ar x' 대신 리눅스 표준 패키지 관리 도구(dpkg-deb)를 이용해 내부 소스를 확실하게 강제 추출합니다.
+          dpkg-deb -x /tmp/xres-pkg/libxres.deb /tmp/xres-pkg/extracted
+          
+          # 5. 추출 완료된 바이너리들을 termuxfs 내부($TERMUX_PREFIX)로 안전하게 복사 이식합니다.
+          cp -r /tmp/xres-pkg/extracted/data/data/com.termux/files/usr/* $TERMUX_PREFIX/
+          
+          # 메손 컴파일러가 요구하는 xres.pc 파일 의존성 꼬임 방지 트릭
           sed -i 's/Requires.private: xproto/Requires.private: /g' $TERMUX_PREFIX/lib/pkgconfig/xres.pc || true
           
-          # 5. 최종 정상 이식 확인용 디버깅 로그
+          # 6. 최종 주입 검증 확인 로그
           echo "=== Official Injected XRes Check ==="
           ls -la $TERMUX_PREFIX/lib/pkgconfig/xres.pc
           ls -la $TERMUX_PREFIX/lib/libXRes.so*
