@@ -52,10 +52,9 @@ jobs:
           NDK_ROOT=$ANDROID_NDK/toolchains/llvm/prebuilt/linux-x86_64
           TOOLCHAIN=$NDK_ROOT/bin
           
-          # CXXFLAGS에 -DEGL_EGLEXT_PROTOTYPES 플래그를 추가하여 확장 기능 프로토타입도 명시적으로 활성화합니다.
           make \
             CXX="$TOOLCHAIN/aarch64-linux-android${API_LEVEL}-clang++" \
-            CXXFLAGS="-std=c++17 -fPIC --target=aarch64-linux-android${API_LEVEL} -D__TERMUX__ -D__USE_GNU -U__ANDROID__ -DEGL_EGLEXT_PROTOTYPES -idirafter$TERMUX_PREFIX/include -include fcntl.h -include unistd.h" \
+            CXXFLAGS="-std=c++17 -fPIC --target=aarch64-linux-android${API_LEVEL} -D__TERMUX__ -D__USE_GNU -U__ANDROID__ -DEGL_EGLEXT_PROTOTYPES -DGL_GLEXT_PROTOTYPES -I$TERMUX_PREFIX/include -idirafter$NDK_ROOT/sysroot/usr/include -include fcntl.h -include unistd.h" \
             LDFLAGS="-shared --target=aarch64-linux-android${API_LEVEL} -nostdlib++ -L$TERMUX_PREFIX/lib -Wl,-rpath=/system/lib64:$RUNTIME_PATH/lib -landroid-shmem -lc++_shared -lxcb -lxcb-sync -lxcb-present -lxcb-dri3 -lX11 -lX11-xcb -landroid"
 
       - name: Packaging Clean Symlinks
