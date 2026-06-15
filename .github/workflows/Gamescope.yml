@@ -134,7 +134,6 @@ jobs:
           #endif
           EOF
 
-          # 3. 가짜 libinput 명세서 및 헤더 파일 생성
           cat > $TERMUX_PREFIX/lib/pkgconfig/libinput.pc << 'EOF'
           prefix=/data/data/com.termux/files/usr
           exec_prefix=${prefix}
