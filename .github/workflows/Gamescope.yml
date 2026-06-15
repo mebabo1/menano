@@ -23,7 +23,8 @@ jobs:
 
       - name: Clone Gamescope Source
         run: |
-          git clone --depth 1 --recursive https://github.com/ValveSoftware/gamescope.git gamescope-src
+          # 🌟 서브모듈 유실을 방지하기 위해 정석 클론 명령을 사용합니다.
+          git clone --recurse-submodules --depth 1 https://github.com/ValveSoftware/gamescope.git gamescope-src
           
       - name: Setup Python
         uses: actions/setup-python@v5
@@ -57,13 +58,16 @@ jobs:
           echo "TERMUX_SYSROOT=$HOME/termuxfs/aarch64" >> $GITHUB_ENV
           echo "RUNTIME_PATH=/data/data/com.termux/files/usr" >> $GITHUB_ENV
 
-      - name: Inject Target Wayland Scanner
+      - name: Inject Target Wayland Scanner & Protocols
         run: |
+          # 🌟 수정된 tar.gz 파일을 다운로드하여 추출합니다. (usr/share/pkgconfig/...pc 파일이 같이 풀림)
           wget -qL https://github.com/mebabo1/menano/releases/download/Box/wayland_scanner.tar.gz -O /tmp/wayland_scanner.tar.gz
           tar -xf /tmp/wayland_scanner.tar.gz -C $TERMUX_PREFIX/../
           chmod +x $TERMUX_PREFIX/bin/wayland-scanner
-          echo "=== Injected Wayland Scanner Check ==="
+          
+          echo "=== Injected Files Check ==="
           ls -la $TERMUX_PREFIX/bin/wayland-scanner
+          ls -la $TERMUX_PREFIX/share/pkgconfig/wayland-protocols.pc || echo "Not found in default share!"
 
       - name: Create Gamescope Android Cross File
         run: |
@@ -85,7 +89,6 @@ jobs:
           strip = '$TOOLCHAIN/llvm-strip'
           pkgconfig = 'pkg-config'
           
-          # 🌟 메손이 요구하는 빌드 타겟/호스트 이정표를 완벽하게 가둡니다.
           wayland-scanner = '/usr/bin/wayland-scanner'
           wayland-scanner_for_build = '/usr/bin/wayland-scanner'
 
@@ -109,7 +112,9 @@ jobs:
         run: |
           cd gamescope-src
 
-          export PKG_CONFIG_PATH="$TERMUX_PREFIX/lib/pkgconfig:$TERMUX_PREFIX/share/pkgconfig"
+          # 🌟 [수정 포인트] 직접 주입하신 share/pkgconfig 폴더의 우선순위를 명확히 묶어줍니다.
+          export TERMUX_SHARE_PC="$TERMUX_PREFIX/share/pkgconfig"
+          export PKG_CONFIG_PATH="$TERMUX_SHARE_PC:$TERMUX_PREFIX/lib/pkgconfig"
           export PKG_CONFIG_LIBDIR="$TERMUX_PREFIX/lib/pkgconfig"
           export PKG_CONFIG_SYSROOT_DIR="$TERMUX_SYSROOT"
 
