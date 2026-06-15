@@ -209,6 +209,7 @@ jobs:
             -Dpipewire=disabled \
             -Drt_cap=disabled \
             -Dbenchmark=disabled \
+            -Denable_tests=false \
             --prefix=/data/data/com.termux/files/usr
 
       - name: Build Gamescope
