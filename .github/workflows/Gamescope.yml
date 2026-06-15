@@ -184,7 +184,7 @@ jobs:
             -Denable_openvr_support=false \
             -Dpipewire=disabled \
             -Drt_cap=disabled \
-            -Dcommit_scripts=disabled \
+            -Dbenchmark=disabled \
             --prefix=/data/data/com.termux/files/usr
 
       - name: Build Gamescope
