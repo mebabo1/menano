@@ -217,6 +217,8 @@ jobs:
             -Drt_cap=disabled \
             -Dbenchmark=disabled \
             -Denable_tests=false \
+            -Dwlroots:libinput=disabled \
+            -Dwlroots:session=disabled \
             --prefix=/data/data/com.termux/files/usr
 
       - name: Build Gamescope
