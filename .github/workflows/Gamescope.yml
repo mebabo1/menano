@@ -59,41 +59,45 @@ jobs:
 
       - name: Inject Target Wayland Scanner & Protocols
         run: |
-          # 🌟 새로 패키징하여 업로드하신 통합 tar.gz를 다운로드합니다.
+          # 1. 사용자가 직접 업로드한 커스텀 스캐너 및 프로토콜 압축 파일 다운로드
           wget -qL https://github.com/mebabo1/menano/releases/download/Box/wayland_scanner.tar.gz -O /tmp/wayland_scanner.tar.gz
           
-          # usr/ 폴더 구조가 포함되어 있으므로 TERMUX_PREFIX의 상위 폴더(files/)에 정확히 해제합니다.
+          # 2. termuxfs 구조에 맞게 복사 해제 및 권한 부여
           tar -xf /tmp/wayland_scanner.tar.gz -C $TERMUX_PREFIX/../
           chmod +x $TERMUX_PREFIX/bin/wayland-scanner
           
           echo "=== Injected Files & Protocols Check ==="
           ls -la $TERMUX_PREFIX/bin/wayland-scanner
           ls -la $TERMUX_PREFIX/share/pkgconfig/wayland-protocols.pc
-          # 이전 에러 지점이었던 덤프파일(XML)이 제자리에 잘 풀렸는지 검증합니다.
           ls -la $TERMUX_PREFIX/share/wayland-protocols/stable/linux-dmabuf/linux-dmabuf-v1.xml
 
-      - name: Inject Target XRes Dependency
+      - name: Inject Target XRes Dependency (Official Cloudflare Mirror)
         run: |
-          # 1. 임시 작업 폴더 생성
           mkdir -p /tmp/xres-pkg
           
-          # 2. Termux 패키지 저장소에서 실시간으로 libxres 패키지의 최신 다운로드 주소를 긁어옵니다.
-          # (버전이 올라가도 404 에러가 나지 않도록 자동화하는 트릭입니다)
-          XRES_URL=$(curl -s https://mirrors.tuna.tsinghua.edu.cn/termux/termux-main/dists/stable/main/binary-aarch64/Packages | grep -E "Filename:.*libxres_" | awk '{print "https://mirrors.tuna.tsinghua.edu.cn/termux/termux-main/"$2}' | head -n 1)
+          # 🌟 [공식 저장소 전환 트릭] 
+          # Termux 공식 X11 패키지 인덱스(Packages)에서 'libxres'의 가장 최신 버전 파일명을 실시간 추적합니다.
+          OFFICIAL_X11_BASE="https://packages-cf.termux.dev/apt/termux-x11"
           
-          echo "Downloading from: $XRES_URL"
+          # 패키지 명세표를 긁어와서 libxres 패키지의 실제 경로(Filename)를 파싱합니다.
+          XRES_PATH=$(curl -s "${OFFICIAL_X11_BASE}/dists/stable/main/binary-aarch64/Packages" | grep -E "Filename:.*libxres_" | awk '{print $2}' | head -n 1)
+          
+          # 최종 공식 다운로드 주소 조립
+          XRES_URL="${OFFICIAL_X11_BASE}/${XRES_PATH}"
+          
+          echo "Downloading libxres from Official Mirror: $XRES_URL"
           wget -q "$XRES_URL" -O /tmp/xres-pkg/libxres.deb
           
-          # 3. 절대 경로를 명시하여 압축 해제 진행
+          # 3. .deb 패키지 압축 내부 해제 작업
           ar x /tmp/xres-pkg/libxres.deb --output=/tmp/xres-pkg
           tar -xf /tmp/xres-pkg/data.tar.xz -C /tmp/xres-pkg
-          
-          # 4. 해제된 파일들을 termuxfs 내부($TERMUX_PREFIX)로 안전하게 복사
           cp -r /tmp/xres-pkg/data/data/com.termux/files/usr/* $TERMUX_PREFIX/
+          sed -i 's/Requires.private: xproto/Requires.private: /g' $TERMUX_PREFIX/lib/pkgconfig/xres.pc || true
           
-          # 5. 주입 확인용 디버깅 로그
-          echo "=== Injected XRes Check ==="
+          # 5. 최종 정상 이식 확인용 디버깅 로그
+          echo "=== Official Injected XRes Check ==="
           ls -la $TERMUX_PREFIX/lib/pkgconfig/xres.pc
+          ls -la $TERMUX_PREFIX/lib/libXRes.so*
 
       - name: Create Gamescope Android Cross File
         run: |
