@@ -105,16 +105,13 @@ jobs:
           export PKG_CONFIG_LIBDIR="$TERMUX_PREFIX/lib/pkgconfig"
           export PKG_CONFIG_SYSROOT_DIR="$TERMUX_SYSROOT"
           
-          # 🌟 [안드로이드 전용 옵션 튜닝]
-          # 1. 안드로이드 커널에는 리눅스 보안 모듈인 `libcap` 기능이 없으므로 `input_emulation=disabled` 처리합니다.
-          # 2. VR/OpenVR 기능은 모바일에서 에러를 뿜으므로 `enable_openvr_support=false`로 원천 차단합니다.
-          # 3. Termux의 주 타겟인 `pipewire` 스트리밍은 시스템 사양에 따라 선택적으로 비활성화/활성화합니다.
+          # 🌟 [수정 포인트] -Drt_cap=false 가 아니라 -Drt_cap=disabled 로 변경합니다.
           meson setup build \
             --cross-file /tmp/gamescope-cross.ini \
             -Dinput_emulation=disabled \
             -Denable_openvr_support=false \
             -Dpipewire=disabled \
-            -Drt_cap=false \
+            -Drt_cap=disabled \
             --prefix=/data/data/com.termux/files/usr
 
       - name: Build Gamescope
