@@ -36,7 +36,7 @@ jobs:
           sudo apt update
           sudo apt install -y \
             git wget unzip pkg-config ninja-build cmake bison flex \
-            glslang-tools wayland-protocols libwayland-dev
+            glslang-tools wayland-protocols libwayland-dev libwayland-bin
           python -m pip install --upgrade pip
           python -m pip install meson mako pyyaml ninja
 
@@ -64,7 +64,6 @@ jobs:
           TOOLCHAIN=$NDK_ROOT/bin
           SYSROOT=$NDK_ROOT/sysroot
 
-          # 🌟 이전에 무시하기로 했던 검은 화면 버그를 잡는 최종 rpath 조합을 기입했습니다.
           cat > /tmp/gamescope-cross.ini << EOF
           [host_machine]
           system = 'android'
@@ -78,6 +77,7 @@ jobs:
           ar = '$TOOLCHAIN/llvm-ar'
           strip = '$TOOLCHAIN/llvm-strip'
           pkgconfig = 'pkg-config'
+          wayland-scanner = '/usr/bin/wayland-scanner'
 
           [properties]
           needs_exe_wrapper = true
@@ -86,8 +86,6 @@ jobs:
           [built-in options]
           c_args = ['-fPIC', '-isystem$TERMUX_PREFIX/include', '-idirafter$SYSROOT/usr/include', '-include', 'fcntl.h', '-include', 'unistd.h']
           cpp_args = ['-fPIC', '-isystem$TERMUX_PREFIX/include', '-idirafter$SYSROOT/usr/include', '-include', 'fcntl.h', '-include', 'unistd.h']
-          
-          # 🌟 [/vendor/lib64/egl]을 추가하여 게임스코프가 본체 화면 가속 드라이버를 완벽히 링킹하도록 설계했습니다.
           c_link_args = ['--target=aarch64-linux-android30', '-L$TERMUX_PREFIX/lib', '-Wl,-rpath=/system/lib64:/vendor/lib64:/vendor/lib64/egl:$RUNTIME_PATH/lib', '-Wl,--no-as-needed', '-lEGL', '-landroid-shmem']
           cpp_link_args = ['--target=aarch64-linux-android30', '-L$TERMUX_PREFIX/lib', '-Wl,-rpath=/system/lib64:/vendor/lib64:/vendor/lib64/egl:$RUNTIME_PATH/lib', '-Wl,--no-as-needed', '-lEGL', '-landroid-shmem', '-static-libstdc++']
 
@@ -104,8 +102,7 @@ jobs:
           export PKG_CONFIG_PATH="$TERMUX_PREFIX/lib/pkgconfig:$TERMUX_PREFIX/share/pkgconfig"
           export PKG_CONFIG_LIBDIR="$TERMUX_PREFIX/lib/pkgconfig"
           export PKG_CONFIG_SYSROOT_DIR="$TERMUX_SYSROOT"
-          
-          # 🌟 [수정 포인트] -Drt_cap=false 가 아니라 -Drt_cap=disabled 로 변경합니다.
+
           meson setup build \
             --cross-file /tmp/gamescope-cross.ini \
             -Dinput_emulation=disabled \
