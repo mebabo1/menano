@@ -71,12 +71,12 @@ jobs:
           ls -la $TERMUX_PREFIX/share/pkgconfig/wayland-protocols.pc
           ls -la $TERMUX_PREFIX/share/wayland-protocols/stable/linux-dmabuf/linux-dmabuf-v1.xml
 
-      - name: Mock Target XRes & Libudev Dependency (Fix for Termux Architecture)
+      - name: Mock Target XRes, Libudev & Libinput Dependency (Fix for Termux)
         run: |
           mkdir -p $TERMUX_PREFIX/lib/pkgconfig
           mkdir -p $TERMUX_PREFIX/include/X11/extensions
+          mkdir -p $TERMUX_PREFIX/include
 
-          # 1. 🌟 가짜 xres.pc 명세서 생성
           cat > $TERMUX_PREFIX/lib/pkgconfig/xres.pc << 'EOF'
           prefix=/data/data/com.termux/files/usr
           exec_prefix=${prefix}
@@ -91,9 +91,6 @@ jobs:
           EOF
           touch $TERMUX_PREFIX/include/X11/extensions/XRes.h
 
-          # 2. 🌟 가짜 libudev.pc 명세서 생성
-          # 메손이 'Run-time dependency libudev found: YES'를 띄우게 만듭니다.
-          # 안드로이드 링커가 존재하지 않는 libudev.so를 찾아 헤매지 않도록 Libs에서 바이너리 링크(-ludev)를 제거합니다.
           cat > $TERMUX_PREFIX/lib/pkgconfig/libudev.pc << 'EOF'
           prefix=/data/data/com.termux/files/usr
           exec_prefix=${prefix}
@@ -106,15 +103,26 @@ jobs:
           Cflags: -I${includedir}
           Libs: -L${libdir}
           EOF
-
-          # 혹시나 코드 컴파일 중 udev.h 헤더를 요구할 것에 대비해 빈 가짜 헤더 파일도 생성해 둡니다.
-          mkdir -p $TERMUX_PREFIX/include
           touch $TERMUX_PREFIX/include/libudev.h
 
-          # 3. 주입 결과 검증 로그 출력
-          echo "=== Fake XRes & Libudev Injection Complete ==="
+          cat > $TERMUX_PREFIX/lib/pkgconfig/libinput.pc << 'EOF'
+          prefix=/data/data/com.termux/files/usr
+          exec_prefix=${prefix}
+          libdir=${exec_prefix}/lib
+          includedir=${prefix}/include
+
+          Name: libinput
+          Description: libinput mockup library config for Termux (Android Cross-Build)
+          Version: 1.26.0
+          Cflags: -I${includedir}
+          Libs: -L${libdir}
+          EOF
+          touch $TERMUX_PREFIX/include/libinput.h
+
+          echo "=== Fake XRes, Libudev, Libinput Injection Complete ==="
           ls -la $TERMUX_PREFIX/lib/pkgconfig/xres.pc
           ls -la $TERMUX_PREFIX/lib/pkgconfig/libudev.pc
+          ls -la $TERMUX_PREFIX/lib/pkgconfig/libinput.pc
           
       - name: Create Gamescope Android Cross File
         run: |
