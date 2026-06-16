@@ -112,7 +112,7 @@ jobs:
 
               # 3. Gamescope 소스 다운로드 및 진입
               if [ ! -d \"gamescope-src\" ]; then
-                git clone --recursive https://github.com/ValveSoftware/gamescope.git gamescope-src
+                git clone --recursive https://github.com/DadSchoorse/gamescope.git gamescope-src
               fi
               cd gamescope-src
 
