@@ -1,256 +1,102 @@
-name: Build Gamescope for Termux aarch64
+name: Build Gamescope (Native arm64 Ubuntu with Termux glibc Linker)
 
 on:
-  push:
   workflow_dispatch:
 
+env:
+  DEBIAN_FRONTEND: noninteractive
+
 permissions:
-  contents: read
+  contents: write
 
 jobs:
-  build-gamescope:
-    runs-on: ubuntu-22.04
-
-    env:
-      ANDROID_NDK_VERSION: r27
-      API_LEVEL: 30
+  build-arm64:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
 
     steps:
-      - name: Checkout
+      - name: Checkout Repository
         uses: actions/checkout@v4
+
+      - name: Set up QEMU for arm64 emulation
+        uses: docker/setup-qemu-action@v3
         with:
-          submodules: recursive
+          platforms: arm64
 
-      - name: Clone Gamescope Source
+      - name: Build Gamescope inside Native arm64 Ubuntu Container
         run: |
-          git clone --recurse-submodules --depth 1 https://github.com/ValveSoftware/gamescope.git gamescope-src
-          
-      - name: Setup Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
+          docker run --rm --privileged \
+            -v ${{ github.workspace }}:/workspace \
+            -w /workspace \
+            arm64v8/ubuntu:24.04 /bin/bash -c "
+              set -e
+              echo '🚀 arm64 네이티브 컨테이너 진입 (Architecture: '\$(uname -m)')'
 
-      - name: Install Host Dependencies
+              # 1. 우분투 arm64 순정 최신 개발 패키지들 깔끔하게 설치 (헤더/프로토콜 에러 원천 차단)
+              apt-get update
+              apt-get install -y --no-install-recommends \
+                build-essential git cmake ninja-build python3 python3-pip pkg-config \
+                meson libwayland-dev wayland-protocols libvulkan-dev libx11-dev \
+                libx11-xcb-dev libxcb-xdgoutput0-dev libxcb-icccm4-dev libxcb-ewmh-dev \
+                libxcb-res0-dev libxcomposite-dev libxext-dev libxfixes-dev libxrender-dev \
+                libxrandr-dev libxinerama-dev libxkbcommon-dev libxxf86vm-dev \
+                libinput-dev libudev-dev libpixman-1-dev libdrm-dev libseat-dev \
+                libluajit-5.1-dev libgl-dev libegl-dev libgles-dev libepoxy-dev \
+                hwdata glslang-tools libcap-dev libbenchmark-dev libpulse-dev \
+                libpipewire-0.3-dev libavutil-dev libavcodec-dev libswscale-dev \
+                libdecor-0-dev libliftoff-dev
+
+              # 2. Gamescope 소스 다운로드
+              git clone --recursive https://github.com/ValveSoftware/gamescope.git gamescope-src
+              cd gamescope-src
+
+              # 🌟 3. [누락 교정 완료] Termux 순정 경로($deps)와 glibc 경로($depsg) 선언
+              export deps=\"/data/data/com.termux/files/usr\"
+              export depsg=\"/data/data/com.termux/files/usr/glibc\"
+              
+              # 🌟 4. [누락 교정 완료] Meson이 호스트 패키지를 정상 조화하도록 pkg-config 타겟 강제 지정
+              export PKG_CONFIG_SYSROOT_DIR=\"/\"
+              export PKG_CONFIG_LIBDIR=\"/usr/lib/aarch64-linux-gnu/pkgconfig:/usr/share/pkgconfig\"
+              export PKG_CONFIG_PATH=\"/usr/lib/aarch64-linux-gnu/pkgconfig\"
+
+              # 5. 컴파일러 강제 설정
+              export CC=\"clang\"
+              export CXX=\"clang++\"
+              export CFLAGS=\"-O2 -pipe -I\$depsg/include\"
+              export CXXFLAGS=\"-O2 -pipe -I\$depsg/include\"        
+              # 7. Termux glibc용 핵심 실행 파일 링커 고정 플래그
+              export TERMUX_LDFLAGS=\"-s -L/usr/lib/aarch64-linux-gnu -Wl,--dynamic-linker=\$depsg/lib/ld-linux-aarch64.so.1 -Wl,-rpath=\$depsg/lib -Wl,-O3,--sort-common,--as-needed\"
+
+              echo '⚙️ Termux glibc 환경 및 오디오 설정을 메손 빌더에 주입하는 중...'
+              
+              # 🌟 8. Meson 내장 인자 시스템으로 CFLAGS와 LDFLAGS를 누락 없이 완전 투입합니다.
+              meson setup build \
+                -Dinput_emulation=disabled \
+                -Denable_openvr_support=false \
+                -Drt_cap=disabled \
+                -Denable_tests=false \
+                -Dc_args=\"\$CFLAGS \$PULSE_CFLAGS\" \
+                -Dcpp_args=\"\$CXXFLAGS \$PULSE_CFLAGS\" \
+                -Dc_link_args=\"\$TERMUX_LDFLAGS \$PULSE_LIBS\" \
+                -Dcpp_link_args=\"\$TERMUX_LDFLAGS \$PULSE_LIBS\" \
+                --prefix=/data/data/com.termux/files/usr/glibc
+
+              echo '🛠️ Gamescope 컴파일 시작...'
+              meson compile -C build --verbose
+
+              echo '📦 빌드 완료품 아티팩트 추출 중...'
+              mkdir -p /workspace/gamescope-dist
+              DESTDIR=/workspace/gamescope-dist meson install -C build
+            "
+
+      - name: Package Native arm64 Artifacts
         run: |
-          sudo apt update
-          sudo apt install -y \
-            git wget unzip pkg-config ninja-build cmake bison flex \
-            glslang-tools wayland-protocols libwayland-dev libwayland-bin
-          python -m pip install --upgrade pip
-          python -m pip install meson mako pyyaml ninja
-
-      - name: Download Android NDK
-        run: |
-          cd /tmp
-          wget -q https://dl.google.com/android/repository/android-ndk-${ANDROID_NDK_VERSION}-linux.zip
-          unzip -q android-ndk-${ANDROID_NDK_VERSION}-linux.zip
-          echo "ANDROID_NDK=/tmp/android-ndk-${ANDROID_NDK_VERSION}" >> $GITHUB_ENV
-
-      - name: Download and extract termuxfs for aarch64
-        run: |
-          mkdir -p $HOME/termuxfs/aarch64
-          cd $HOME/termuxfs/aarch64
-          wget -q https://github.com/ziad9267/termux-on-gha/releases/download/test/termuxfs.tar
-          tar -xf termuxfs.tar
-          
-          echo "TERMUX_PREFIX=$HOME/termuxfs/aarch64/data/data/com.termux/files/usr" >> $GITHUB_ENV
-          echo "TERMUX_SYSROOT=$HOME/termuxfs/aarch64" >> $GITHUB_ENV
-          echo "RUNTIME_PATH=/data/data/com.termux/files/usr" >> $GITHUB_ENV
-
-      - name: Inject Target Assets (Scanner, Protocols, XWayland)
-        run: |
-          # 1. XWayland 실물이 통합 패키징된 tar.gz 다운로드 및 해제
-          wget -qL https://github.com/mebabo1/menano/releases/download/Box/wayland_scanner.tar.gz -O /tmp/wayland_scanner.tar.gz
-          tar -xf /tmp/wayland_scanner.tar.gz -C $TERMUX_PREFIX/../
-          
-          # 2. 실행 파일들 권한 부여
-          chmod +x $TERMUX_PREFIX/bin/wayland-scanner
-          chmod +x $TERMUX_PREFIX/bin/Xwayland || chmod +x $TERMUX_PREFIX/bin/Xxwayland || true
-          
-          echo "=== Injected Files & Protocols Check ==="
-          ls -la $TERMUX_PREFIX/bin/wayland-scanner
-          ls -la $TERMUX_PREFIX/bin/Xwayland || echo "⚠️ Xwayland 바이너리가 usr/bin에 없습니다!"
-          ls -la $TERMUX_PREFIX/share/pkgconfig/wayland-protocols.pc
-          ls -la $TERMUX_PREFIX/lib/pkgconfig/xwayland.pc || ls -la $TERMUX_PREFIX/share/pkgconfig/xwayland.pc || echo "⚠️ xwayland.pc 파일이 없습니다!"
-
-      - name: Inject Real ARM64 Linux Assets (Instead of Mocking)
-        run: |
-          set -e
-          mkdir -p /tmp/deps-extract
-          cd /tmp/deps-extract
-
-          echo "📦 Downloading Fixed ARM64 Linux Packages from GitHub Release..."
-          wget -q https://github.com/mebabo1/menano/releases/download/Box/libudev-dev_261.rc3-1_arm64.deb
-          wget -q https://github.com/mebabo1/menano/releases/download/Box/libinput-dev_1.31.3-1_arm64.deb
-          wget -q https://github.com/mebabo1/menano/releases/download/Box/libxres-dev_1.2.1-1+b2_arm64.deb
-          wget -q https://github.com/mebabo1/menano/releases/download/Box/libluajit-5.1-dev_2.1.0+openresty20251030-1+b2_arm64.deb
-          wget -q https://github.com/mebabo1/menano/releases/download/Box/libxcb-ewmh-dev_0.4.2-1+b2_arm64.deb
-          wget -q https://github.com/mebabo1/menano/releases/download/Box/libxcb-icccm4-dev_0.4.2-1+b2_arm64.deb
-          wget -q https://github.com/mebabo1/menano/releases/download/Box/libwayland-dev_1.25.0-2_arm64.deb
-
-          echo "📂 Extracting and Injecting into Sysroot ($TERMUX_PREFIX) ..."
-          for deb in *.deb; do
-            if [ -f "$deb" ]; then
-              echo "Extracting: $deb"
-              dpkg-deb -x "$deb" .
-            fi
-          done
-
-          # 1. 추출된 진짜 헤더 파일들 복사
-          if [ -d "./usr/include" ]; then
-            cp -r ./usr/include/* $TERMUX_PREFIX/include/
-          fi
-          
-          # 2. XRes 헤더 대소문자 방어막
-          if [ -d "$TERMUX_PREFIX/include/X11/extensions" ]; then
-            cp -v $TERMUX_PREFIX/include/X11/extensions/XRes.h $TERMUX_PREFIX/include/X11/extensions/Xres.h 2>/dev/null || true
-          fi
-
-          # 3. LuaJIT 헤더 경로 매핑
-          if [ -d "./usr/include/luajit-2.1" ]; then
-            mkdir -p $TERMUX_PREFIX/include/luajit-2.1
-            cp -r ./usr/include/luajit-2.1/* $TERMUX_PREFIX/include/luajit-2.1/
-          fi
-
-          # 4. 추출된 진짜 .so 라이브러리 파일들을 Termux lib 폴더에 강제 투입
-          find ./usr/lib -type f -name "*.so*" -o -type l -name "*.so*" | while read -r lib_file; do
-            cp -pd "$lib_file" $TERMUX_PREFIX/lib/
-          done
-
-          # 5. pkgconfig 명세서 복사 및 대소문자 링크 생성
-          find ./usr/lib -name "*.pc" | while read -r pc_file; do
-            cp -v "$pc_file" $TERMUX_PREFIX/lib/pkgconfig/
-          done
-
-          if [ -f "$TERMUX_PREFIX/lib/pkgconfig/XRes.pc" ]; then
-            cp -v $TERMUX_PREFIX/lib/pkgconfig/XRes.pc $TERMUX_PREFIX/lib/pkgconfig/xres.pc
-          fi
-
-          # 6. 패키지 내부에 포함되어 있던 진짜 1.25.0 버전의 순정 wayland.xml 스펙 배치
-          echo "🔄 Deploying Pure 1.25.0 wayland.xml Protocol Specification..."
-          if [ -f "./usr/share/wayland/wayland.xml" ]; then
-            mkdir -p $TERMUX_PREFIX/share/wayland
-            cp -v ./usr/share/wayland/wayland.xml $TERMUX_PREFIX/share/wayland/wayland.xml
-          fi
-
-          # 7. 최신 공식 wayland-protocols를 받아 xdg-shell.xml을 완전히 최신화합니다.
-          echo "🌐 Downloading and Injecting Pure/Latest Wayland Protocols (Master Branch)..."
-          mkdir -p /tmp/wp-latest
-          wget -q https://gitlab.freedesktop.org/wayland/wayland-protocols/-/archive/main/wayland-protocols-main.tar.gz -O /tmp/wp-latest/wp.tar.gz
-          tar -xf /tmp/wp-latest/wp.tar.gz -C /tmp/wp-latest/
-          
-          mkdir -p $TERMUX_PREFIX/share/wayland-protocols
-          cp -rf /tmp/wp-latest/wayland-protocols-main/* $TERMUX_PREFIX/share/wayland-protocols/
-          
-          # 8. 🌟 [치명적 에러 수정] 에러가 나던 .pc.in 복사 구문을 제거하고, 
-          # 빌더가 100% 인식할 수 있는 순정 pkg-config 명세서를 실시간으로 직접 생성해 주입합니다.
-          echo "📝 Creating Perfect wayland-protocols.pc file manually..."
-          mkdir -p $TERMUX_PREFIX/share/pkgconfig
-          cat > $TERMUX_PREFIX/share/pkgconfig/wayland-protocols.pc << EOF
-          prefix=$TERMUX_PREFIX
-          datarootdir=\${prefix}/share
-          pkgdatadir=\${datarootdir}/wayland-protocols
-
-          Name: Wayland Protocols
-          Description: Wayland protocol descriptions
-          Version: 1.40
-          EOF
-
-          echo "=== 🚀 Real ARM64 Linux Assets & Latest Protocols Verified ==="
-          ls -la $TERMUX_PREFIX/include/wayland-server.h
-          ls -la $TERMUX_PREFIX/share/wayland/wayland.xml
-          ls -la $TERMUX_PREFIX/share/wayland-protocols/stable/xdg-shell/xdg-shell.xml
-          ls -la $TERMUX_PREFIX/share/pkgconfig/wayland-protocols.pc
-          
-      - name: Create Gamescope Android Cross File
-        run: |
-          NDK_ROOT=$ANDROID_NDK/toolchains/llvm/prebuilt/linux-x86_64
-          TOOLCHAIN=$NDK_ROOT/bin
-          SYSROOT=$NDK_ROOT/sysroot
-
-          cat > /tmp/gamescope-cross.ini << EOF
-          [host_machine]
-          system = 'android'
-          cpu_family = 'aarch64'
-          cpu = 'aarch64'
-          endian = 'little'
-
-          [binaries]
-          c = ['$TOOLCHAIN/aarch64-linux-android${API_LEVEL}-clang', '-D__TERMUX__', '-D__USE_GNU', '-U__ANDROID__', '--target=aarch64-linux-android30']
-          cpp = ['$TOOLCHAIN/aarch64-linux-android${API_LEVEL}-clang++', '-D__TERMUX__', '-D__USE_GNU', '-U__ANDROID__', '--target=aarch64-linux-android30']
-          ar = '$TOOLCHAIN/llvm-ar'
-          strip = '$TOOLCHAIN/llvm-strip'
-          pkgconfig = 'pkg-config'
-          
-          wayland-scanner = '/usr/bin/wayland-scanner'
-          wayland-scanner_for_build = '/usr/bin/wayland-scanner'
-
-          [properties]
-          needs_exe_wrapper = true
-          sysroot = '$SYSROOT'
-
-          [built-in options]
-          # 🌟 [-w] 옵션을 추가하여 700개가 넘는 짜증나는 경고 로그를 아예 숨겨버립니다.
-          # 또한, Gamescope 내부 하위 프로젝트들이 강제로 경고를 에러로 바꾸지 못하도록 강제 진화합니다.
-          c_args = ['-w', '-fPIC', '-I$TERMUX_PREFIX/include', '-idirafter$SYSROOT/usr/include', '-include', 'fcntl.h', '-include', 'unistd.h', '-Wno-error']
-          cpp_args = ['-w', '-fPIC', '-I$TERMUX_PREFIX/include', '-idirafter$SYSROOT/usr/include', '-include', 'fcntl.h', '-include', 'unistd.h', '-Wno-error']
-          c_link_args = ['--target=aarch64-linux-android30', '-L$TERMUX_PREFIX/lib', '-Wl,-rpath=/system/lib64:/vendor/lib64:/vendor/lib64/egl:$RUNTIME_PATH/lib', '-Wl,--no-as-needed', '-lEGL', '-landroid-shmem']
-          cpp_link_args = ['--target=aarch64-linux-android30', '-L$TERMUX_PREFIX/lib', '-Wl,-rpath=/system/lib64:/vendor/lib64:/vendor/lib64/egl:$RUNTIME_PATH/lib', '-Wl,--no-as-needed', '-lEGL', '-landroid-shmem', '-static-libstdc++']
-
-          [env]
-          PKG_CONFIG_PATH = '$TERMUX_PREFIX/lib/pkgconfig:$TERMUX_PREFIX/share/pkgconfig'
-          PKG_CONFIG_LIBDIR = '$TERMUX_PREFIX/lib/pkgconfig'
-          PKG_CONFIG_SYSROOT_DIR = '$TERMUX_SYSROOT'
-          EOF
-
-      - name: Configure Gamescope
-        run: |
-          cd gamescope-src
-
-          export TERMUX_SHARE_PC="$TERMUX_PREFIX/share/pkgconfig"
-          export PKG_CONFIG_PATH="$TERMUX_SHARE_PC:$TERMUX_PREFIX/lib/pkgconfig"
-          export PKG_CONFIG_LIBDIR="$TERMUX_PREFIX/lib/pkgconfig"
-          export PKG_CONFIG_SYSROOT_DIR="$TERMUX_SYSROOT"
-
-          mkdir -p $TERMUX_PREFIX/lib/pkgconfig
-          cp -rsf $TERMUX_PREFIX/share/pkgconfig/* $TERMUX_PREFIX/lib/pkgconfig/ 2>/dev/null || true
-
-          # 🌟 [동기화] 방금 libwayland-dev 패키지에서 추출한 진짜 1.25.0 최신 xml로 프로토콜 헤더를 생성합니다!
-          echo "🔄 Generating and Injecting Pure/Latest Wayland Protocols from 1.25.0 Assets..."
-          wayland-scanner server-header $TERMUX_PREFIX/share/wayland/wayland.xml $TERMUX_PREFIX/include/wayland-server-protocol.h
-          wayland-scanner client-header $TERMUX_PREFIX/share/wayland/wayland.xml $TERMUX_PREFIX/include/wayland-client-protocol.h
-
-          # 호스트 시스템과 크로스 환경 경로 세팅
-          mv $TERMUX_PREFIX/bin/wayland-scanner $TERMUX_PREFIX/bin/wayland-scanner-android || true
-          
-          sudo mkdir -p /data/data/com.termux/files/usr/bin
-          sudo ln -sf /usr/bin/wayland-scanner /data/data/com.termux/files/usr/bin/wayland-scanner
-          sudo ln -sf $TERMUX_PREFIX/bin/Xwayland /data/data/com.termux/files/usr/bin/Xwayland || true
-
-          meson setup build \
-            --cross-file /tmp/gamescope-cross.ini \
-            -Dinput_emulation=disabled \
-            -Denable_openvr_support=false \
-            -Dpipewire=disabled \
-            -Drt_cap=disabled \
-            -Dbenchmark=disabled \
-            -Denable_tests=false \
-            --prefix=/data/data/com.termux/files/usr
-
-      - name: Build Gamescope
-        run: |
-          cd gamescope-src
-          ninja -C build -v 2>&1 | tee build.log
-
-      - name: Install Gamescope
-        run: |
-          cd gamescope-src
-          DESTDIR=$PWD/install ninja -C build install
+          cd ${{ github.workspace }}/gamescope-dist
+          tar -cJf ${{ github.workspace }}/gamescope-native-arm64.tar.xz .
+          echo "✔ Termux glibc용 패키징 완료!"
 
       - name: Upload Gamescope Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: gamescope-termux-aarch64
-          path: |
-            gamescope-src/build.log
-            gamescope-src/install
+          name: gamescope-native-arm64
+          path: gamescope-native-arm64.tar.xz
