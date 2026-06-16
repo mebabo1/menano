@@ -73,105 +73,63 @@ jobs:
           ls -la $TERMUX_PREFIX/share/pkgconfig/wayland-protocols.pc
           ls -la $TERMUX_PREFIX/lib/pkgconfig/xwayland.pc || ls -la $TERMUX_PREFIX/share/pkgconfig/xwayland.pc || echo "⚠️ xwayland.pc 파일이 없습니다!"
 
-      - name: Mock Target Missing Dependencies (XRes, Libudev, Libinput, LuaJIT)
+      - name: Inject Real ARM64 Linux Assets (Instead of Mocking)
         run: |
-          mkdir -p $TERMUX_PREFIX/lib/pkgconfig
-          mkdir -p $TERMUX_PREFIX/include/X11/extensions
-          mkdir -p $TERMUX_PREFIX/include/luajit-2.1
-          mkdir -p $TERMUX_PREFIX/include
+          mkdir -p /tmp/deps-extract
+          cd /tmp/deps-extract
 
-          # 1. 가짜 xres 명세서 및 헤더 (대소문자 완벽 가드 및 문법 교정)
-          cat > $TERMUX_PREFIX/lib/pkgconfig/xres.pc << 'EOF'
-          prefix=/data/data/com.termux/files/usr
-          exec_prefix=${prefix}
-          libdir=${exec_prefix}/lib
-          includedir=${prefix}/include
-          Name: XRes
-          Description: X11 Resource extension mockup for Termux
-          Version: 1.2.2
-          Cflags: -I${includedir} -I${includedir}/X11 -I${includedir}/X11/extensions
-          Libs: -L${libdir}
-          EOF
+          echo "📦 Downloading Real ARM64 Linux Packages for Gamescope..."
           
-          # 기본 헤더 베이스 생성
-          cat > $TERMUX_PREFIX/include/X11/extensions/XRes.h << 'EOF'
-          #ifndef XRES_H
-          #define XRES_H
-          #endif
-          EOF
+          # 1. 공식 Ubuntu/Debian Ports 저장소에서 실제 ARM64 자원 수집 (udev, input, xres)
+          wget -q http://ports.ubuntu.com/ubuntu-ports/pool/main/s/systemd/libudev-dev_255.4-1ubuntu8_arm64.deb || \
+          wget -q http://ftp.debian.org/debian/pool/main/s/systemd/libudev-dev_255.4-1_arm64.deb || true
           
-          # 대소문자 우회 및 루트 경로 복사본 배치
-          cp $TERMUX_PREFIX/include/X11/extensions/XRes.h $TERMUX_PREFIX/include/X11/extensions/Xres.h
-          cp $TERMUX_PREFIX/include/X11/extensions/XRes.h $TERMUX_PREFIX/include/XRes.h
-          cp $TERMUX_PREFIX/include/X11/extensions/XRes.h $TERMUX_PREFIX/include/Xres.h
-
-          # 2. 가짜 libudev 명세서 및 헤더 파일 생성
-          cat > $TERMUX_PREFIX/lib/pkgconfig/libudev.pc << 'EOF'
-          prefix=/data/data/com.termux/files/usr
-          exec_prefix=${prefix}
-          libdir=${exec_prefix}/lib
-          includedir=${prefix}/include
-          Name: libudev
-          Description: udev mockup library config for Termux
-          Version: 255
-          Cflags: -I${includedir}
-          Libs: -L${libdir}
-          EOF
+          wget -q http://ports.ubuntu.com/ubuntu-ports/pool/main/libi/libinput/libinput-dev_1.25.0-1ubuntu2_arm64.deb || \
+          wget -q http://ftp.debian.org/debian/pool/main/libi/libinput/libinput-dev_1.25.0-1_arm64.deb || true
           
-          cat > $TERMUX_PREFIX/include/libudev.h << 'EOF'
-          #ifndef LIBUDEV_H
-          #define LIBUDEV_H
-          #include <sys/types.h>
-          struct udev;
-          struct udev_device;
-          struct udev_monitor;
-          static inline const char *udev_device_get_property_value(struct udev_device *d, const char *p) { return ""; }
-          static inline const char *udev_device_get_sysname(struct udev_device *d) { return ""; }
-          static inline const char *udev_device_get_devnode(struct udev_device *d) { return ""; }
-          static inline const char *udev_device_get_action(struct udev_device *d) { return ""; }
-          static inline dev_t udev_device_get_devnum(struct udev_device *d) { return 0; }
-          static inline struct udev_device *udev_monitor_receive_device(struct udev_monitor *m) { return (void*)0; }
-          #endif
-          EOF
+          wget -q http://ports.ubuntu.com/ubuntu-ports/pool/main/libx/libxres/libxres-dev_1.2.2-1_arm64.deb || \
+          wget -q http://ftp.debian.org/debian/pool/main/libx/libxres/libxres-dev_1.2.2-1_arm64.deb || true
 
-          cat > $TERMUX_PREFIX/lib/pkgconfig/libinput.pc << 'EOF'
-          prefix=/data/data/com.termux/files/usr
-          exec_prefix=${prefix}
-          libdir=${exec_prefix}/lib
-          includedir=${prefix}/include
-          Name: libinput
-          Version: 1.26.0
-          Cflags: -I${includedir}
-          Libs: -L${libdir}
-          EOF
+          # 2. Gamescope 핵심 오버레이에 쓰이는 진짜 LuaJIT ARM64 개발 패키지 수집
+          wget -q http://ports.ubuntu.com/ubuntu-ports/pool/main/l/luajit/libluajit-5.1-dev_2.1.0~beta3+dfsg-1.1_arm64.deb || \
+          wget -q http://ftp.debian.org/debian/pool/main/l/luajit/libluajit-5.1-dev_2.1.0~beta3+dfsg-1_arm64.deb || true
+
+          echo "📂 Extracting and Injecting into Sysroot ($TERMUX_PREFIX) ..."
+          # 다운로드한 .deb 패키지 압축 풀기
+          for deb in *.deb; do
+            if [ -f "$deb" ]; then
+              echo "Extracting: $deb"
+              dpkg-deb -x "$deb" .
+            fi
+          done
+
+          # 추출된 진짜 헤더 파일들 복사
+          if [ -d "./usr/include" ]; then
+            cp -r ./usr/include/* $TERMUX_PREFIX/include/
+          fi
           
-          cat > $TERMUX_PREFIX/include/libinput.h << 'EOF'
-          #ifndef LIBINPUT_H
-          #define LIBINPUT_H
-          struct libinput_event;
-          struct libinput_device;
-          #endif
-          EOF
+          # XRes 대소문자 매핑 우회 안전장치
+          if [ -d "$TERMUX_PREFIX/include/X11/extensions" ]; then
+            cp -v $TERMUX_PREFIX/include/X11/extensions/XRes.h $TERMUX_PREFIX/include/X11/extensions/Xres.h 2>/dev/null || true
+          fi
 
-          # 4. 가짜 luajit 명세서 및 헤더 파일 생성
-          cat > $TERMUX_PREFIX/lib/pkgconfig/luajit.pc << 'EOF'
-          prefix=/data/data/com.termux/files/usr
-          exec_prefix=${prefix}
-          libdir=${exec_prefix}/lib
-          includedir=${prefix}/include/luajit-2.1
-          Name: LuaJIT
-          Version: 2.1.0-beta3
-          Libs: -L${libdir}
-          Cflags: -I${includedir}
-          EOF
+          # LuaJIT 헤더 경로 맞춤 서비스
+          if [ -d "./usr/include/luajit-2.1" ]; then
+            mkdir -p $TERMUX_PREFIX/include/luajit-2.1
+            cp -r ./usr/include/luajit-2.1/* $TERMUX_PREFIX/include/luajit-2.1/
+          fi
 
-          touch $TERMUX_PREFIX/include/luajit-2.1/lua.h
-          touch $TERMUX_PREFIX/include/luajit-2.1/lualib.h
-          touch $TERMUX_PREFIX/include/luajit-2.1/lauxlib.h
-          touch $TERMUX_PREFIX/include/luajit-2.1/luajit.h
+          # 추출된 진짜 .so 라이브러리 파일들을 Termux lib 폴더에 강제 투입
+          if [ -d "./usr/lib/aarch64-linux-gnu" ]; then
+            cp -r ./usr/lib/aarch64-linux-gnu/* $TERMUX_PREFIX/lib/
+          elif [ -d "./data/data/com.termux/files/usr/lib" ]; then
+            cp -r ./data/data/com.termux/files/usr/lib/* $TERMUX_PREFIX/lib/
+          fi
 
-          echo "=== All Mock Dependencies Cleansed & Injected ==="
-          ls -la $TERMUX_PREFIX/lib/pkgconfig/
+          echo "=== 🚀 Real ARM64 Linux Assets Deployment Verified ==="
+          ls -la $TERMUX_PREFIX/lib/liblibinput.so* 2>/dev/null || ls -la $TERMUX_PREFIX/lib/libudev.so* || true
+          ls -la $TERMUX_PREFIX/include/libinput.h
+          ls -la $TERMUX_PREFIX/include/luajit-2.1/lua.h
           
       - name: Create Gamescope Android Cross File
         run: |
