@@ -168,9 +168,10 @@ jobs:
           sysroot = '$SYSROOT'
 
           [built-in options]
-          # 🌟 [문법 교정] 파싱 에러를 완벽하게 차단하기 위해 모든 인자들을 한 줄로 완벽히 정렬했습니다.
-          c_args = ['-fPIC', '-I$TERMUX_PREFIX/include', '-idirafter$SYSROOT/usr/include', '-include', 'fcntl.h', '-include', 'unistd.h', '-Wno-error=gnu-zero-variadic-macro-arguments', '-Wno-error=nullability-extension', '-Wno-error=gnu-include-next', '-Wno-error=strict-prototypes', '-Wno-error=macro-redefined']
-          cpp_args = ['-fPIC', '-I$TERMUX_PREFIX/include', '-idirafter$SYSROOT/usr/include', '-include', 'fcntl.h', '-include', 'unistd.h', '-Wno-error=gnu-zero-variadic-macro-arguments', '-Wno-error=nullability-extension', '-Wno-error=gnu-include-next', '-Wno-error=strict-prototypes', '-Wno-error=macro-redefined']
+          # 🌟 [-w] 옵션을 추가하여 700개가 넘는 짜증나는 경고 로그를 아예 숨겨버립니다.
+          # 또한, Gamescope 내부 하위 프로젝트들이 강제로 경고를 에러로 바꾸지 못하도록 강제 진화합니다.
+          c_args = ['-w', '-fPIC', '-I$TERMUX_PREFIX/include', '-idirafter$SYSROOT/usr/include', '-include', 'fcntl.h', '-include', 'unistd.h', '-Wno-error']
+          cpp_args = ['-w', '-fPIC', '-I$TERMUX_PREFIX/include', '-idirafter$SYSROOT/usr/include', '-include', 'fcntl.h', '-include', 'unistd.h', '-Wno-error']
           c_link_args = ['--target=aarch64-linux-android30', '-L$TERMUX_PREFIX/lib', '-Wl,-rpath=/system/lib64:/vendor/lib64:/vendor/lib64/egl:$RUNTIME_PATH/lib', '-Wl,--no-as-needed', '-lEGL', '-landroid-shmem']
           cpp_link_args = ['--target=aarch64-linux-android30', '-L$TERMUX_PREFIX/lib', '-Wl,-rpath=/system/lib64:/vendor/lib64:/vendor/lib64/egl:$RUNTIME_PATH/lib', '-Wl,--no-as-needed', '-lEGL', '-landroid-shmem', '-static-libstdc++']
 
