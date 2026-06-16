@@ -75,28 +75,34 @@ jobs:
 
       - name: Inject Real ARM64 Linux Assets (Instead of Mocking)
         run: |
-          set -e  # 👈 이제 하나라도 다운로드 실패하면 여기서 빌드가 멈추므로 원인 파악이 쉽습니다.
+          set -e
           mkdir -p /tmp/deps-extract
           cd /tmp/deps-extract
 
-          echo "📦 Downloading Real ARM64 Linux Packages for Gamescope..."
+          echo "📦 Downloading Real ARM64 Linux Packages from High-Speed Ubuntu Mirror..."
           
-          # 1. libudev-dev (데비안 공식 영구 아카이브 주소로 고정)
-          wget -q https://snapshot.debian.org/archive/debian/20240325T210344Z/pool/main/s/systemd/libudev-dev_255.4-1_arm64.deb
+          # 🚀 속도가 빠르고 안정적인 공식 우분투 포트 아카이브 주소로 교체
+          # 1. libudev-dev
+          wget -q http://ports.ubuntu.com/ubuntu-ports/pool/main/s/systemd/libudev-dev_255.4-1ubuntu8.5_arm64.deb || \
+          wget -q http://ports.ubuntu.com/ubuntu-ports/pool/main/s/systemd/libudev-dev_255.4-1ubuntu8_arm64.deb
           
           # 2. libinput-dev
-          wget -q https://snapshot.debian.org/archive/debian/20240325T210344Z/pool/main/libi/libinput/libinput-dev_1.25.0-1_arm64.deb
+          wget -q http://ports.ubuntu.com/ubuntu-ports/pool/main/libi/libinput/libinput-dev_1.25.0-1ubuntu2.2_arm64.deb || \
+          wget -q http://ports.ubuntu.com/ubuntu-ports/pool/main/libi/libinput/libinput-dev_1.25.0-1ubuntu2_arm64.deb
           
-          # 3. libxres-dev (대소문자 에러의 주범, 진짜 파일 확보)
-          wget -q https://snapshot.debian.org/archive/debian/20240325T210344Z/pool/main/libx/libxres/libxres-dev_1.2.2-1_arm64.deb
+          # 3. libxres-dev
+          wget -q http://ports.ubuntu.com/ubuntu-ports/pool/main/libx/libxres/libxres-dev_1.2.2-1_arm64.deb
           
-          # 4. libluajit-5.1-dev (Gamescope 오버레이 스크립트용)
-          wget -q https://snapshot.debian.org/archive/debian/20240325T210344Z/pool/main/l/luajit/libluajit-5.1-dev_2.1.0~beta3+dfsg-1_arm64.deb
+          # 4. libluajit-5.1-dev
+          wget -q http://ports.ubuntu.com/ubuntu-ports/pool/main/l/luajit/libluajit-5.1-dev_2.1.0~beta3+dfsg-1.1_arm64.deb || \
+          wget -q http://ports.ubuntu.com/ubuntu-ports/pool/main/l/luajit/libluajit-5.1-dev_2.1.0~beta3+dfsg-1_arm64.deb
 
           echo "📂 Extracting and Injecting into Sysroot ($TERMUX_PREFIX) ..."
           for deb in *.deb; do
-            echo "Extracting: $deb"
-            dpkg-deb -x "$deb" .
+            if [ -f "$deb" ]; then
+              echo "Extracting: $deb"
+              dpkg-deb -x "$deb" .
+            fi
           done
 
           # 추출된 진짜 헤더 파일들 복사
@@ -109,7 +115,7 @@ jobs:
             cp -v $TERMUX_PREFIX/include/X11/extensions/XRes.h $TERMUX_PREFIX/include/X11/extensions/Xres.h 2>/dev/null || true
           fi
 
-          # LuaJIT 헤더 경로 매핑 (이제 진짜 폴더가 생성됩니다)
+          # LuaJIT 헤더 경로 매핑
           if [ -d "./usr/include/luajit-2.1" ]; then
             mkdir -p $TERMUX_PREFIX/include/luajit-2.1
             cp -r ./usr/include/luajit-2.1/* $TERMUX_PREFIX/include/luajit-2.1/
