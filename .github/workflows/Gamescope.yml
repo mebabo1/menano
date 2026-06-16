@@ -23,13 +23,13 @@ jobs:
         with:
           platforms: arm64
 
-      # 🌟 [교정 1] 호스트 단에서 깔끔하게 출력용 폴더를 밀고 시작합니다.
+      # 1. 호스트 단에서 깔끔하게 출력용 폴더를 밀고 시작합니다.
       - name: Pre-create output directory
         run: |
           rm -rf ${{ github.workspace }}/gamescope-dist
           mkdir -p ${{ github.workspace }}/gamescope-dist
 
-      # 🌟 [교정 2] 문법 에러의 주범인 메손 크로스 파일을 도커 진입 전에 호스트에서 안전하게 구워냅니다.
+      # 🌟 [교정 1] 수동 빌드될 최신 wayland-server 경로를 pkg-config가 최우선 추적하도록 명시
       - name: Create Meson Cross File (Safe Host Side)
         run: |
           cat << 'EOF' > ${{ github.workspace }}/termux-glibc.ini
@@ -46,6 +46,7 @@ jobs:
 
           [properties]
           needs_exe_wrapper = true
+          pkg_config_libdir = '/usr/lib/pkgconfig:/usr/lib/aarch64-linux-gnu/pkgconfig:/usr/share/pkgconfig'
 
           [host_machine]
           system = 'linux'
@@ -65,7 +66,7 @@ jobs:
               set -e
               echo '🚀 arm64 네이티브 컨테이너 진입 (Architecture: '\$(uname -m)')'
 
-              # 1. 의존성 패키지 설치 (libxml2-dev 추가 완료)
+              # 1. 의존성 패키지 설치
               apt-get update
               apt-get install -y --no-install-recommends \
                 build-essential git cmake ninja-build python3 python3-pip python3-setuptools pkg-config \
@@ -85,52 +86,34 @@ jobs:
                 libfontconfig1-dev libsdl2-dev libasound2-dev libgstreamer1.0-dev \
                 libgstreamer-plugins-base1.0-dev dpkg-dev fakeroot debhelper dh-make screen nano less
 
-              # 🌟 [교정 핵심] 2. Wayland 최신 소스코드 빌드 및 시스템 상위 배치 (우분투 순정 버전 1.22 우회)
+              # 2. Wayland 코어 컴포넌트 수동 업그레이드 (wlroots 1.23.1+ 요구 만족용)
               echo '📥 Upgrading Wayland Core to latest version for wlroots...'
               cd /tmp
               git clone https://gitlab.freedesktop.org/wayland/wayland.git
               cd wayland
-              # 안전한 최신 안정 빌드 태그 선택 (1.23.1 조건 충족)
               git checkout 1.23.0 || git checkout main
               meson setup build --prefix=/usr --buildtype=release -Ddocumentation=false
               meson compile -C build
               meson install -C build
               cd /workspace
 
-              # 3. Gamescope 소스 다운로드 및 진입
-              if [ ! -d "gamescope-src" ]; then
-                git clone --recursive https://github.com/ValveSoftware/gamescope.git gamescope-src
-              fi
-              cd gamescope-src
-
-              # 4. 환경 변수 적용
-              export deps="/data/data/com.termux/files/usr"
-              export depsg="/data/data/com.termux/files/usr/glibc"
-              export PKG_CONFIG_SYSROOT_DIR="/"
-              
-              # 🌟 [교정 핵심] 수동 설치된 /usr/lib/aarch64-linux-gnu 대신 /usr/lib/pkgconfig 도 정상 스캔하도록 경로 보강
-              export PKG_CONFIG_LIBDIR="/usr/lib/pkgconfig:/usr/lib/aarch64-linux-gnu/pkgconfig:/usr/share/pkgconfig"
-              export PKG_CONFIG_PATH="/usr/lib/pkgconfig:/usr/lib/aarch64-linux-gnu/pkgconfig"
-
-              echo '⚙️ Running Meson Setup with External Cross File...'
-              rm -rf build
-              # 2. Gamescope 소스 관리
+              # 3. Gamescope 소스 다운로드 및 진입 (중복 제거 완료)
               if [ ! -d \"gamescope-src\" ]; then
                 git clone --recursive https://github.com/ValveSoftware/gamescope.git gamescope-src
               fi
               cd gamescope-src
 
-              # 3. 환경 변수 적용
+              # 4. Termux 고정 경로 선언
               export deps=\"/data/data/com.termux/files/usr\"
               export depsg=\"/data/data/com.termux/files/usr/glibc\"
-              export PKG_CONFIG_SYSROOT_DIR=\"/\"
-              export PKG_CONFIG_LIBDIR=\"/usr/lib/aarch64-linux-gnu/pkgconfig:/usr/share/pkgconfig\"
-              export PKG_CONFIG_PATH=\"/usr/lib/aarch64-linux-gnu/pkgconfig\"
 
               echo '⚙️ Running Meson Setup with External Cross File...'
               rm -rf build
               
-              # 🌟 [교정 3] 호스트 단에서 만들어서 넘어온 /workspace/termux-glibc.ini 파일을 그대로 읽어냅니다.
+              # 🌟 [교정 2] 단독 export 문 유실 현상을 우회하기 위해 변수 체인을 묶어 setup 실행
+              PKG_CONFIG_SYSROOT_DIR=\"/\" \
+              PKG_CONFIG_LIBDIR=\"/usr/lib/pkgconfig:/usr/lib/aarch64-linux-gnu/pkgconfig:/usr/share/pkgconfig\" \
+              PKG_CONFIG_PATH=\"/usr/lib/pkgconfig:/usr/lib/aarch64-linux-gnu/pkgconfig\" \
               meson setup build \
                 --cross-file /workspace/termux-glibc.ini \
                 -Dinput_emulation=disabled \
