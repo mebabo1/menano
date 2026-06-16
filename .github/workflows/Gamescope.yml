@@ -25,7 +25,9 @@ jobs:
 
       - name: Build Gamescope inside Native arm64 Ubuntu Container
         run: |
+          # 🌟 [에러 해결 핵심] --platform linux/arm64 옵션을 추가하여 x86_64 호스트에서 arm64 이미지를 정상 로드하게 만듭니다.
           docker run --rm --privileged \
+            --platform linux/arm64 \
             -v ${{ github.workspace }}:/workspace \
             -w /workspace \
             arm64v8/ubuntu:24.04 /bin/bash -c "
@@ -50,26 +52,31 @@ jobs:
               git clone --recursive https://github.com/ValveSoftware/gamescope.git gamescope-src
               cd gamescope-src
 
-              # 🌟 3. [누락 교정 완료] Termux 순정 경로($deps)와 glibc 경로($depsg) 선언
+              # 3. Termux 순정 경로($deps)와 glibc 경로($depsg) 선언
               export deps=\"/data/data/com.termux/files/usr\"
               export depsg=\"/data/data/com.termux/files/usr/glibc\"
               
-              # 🌟 4. [누락 교정 완료] Meson이 호스트 패키지를 정상 조화하도록 pkg-config 타겟 강제 지정
+              # 4. Meson이 호스트 패키지를 정상 조화하도록 pkg-config 타겟 강제 지정
               export PKG_CONFIG_SYSROOT_DIR=\"/\"
               export PKG_CONFIG_LIBDIR=\"/usr/lib/aarch64-linux-gnu/pkgconfig:/usr/share/pkgconfig\"
               export PKG_CONFIG_PATH=\"/usr/lib/aarch64-linux-gnu/pkgconfig\"
 
-              # 5. 컴파일러 강제 설정
+              # 5. 컴파일러 강제 설정 및 플래그 세팅
               export CC=\"clang\"
               export CXX=\"clang++\"
               export CFLAGS=\"-O2 -pipe -I\$depsg/include\"
               export CXXFLAGS=\"-O2 -pipe -I\$depsg/include\"        
+
+              # 🌟 6. [누락 교정] 아래 meson setup에서 사용하는 펄스오디오 플래그 선언 복구
+              export PULSE_CFLAGS=\"-I\$deps/include/pulse\"
+              export PULSE_LIBS=\"-L\$deps/lib/pulseaudio -lpulse\"
+
               # 7. Termux glibc용 핵심 실행 파일 링커 고정 플래그
               export TERMUX_LDFLAGS=\"-s -L/usr/lib/aarch64-linux-gnu -Wl,--dynamic-linker=\$depsg/lib/ld-linux-aarch64.so.1 -Wl,-rpath=\$depsg/lib -Wl,-O3,--sort-common,--as-needed\"
 
               echo '⚙️ Termux glibc 환경 및 오디오 설정을 메손 빌더에 주입하는 중...'
               
-              # 🌟 8. Meson 내장 인자 시스템으로 CFLAGS와 LDFLAGS를 누락 없이 완전 투입합니다.
+              # 8. Meson 내장 인자 시스템으로 CFLAGS와 LDFLAGS를 누락 없이 완전 투입합니다.
               meson setup build \
                 -Dinput_emulation=disabled \
                 -Denable_openvr_support=false \
