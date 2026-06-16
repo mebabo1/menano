@@ -86,7 +86,7 @@ jobs:
                 libfontconfig1-dev libsdl2-dev libasound2-dev libgstreamer1.0-dev \
                 libgstreamer-plugins-base1.0-dev dpkg-dev fakeroot debhelper dh-make screen nano less
 
-              # 2. Wayland 코어 컴포넌트 수동 업그레이드 (wlroots 1.23.1+ 요구 만족용)
+              # 2. Wayland 코어 컴포넌트 수동 업그레이드
               echo '📥 Upgrading Wayland Core to 1.24.0 for wlroots...'
               cd /tmp
               rm -rf wayland
@@ -98,13 +98,12 @@ jobs:
               meson install -C build
               cd /workspace
 
-              # 🌟 [교정 핵심] 2-2. Pixman 라이브러리 수동 업그레이드 (wlroots >=0.43.0 요구 만족용)
+              # 2-2. Pixman 라이브러리 수동 업그레이드
               echo '📥 Upgrading Pixman to latest version for wlroots...'
               cd /tmp
               rm -rf pixman
               git clone https://gitlab.freedesktop.org/pixman/pixman.git
               cd pixman
-              # 요구조건인 0.43.0을 충족하는 안정 태그 선택
               git checkout pixman-0.44.0 || git checkout master
               meson setup build --prefix=/usr --buildtype=release -Dtests=disabled
               meson compile -C build
@@ -122,10 +121,9 @@ jobs:
               export depsg=\"/data/data/com.termux/files/usr/glibc\"
 
               echo '⚙️ Running Meson Setup with External Cross File...'
-              # 기존 빌드 폴더 완전 파괴 (구버전 캐시 제거)
               rm -rf build
               
-              # 🌟 [교정 핵심 2] --clearcache 플래그 추가 및 환경변수 다이렉트 주입으로 구버전 캐시 무효화
+              # 🌟 [교정 핵심] -Dwlroots:xwayland=disabled 인자를 주입하여 하위 의존성 빌드 루프를 차단합니다.
               PKG_CONFIG_SYSROOT_DIR=\"/\" \
               PKG_CONFIG_LIBDIR=\"/usr/lib/pkgconfig:/usr/lib/aarch64-linux-gnu/pkgconfig:/usr/share/pkgconfig\" \
               PKG_CONFIG_PATH=\"/usr/lib/pkgconfig:/usr/lib/aarch64-linux-gnu/pkgconfig\" \
@@ -136,6 +134,7 @@ jobs:
                 -Denable_openvr_support=false \
                 -Drt_cap=disabled \
                 -Denable_tests=false \
+                -Dwlroots:xwayland=disabled \
                 --prefix=/data/data/com.termux/files/usr/glibc
 
               echo '🛠️ Gamescope 컴파일 시작...'
