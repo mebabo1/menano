@@ -30,6 +30,7 @@ jobs:
           mkdir -p ${{ github.workspace }}/gamescope-dist
 
       # 2. 메손 크로스 파일 생성 (Clang 표준 라이브러리 참조 꼬임 방지 대책 적용)
+      # 2. 메손 크로스 파일 생성 (C++ 헤더 인식 꼬임 방지 대책 적용)
       - name: Create Meson Cross File (Safe Host Side)
         run: |
           cat << 'EOF' > ${{ github.workspace }}/termux-glibc.ini
@@ -39,10 +40,11 @@ jobs:
           pkgconfig = 'pkg-config'
 
           [built-in options]
-          c_args = ['-O2', '-pipe', '--target=aarch64-linux-gnu', '-isystem', '/data/data/com.termux/files/usr/glibc/include', '-I/data/data/com.termux/files/usr/include/pulse']
-          cpp_args = ['-O2', '-pipe', '--target=aarch64-linux-gnu', '-isystem', '/data/data/com.termux/files/usr/glibc/include', '-I/data/data/com.termux/files/usr/include/pulse']
-          c_link_args = ['-s', '--target=aarch64-linux-gnu', '-L/usr/lib/aarch64-linux-gnu', '-Wl,--dynamic-linker=/data/data/com.termux/files/usr/glibc/lib/ld-linux-aarch64.so.1', '-Wl,-rpath=/data/data/com.termux/files/usr/glibc/lib', '-Wl,-O3,--sort-common,--as-needed', '-L/data/data/com.termux/files/usr/lib/pulseaudio', '-lpulse']
-          cpp_link_args = ['-s', '--target=aarch64-linux-gnu', '-L/usr/lib/aarch64-linux-gnu', '-Wl,--dynamic-linker=/data/data/com.termux/files/usr/glibc/lib/ld-linux-aarch64.so.1', '-Wl,-rpath=/data/data/com.termux/files/usr/glibc/lib', '-Wl,-O3,--sort-common,--as-needed', '-L/data/data/com.termux/files/usr/lib/pulseaudio', '-lpulse']
+          # -stdlib=libstdc++를 명시하고, 호스트(Ubuntu)의 고유 C++ 헤더 경로를 시스템 우선 순위로 강제 주입합니다.
+          c_args = ['-O2', '-pipe', '--target=aarch64-linux-gnu', '-isystem']
+          cpp_args = ['-O2', '-pipe', '--target=aarch64-linux-gnu', '-stdlib=libstdc++', '-isystem', '/usr/include/c++/13', '-isystem', '/usr/include/aarch64-linux-gnu/c++/13', '-isystem']
+          c_link_args = ['-s', '--target=aarch64-linux-gnu', '-L/usr/lib/aarch64-linux-gnu', '-Wl,--dynamic-linker=/data/data/com.termux/files/usr/glibc/lib/ld-linux-aarch64.so.1', '-Wl,-rpath=/data/data/com.termux/files/usr/glibc/lib', '-Wl,-O3,--sort-common,--as-needed', '-lpulse']
+          cpp_link_args = ['-s', '--target=aarch64-linux-gnu', '-stdlib=libstdc++', '-L/usr/lib/aarch64-linux-gnu', '-Wl,--dynamic-linker=/data/data/com.termux/files/usr/glibc/lib/ld-linux-aarch64.so.1', '-Wl,-rpath=/data/data/com.termux/files/usr/glibc/lib', '-Wl,-O3,--sort-common,--as-needed', '-lpulse']
 
           [properties]
           needs_exe_wrapper = true
@@ -54,7 +56,7 @@ jobs:
           cpu = 'armv8-a'
           endian = 'little'
           EOF
-          echo "✔ Meson Cross File이 워크스페이스에 작성되었습니다."
+          echo "✔ Meson Cross File이 교정되었습니다."
 
       - name: Build Gamescope inside Native arm64 Ubuntu Container
         run: |
