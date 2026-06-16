@@ -85,6 +85,9 @@ jobs:
           wget -q https://github.com/mebabo1/menano/releases/download/Box/libxres-dev_1.2.1-1+b2_arm64.deb
           wget -q https://github.com/mebabo1/menano/releases/download/Box/libluajit-5.1-dev_2.1.0+openresty20251030-1+b2_arm64.deb
           wget -q https://github.com/mebabo1/menano/releases/download/Box/libxcb-ewmh-dev_0.4.2-1+b2_arm64.deb
+          
+          # 🚀 [교체 완료] 확인해주신 0.4.2 버전의 icccm 패키지 반영
+          wget -q https://github.com/mebabo1/menano/releases/download/Box/libxcb-icccm4-dev_0.4.2-1+b2_arm64.deb
 
           echo "📂 Extracting and Injecting into Sysroot ($TERMUX_PREFIX) ..."
           for deb in *.deb; do
@@ -115,7 +118,7 @@ jobs:
             cp -pd "$lib_file" $TERMUX_PREFIX/lib/
           done
 
-          # 5. pkgconfig 명세서 복사 및 대소문자 링크 생성 (새로 추가된 xcb-ewmh.pc도 함께 복사됩니다)
+          # 5. pkgconfig 명세서 복사 및 대소문자 링크 생성
           find ./usr/lib -name "*.pc" | while read -r pc_file; do
             cp -v "$pc_file" $TERMUX_PREFIX/lib/pkgconfig/
           done
@@ -134,8 +137,8 @@ jobs:
 
           echo "=== 🚀 Real ARM64 Linux Assets Deployment Verified ==="
           ls -la $TERMUX_PREFIX/include/xcb/xcb_ewmh.h || echo "⚠️ xcb_ewmh.h가 없습니다!"
-          ls -la $TERMUX_PREFIX/lib/pkgconfig/xcb-ewmh.pc || echo "⚠️ xcb-ewmh.pc가 없습니다!"
-          ls -la $TERMUX_PREFIX/share/wayland-protocols/stable/xdg-shell/xdg-shell.xml || echo "⚠️ xdg-shell.xml 확인 실패!"
+          ls -la $TERMUX_PREFIX/include/xcb/xcb_icccm.h || echo "⚠️ xcb_icccm.h가 없습니다!"
+          ls -la $TERMUX_PREFIX/lib/pkgconfig/xcb-icccm.pc || echo "⚠️ xcb-icccm.pc가 없습니다!"
           
       - name: Create Gamescope Android Cross File
         run: |
