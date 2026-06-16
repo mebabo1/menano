@@ -131,9 +131,7 @@ jobs:
               meson setup build \
                 --cross-file /workspace/termux-glibc.ini \
                 --clearcache \
-                --prefix=/data/data/com.termux/files/usr/glibc \
-                -Dxwayland=enabled \
-                -Dwlroots:xwayland=enabled
+                --prefix=/data/data/com.termux/files/usr/glibc
 
               echo '🛠️ Gamescope 컴파일 시작...'
               meson compile -C build --verbose
