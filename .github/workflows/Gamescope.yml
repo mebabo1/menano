@@ -186,14 +186,15 @@ jobs:
           cd gamescope-src
 
           export TERMUX_SHARE_PC="$TERMUX_PREFIX/share/pkgconfig"
-          export PKG_CONFIG_PATH="$TERMUX_SHARE_PC:$TERMUX_PREFIX/lib/pkgconfig"
+          export PKG_CONFIG_PATH="$TERMUSH_SHARE_PC:$TERMUX_PREFIX/lib/pkgconfig"
           export PKG_CONFIG_LIBDIR="$TERMUX_PREFIX/lib/pkgconfig"
           export PKG_CONFIG_SYSROOT_DIR="$TERMUX_SYSROOT"
 
-          # 🌟 [치명적 에러 해결] 시스템에 박힌 구형 웨일랜드 헤더 파일을 백업하여 격리합니다.
-          # 이렇게 하면 wlroots 빌드 엔진이 이 구형 파일을 참조하지 못하고, 실시간 생성되는 최신 규격 파일을 사용합니다.
-          mv $TERMUX_PREFIX/include/wayland-server-protocol.h $TERMUX_PREFIX/include/wayland-server-protocol.h.bak || true
-          mv $TERMUX_PREFIX/include/wayland-client-protocol.h $TERMUX_PREFIX/include/wayland-client-protocol.h.bak || true
+          # 🌟 [완벽 해결] 이름을 바꾸는 대신, 호스트 우분투의 최신 웨일랜드 프로토콜 헤더를 
+          # Termux 프리픽스 내부로 복사하여 덮어씌웁니다. (충돌 예방 + 유실 방지 둘 다 잡기)
+          echo "🔄 Injecting Host Wayland Server/Client Protocols..."
+          sudo find /usr/include -name "wayland-server-protocol.h" -exec cp -v {} $TERMUX_PREFIX/include/ \;
+          sudo find /usr/include -name "wayland-client-protocol.h" -exec cp -v {} $TERMUX_PREFIX/include/ \;
 
           # 호스트 시스템과 크로스 환경 경로 세팅
           mv $TERMUX_PREFIX/bin/wayland-scanner $TERMUX_PREFIX/bin/wayland-scanner-android || true
