@@ -34,12 +34,11 @@ jobs:
               set -e
               echo '🚀 arm64 네이티브 컨테이너 진입 (Architecture: '\$(uname -m)')'
 
-              # 1. 우분투 arm64 순정 최신 개발 패키지들 깔끔하게 설치 (헤더/프로토콜 에러 원천 차단)
               apt-get update
               apt-get install -y --no-install-recommends \
                 build-essential git cmake ninja-build python3 python3-pip pkg-config \
                 meson libwayland-dev wayland-protocols libvulkan-dev libx11-dev \
-                libx11-xcb-dev libxcb-xdgoutput0-dev libxcb-icccm4-dev libxcb-ewmh-dev \
+                libx11-xcb-dev libxcb-icccm4-dev libxcb-ewmh-dev xcb-proto libxcb-proto \
                 libxcb-res0-dev libxcomposite-dev libxext-dev libxfixes-dev libxrender-dev \
                 libxrandr-dev libxinerama-dev libxkbcommon-dev libxxf86vm-dev \
                 libinput-dev libudev-dev libpixman-1-dev libdrm-dev libseat-dev \
