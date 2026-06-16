@@ -80,8 +80,6 @@ jobs:
           cd /tmp/deps-extract
 
           echo "📦 Downloading Fixed ARM64 Linux Packages from GitHub Release..."
-          
-          # 🚀 질문자님이 제공해주신 안전한 깃허브 고정 주소로 전면 교체
           wget -q https://github.com/mebabo1/menano/releases/download/Box/libudev-dev_261.rc3-1_arm64.deb
           wget -q https://github.com/mebabo1/menano/releases/download/Box/libinput-dev_1.31.3-1_arm64.deb
           wget -q https://github.com/mebabo1/menano/releases/download/Box/libxres-dev_1.2.1-1+b2_arm64.deb
@@ -100,7 +98,7 @@ jobs:
             cp -r ./usr/include/* $TERMUX_PREFIX/include/
           fi
           
-          # 2. XRes 대소문자 매핑 우회 안전장치 (Gamescope 빌드 에러 방어)
+          # 2. XRes 헤더 대소문자 방어막
           if [ -d "$TERMUX_PREFIX/include/X11/extensions" ]; then
             cp -v $TERMUX_PREFIX/include/X11/extensions/XRes.h $TERMUX_PREFIX/include/X11/extensions/Xres.h 2>/dev/null || true
           fi
@@ -112,15 +110,25 @@ jobs:
           fi
 
           # 4. 추출된 진짜 .so 라이브러리 파일들을 Termux lib 폴더에 강제 투입
-          # 패키지 빌드 성향에 따라 aarch64-linux-gnu 혹은 다른 아키텍처 폴더명일 수 있으므로 통틀어서 찾아 복사합니다.
           find ./usr/lib -type f -name "*.so*" -o -type l -name "*.so*" | while read -r lib_file; do
             cp -pd "$lib_file" $TERMUX_PREFIX/lib/
           done
 
+          # 5. 🌟 [치명적 에러 해결] pkgconfig 명세서 복사 및 대소문자 링크 생성
+          # 패키지 안에 들어있던 모든 명세서(.pc)들을 Termux pkgconfig 폴더로 이동합니다.
+          find ./usr/lib -name "*.pc" | while read -r pc_file; do
+            cp -v "$pc_file" $TERMUX_PREFIX/lib/pkgconfig/
+          done
+
+          # 메손 빌드가 소문자 'xres'로 요청할 때를 대비해 XRes.pc를 xres.pc로 복사 생성합니다.
+          if [ -f "$TERMUX_PREFIX/lib/pkgconfig/XRes.pc" ]; then
+            cp -v $TERMUX_PREFIX/lib/pkgconfig/XRes.pc $TERMUX_PREFIX/lib/pkgconfig/xres.pc
+            echo "✔ Created lowercase xres.pc mapping successfully!"
+          fi
+
           echo "=== 🚀 Real ARM64 Linux Assets Deployment Verified ==="
+          ls -la $TERMUX_PREFIX/lib/pkgconfig/xres.pc || echo "⚠️ xres.pc가 없습니다!"
           ls -la $TERMUX_PREFIX/lib/libudev.so* || echo "⚠️ libudev.so 미확인"
-          ls -la $TERMUX_PREFIX/include/libinput.h || echo "⚠️ libinput.h 미확인"
-          ls -la $TERMUX_PREFIX/include/luajit-2.1/lua.h || echo "⚠️ lua.h 미확인"
           
       - name: Create Gamescope Android Cross File
         run: |
