@@ -36,16 +36,21 @@ jobs:
 
               apt-get update
               apt-get install -y --no-install-recommends \
-                build-essential git cmake ninja-build python3 python3-pip pkg-config \
+                build-essential git cmake ninja-build python3 python3-pip python3-setuptools pkg-config \
                 meson libwayland-dev wayland-protocols libvulkan-dev libx11-dev \
-                libx11-xcb-dev libxcb-icccm4-dev libxcb-ewmh-dev xcb-proto libxcb-proto \
+                libx11-xcb-dev libxcb-icccm4-dev libxcb-ewmh-dev xcb-proto \
                 libxcb-res0-dev libxcomposite-dev libxext-dev libxfixes-dev libxrender-dev \
                 libxrandr-dev libxinerama-dev libxkbcommon-dev libxxf86vm-dev \
                 libinput-dev libudev-dev libpixman-1-dev libdrm-dev libseat-dev \
                 libluajit-5.1-dev libgl-dev libegl-dev libgles-dev libepoxy-dev \
                 hwdata glslang-tools libcap-dev libbenchmark-dev libpulse-dev \
                 libpipewire-0.3-dev libavutil-dev libavcodec-dev libswscale-dev \
-                libdecor-0-dev libliftoff-dev
+                libdecor-0-dev libliftoff-dev \
+                autoconf automake libtool gettext flex bison nasm ca-certificates wget curl xz-utils file \
+                clang llvm lld libglib2.0-dev libfreetype6-dev libltdl-dev libxcb1-dev librsvg2-bin \
+                libunwind-dev libdbus-1-dev libxcursor-dev libxi-dev libmpg123-dev libopenal-dev \
+                libfontconfig1-dev libsdl2-dev libasound2-dev libgstreamer1.0-dev \
+                libgstreamer-plugins-base1.0-dev dpkg-dev fakeroot debhelper dh-make screen nano less
 
               # 2. Gamescope 소스 다운로드
               git clone --recursive https://github.com/ValveSoftware/gamescope.git gamescope-src
