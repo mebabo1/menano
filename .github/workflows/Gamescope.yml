@@ -65,7 +65,7 @@ jobs:
               set -e
               echo '🚀 arm64 네이티브 컨테이너 진입 (Architecture: '\$(uname -m)')'
 
-              # 1. 의존성 패키지 설치
+              # 1. 의존성 패키지 설치 (누락된 libxdamage-dev 및 그래픽 확장 팩 추가)
               apt-get update
               apt-get install -y --no-install-recommends \
                 build-essential git cmake ninja-build python3 python3-pip python3-setuptools pkg-config \
@@ -78,6 +78,7 @@ jobs:
                 hwdata glslang-tools libcap-dev libbenchmark-dev libpulse-dev \
                 libpipewire-0.3-dev libavutil-dev libavcodec-dev libswscale-dev \
                 libdecor-0-dev libliftoff-dev \
+                libxdamage-dev libxmu-dev libxtst-dev libxshmfence-dev \
                 autoconf automake libtool gettext flex bison nasm ca-certificates wget curl xz-utils file \
                 clang llvm lld libglib2.0-dev libfreetype6-dev libltdl-dev libxcb1-dev librsvg2-bin \
                 libunwind-dev libdbus-1-dev libxcursor-dev libxi-dev libmpg123-dev libopenal-dev \
