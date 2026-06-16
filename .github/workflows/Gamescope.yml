@@ -23,9 +23,11 @@ jobs:
         with:
           platforms: arm64
 
-      # 🌟 [교정] 권한 문제 예방을 위해 호스트 단에서 미리 배포용 폴더를 깔끔하게 생성해 둡니다.
+      # 1. 호스트 단에서 깨끗한 배포용 폴더 확보
       - name: Pre-create output directory
-        run: mkdir -p ${{ github.workspace }}/gamescope-dist
+        run: |
+          rm -rf ${{ github.workspace }}/gamescope-dist
+          mkdir -p ${{ github.workspace }}/gamescope-dist
 
       - name: Build Gamescope inside Native arm64 Ubuntu Container
         run: |
@@ -37,7 +39,7 @@ jobs:
               set -e
               echo '🚀 arm64 네이티브 컨테이너 진입 (Architecture: '\$(uname -m)')'
 
-              # 1. 패키지 설치
+              # 패키지 설치 단계
               apt-get update
               apt-get install -y --no-install-recommends \
                 build-essential git cmake ninja-build python3 python3-pip python3-setuptools pkg-config \
@@ -56,22 +58,18 @@ jobs:
                 libfontconfig1-dev libsdl2-dev libasound2-dev libgstreamer1.0-dev \
                 libgstreamer-plugins-base1.0-dev dpkg-dev fakeroot debhelper dh-make screen nano less
 
-              # 2. Gamescope 소스 다운로드
               if [ ! -d \"gamescope-src\" ]; then
                 git clone --recursive https://github.com/ValveSoftware/gamescope.git gamescope-src
               fi
               cd gamescope-src
 
-              # 3. Termux 경로 지정
               export deps=\"/data/data/com.termux/files/usr\"
               export depsg=\"/data/data/com.termux/files/usr/glibc\"
               
-              # 4. pkg-config 타겟 경로 강제 고정
               export PKG_CONFIG_SYSROOT_DIR=\"/\"
               export PKG_CONFIG_LIBDIR=\"/usr/lib/aarch64-linux-gnu/pkgconfig:/usr/share/pkgconfig\"
               export PKG_CONFIG_PATH=\"/usr/lib/aarch64-linux-gnu/pkgconfig\"
 
-              # 🌟 5. [오타 완전 박멸] 정상적인 인라인 파일 작성을 위해 이스케이프와 오타(Professional 등)를 전부 제거했습니다.
               echo '📝 Creating Meson Cross File for Termux glibc...'
               cat << 'EOF' > /tmp/termux-glibc.ini
               [binaries]
@@ -96,7 +94,6 @@ jobs:
               EOF
 
               echo '⚙️ Running Meson Setup with Cross File...'
-              # 기존 빌드 내역이 있다면 초기화 후 재설정
               rm -rf build
               meson setup build \
                 --cross-file /tmp/termux-glibc.ini \
@@ -109,18 +106,43 @@ jobs:
               echo '🛠️ Gamescope 컴파일 시작...'
               meson compile -C build --verbose
 
-              echo '📦 빌드 완료품 아티팩트 추출 중...'
-              DESTDIR=/workspace/gamescope-dist meson install -C build
+              echo '📦 빌드 완료품 아티팩트 가공 중...'
+              # 임시 설치 폴더를 따로 지정해서 결과물을 수집합니다.
+              rm -rf /tmp/gamescope-stage
+              DESTDIR=/tmp/gamescope-stage meson install -C build
+
+              # 🌟 [에러 해결 핵심 핵심] 
+              # 깊숙하게 처박힌 Termux용 폴더 구조 안에서 알맹이들(bin, lib, share 등)만 쏙 빼내어 
+              # 공유 볼륨인 /workspace/gamescope-dist 직속 루트로 복사합니다.
+              echo '🚚 복잡한 하위 경로에서 결과물 구출 중...'
+              if [ -d \"/tmp/gamescope-stage/data/data/com.termux/files/usr/glibc\" ]; then
+                cp -r /tmp/gamescope-stage/data/data/com.termux/files/usr/glibc/* /workspace/gamescope-dist/
+                echo \"✔ 아티팩트 구출 성공!\"
+              else
+                echo \"❌ 에러: 빌드 설치 파일 경로가 올바르지 않습니다.\"
+                exit 1
+              fi
               
-              # 호스트 가상머신이 파일을 제어할 수 있도록 권한을 개방합니다.
+              # 권한 전면 해제
               chmod -R 777 /workspace/gamescope-dist
             "
             
+      # 2. 결과물 압축 및 확인 안전장치 추가
       - name: Package Native arm64 Artifacts
         run: |
           cd ${{ github.workspace }}/gamescope-dist
-          tar -cJf ${{ github.workspace }}/gamescope-native-arm64.tar.xz .
-          echo "✔ Termux glibc용 패키징 완료!"
+          # 압축 전 파일 목록 로그 디버깅용 출력
+          echo "=== 아티팩트 목록 확인 ==="
+          ls -la
+          
+          # 파일이 정말 존재할 때만 정상 패키징
+          if [ -n "$(ls -A .)" ]; then
+            tar -cJf ${{ github.workspace }}/gamescope-native-arm64.tar.xz .
+            echo "✔ Termux glibc용 완벽 패키징 완료!"
+          else
+            echo "❌ 에러: 여전히 압축 대상 폴더가 비어 있습니다."
+            exit 1
+          fi
 
       - name: Upload Gamescope Artifact
         uses: actions/upload-artifact@v4
