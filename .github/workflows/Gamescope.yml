@@ -133,7 +133,7 @@ jobs:
             cp -v ./usr/share/wayland/wayland.xml $TERMUX_PREFIX/share/wayland/wayland.xml
           fi
 
-          # 7. 🌟 [통합 완료] 최신 공식 wayland-protocols를 받아 xdg-shell.xml을 완전히 최신화합니다.
+          # 7. 최신 공식 wayland-protocols를 받아 xdg-shell.xml을 완전히 최신화합니다.
           echo "🌐 Downloading and Injecting Pure/Latest Wayland Protocols (Master Branch)..."
           mkdir -p /tmp/wp-latest
           wget -q https://gitlab.freedesktop.org/wayland/wayland-protocols/-/archive/main/wayland-protocols-main.tar.gz -O /tmp/wp-latest/wp.tar.gz
@@ -142,13 +142,19 @@ jobs:
           mkdir -p $TERMUX_PREFIX/share/wayland-protocols
           cp -rf /tmp/wp-latest/wayland-protocols-main/* $TERMUX_PREFIX/share/wayland-protocols/
           
-          # 8. 🌟 메손 빌더가 이 최신 프로토콜 경로를 읽을 수 있도록 pkg-config 명세서도 조율해 줍니다.
+          # 8. 🌟 [치명적 에러 수정] 에러가 나던 .pc.in 복사 구문을 제거하고, 
+          # 빌더가 100% 인식할 수 있는 순정 pkg-config 명세서를 실시간으로 직접 생성해 주입합니다.
+          echo "📝 Creating Perfect wayland-protocols.pc file manually..."
           mkdir -p $TERMUX_PREFIX/share/pkgconfig
-          cp -v /tmp/wp-latest/wayland-protocols-main/wayland-protocols.pc.in $TERMUX_PREFIX/share/pkgconfig/wayland-protocols.pc
-          sed -i "s|@prefix@|$TERMUX_PREFIX|g" $TERMUX_PREFIX/share/pkgconfig/wayland-protocols.pc
-          sed -i "s|@datarootdir@|\${prefix}/share|g" $TERMUX_PREFIX/share/pkgconfig/wayland-protocols.pc
-          sed -i "s|@datadir@|\${datarootdir}|g" $TERMUX_PREFIX/share/pkgconfig/wayland-protocols.pc
-          sed -i "s|@PACKAGE_VERSION@|1.40|g" $TERMUX_PREFIX/share/pkgconfig/wayland-protocols.pc
+          cat > $TERMUX_PREFIX/share/pkgconfig/wayland-protocols.pc << EOF
+          prefix=$TERMUX_PREFIX
+          datarootdir=\${prefix}/share
+          pkgdatadir=\${datarootdir}/wayland-protocols
+
+          Name: Wayland Protocols
+          Description: Wayland protocol descriptions
+          Version: 1.40
+          EOF
 
           echo "=== 🚀 Real ARM64 Linux Assets & Latest Protocols Verified ==="
           ls -la $TERMUX_PREFIX/include/wayland-server.h
