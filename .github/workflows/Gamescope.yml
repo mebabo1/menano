@@ -66,7 +66,7 @@ jobs:
               set -e
               echo '🚀 arm64 네이티브 컨테이너 진입 (Architecture: '\$(uname -m)')'
 
-              # 1. 의존성 패키지 설치
+              # 1. 의존성 패키지 설치 (xwayland 패키지 명시적 추가)
               apt-get update
               apt-get install -y --no-install-recommends \
                 build-essential git cmake ninja-build python3 python3-pip python3-setuptools pkg-config \
@@ -84,7 +84,8 @@ jobs:
                 clang llvm lld libglib2.0-dev libfreetype6-dev libltdl-dev libxcb1-dev librsvg2-bin \
                 libunwind-dev libdbus-1-dev libxcursor-dev libxi-dev libmpg123-dev libopenal-dev \
                 libfontconfig1-dev libsdl2-dev libasound2-dev libgstreamer1.0-dev \
-                libgstreamer-plugins-base1.0-dev dpkg-dev fakeroot debhelper dh-make screen nano less
+                libgstreamer-plugins-base1.0-dev dpkg-dev fakeroot debhelper dh-make screen nano less \
+                xwayland
 
               # 2. Wayland 코어 컴포넌트 수동 업그레이드
               echo '📥 Upgrading Wayland Core to 1.24.0 for wlroots...'
@@ -123,14 +124,16 @@ jobs:
               echo '⚙️ Running Meson Setup with External Cross File...'
               rm -rf build
               
-              # 🌟 [교정 핵심] -Dwlroots:xwayland=disabled 인자를 주입하여 하위 의존성 빌드 루프를 차단합니다.
+              # 🌟 [수정 반영] wlroots 및 gamescope 전체에 xwayland를 활성화하도록 명시적 옵션 추가
               PKG_CONFIG_SYSROOT_DIR=\"/\" \
               PKG_CONFIG_LIBDIR=\"/usr/lib/pkgconfig:/usr/lib/aarch64-linux-gnu/pkgconfig:/usr/share/pkgconfig\" \
               PKG_CONFIG_PATH=\"/usr/lib/pkgconfig:/usr/lib/aarch64-linux-gnu/pkgconfig\" \
               meson setup build \
                 --cross-file /workspace/termux-glibc.ini \
                 --clearcache \
-                --prefix=/data/data/com.termux/files/usr/glibc
+                --prefix=/data/data/com.termux/files/usr/glibc \
+                -Dxwayland=enabled \
+                -Dwlroots:xwayland=enabled
 
               echo '🛠️ Gamescope 컴파일 시작...'
               meson compile -C build --verbose
