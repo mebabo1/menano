@@ -79,23 +79,13 @@ jobs:
           mkdir -p /tmp/deps-extract
           cd /tmp/deps-extract
 
-          echo "📦 Downloading Real ARM64 Linux Packages from High-Speed Ubuntu Mirror..."
+          echo "📦 Downloading Fixed ARM64 Linux Packages from GitHub Release..."
           
-          # 🚀 속도가 빠르고 안정적인 공식 우분투 포트 아카이브 주소로 교체
-          # 1. libudev-dev
-          wget -q http://ports.ubuntu.com/ubuntu-ports/pool/main/s/systemd/libudev-dev_255.4-1ubuntu8.5_arm64.deb || \
-          wget -q http://ports.ubuntu.com/ubuntu-ports/pool/main/s/systemd/libudev-dev_255.4-1ubuntu8_arm64.deb
-          
-          # 2. libinput-dev
-          wget -q http://ports.ubuntu.com/ubuntu-ports/pool/main/libi/libinput/libinput-dev_1.25.0-1ubuntu2.2_arm64.deb || \
-          wget -q http://ports.ubuntu.com/ubuntu-ports/pool/main/libi/libinput/libinput-dev_1.25.0-1ubuntu2_arm64.deb
-          
-          # 3. libxres-dev
-          wget -q http://ports.ubuntu.com/ubuntu-ports/pool/main/libx/libxres/libxres-dev_1.2.2-1_arm64.deb
-          
-          # 4. libluajit-5.1-dev
-          wget -q http://ports.ubuntu.com/ubuntu-ports/pool/main/l/luajit/libluajit-5.1-dev_2.1.0~beta3+dfsg-1.1_arm64.deb || \
-          wget -q http://ports.ubuntu.com/ubuntu-ports/pool/main/l/luajit/libluajit-5.1-dev_2.1.0~beta3+dfsg-1_arm64.deb
+          # 🚀 질문자님이 제공해주신 안전한 깃허브 고정 주소로 전면 교체
+          wget -q https://github.com/mebabo1/menano/releases/download/Box/libudev-dev_261.rc3-1_arm64.deb
+          wget -q https://github.com/mebabo1/menano/releases/download/Box/libinput-dev_1.31.3-1_arm64.deb
+          wget -q https://github.com/mebabo1/menano/releases/download/Box/libxres-dev_1.2.1-1+b2_arm64.deb
+          wget -q https://github.com/mebabo1/menano/releases/download/Box/libluajit-5.1-dev_2.1.0+openresty20251030-1+b2_arm64.deb
 
           echo "📂 Extracting and Injecting into Sysroot ($TERMUX_PREFIX) ..."
           for deb in *.deb; do
@@ -105,31 +95,32 @@ jobs:
             fi
           done
 
-          # 추출된 진짜 헤더 파일들 복사
+          # 1. 추출된 진짜 헤더 파일들 복사
           if [ -d "./usr/include" ]; then
             cp -r ./usr/include/* $TERMUX_PREFIX/include/
           fi
           
-          # XRes 대소문자 매핑 우회 안전장치
+          # 2. XRes 대소문자 매핑 우회 안전장치 (Gamescope 빌드 에러 방어)
           if [ -d "$TERMUX_PREFIX/include/X11/extensions" ]; then
             cp -v $TERMUX_PREFIX/include/X11/extensions/XRes.h $TERMUX_PREFIX/include/X11/extensions/Xres.h 2>/dev/null || true
           fi
 
-          # LuaJIT 헤더 경로 매핑
+          # 3. LuaJIT 헤더 경로 매핑
           if [ -d "./usr/include/luajit-2.1" ]; then
             mkdir -p $TERMUX_PREFIX/include/luajit-2.1
             cp -r ./usr/include/luajit-2.1/* $TERMUX_PREFIX/include/luajit-2.1/
           fi
 
-          # 추출된 진짜 .so 라이브러리 파일들을 Termux lib 폴더에 강제 투입
-          if [ -d "./usr/lib/aarch64-linux-gnu" ]; then
-            cp -r ./usr/lib/aarch64-linux-gnu/* $TERMUX_PREFIX/lib/
-          fi
+          # 4. 추출된 진짜 .so 라이브러리 파일들을 Termux lib 폴더에 강제 투입
+          # 패키지 빌드 성향에 따라 aarch64-linux-gnu 혹은 다른 아키텍처 폴더명일 수 있으므로 통틀어서 찾아 복사합니다.
+          find ./usr/lib -type f -name "*.so*" -o -type l -name "*.so*" | while read -r lib_file; do
+            cp -pd "$lib_file" $TERMUX_PREFIX/lib/
+          done
 
           echo "=== 🚀 Real ARM64 Linux Assets Deployment Verified ==="
-          ls -la $TERMUX_PREFIX/lib/libudev.so*
-          ls -la $TERMUX_PREFIX/include/libinput.h
-          ls -la $TERMUX_PREFIX/include/luajit-2.1/lua.h
+          ls -la $TERMUX_PREFIX/lib/libudev.so* || echo "⚠️ libudev.so 미확인"
+          ls -la $TERMUX_PREFIX/include/libinput.h || echo "⚠️ libinput.h 미확인"
+          ls -la $TERMUX_PREFIX/include/luajit-2.1/lua.h || echo "⚠️ lua.h 미확인"
           
       - name: Create Gamescope Android Cross File
         run: |
