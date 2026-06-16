@@ -23,11 +23,37 @@ jobs:
         with:
           platforms: arm64
 
-      # 1. 호스트 단에서 깨끗한 배포용 폴더 확보
+      # 🌟 [교정 1] 호스트 단에서 깔끔하게 출력용 폴더를 밀고 시작합니다.
       - name: Pre-create output directory
         run: |
           rm -rf ${{ github.workspace }}/gamescope-dist
           mkdir -p ${{ github.workspace }}/gamescope-dist
+
+      # 🌟 [교정 2] 문법 에러의 주범인 메손 크로스 파일을 도커 진입 전에 호스트에서 안전하게 구워냅니다.
+      - name: Create Meson Cross File (Safe Host Side)
+        run: |
+          cat << 'EOF' > ${{ github.workspace }}/termux-glibc.ini
+          [binaries]
+          c = 'clang'
+          cpp = 'clang++'
+          pkgconfig = 'pkg-config'
+
+          [built-in options]
+          c_args = ['-O2', '-pipe', '-I/data/data/com.termux/files/usr/glibc/include', '-I/data/data/com.termux/files/usr/include/pulse']
+          cpp_args = ['-O2', '-pipe', '-I/data/data/com.termux/files/usr/glibc/include', '-I/data/data/com.termux/files/usr/include/pulse']
+          c_link_args = ['-s', '-L/usr/lib/aarch64-linux-gnu', '-Wl,--dynamic-linker=/data/data/com.termux/files/usr/glibc/lib/ld-linux-aarch64.so.1', '-Wl,-rpath=/data/data/com.termux/files/usr/glibc/lib', '-Wl,-O3,--sort-common,--as-needed', '-L/data/data/com.termux/files/usr/lib/pulseaudio', '-lpulse']
+          cpp_link_args = ['-s', '-L/usr/lib/aarch64-linux-gnu', '-Wl,--dynamic-linker=/data/data/com.termux/files/usr/glibc/lib/ld-linux-aarch64.so.1', '-Wl,-rpath=/data/data/com.termux/files/usr/glibc/lib', '-Wl,-O3,--sort-common,--as-needed', '-L/data/data/com.termux/files/usr/lib/pulseaudio', '-lpulse']
+
+          [properties]
+          needs_exe_wrapper = true
+
+          [host_machine]
+          system = 'linux'
+          cpu_family = 'aarch64'
+          cpu = 'armv8-a'
+          endian = 'little'
+          EOF
+          echo "✔ Meson Cross File이 워크스페이스에 작성되었습니다."
 
       - name: Build Gamescope inside Native arm64 Ubuntu Container
         run: |
@@ -39,7 +65,7 @@ jobs:
               set -e
               echo '🚀 arm64 네이티브 컨테이너 진입 (Architecture: '\$(uname -m)')'
 
-              # 패키지 설치 단계
+              # 1. 의존성 패키지 설치
               apt-get update
               apt-get install -y --no-install-recommends \
                 build-essential git cmake ninja-build python3 python3-pip python3-setuptools pkg-config \
@@ -58,45 +84,25 @@ jobs:
                 libfontconfig1-dev libsdl2-dev libasound2-dev libgstreamer1.0-dev \
                 libgstreamer-plugins-base1.0-dev dpkg-dev fakeroot debhelper dh-make screen nano less
 
+              # 2. Gamescope 소스 관리
               if [ ! -d \"gamescope-src\" ]; then
                 git clone --recursive https://github.com/ValveSoftware/gamescope.git gamescope-src
               fi
               cd gamescope-src
 
+              # 3. 환경 변수 적용
               export deps=\"/data/data/com.termux/files/usr\"
               export depsg=\"/data/data/com.termux/files/usr/glibc\"
-              
               export PKG_CONFIG_SYSROOT_DIR=\"/\"
               export PKG_CONFIG_LIBDIR=\"/usr/lib/aarch64-linux-gnu/pkgconfig:/usr/share/pkgconfig\"
               export PKG_CONFIG_PATH=\"/usr/lib/aarch64-linux-gnu/pkgconfig\"
 
-              echo '📝 Creating Meson Cross File for Termux glibc...'
-              cat << 'EOF' > /tmp/termux-glibc.ini
-              [binaries]
-              c = 'clang'
-              cpp = 'clang++'
-              pkgconfig = 'pkg-config'
-
-              [built-in options]
-              c_args = ['-O2', '-pipe', '-I/data/data/com.termux/files/usr/glibc/include', '-I/data/data/com.termux/files/usr/include/pulse']
-              cpp_args = ['-O2', '-pipe', '-I/data/data/com.termux/files/usr/glibc/include', '-I/data/data/com.termux/files/usr/include/pulse']
-              c_link_args = ['-s', '-L/usr/lib/aarch64-linux-gnu', '-Wl,--dynamic-linker=/data/data/com.termux/files/usr/glibc/lib/ld-linux-aarch64.so.1', '-Wl,-rpath=/data/data/com.termux/files/usr/glibc/lib', '-Wl,-O3,--sort-common,--as-needed', '-L/data/data/com.termux/files/usr/lib/pulseaudio', '-lpulse']
-              cpp_link_args = ['-s', '-L/usr/lib/aarch64-linux-gnu', '-Wl,--dynamic-linker=/data/data/com.termux/files/usr/glibc/lib/ld-linux-aarch64.so.1', '-Wl,-rpath=/data/data/com.termux/files/usr/glibc/lib', '-Wl,-O3,--sort-common,--as-needed', '-L/data/data/com.termux/files/usr/lib/pulseaudio', '-lpulse']
-
-              [properties]
-              needs_exe_wrapper = true
-
-              [host_machine]
-              system = 'linux'
-              cpu_family = 'aarch64'
-              cpu = 'armv8-a'
-              endian = 'little'
-              EOF
-
-              echo '⚙️ Running Meson Setup with Cross File...'
+              echo '⚙️ Running Meson Setup with External Cross File...'
               rm -rf build
+              
+              # 🌟 [교정 3] 호스트 단에서 만들어서 넘어온 /workspace/termux-glibc.ini 파일을 그대로 읽어냅니다.
               meson setup build \
-                --cross-file /tmp/termux-glibc.ini \
+                --cross-file /workspace/termux-glibc.ini \
                 -Dinput_emulation=disabled \
                 -Denable_openvr_support=false \
                 -Drt_cap=disabled \
@@ -106,36 +112,28 @@ jobs:
               echo '🛠️ Gamescope 컴파일 시작...'
               meson compile -C build --verbose
 
-              echo '📦 빌드 완료품 아티팩트 가공 중...'
-              # 임시 설치 폴더를 따로 지정해서 결과물을 수집합니다.
+              echo '📦 빌드 완료품 아티팩트 분리 수집...'
               rm -rf /tmp/gamescope-stage
               DESTDIR=/tmp/gamescope-stage meson install -C build
 
-              # 🌟 [에러 해결 핵심 핵심] 
-              # 깊숙하게 처박힌 Termux용 폴더 구조 안에서 알맹이들(bin, lib, share 등)만 쏙 빼내어 
-              # 공유 볼륨인 /workspace/gamescope-dist 직속 루트로 복사합니다.
-              echo '🚚 복잡한 하위 경로에서 결과물 구출 중...'
+              echo '🚚 안드로이드 디렉토리 하위에서 실제 바이너리 복사 중...'
               if [ -d \"/tmp/gamescope-stage/data/data/com.termux/files/usr/glibc\" ]; then
                 cp -r /tmp/gamescope-stage/data/data/com.termux/files/usr/glibc/* /workspace/gamescope-dist/
                 echo \"✔ 아티팩트 구출 성공!\"
               else
-                echo \"❌ 에러: 빌드 설치 파일 경로가 올바르지 않습니다.\"
+                echo \"❌ 에러: 빌드된 바이너리 트리 구조가 올바르지 않습니다.\"
                 exit 1
               fi
               
-              # 권한 전면 해제
               chmod -R 777 /workspace/gamescope-dist
             "
             
-      # 2. 결과물 압축 및 확인 안전장치 추가
       - name: Package Native arm64 Artifacts
         run: |
           cd ${{ github.workspace }}/gamescope-dist
-          # 압축 전 파일 목록 로그 디버깅용 출력
-          echo "=== 아티팩트 목록 확인 ==="
+          echo "=== 📦최종 압축 전 파일 목록 디버깅 ==="
           ls -la
           
-          # 파일이 정말 존재할 때만 정상 패키징
           if [ -n "$(ls -A .)" ]; then
             tar -cJf ${{ github.workspace }}/gamescope-native-arm64.tar.xz .
             echo "✔ Termux glibc용 완벽 패키징 완료!"
