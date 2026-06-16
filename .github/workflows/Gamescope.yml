@@ -168,8 +168,9 @@ jobs:
           sysroot = '$SYSROOT'
 
           [built-in options]
-          c_args = ['-fPIC', '-isystem$TERMUX_PREFIX/include', '-idirafter$SYSROOT/usr/include', '-include', 'fcntl.h', '-include', 'unistd.h']
-          cpp_args = ['-fPIC', '-isystem$TERMUX_PREFIX/include', '-idirafter$SYSROOT/usr/include', '-include', 'fcntl.h', '-include', 'unistd.h']
+          # 🌟 [-isystem] 대신 [-I]로 변경하여 최신 로컬 헤더가 구형 시스템 헤더보다 우선 배정되도록 순서를 비틉니다.
+          c_args = ['-fPIC', '-I$TERMUX_PREFIX/include', '-idirafter$SYSROOT/usr/include', '-include', 'fcntl.h', '-include', 'unistd.h']
+          cpp_args = ['-fPIC', '-I$TERMUX_PREFIX/include', '-idirafter$SYSROOT/usr/include', '-include', 'fcntl.h', '-include', 'unistd.h']
           c_link_args = ['--target=aarch64-linux-android30', '-L$TERMUX_PREFIX/lib', '-Wl,-rpath=/system/lib64:/vendor/lib64:/vendor/lib64/egl:$RUNTIME_PATH/lib', '-Wl,--no-as-needed', '-lEGL', '-landroid-shmem']
           cpp_link_args = ['--target=aarch64-linux-android30', '-L$TERMUX_PREFIX/lib', '-Wl,-rpath=/system/lib64:/vendor/lib64:/vendor/lib64/egl:$RUNTIME_PATH/lib', '-Wl,--no-as-needed', '-lEGL', '-landroid-shmem', '-static-libstdc++']
 
@@ -188,15 +189,16 @@ jobs:
           export PKG_CONFIG_LIBDIR="$TERMUX_PREFIX/lib/pkgconfig"
           export PKG_CONFIG_SYSROOT_DIR="$TERMUX_SYSROOT"
 
-          # 🌟 [완벽 교정] 호스트 시스템과 크로스 환경 경로 세팅
-          # 안드로이드용 arm64 웨일랜드 스캐너는 우분투에서 실행할 수 없으므로 잠시 이름을 바꿉니다.
+          # 🌟 [치명적 에러 해결] 시스템에 박힌 구형 웨일랜드 헤더 파일을 백업하여 격리합니다.
+          # 이렇게 하면 wlroots 빌드 엔진이 이 구형 파일을 참조하지 못하고, 실시간 생성되는 최신 규격 파일을 사용합니다.
+          mv $TERMUX_PREFIX/include/wayland-server-protocol.h $TERMUX_PREFIX/include/wayland-server-protocol.h.bak || true
+          mv $TERMUX_PREFIX/include/wayland-client-protocol.h $TERMUX_PREFIX/include/wayland-client-protocol.h.bak || true
+
+          # 호스트 시스템과 크로스 환경 경로 세팅
           mv $TERMUX_PREFIX/bin/wayland-scanner $TERMUX_PREFIX/bin/wayland-scanner-android || true
           
-          # 호스트 우분투 빌드 서버 전용 가상 디렉토리 생성 및 순정 x86_64 스캐너 배치
           sudo mkdir -p /data/data/com.termux/files/usr/bin
           sudo ln -sf /usr/bin/wayland-scanner /data/data/com.termux/files/usr/bin/wayland-scanner
-          
-          # Xwayland는 빌드 중 직접 실행하는 것이 아니라 위치만 체크하므로 기존 셋팅 유지
           sudo ln -sf $TERMUX_PREFIX/bin/Xwayland /data/data/com.termux/files/usr/bin/Xwayland || true
 
           meson setup build \
