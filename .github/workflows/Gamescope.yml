@@ -75,32 +75,28 @@ jobs:
 
       - name: Inject Real ARM64 Linux Assets (Instead of Mocking)
         run: |
+          set -e  # 👈 이제 하나라도 다운로드 실패하면 여기서 빌드가 멈추므로 원인 파악이 쉽습니다.
           mkdir -p /tmp/deps-extract
           cd /tmp/deps-extract
 
           echo "📦 Downloading Real ARM64 Linux Packages for Gamescope..."
           
-          # 1. 공식 Ubuntu/Debian Ports 저장소에서 실제 ARM64 자원 수집 (udev, input, xres)
-          wget -q http://ports.ubuntu.com/ubuntu-ports/pool/main/s/systemd/libudev-dev_255.4-1ubuntu8_arm64.deb || \
-          wget -q http://ftp.debian.org/debian/pool/main/s/systemd/libudev-dev_255.4-1_arm64.deb || true
+          # 1. libudev-dev (데비안 공식 영구 아카이브 주소로 고정)
+          wget -q https://snapshot.debian.org/archive/debian/20240325T210344Z/pool/main/s/systemd/libudev-dev_255.4-1_arm64.deb
           
-          wget -q http://ports.ubuntu.com/ubuntu-ports/pool/main/libi/libinput/libinput-dev_1.25.0-1ubuntu2_arm64.deb || \
-          wget -q http://ftp.debian.org/debian/pool/main/libi/libinput/libinput-dev_1.25.0-1_arm64.deb || true
+          # 2. libinput-dev
+          wget -q https://snapshot.debian.org/archive/debian/20240325T210344Z/pool/main/libi/libinput/libinput-dev_1.25.0-1_arm64.deb
           
-          wget -q http://ports.ubuntu.com/ubuntu-ports/pool/main/libx/libxres/libxres-dev_1.2.2-1_arm64.deb || \
-          wget -q http://ftp.debian.org/debian/pool/main/libx/libxres/libxres-dev_1.2.2-1_arm64.deb || true
-
-          # 2. Gamescope 핵심 오버레이에 쓰이는 진짜 LuaJIT ARM64 개발 패키지 수집
-          wget -q http://ports.ubuntu.com/ubuntu-ports/pool/main/l/luajit/libluajit-5.1-dev_2.1.0~beta3+dfsg-1.1_arm64.deb || \
-          wget -q http://ftp.debian.org/debian/pool/main/l/luajit/libluajit-5.1-dev_2.1.0~beta3+dfsg-1_arm64.deb || true
+          # 3. libxres-dev (대소문자 에러의 주범, 진짜 파일 확보)
+          wget -q https://snapshot.debian.org/archive/debian/20240325T210344Z/pool/main/libx/libxres/libxres-dev_1.2.2-1_arm64.deb
+          
+          # 4. libluajit-5.1-dev (Gamescope 오버레이 스크립트용)
+          wget -q https://snapshot.debian.org/archive/debian/20240325T210344Z/pool/main/l/luajit/libluajit-5.1-dev_2.1.0~beta3+dfsg-1_arm64.deb
 
           echo "📂 Extracting and Injecting into Sysroot ($TERMUX_PREFIX) ..."
-          # 다운로드한 .deb 패키지 압축 풀기
           for deb in *.deb; do
-            if [ -f "$deb" ]; then
-              echo "Extracting: $deb"
-              dpkg-deb -x "$deb" .
-            fi
+            echo "Extracting: $deb"
+            dpkg-deb -x "$deb" .
           done
 
           # 추출된 진짜 헤더 파일들 복사
@@ -113,7 +109,7 @@ jobs:
             cp -v $TERMUX_PREFIX/include/X11/extensions/XRes.h $TERMUX_PREFIX/include/X11/extensions/Xres.h 2>/dev/null || true
           fi
 
-          # LuaJIT 헤더 경로 맞춤 서비스
+          # LuaJIT 헤더 경로 매핑 (이제 진짜 폴더가 생성됩니다)
           if [ -d "./usr/include/luajit-2.1" ]; then
             mkdir -p $TERMUX_PREFIX/include/luajit-2.1
             cp -r ./usr/include/luajit-2.1/* $TERMUX_PREFIX/include/luajit-2.1/
@@ -122,12 +118,10 @@ jobs:
           # 추출된 진짜 .so 라이브러리 파일들을 Termux lib 폴더에 강제 투입
           if [ -d "./usr/lib/aarch64-linux-gnu" ]; then
             cp -r ./usr/lib/aarch64-linux-gnu/* $TERMUX_PREFIX/lib/
-          elif [ -d "./data/data/com.termux/files/usr/lib" ]; then
-            cp -r ./data/data/com.termux/files/usr/lib/* $TERMUX_PREFIX/lib/
           fi
 
           echo "=== 🚀 Real ARM64 Linux Assets Deployment Verified ==="
-          ls -la $TERMUX_PREFIX/lib/liblibinput.so* 2>/dev/null || ls -la $TERMUX_PREFIX/lib/libudev.so* || true
+          ls -la $TERMUX_PREFIX/lib/libudev.so*
           ls -la $TERMUX_PREFIX/include/libinput.h
           ls -la $TERMUX_PREFIX/include/luajit-2.1/lua.h
           
