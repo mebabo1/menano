@@ -23,9 +23,12 @@ jobs:
         with:
           platforms: arm64
 
+      # 🌟 [교정] 권한 문제 예방을 위해 호스트 단에서 미리 배포용 폴더를 깔끔하게 생성해 둡니다.
+      - name: Pre-create output directory
+        run: mkdir -p ${{ github.workspace }}/gamescope-dist
+
       - name: Build Gamescope inside Native arm64 Ubuntu Container
         run: |
-          # 1. --platform linux/arm64 옵션으로 에뮬레이션 레이어 활성화
           docker run --rm --privileged \
             --platform linux/arm64 \
             -v ${{ github.workspace }}:/workspace \
@@ -34,7 +37,7 @@ jobs:
               set -e
               echo '🚀 arm64 네이티브 컨테이너 진입 (Architecture: '\$(uname -m)')'
 
-              # 2. 패키지 설치 단계 (유령 패키지인 libxcb-xdgoutput0-dev 및 libxcb-proto 제외 완료)
+              # 1. 패키지 설치
               apt-get update
               apt-get install -y --no-install-recommends \
                 build-essential git cmake ninja-build python3 python3-pip python3-setuptools pkg-config \
@@ -53,32 +56,34 @@ jobs:
                 libfontconfig1-dev libsdl2-dev libasound2-dev libgstreamer1.0-dev \
                 libgstreamer-plugins-base1.0-dev dpkg-dev fakeroot debhelper dh-make screen nano less
 
-              # 3. Gamescope 소스 다운로드 및 진입
-              git clone --recursive https://github.com/ValveSoftware/gamescope.git gamescope-src
+              # 2. Gamescope 소스 다운로드
+              if [ ! -d \"gamescope-src\" ]; then
+                git clone --recursive https://github.com/ValveSoftware/gamescope.git gamescope-src
+              fi
               cd gamescope-src
 
-              # 4. Termux glibc 아키텍처 환경 변수 정의
+              # 3. Termux 경로 지정
               export deps=\"/data/data/com.termux/files/usr\"
               export depsg=\"/data/data/com.termux/files/usr/glibc\"
               
-              # 5. 호스트 우분투의 pkg-config 명세서 경로 강제 추적 설정
+              # 4. pkg-config 타겟 경로 강제 고정
               export PKG_CONFIG_SYSROOT_DIR=\"/\"
               export PKG_CONFIG_LIBDIR=\"/usr/lib/aarch64-linux-gnu/pkgconfig:/usr/share/pkgconfig\"
               export PKG_CONFIG_PATH=\"/usr/lib/aarch64-linux-gnu/pkgconfig\"
 
-              # 🌟 6. [중요] 컴파일러 실행 불가능 에러(Not Runnable) 우회를 위한 크로스 설정 파일 동적 생성
+              # 🌟 5. [오타 완전 박멸] 정상적인 인라인 파일 작성을 위해 이스케이프와 오타(Professional 등)를 전부 제거했습니다.
               echo '📝 Creating Meson Cross File for Termux glibc...'
-              cat > /tmp/termux-glibc.ini << EOF
+              cat << 'EOF' > /tmp/termux-glibc.ini
               [binaries]
               c = 'clang'
               cpp = 'clang++'
               pkgconfig = 'pkg-config'
 
               [built-in options]
-              c_args = ['-O2', '-pipe', '-I\${depsg}/include', '-I\Professional \${deps}/include/pulse']
-              cpp_args = ['-O2', '-pipe', '-I\${depsg}/include', '-I\Professional \${deps}/include/pulse']
-              c_link_args = ['-s', '-L/usr/lib/aarch64-linux-gnu', '-Wl,--dynamic-linker=\${depsg}/lib/ld-linux-aarch64.so.1', '-Wl,-rpath=\${depsg}/lib', '-Wl,-O3,--sort-common,--as-needed', '-L\${deps}/lib/pulseaudio', '-lpulse']
-              cpp_link_args = ['-s', '-L/usr/lib/aarch64-linux-gnu', '-Wl,--dynamic-linker=\${depsg}/lib/ld-linux-aarch64.so.1', '-Wl,-rpath=\\${depsg}/lib', '-Wl,-O3,--sort-common,--as-needed', '-L\${deps}/lib/pulseaudio', '-lpulse']
+              c_args = ['-O2', '-pipe', '-I/data/data/com.termux/files/usr/glibc/include', '-I/data/data/com.termux/files/usr/include/pulse']
+              cpp_args = ['-O2', '-pipe', '-I/data/data/com.termux/files/usr/glibc/include', '-I/data/data/com.termux/files/usr/include/pulse']
+              c_link_args = ['-s', '-L/usr/lib/aarch64-linux-gnu', '-Wl,--dynamic-linker=/data/data/com.termux/files/usr/glibc/lib/ld-linux-aarch64.so.1', '-Wl,-rpath=/data/data/com.termux/files/usr/glibc/lib', '-Wl,-O3,--sort-common,--as-needed', '-L/data/data/com.termux/files/usr/lib/pulseaudio', '-lpulse']
+              cpp_link_args = ['-s', '-L/usr/lib/aarch64-linux-gnu', '-Wl,--dynamic-linker=/data/data/com.termux/files/usr/glibc/lib/ld-linux-aarch64.so.1', '-Wl,-rpath=/data/data/com.termux/files/usr/glibc/lib', '-Wl,-O3,--sort-common,--as-needed', '-L/data/data/com.termux/files/usr/lib/pulseaudio', '-lpulse']
 
               [properties]
               needs_exe_wrapper = true
@@ -91,8 +96,8 @@ jobs:
               EOF
 
               echo '⚙️ Running Meson Setup with Cross File...'
-              
-              # 🌟 7. 메손에게 생성한 크로스 파일을 먹여 테스트 실행 단계를 패스시킵니다.
+              # 기존 빌드 내역이 있다면 초기화 후 재설정
+              rm -rf build
               meson setup build \
                 --cross-file /tmp/termux-glibc.ini \
                 -Dinput_emulation=disabled \
@@ -105,10 +110,12 @@ jobs:
               meson compile -C build --verbose
 
               echo '📦 빌드 완료품 아티팩트 추출 중...'
-              mkdir -p /workspace/gamescope-dist
               DESTDIR=/workspace/gamescope-dist meson install -C build
+              
+              # 호스트 가상머신이 파일을 제어할 수 있도록 권한을 개방합니다.
+              chmod -R 777 /workspace/gamescope-dist
             "
-
+            
       - name: Package Native arm64 Artifacts
         run: |
           cd ${{ github.workspace }}/gamescope-dist
@@ -119,4 +126,4 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: gamescope-native-arm64
-          path: gamescope-native-arm64.tar.xz
+          path: ${{ github.workspace }}/gamescope-native-arm64.tar.xz
