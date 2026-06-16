@@ -185,13 +185,17 @@ jobs:
         run: |
           cd gamescope-src
 
+          # 🌟 [오타 완벽 교정] TERMUSH -> TERMUX 로 수정하여 명세서 경로를 제대로 살려냅니다.
           export TERMUX_SHARE_PC="$TERMUX_PREFIX/share/pkgconfig"
-          export PKG_CONFIG_PATH="$TERMUSH_SHARE_PC:$TERMUX_PREFIX/lib/pkgconfig"
+          export PKG_CONFIG_PATH="$TERMUX_SHARE_PC:$TERMUX_PREFIX/lib/pkgconfig"
           export PKG_CONFIG_LIBDIR="$TERMUX_PREFIX/lib/pkgconfig"
           export PKG_CONFIG_SYSROOT_DIR="$TERMUX_SYSROOT"
 
-          # 🌟 [완벽 해결] 이름을 바꾸는 대신, 호스트 우분투의 최신 웨일랜드 프로토콜 헤더를 
-          # Termux 프리픽스 내부로 복사하여 덮어씌웁니다. (충돌 예방 + 유실 방지 둘 다 잡기)
+          # 🌟 [안전장치 추가] 혹시 모를 경로 누락을 대비해 share의 pkgconfig 내용물을 lib 쪽으로도 링크를 걸어줍니다.
+          mkdir -p $TERMUX_PREFIX/lib/pkgconfig
+          cp -rsf $TERMUX_PREFIX/share/pkgconfig/* $TERMUX_PREFIX/lib/pkgconfig/ 2>/dev/null || true
+
+          # 호스트 우분투의 최신 웨일랜드 프로토콜 헤더 주입
           echo "🔄 Injecting Host Wayland Server/Client Protocols..."
           sudo find /usr/include -name "wayland-server-protocol.h" -exec cp -v {} $TERMUX_PREFIX/include/ \;
           sudo find /usr/include -name "wayland-client-protocol.h" -exec cp -v {} $TERMUX_PREFIX/include/ \;
