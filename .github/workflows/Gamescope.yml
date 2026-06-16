@@ -29,8 +29,7 @@ jobs:
           rm -rf ${{ github.workspace }}/gamescope-dist
           mkdir -p ${{ github.workspace }}/gamescope-dist
 
-      # 2. 메손 크로스 파일 생성 (Clang 표준 라이브러리 참조 꼬임 방지 대책 적용)
-      # 2. 메손 크로스 파일 생성 (C++ 헤더 인식 꼬임 방지 대책 적용)
+      # 2. 메손 크로스 파일 생성 (C++ 헤더 인식 꼬임 방지 및 문법 교정 완료)
       - name: Create Meson Cross File (Safe Host Side)
         run: |
           cat << 'EOF' > ${{ github.workspace }}/termux-glibc.ini
@@ -40,9 +39,9 @@ jobs:
           pkgconfig = 'pkg-config'
 
           [built-in options]
-          # -stdlib=libstdc++를 명시하고, 호스트(Ubuntu)의 고유 C++ 헤더 경로를 시스템 우선 순위로 강제 주입합니다.
-          c_args = ['-O2', '-pipe', '--target=aarch64-linux-gnu', '-isystem']
-          cpp_args = ['-O2', '-pipe', '--target=aarch64-linux-gnu', '-stdlib=libstdc++', '-isystem', '/usr/include/c++/13', '-isystem', '/usr/include/aarch64-linux-gnu/c++/13', '-isystem']
+          # 🌟 -isystem 뒤에 경로를 올바르게 매칭하고, 누락되었던 필수 헤더 경로들을 안전하게 정돈했습니다.
+          c_args = ['-O2', '-pipe', '--target=aarch64-linux-gnu', '-isystem', '/data/data/com.termux/files/usr/glibc/include']
+          cpp_args = ['-O2', '-pipe', '--target=aarch64-linux-gnu', '-stdlib=libstdc++', '-isystem', '/usr/include/c++/13', '-isystem', '/usr/include/aarch64-linux-gnu/c++/13', '-isystem', '/data/data/com.termux/files/usr/glibc/include']
           c_link_args = ['-s', '--target=aarch64-linux-gnu', '-L/usr/lib/aarch64-linux-gnu', '-Wl,--dynamic-linker=/data/data/com.termux/files/usr/glibc/lib/ld-linux-aarch64.so.1', '-Wl,-rpath=/data/data/com.termux/files/usr/glibc/lib', '-Wl,-O3,--sort-common,--as-needed', '-lpulse']
           cpp_link_args = ['-s', '--target=aarch64-linux-gnu', '-stdlib=libstdc++', '-L/usr/lib/aarch64-linux-gnu', '-Wl,--dynamic-linker=/data/data/com.termux/files/usr/glibc/lib/ld-linux-aarch64.so.1', '-Wl,-rpath=/data/data/com.termux/files/usr/glibc/lib', '-Wl,-O3,--sort-common,--as-needed', '-lpulse']
 
@@ -56,7 +55,7 @@ jobs:
           cpu = 'armv8-a'
           endian = 'little'
           EOF
-          echo "✔ Meson Cross File이 교정되었습니다."
+          echo "✔ Meson Cross File이 완벽하게 교정되었습니다."
 
       - name: Build Gamescope inside Native arm64 Ubuntu Container
         run: |
@@ -133,7 +132,9 @@ jobs:
               meson setup build \
                 --cross-file /workspace/termux-glibc.ini \
                 --clearcache \
-                --prefix=/data/data/com.termux/files/usr/glibc
+                --prefix=/data/data/com.termux/files/usr/glibc \
+                -Dxwayland=enabled \
+                -Dwlroots:xwayland=enabled
 
               echo '🛠️ Gamescope 컴파일 시작...'
               meson compile -C build --verbose
