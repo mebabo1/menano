@@ -79,16 +79,12 @@ jobs:
           mkdir -p /tmp/deps-extract
           cd /tmp/deps-extract
 
-          echo "📦 Downloading Fixed ARM64 Linux Packages from GitHub & Ubuntu..."
-          # 기존 필수 패키지 4종
+          echo "📦 Downloading Fixed ARM64 Linux Packages from GitHub Release..."
           wget -q https://github.com/mebabo1/menano/releases/download/Box/libudev-dev_261.rc3-1_arm64.deb
           wget -q https://github.com/mebabo1/menano/releases/download/Box/libinput-dev_1.31.3-1_arm64.deb
           wget -q https://github.com/mebabo1/menano/releases/download/Box/libxres-dev_1.2.1-1+b2_arm64.deb
           wget -q https://github.com/mebabo1/menano/releases/download/Box/libluajit-5.1-dev_2.1.0+openresty20251030-1+b2_arm64.deb
-
-          # 🌟 [추가 해결 1] xcb/xcb_ewmh.h 헤더 유실 에러 해결을 위한 진짜 패키지 추가
-          wget -q http://ports.ubuntu.com/ubuntu-ports/pool/main/x/xcb-util-ewmh/libxcb-ewmh-dev_0.4.1-1.1_arm64.deb || \
-          wget -q http://ports.ubuntu.com/ubuntu-ports/pool/main/x/xcb-util-ewmh/libxcb-ewmh-dev_0.4.1-1_arm64.deb
+          wget -q https://github.com/mebabo1/menano/releases/download/Box/libxcb-ewmh-dev_0.4.2-1+b2_arm64.deb
 
           echo "📂 Extracting and Injecting into Sysroot ($TERMUX_PREFIX) ..."
           for deb in *.deb; do
@@ -119,7 +115,7 @@ jobs:
             cp -pd "$lib_file" $TERMUX_PREFIX/lib/
           done
 
-          # 5. pkgconfig 명세서 복사 및 대소문자 링크 생성
+          # 5. pkgconfig 명세서 복사 및 대소문자 링크 생성 (새로 추가된 xcb-ewmh.pc도 함께 복사됩니다)
           find ./usr/lib -name "*.pc" | while read -r pc_file; do
             cp -v "$pc_file" $TERMUX_PREFIX/lib/pkgconfig/
           done
@@ -128,8 +124,7 @@ jobs:
             cp -v $TERMUX_PREFIX/lib/pkgconfig/XRes.pc $TERMUX_PREFIX/lib/pkgconfig/xres.pc
           fi
 
-          # 🌟 [추가 해결 2] 낡은 xdg_positioner 프로토콜 업데이트 (Wayland 선언문 강제 최신화)
-          # 호스트 우분투 시스템(ubuntu-22.04)에 깔린 순정 최신 프로토콜 자원을 Termux 환경에 억지로 이식합니다.
+          # 6. 낡은 xdg_positioner 프로토콜 업데이트 (Wayland 선언문 강제 최신화)
           echo "🔄 Upgrading Wayland Protocols to Host Version..."
           if [ -d "/usr/share/wayland-protocols" ]; then
             mkdir -p $TERMUX_PREFIX/share/wayland-protocols
@@ -139,6 +134,7 @@ jobs:
 
           echo "=== 🚀 Real ARM64 Linux Assets Deployment Verified ==="
           ls -la $TERMUX_PREFIX/include/xcb/xcb_ewmh.h || echo "⚠️ xcb_ewmh.h가 없습니다!"
+          ls -la $TERMUX_PREFIX/lib/pkgconfig/xcb-ewmh.pc || echo "⚠️ xcb-ewmh.pc가 없습니다!"
           ls -la $TERMUX_PREFIX/share/wayland-protocols/stable/xdg-shell/xdg-shell.xml || echo "⚠️ xdg-shell.xml 확인 실패!"
           
       - name: Create Gamescope Android Cross File
