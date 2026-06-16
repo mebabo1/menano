@@ -65,7 +65,7 @@ jobs:
               set -e
               echo '🚀 arm64 네이티브 컨테이너 진입 (Architecture: '\$(uname -m)')'
 
-              # 1. 의존성 패키지 설치 (누락된 libxres-dev 추가 완료)
+              # 1. 의존성 패키지 설치
               apt-get update
               apt-get install -y --no-install-recommends \
                 build-essential git cmake ninja-build python3 python3-pip python3-setuptools pkg-config \
@@ -85,6 +85,35 @@ jobs:
                 libfontconfig1-dev libsdl2-dev libasound2-dev libgstreamer1.0-dev \
                 libgstreamer-plugins-base1.0-dev dpkg-dev fakeroot debhelper dh-make screen nano less
 
+              # 🌟 [교정 핵심] 2. Wayland 최신 소스코드 빌드 및 시스템 상위 배치 (우분투 순정 버전 1.22 우회)
+              echo '📥 Upgrading Wayland Core to latest version for wlroots...'
+              cd /tmp
+              git clone https://gitlab.freedesktop.org/wayland/wayland.git
+              cd wayland
+              # 안전한 최신 안정 빌드 태그 선택 (1.23.1 조건 충족)
+              git checkout 1.23.0 || git checkout main
+              meson setup build --prefix=/usr --buildtype=release -Ddocumentation=false
+              meson compile -C build
+              meson install -C build
+              cd /workspace
+
+              # 3. Gamescope 소스 다운로드 및 진입
+              if [ ! -d "gamescope-src" ]; then
+                git clone --recursive https://github.com/ValveSoftware/gamescope.git gamescope-src
+              fi
+              cd gamescope-src
+
+              # 4. 환경 변수 적용
+              export deps="/data/data/com.termux/files/usr"
+              export depsg="/data/data/com.termux/files/usr/glibc"
+              export PKG_CONFIG_SYSROOT_DIR="/"
+              
+              # 🌟 [교정 핵심] 수동 설치된 /usr/lib/aarch64-linux-gnu 대신 /usr/lib/pkgconfig 도 정상 스캔하도록 경로 보강
+              export PKG_CONFIG_LIBDIR="/usr/lib/pkgconfig:/usr/lib/aarch64-linux-gnu/pkgconfig:/usr/share/pkgconfig"
+              export PKG_CONFIG_PATH="/usr/lib/pkgconfig:/usr/lib/aarch64-linux-gnu/pkgconfig"
+
+              echo '⚙️ Running Meson Setup with External Cross File...'
+              rm -rf build
               # 2. Gamescope 소스 관리
               if [ ! -d \"gamescope-src\" ]; then
                 git clone --recursive https://github.com/ValveSoftware/gamescope.git gamescope-src
