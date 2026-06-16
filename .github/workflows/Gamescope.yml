@@ -29,7 +29,7 @@ jobs:
           rm -rf ${{ github.workspace }}/gamescope-dist
           mkdir -p ${{ github.workspace }}/gamescope-dist
 
-      # 2. 메손 크로스 파일 생성 (수동 빌드될 최신 wayland-server 경로 추적 포함)
+      # 2. 메손 크로스 파일 생성 (Clang 표준 라이브러리 참조 꼬임 방지 대책 적용)
       - name: Create Meson Cross File (Safe Host Side)
         run: |
           cat << 'EOF' > ${{ github.workspace }}/termux-glibc.ini
@@ -39,10 +39,10 @@ jobs:
           pkgconfig = 'pkg-config'
 
           [built-in options]
-          c_args = ['-O2', '-pipe', '-I/data/data/com.termux/files/usr/glibc/include', '-I/data/data/com.termux/files/usr/include/pulse']
-          cpp_args = ['-O2', '-pipe', '-I/data/data/com.termux/files/usr/glibc/include', '-I/data/data/com.termux/files/usr/include/pulse']
-          c_link_args = ['-s', '-L/usr/lib/aarch64-linux-gnu', '-Wl,--dynamic-linker=/data/data/com.termux/files/usr/glibc/lib/ld-linux-aarch64.so.1', '-Wl,-rpath=/data/data/com.termux/files/usr/glibc/lib', '-Wl,-O3,--sort-common,--as-needed', '-L/data/data/com.termux/files/usr/lib/pulseaudio', '-lpulse']
-          cpp_link_args = ['-s', '-L/usr/lib/aarch64-linux-gnu', '-Wl,--dynamic-linker=/data/data/com.termux/files/usr/glibc/lib/ld-linux-aarch64.so.1', '-Wl,-rpath=/data/data/com.termux/files/usr/glibc/lib', '-Wl,-O3,--sort-common,--as-needed', '-L/data/data/com.termux/files/usr/lib/pulseaudio', '-lpulse']
+          c_args = ['-O2', '-pipe', '--target=aarch64-linux-gnu', '-isystem', '/data/data/com.termux/files/usr/glibc/include', '-I/data/data/com.termux/files/usr/include/pulse']
+          cpp_args = ['-O2', '-pipe', '--target=aarch64-linux-gnu', '-isystem', '/data/data/com.termux/files/usr/glibc/include', '-I/data/data/com.termux/files/usr/include/pulse']
+          c_link_args = ['-s', '--target=aarch64-linux-gnu', '-L/usr/lib/aarch64-linux-gnu', '-Wl,--dynamic-linker=/data/data/com.termux/files/usr/glibc/lib/ld-linux-aarch64.so.1', '-Wl,-rpath=/data/data/com.termux/files/usr/glibc/lib', '-Wl,-O3,--sort-common,--as-needed', '-L/data/data/com.termux/files/usr/lib/pulseaudio', '-lpulse']
+          cpp_link_args = ['-s', '--target=aarch64-linux-gnu', '-L/usr/lib/aarch64-linux-gnu', '-Wl,--dynamic-linker=/data/data/com.termux/files/usr/glibc/lib/ld-linux-aarch64.so.1', '-Wl,-rpath=/data/data/com.termux/files/usr/glibc/lib', '-Wl,-O3,--sort-common,--as-needed', '-L/data/data/com.termux/files/usr/lib/pulseaudio', '-lpulse']
 
           [properties]
           needs_exe_wrapper = true
@@ -66,7 +66,7 @@ jobs:
               set -e
               echo '🚀 arm64 네이티브 컨테이너 진입 (Architecture: '\$(uname -m)')'
 
-              # 1. 의존성 패키지 설치 (Xwayland 및 필수 XCB 확장 패키지 전면 보강)
+              # 1. 의존성 패키지 설치
               apt-get update
               apt-get install -y --no-install-recommends \
                 build-essential git cmake ninja-build python3 python3-pip python3-setuptools pkg-config \
@@ -124,7 +124,7 @@ jobs:
               echo '⚙️ Running Meson Setup with External Cross File...'
               rm -rf build
               
-              # wlroots 내부에서 Xwayland가 정상적으로 맞물리도록 빌드 환경 유도
+              # 빌드 환경 구성
               PKG_CONFIG_SYSROOT_DIR=\"/\" \
               PKG_CONFIG_LIBDIR=\"/usr/lib/pkgconfig:/usr/lib/aarch64-linux-gnu/pkgconfig:/usr/share/pkgconfig\" \
               PKG_CONFIG_PATH=\"/usr/lib/pkgconfig:/usr/lib/aarch64-linux-gnu/pkgconfig\" \
