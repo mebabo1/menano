@@ -85,7 +85,7 @@ jobs:
                 libunwind-dev libdbus-1-dev libxcursor-dev libxi-dev libmpg123-dev libopenal-dev \
                 libfontconfig1-dev libsdl2-dev libasound2-dev libgstreamer1.0-dev \
                 libgstreamer-plugins-base1.0-dev dpkg-dev fakeroot debhelper dh-make screen nano less \
-                xwayland libxcb-composite0-dev libxcb-render0-dev libxcb-util-dev libxcb-errors-dev
+                xwayland libxcb-composite0-dev libxcb-render0-dev libxcb-util-dev
 
               # 2. Wayland 코어 컴포넌트 수동 업그레이드
               echo '📥 Upgrading Wayland Core to 1.24.0 for wlroots...'
