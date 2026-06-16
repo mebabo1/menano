@@ -86,7 +86,7 @@ jobs:
                 libfontconfig1-dev libsdl2-dev libasound2-dev libgstreamer1.0-dev \
                 libgstreamer-plugins-base1.0-dev dpkg-dev fakeroot debhelper dh-make screen nano less
 
-              # 🌟 [교정 핵심 1] wlroots 요구조건(>=1.23.1)을 완벽히 넘어서는 1.24.0 안정 버전 빌드
+              # 2. Wayland 코어 컴포넌트 수동 업그레이드 (wlroots 1.23.1+ 요구 만족용)
               echo '📥 Upgrading Wayland Core to 1.24.0 for wlroots...'
               cd /tmp
               rm -rf wayland
@@ -94,6 +94,19 @@ jobs:
               cd wayland
               git checkout 1.24.0 || git checkout main
               meson setup build --prefix=/usr --buildtype=release -Ddocumentation=false
+              meson compile -C build
+              meson install -C build
+              cd /workspace
+
+              # 🌟 [교정 핵심] 2-2. Pixman 라이브러리 수동 업그레이드 (wlroots >=0.43.0 요구 만족용)
+              echo '📥 Upgrading Pixman to latest version for wlroots...'
+              cd /tmp
+              rm -rf pixman
+              git clone https://gitlab.freedesktop.org/pixman/pixman.git
+              cd pixman
+              # 요구조건인 0.43.0을 충족하는 안정 태그 선택
+              git checkout pixman-0.44.0 || git checkout master
+              meson setup build --prefix=/usr --buildtype=release -Dtests=disabled
               meson compile -C build
               meson install -C build
               cd /workspace
