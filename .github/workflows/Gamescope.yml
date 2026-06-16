@@ -134,7 +134,6 @@ jobs:
                 -Denable_openvr_support=false \
                 -Drt_cap=disabled \
                 -Denable_tests=false \
-                -Dwlroots:xwayland=disabled \
                 --prefix=/data/data/com.termux/files/usr/glibc
 
               echo '🛠️ Gamescope 컴파일 시작...'
