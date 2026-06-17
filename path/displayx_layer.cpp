@@ -627,6 +627,9 @@ DisplayX_CreateSwapchainKHR(VkDevice device,
 	if (!swapchain) return VK_ERROR_OUT_OF_HOST_MEMORY;
 	swapchain->loader_magic = ICD_LOADER_MAGIC;
 	swapchain->obj_type = VK_OBJECT_TYPE_SWAPCHAIN_KHR;
+	swapchain->wsi_device = device;
+	swapchain->wait_for_present = true;
+	swapchain->use_prime_blit = false;
 	swapchain->imageCount = pCreateInfo->minImageCount;
 	swapchain->format = pCreateInfo->imageFormat;
 	swapchain->extent = pCreateInfo->imageExtent;
