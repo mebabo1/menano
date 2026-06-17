@@ -806,6 +806,10 @@ DisplayX_AcquireNextImageKHR(VkDevice device,
 	
 	VK_UNWRAP_NON_DISPATCHABLE_HANDLE(swapchain, struct fake_swapchain, fake_swapchain)
 
+	if (fake_swapchain == nullptr || (uintptr_t)fake_swapchain < 0x1000) {
+		Logger::log("error", "Critical: fake_swapchain is invalid (null) in AcquireNextImageKHR!");
+		return VK_ERROR_OUT_OF_DATE_KHR;
+	}
 	if (fence != VK_NULL_HANDLE || semaphore != VK_NULL_HANDLE) {
 		scoped_lock l(global_lock);
 		auto dev = deviceDispatch[GetKey(device)];                                                     
@@ -813,7 +817,7 @@ DisplayX_AcquireNextImageKHR(VkDevice device,
 		VkSubmitInfo submitInfo{};
 		submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
 		submitInfo.signalSemaphoreCount = (semaphore != VK_NULL_HANDLE) ? 1 : 0;
-		submitInfo.pSignalSemaphores = (semaphore != VK_NULL_HANDLE) ? &semaphore : VK_NULL_HANDLE;
+		submitInfo.pSignalSemaphores = (semaphore != VK_NULL_HANDLE) ? &semaphore : nullptr; // VK_NULL_HANDLE 대신 nullptr 보정
 		dev->table.QueueSubmit(q->handle, 1, &submitInfo, fence);
 	}
 
