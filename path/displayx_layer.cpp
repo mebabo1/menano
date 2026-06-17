@@ -300,19 +300,20 @@ DisplayX_CreateXcbSurfaceKHR(VkInstance instance,
 
 	struct sockaddr_un addr{};
 	addr.sun_family = AF_UNIX;
-	const char *sock_name = "native_renderer";
+
+	const char *sock_name = "/data/data/com.termux/files/usr/tmp/.X11-unix/X0";
 	size_t name_len = strlen(sock_name);
 	
-	addr.sun_path[0] = '\0';
+	addr.sun_path[0] = '\0'; // 추상 소켓 마커 (@ 역할)
 	memcpy(addr.sun_path + 1, sock_name, name_len);
 	
 	socklen_t len = offsetof(struct sockaddr_un, sun_path) + 1 + name_len;
 	res = connect(fake_surf->native_renderer_fd, (struct sockaddr *)&addr, len);
 
 	if (res != 0) {
-		Logger::log("error", "Failed to connect to native renderer (XCB), res %d", res);
+		Logger::log("error", "Failed to connect to Termux-X11 socket (XCB), res %d", res);
 		close(fake_surf->native_renderer_fd);
-		free(fake_surf); // 🛠️ 메모리 누수 방어
+		free(fake_surf); 
 		return VK_ERROR_INITIALIZATION_FAILED;
 	}
 
@@ -342,7 +343,8 @@ DisplayX_CreateXlibSurfaceKHR(VkInstance instance,
 	
 	struct sockaddr_un addr{};
 	addr.sun_family = AF_UNIX;
-	const char *sock_name = "native_renderer";
+
+	const char *sock_name = "/data/data/com.termux/files/usr/tmp/.X11-unix/X0";
 	size_t name_len = strlen(sock_name);
 	
 	addr.sun_path[0] = '\0';
@@ -352,9 +354,9 @@ DisplayX_CreateXlibSurfaceKHR(VkInstance instance,
 	res = connect(fake_surf->native_renderer_fd, (struct sockaddr *)&addr, len);
 
 	if (res != 0) {                                                                                    
-		Logger::log("error", "Failed to connect to native renderer (XLIB), res %d", res);                     
+		Logger::log("error", "Failed to connect to Termux-X11 socket (XLIB), res %d", res);                     
 		close(fake_surf->native_renderer_fd);
-		free(fake_surf); // 🛠️ 메모리 누수 방어                                                 
+		free(fake_surf);                                                
 		return VK_ERROR_INITIALIZATION_FAILED;                                                     
 	}
 
