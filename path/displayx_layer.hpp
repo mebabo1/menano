@@ -29,6 +29,7 @@
 #endif
 
 #define AHARDWAREBUFFER_FORMAT_B8G8R8A8_UNORM 5
+#define ICD_LOADER_MAGIC 0x01D01010
 
 template <typename T>
 void* GetKey(T item) {
