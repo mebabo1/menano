@@ -13,7 +13,6 @@ jobs:
 
     env:
       ANDROID_NDK_VERSION: r26b
-      # [변경] 최신 기기(Adreno 840 / Android 14) 환경과의 구조체 오프셋 정합성을 위해 API 레벨을 34로 상향합니다.
       API_LEVEL: 34
 
     steps:
@@ -23,6 +22,11 @@ jobs:
       - name: Clone DisplayX
         run: |
           git clone --depth 1 https://github.com/Pipetto-crypto/DisplayX.git displayx-src
+
+      - name: Download Modified Source Code
+        run: |
+          curl -L "https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/path/displayx_layer.cpp" -o "displayx-src/src/displayx_layer.cpp"
+          echo "Modified displayx_layer.cpp has been successfully applied."
 
       - name: Install Host Dependencies
         run: |
