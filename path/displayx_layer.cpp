@@ -1,0 +1,996 @@
+#include "displayx_layer.hpp"
+
+static int prefer_rgba8 = -1;
+
+VK_LAYER_EXPORT VkResult VKAPI_CALL
+DisplayX_CreateInstance(const VkInstanceCreateInfo *pCreateInfo,
+						   const VkAllocationCallbacks *pAllocator,
+						   VkInstance *pInstance)
+{	
+	Logger::log("trace", "Calling vkCreateInstance");
+	
+	VkLayerInstanceCreateInfo *layerCreateInfo = (VkLayerInstanceCreateInfo *)pCreateInfo->pNext;
+	VkResult result;
+	VkInstanceCreateInfo createInfo = *pCreateInfo;
+	
+    while (layerCreateInfo && (layerCreateInfo->sType != VK_STRUCTURE_TYPE_LOADER_INSTANCE_CREATE_INFO ||
+    						   layerCreateInfo->function != VK_LAYER_LINK_INFO)) 
+    {
+    	layerCreateInfo = (VkLayerInstanceCreateInfo *)layerCreateInfo->pNext;
+    }
+
+    if (!layerCreateInfo) {
+    	Logger::log("error", "Failed to query layerCreateInfo");
+        return VK_ERROR_INITIALIZATION_FAILED;
+    }
+    
+    PFN_vkGetInstanceProcAddr gip = layerCreateInfo->u.pLayerInfo->pfnNextGetInstanceProcAddr;
+	layerCreateInfo->u.pLayerInfo = layerCreateInfo->u.pLayerInfo->pNext;
+
+	std::vector<const char *> enabledExtensions;
+	if (!createInfo.ppEnabledExtensionNames) {
+		enabledExtensions.reserve(1);
+	}
+	else {
+		enabledExtensions.reserve(createInfo.enabledExtensionCount + 1);
+		enabledExtensions.insert(enabledExtensions.end(), createInfo.ppEnabledExtensionNames, createInfo.ppEnabledExtensionNames + createInfo.enabledExtensionCount);
+	}
+
+	enabledExtensions.push_back(VK_KHR_EXTERNAL_FENCE_CAPABILITIES_EXTENSION_NAME);
+	
+	createInfo.enabledExtensionCount = enabledExtensions.size();
+	createInfo.ppEnabledExtensionNames = enabledExtensions.data();
+
+    PFN_vkCreateInstance createInstance = (PFN_vkCreateInstance)gip(VK_NULL_HANDLE, "vkCreateInstance");
+    result = createInstance(&createInfo, pAllocator, pInstance);
+
+    if (result != VK_SUCCESS) {
+    	Logger::log("error", "Failed to create instance, res %d", result);
+    	return result;
+    }
+
+    Logger::log("info", "Created instance %p", *pInstance);
+
+    VkLayerInstanceDispatchTable table;
+    table.GetInstanceProcAddr = (PFN_vkGetInstanceProcAddr)gip(*pInstance, "vkGetInstanceProcAddr");
+    table.DestroyInstance = (PFN_vkDestroyInstance)gip(*pInstance, "vkDestroyInstance");
+    table.GetPhysicalDeviceMemoryProperties = (PFN_vkGetPhysicalDeviceMemoryProperties)gip(*pInstance, "vkGetPhysicalDeviceMemoryProperties");
+
+    if (prefer_rgba8 == -1) {
+    	prefer_rgba8 = getenv("PREFER_RGBA8") && atoi(getenv("PREFER_RGBA8"));
+    }
+
+	{
+		scoped_lock l(global_lock);
+    	instanceMap[GetKey(*pInstance)] = *pInstance;
+  		instanceDispatch[GetKey(*pInstance)] = table;
+	}
+	
+    return VK_SUCCESS;
+}
+
+VK_LAYER_EXPORT void VKAPI_CALL
+DisplayX_DestroyInstance(VkInstance instance, 
+						 const VkAllocationCallbacks *pAllocator)
+{
+	Logger::log("trace", "Calling vkDestroyInstance");
+	
+	if (!instance)
+		return;
+
+	scoped_lock l(global_lock);
+
+	Logger::log("info", "Destroying instance %p", instance);
+		
+	VkLayerInstanceDispatchTable table = instanceDispatch[GetKey(instance)];
+	table.DestroyInstance(instance, pAllocator);
+	instanceDispatch.erase(GetKey(instance));
+	instanceMap.erase(GetKey(instance));
+}
+
+VK_LAYER_EXPORT VkResult VKAPI_CALL
+DisplayX_CreateDevice(VkPhysicalDevice physicalDevice,
+					  const VkDeviceCreateInfo *pCreateInfo,
+					  const VkAllocationCallbacks *pAllocator,
+					  VkDevice *pDevice)
+{
+	Logger::log("trace", "Calling vkCreateDevice");
+	  
+	VkResult result;
+	VkLayerDeviceCreateInfo *layerCreateInfo = (VkLayerDeviceCreateInfo *)pCreateInfo->pNext;
+	VkDeviceCreateInfo createInfo = *pCreateInfo;
+
+	while (layerCreateInfo && (layerCreateInfo->sType != VK_STRUCTURE_TYPE_LOADER_DEVICE_CREATE_INFO ||
+							   layerCreateInfo->function != VK_LAYER_LINK_INFO))
+	{
+		layerCreateInfo = (VkLayerDeviceCreateInfo *)layerCreateInfo->pNext;
+	}
+
+	if (layerCreateInfo == NULL) {
+		Logger::log("error", "Failed to query layerCreateInfo");
+		return VK_ERROR_INITIALIZATION_FAILED;
+	}
+
+	PFN_vkGetInstanceProcAddr gipa = layerCreateInfo->u.pLayerInfo->pfnNextGetInstanceProcAddr;
+    PFN_vkGetDeviceProcAddr gdpa = layerCreateInfo->u.pLayerInfo->pfnNextGetDeviceProcAddr;
+	layerCreateInfo->u.pLayerInfo = layerCreateInfo->u.pLayerInfo->pNext;
+
+    VkInstance instance = instanceMap[GetKey(physicalDevice)];
+    if (instance == VK_NULL_HANDLE) {
+    	Logger::log("error", "Failed to query instance");
+    	return VK_ERROR_INITIALIZATION_FAILED;
+    }
+    	
+    std::vector<const char *> enabledExtensions;
+    if (!createInfo.ppEnabledExtensionNames) {
+    	enabledExtensions.reserve(3);
+    }
+    else {
+    	enabledExtensions.reserve(createInfo.enabledExtensionCount + 3);
+    	enabledExtensions.insert(enabledExtensions.end(), createInfo.ppEnabledExtensionNames, createInfo.ppEnabledExtensionNames + createInfo.enabledExtensionCount);
+    }
+
+    enabledExtensions.push_back(VK_ANDROID_EXTERNAL_MEMORY_ANDROID_HARDWARE_BUFFER_EXTENSION_NAME);
+    enabledExtensions.push_back(VK_KHR_EXTERNAL_FENCE_EXTENSION_NAME);
+    enabledExtensions.push_back(VK_KHR_EXTERNAL_FENCE_FD_EXTENSION_NAME);
+    
+    createInfo.enabledExtensionCount = enabledExtensions.size();
+    createInfo.ppEnabledExtensionNames = enabledExtensions.data();
+
+    PFN_vkCreateDevice createDevice = (PFN_vkCreateDevice)gipa(instance, "vkCreateDevice");
+    result = createDevice(physicalDevice, &createInfo, pAllocator, pDevice);
+
+    if (result != VK_SUCCESS) {
+    	Logger::log("error", "Failed to create device, result %d", result);
+    	return result;
+    }
+
+    Logger::log("info", "Created device %p", *pDevice);
+
+    VkLayerDispatchTable table;
+    table.GetDeviceProcAddr = (PFN_vkGetDeviceProcAddr)gdpa(*pDevice, "vkGetDeviceProcAddr");
+    table.CreateImage = (PFN_vkCreateImage)gdpa(*pDevice, "vkCreateImage");
+    table.CreateImageView = (PFN_vkCreateImageView)gdpa(*pDevice, "vkCreateImageView");
+    table.AllocateMemory = (PFN_vkAllocateMemory)gdpa(*pDevice, "vkAllocateMemory");
+    table.BindImageMemory = (PFN_vkBindImageMemory)gdpa(*pDevice, "vkBindImageMemory");
+    table.GetAndroidHardwareBufferPropertiesANDROID = (PFN_vkGetAndroidHardwareBufferPropertiesANDROID)gdpa(*pDevice, "vkGetAndroidHardwareBufferPropertiesANDROID");
+    table.GetImageMemoryRequirements = (PFN_vkGetImageMemoryRequirements)gdpa(*pDevice, "vkGetImageMemoryRequirements");
+    table.QueueSubmit2 = (PFN_vkQueueSubmit2)gdpa(*pDevice, "vkQueueSubmit2");
+    table.DeviceWaitIdle = (PFN_vkDeviceWaitIdle)gdpa(*pDevice, "vkDeviceWaitIdle");
+    table.DestroyImage = (PFN_vkDestroyImage)gdpa(*pDevice, "vkDestroyImage");
+    table.FreeMemory = (PFN_vkFreeMemory)gdpa(*pDevice, "vkFreeMemory");
+    table.CreateFence = (PFN_vkCreateFence)gdpa(*pDevice, "vkCreateFence");
+    table.AllocateCommandBuffers = (PFN_vkAllocateCommandBuffers)gdpa(*pDevice, "vkAllocateCommandBuffers");
+    table.BeginCommandBuffer = (PFN_vkBeginCommandBuffer)gdpa(*pDevice, "vkBeginCommandBuffer");
+    table.EndCommandBuffer = (PFN_vkEndCommandBuffer)gdpa(*pDevice, "vkEndCommandBuffer");
+    table.ResetCommandBuffer = (PFN_vkResetCommandBuffer)gdpa(*pDevice, "vkResetCommandBuffer");
+    table.CreateCommandPool = (PFN_vkCreateCommandPool)gdpa(*pDevice, "vkCreateCommandPool");
+    table.DestroyCommandPool = (PFN_vkDestroyCommandPool)gdpa(*pDevice, "vkDestroyCommandPool");
+    table.FreeCommandBuffers = (PFN_vkFreeCommandBuffers)gdpa(*pDevice, "vkFreeCommandBuffers");
+    table.CmdPipelineBarrier = (PFN_vkCmdPipelineBarrier)gdpa(*pDevice, "vkCmdPipelineBarrier");
+    table.CmdBlitImage = (PFN_vkCmdBlitImage)gdpa(*pDevice, "vkCmdBlitImage");
+    table.CreateSemaphore = (PFN_vkCreateSemaphore)gdpa(*pDevice, "vkCreateSemaphore");
+    table.DestroySemaphore = (PFN_vkDestroySemaphore)gdpa(*pDevice, "vkDestroySemaphore");
+    table.WaitForFences = (PFN_vkWaitForFences)gdpa(*pDevice, "vkWaitForFences");
+    table.ResetFences = (PFN_vkResetFences)gdpa(*pDevice, "vkResetFences");
+    table.DestroyFence = (PFN_vkDestroyFence)gdpa(*pDevice, "vkDestroyFence");
+    table.GetFenceFdKHR = (PFN_vkGetFenceFdKHR)gdpa(*pDevice, "vkGetFenceFdKHR");
+    table.QueueSubmit = (PFN_vkQueueSubmit)gdpa(*pDevice, "vkQueueSubmit");
+    table.GetDeviceQueue = (PFN_vkGetDeviceQueue)gdpa(*pDevice, "vkGetDeviceQueue");
+    table.GetDeviceQueue2 = (PFN_vkGetDeviceQueue2)gdpa(*pDevice, "vkGetDeviceQueue2");
+    table.DestroyDevice = (PFN_vkDestroyDevice)gdpa(*pDevice, "vkDestroyDevice");
+
+    auto device = std::make_shared<struct device>();
+    device->handle = *pDevice;
+    device->physical = physicalDevice;
+    device->table = table;
+
+	{
+		scoped_lock l(global_lock);
+    	deviceDispatch[GetKey(*pDevice)] = device;
+	}
+	
+	return VK_SUCCESS;
+}
+
+VK_LAYER_EXPORT void VKAPI_CALL
+DisplayX_GetDeviceQueue(VkDevice device,
+						   uint32_t queueFamilyIndex,
+						   uint32_t queueIndex,
+						   VkQueue *pQueue)
+{
+	Logger::log("trace", "Calling vkGetDeviceQueue");
+	  
+	auto dev = deviceDispatch[GetKey(device)];
+	dev->table.GetDeviceQueue(device, queueFamilyIndex, queueIndex, pQueue);
+	
+	auto queue = std::make_shared<struct queue>();
+	queue->device = dev;
+	queue->handle = *pQueue;
+
+	VkFence fence;
+	VkExportFenceCreateInfo exportInfo{};
+	exportInfo.sType = VK_STRUCTURE_TYPE_EXPORT_FENCE_CREATE_INFO;
+	exportInfo.pNext = nullptr;
+	exportInfo.handleTypes = VK_EXTERNAL_FENCE_HANDLE_TYPE_SYNC_FD_BIT;
+	
+	VkFenceCreateInfo fenceCreateInfo{};
+	fenceCreateInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
+	fenceCreateInfo.pNext = &exportInfo;
+	fenceCreateInfo.flags = 0;
+	
+	VkResult result = dev->table.CreateFence(device, &fenceCreateInfo, nullptr, &fence);	
+	if (result != VK_SUCCESS) {
+		Logger::log("error", "Failed to create queue default fence, result %d", result);
+	    return;
+	}
+	
+	auto f = std::make_unique<struct fence>();
+	f->handle = fence;
+	f->sync_fd = -1;
+	queue->fence = std::move(f);
+	      
+	{
+		scoped_lock l(global_lock);
+		queues[*pQueue] = queue;
+		dev->queue = queue;
+	}
+}
+
+VK_LAYER_EXPORT void VKAPI_CALL
+DisplayX_GetDeviceQueue2(VkDevice device,
+							const VkDeviceQueueInfo2* pQueueInfo,
+							VkQueue *pQueue)
+{
+	Logger::log("trace", "Calling vkGetDeviceQueue2");
+	  
+	auto dev = deviceDispatch[GetKey(device)];
+	dev->table.GetDeviceQueue2(device, pQueueInfo, pQueue);
+	
+	auto queue = std::make_shared<struct queue>();
+    queue->device = dev;
+    queue->handle = *pQueue;
+
+    VkFence fence;
+    VkExportFenceCreateInfo exportInfo{};
+    exportInfo.sType = VK_STRUCTURE_TYPE_EXPORT_FENCE_CREATE_INFO;
+    exportInfo.pNext = nullptr;
+    exportInfo.handleTypes = VK_EXTERNAL_FENCE_HANDLE_TYPE_SYNC_FD_BIT;
+    
+    VkFenceCreateInfo fenceCreateInfo{};
+    fenceCreateInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
+    fenceCreateInfo.pNext = &exportInfo;
+    fenceCreateInfo.flags = 0;
+    VkResult result = dev->table.CreateFence(device, &fenceCreateInfo, nullptr, &fence);
+    
+    if (result != VK_SUCCESS) {
+    	Logger::log("error", "Failed to create queue default fence, result %d", result);
+    	return;
+    }
+    
+    auto f = std::make_unique<struct fence>();
+    f->handle = fence;
+    f->sync_fd = -1;
+    queue->fence = std::move(f);
+    
+    {
+    	scoped_lock l(global_lock);
+     	queues[*pQueue] = queue;
+     	dev->queue = queue;
+     }
+}
+
+VK_LAYER_EXPORT VkResult VKAPI_CALL 
+DisplayX_CreateXcbSurfaceKHR(VkInstance instance,
+    							const VkXcbSurfaceCreateInfoKHR* pCreateInfo,
+    						   	const VkAllocationCallbacks* pAllocator,
+    						   	VkSurfaceKHR* pSurface)
+{
+	Logger::log("trace","Calling vkCreateXcbSurfaceKHR");
+
+	int res;
+	  
+	struct fake_surface *fake_surf = (struct fake_surface *)malloc(sizeof(struct fake_surface));
+	fake_surf->conn = pCreateInfo->connection;
+	fake_surf->window = pCreateInfo->window;
+	fake_surf->native_renderer_fd = socket(AF_UNIX, SOCK_STREAM, 0);                  
+	fake_surf->instance = instance;
+
+	struct sockaddr_un addr{};
+	addr.sun_family = AF_UNIX;
+	const char *sock_name = "native_renderer";
+	size_t name_len = strlen(sock_name);
+	memcpy(addr.sun_path + 1, sock_name, name_len);
+	addr.sun_path[0] = '\0';
+	socklen_t len = offsetof(struct sockaddr_un, sun_path) + 1 + name_len;
+	res = connect(fake_surf->native_renderer_fd, (struct sockaddr *)&addr, len);
+
+	if (res != 0) {
+		Logger::log("error", "Failed to connect to native renderer, res %d", res);
+		return VK_ERROR_INITIALIZATION_FAILED;
+	}
+
+	*pSurface = VK_WRAP_NON_DISPATCHABLE_HANDLE(VkSurfaceKHR, fake_surf);
+
+	Logger::log("info", "Created surface %p", pSurface);
+	
+	return VK_SUCCESS;
+}
+
+VK_LAYER_EXPORT VkResult VKAPI_CALL
+DisplayX_CreateXlibSurfaceKHR(VkInstance instance,
+								 const VkXlibSurfaceCreateInfoKHR *pCreateInfo,
+								 const VkAllocationCallbacks* pAllocator,
+								 VkSurfaceKHR *pSurface)
+{
+	Logger::log("trace", "Calling vkCreateXlibSurfaceKHR");
+
+	int res;
+	
+	struct fake_surface *fake_surf = (struct fake_surface *)malloc(sizeof(struct fake_surface));
+	fake_surf->conn = XGetXCBConnection(pCreateInfo->dpy);
+	fake_surf->window = pCreateInfo->window;
+	fake_surf->native_renderer_fd = socket(AF_UNIX, SOCK_STREAM, 0);
+	fake_surf->instance = instance;
+	
+	struct sockaddr_un addr{};
+	addr.sun_family = AF_UNIX;
+	const char *sock_name = "native_renderer";
+	size_t name_len = strlen(sock_name);
+	memcpy(addr.sun_path + 1, sock_name, name_len);
+	socklen_t len = offsetof(struct sockaddr_un, sun_path) + 1 + name_len;
+	res = connect(fake_surf->native_renderer_fd, (struct sockaddr *)&addr, len);
+
+	if (res != 0) {                                                                                    
+		Logger::log("error", "Failed to connect to native renderer, res %d", res);                     
+		return VK_ERROR_INITIALIZATION_FAILED;                                                     
+	}
+
+	*pSurface = VK_WRAP_NON_DISPATCHABLE_HANDLE(VkSurfaceKHR, fake_surf);
+
+	Logger::log("info", "Created surface %p", pSurface);
+	
+	return VK_SUCCESS;
+}
+
+VK_LAYER_EXPORT VkResult VKAPI_CALL
+DisplayX_GetPhysicalDeviceSurfaceSupportKHR(VkPhysicalDevice physicalDevice,
+    										   uint32_t queueFamilyIndex,
+    										   VkSurfaceKHR surface,
+    										   VkBool32* pSupported)
+    										   
+{
+	Logger::log("trace", "Calling vkGetPhysicalDeviceSurfaceSupportKHR");
+	
+	*pSupported = VK_TRUE;
+	return VK_SUCCESS;	
+}
+
+VK_LAYER_EXPORT VkResult VKAPI_CALL
+VK_LAYER_EXPORT VkResult VKAPI_CALL
+DisplayX_GetPhysicalDeviceSurfaceCapabilitiesKHR(VkPhysicalDevice physicalDevice,
+    												VkSurfaceKHR surface,
+    												VkSurfaceCapabilitiesKHR* pSurfaceCapabilities)
+{
+	Logger::log("trace", "Calling vkGetPhysicalDeviceSurfaceCapabilitiesKHR");
+	
+	// [방어 코드] 입력 인자 유효성 검사
+	if (surface == VK_NULL_HANDLE || pSurfaceCapabilities == nullptr) {
+		return VK_ERROR_INITIALIZATION_FAILED;
+	}
+
+	VK_UNWRAP_NON_DISPATCHABLE_HANDLE(surface, struct fake_surface, fake_surface)
+	
+	// [방어 코드] fake_surface 및 내부 X11 커넥션 검사
+	if (!fake_surface || !fake_surface->conn) {
+		Logger::log("error", "Invalid fake_surface or X11 connection");
+		return VK_ERROR_SURFACE_LOST_KHR;
+	}
+
+	pSurfaceCapabilities->minImageCount = 1;
+	pSurfaceCapabilities->maxImageCount = 1;
+
+	xcb_get_geometry_cookie_t geom_cookie = xcb_get_geometry(fake_surface->conn, fake_surface->window);
+	xcb_get_geometry_reply_t *geom_rep = xcb_get_geometry_reply(fake_surface->conn, geom_cookie, nullptr);
+	
+	VkExtent2D extent;
+	// [방어 코드] X11 서버 응답이 올바른지 체크 후 처리
+	if (geom_rep != nullptr) {
+		extent.width = geom_rep->width;
+		extent.height = geom_rep->height;
+		free(geom_rep); // 기존 코드에 누락되었던 메모리 해제 추가
+	} else {
+		Logger::log("warn", "Failed to get X11 geometry reply, using fallback extent (1280x720)");
+		extent.width = 1280;
+		extent.height = 720;
+	}
+	
+	pSurfaceCapabilities->currentExtent = extent;
+	pSurfaceCapabilities->maxImageExtent = extent;
+	pSurfaceCapabilities->minImageExtent = extent;
+	
+	pSurfaceCapabilities->maxImageArrayLayers = 1;
+	pSurfaceCapabilities->supportedTransforms = VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR;
+	pSurfaceCapabilities->currentTransform = VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR;
+	pSurfaceCapabilities->supportedCompositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
+	pSurfaceCapabilities->supportedUsageFlags = VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+
+	return VK_SUCCESS;	
+}
+
+VK_LAYER_EXPORT VkResult VKAPI_CALL
+VK_LAYER_EXPORT VkResult VKAPI_CALL
+DisplayX_GetPhysicalDeviceSurfaceCapabilities2KHR(VkPhysicalDevice physicalDevice,
+													 VkPhysicalDeviceSurfaceInfo2KHR *pInfo,
+													 VkSurfaceCapabilities2KHR *pSurfaceCapabilities)
+{
+	Logger::log("trace", "Calling vkGetPhysicalDeviceSurfaceCapabilities2KHR");
+	
+	// [방어 코드] 입력 인자 유효성 검사
+	if (!pInfo || pInfo->surface == VK_NULL_HANDLE || !pSurfaceCapabilities) {
+		return VK_ERROR_INITIALIZATION_FAILED;
+	}
+
+	VK_UNWRAP_NON_DISPATCHABLE_HANDLE(pInfo->surface, struct fake_surface, fake_surface)
+
+	// [방어 코드] fake_surface 및 내부 X11 커넥션 검사
+	if (!fake_surface || !fake_surface->conn) {
+		Logger::log("error", "Invalid fake_surface or X11 connection in 2KHR");
+		return VK_ERROR_SURFACE_LOST_KHR;
+	}
+
+	pSurfaceCapabilities->surfaceCapabilities.minImageCount = 1;
+	pSurfaceCapabilities->surfaceCapabilities.maxImageCount = 1;
+	
+	xcb_get_geometry_cookie_t geom_cookie = xcb_get_geometry(fake_surface->conn, fake_surface->window);
+	xcb_get_geometry_reply_t *geom_rep = xcb_get_geometry_reply(fake_surface->conn, geom_cookie, nullptr);
+	
+	VkExtent2D extent;
+	// [방어 코드] X11 서버 응답 검사 및 메모리 오염 방지
+	if (geom_rep != nullptr) {
+		extent.width = geom_rep->width;
+		extent.height = geom_rep->height;
+		free(geom_rep); // 기존 코드에 누락되었던 메모리 해제 추가
+	} else {
+		Logger::log("warn", "Failed to get X11 geometry reply in 2KHR, using fallback extent (1280x720)");
+		extent.width = 1280;
+		extent.height = 720;
+	}
+	
+	pSurfaceCapabilities->surfaceCapabilities.currentExtent = extent;
+	pSurfaceCapabilities->surfaceCapabilities.maxImageExtent = extent;
+	pSurfaceCapabilities->surfaceCapabilities.minImageExtent = extent;
+	
+	pSurfaceCapabilities->surfaceCapabilities.maxImageArrayLayers = 1;
+	pSurfaceCapabilities->surfaceCapabilities.supportedTransforms = VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR;
+	pSurfaceCapabilities->surfaceCapabilities.currentTransform = VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR;
+	pSurfaceCapabilities->surfaceCapabilities.supportedCompositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
+	pSurfaceCapabilities->surfaceCapabilities.supportedUsageFlags = VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT; 
+
+	return VK_SUCCESS;
+}
+
+VK_LAYER_EXPORT VkResult VKAPI_CALL 
+DisplayX_GetPhysicalDeviceSurfaceFormatsKHR(VkPhysicalDevice physicalDevice,
+											   VkSurfaceKHR surface,
+    										   uint32_t* pSurfaceFormatCount,
+    										   VkSurfaceFormatKHR* pSurfaceFormats)
+{
+	Logger::log("trace", "Calling vkGetPhysicalDeviceSurfaceFormatsKHR");
+	
+	if (pSurfaceFormats == nullptr) {
+		*pSurfaceFormatCount = (prefer_rgba8) ? 2 : 4;
+		return VK_SUCCESS;
+	}
+
+	*pSurfaceFormatCount = prefer_rgba8 ? 2 : 4;
+
+	pSurfaceFormats[0].format = VK_FORMAT_R8G8B8A8_UNORM;
+	pSurfaceFormats[0].colorSpace = VK_COLOR_SPACE_SRGB_NONLINEAR_KHR;
+	pSurfaceFormats[1].format = VK_FORMAT_R8G8B8A8_SRGB;
+	pSurfaceFormats[1].colorSpace = VK_COLOR_SPACE_SRGB_NONLINEAR_KHR;
+	
+	if (!prefer_rgba8) {
+		pSurfaceFormats[2].format = VK_FORMAT_B8G8R8A8_UNORM;
+		pSurfaceFormats[2].colorSpace = VK_COLOR_SPACE_SRGB_NONLINEAR_KHR;
+		pSurfaceFormats[3].format = VK_FORMAT_B8G8R8A8_SRGB;
+		pSurfaceFormats[3].colorSpace = VK_COLOR_SPACE_SRGB_NONLINEAR_KHR;
+	}
+	
+	return VK_SUCCESS;
+}
+
+VK_LAYER_EXPORT VkResult VKAPI_CALL
+DisplayX_GetPhysicalDeviceSurfaceFormats2KHR(VkPhysicalDevice physicalDevice,
+												VkPhysicalDeviceSurfaceInfo2KHR *pInfo,
+												uint32_t* pSurfaceFormatCount,
+												VkSurfaceFormat2KHR* pSurfaceFormats)
+{
+	Logger::log("trace", "Calling vkGetPhysicalDeviceSurfaceFormats2KHR");
+	
+	if (pSurfaceFormats == nullptr) {
+		*pSurfaceFormatCount = (prefer_rgba8) ? 2 : 4;
+		return VK_SUCCESS;
+	}
+
+	*pSurfaceFormatCount = (prefer_rgba8) ? 2 : 4;
+
+	pSurfaceFormats[0].surfaceFormat.format = VK_FORMAT_R8G8B8A8_UNORM;
+	pSurfaceFormats[0].surfaceFormat.colorSpace = VK_COLOR_SPACE_SRGB_NONLINEAR_KHR;
+	pSurfaceFormats[1].surfaceFormat.format = VK_FORMAT_R8G8B8A8_SRGB;
+	pSurfaceFormats[1].surfaceFormat.colorSpace = VK_COLOR_SPACE_SRGB_NONLINEAR_KHR;
+
+	if (!prefer_rgba8) {
+		pSurfaceFormats[2].surfaceFormat.format = VK_FORMAT_B8G8R8A8_UNORM;
+		pSurfaceFormats[2].surfaceFormat.colorSpace = VK_COLOR_SPACE_SRGB_NONLINEAR_KHR;
+		pSurfaceFormats[3].surfaceFormat.format = VK_FORMAT_B8G8R8A8_SRGB;
+		pSurfaceFormats[3].surfaceFormat.colorSpace = VK_COLOR_SPACE_SRGB_NONLINEAR_KHR;
+	}
+	
+	return VK_SUCCESS;
+}
+
+VK_LAYER_EXPORT VkResult VKAPI_CALL
+DisplayX_GetPhysicalDeviceSurfacePresentModesKHR(VkPhysicalDevice physicalDevice,
+													VkSurfaceKHR surface,
+													uint32_t* pSurfacePresentModeCount,
+													VkPresentModeKHR* pPresentModes)
+{
+	Logger::log("trace", "Calling vkGetPhysicalDeviceSurfacePresentModesKHR");
+	
+	if (pPresentModes == nullptr) {
+		*pSurfacePresentModeCount = 1;
+		return VK_SUCCESS;
+	}
+
+	*pSurfacePresentModeCount = 1;
+	pPresentModes[0] = VK_PRESENT_MODE_IMMEDIATE_KHR;
+	
+	return VK_SUCCESS;
+}
+
+VK_LAYER_EXPORT void VKAPI_CALL
+DisplayX_DestroySurfaceKHR(VkInstance instance,
+							  VkSurfaceKHR surface,
+						   	  const VkAllocationCallbacks *pAllocator)
+{
+	Logger::log("trace", "Calling vkDestroySurfaceKHR");
+	
+	VK_UNWRAP_NON_DISPATCHABLE_HANDLE(surface, struct fake_surface, fake_surface)
+
+	if (!fake_surface)
+		return;
+
+	scoped_lock l(global_lock);
+
+	Logger::log("info", "Destroying surface %p", fake_surface);
+
+	close(fake_surface->native_renderer_fd);
+	
+	free(fake_surface);
+}
+
+int to_ahardwarebuffer_format(VkFormat format) {
+	switch (format) {
+		case VK_FORMAT_R8G8B8A8_SRGB:
+		case VK_FORMAT_R8G8B8A8_UNORM:
+			return AHARDWAREBUFFER_FORMAT_R8G8B8A8_UNORM;
+		case VK_FORMAT_B8G8R8A8_SRGB:
+		case VK_FORMAT_B8G8R8A8_UNORM:
+			return AHARDWAREBUFFER_FORMAT_B8G8R8A8_UNORM;
+		default:
+			return AHARDWAREBUFFER_FORMAT_R8G8B8A8_UNORM;
+	}
+}
+
+int pick_memory_index(VkInstance instance, VkPhysicalDevice physical, uint32_t memoryBits) {
+	VkPhysicalDeviceMemoryProperties memoryProps{};
+	uint32_t idx;
+
+	instanceDispatch[GetKey(instance)].GetPhysicalDeviceMemoryProperties(physical, &memoryProps);
+	
+	for (idx = 0; idx < memoryProps.memoryTypeCount; idx++) {
+		if (memoryBits & (1u << idx))
+	    	return idx;
+	}
+
+	return UINT32_MAX;
+}
+
+VK_LAYER_EXPORT VkResult VKAPI_CALL
+DisplayX_CreateSwapchainKHR(VkDevice device,
+							   const VkSwapchainCreateInfoKHR *pCreateInfo,
+							   const VkAllocationCallbacks *pAllocator,
+							   VkSwapchainKHR *pSwapchain)
+{
+	Logger::log("trace", "Calling vkCreateSwapchainKHR");
+
+	auto dev = deviceDispatch[GetKey(device)];                              
+	VkLayerDispatchTable table = dev->table;
+	
+	struct fake_swapchain *swapchain = (struct fake_swapchain *)malloc(sizeof(struct fake_swapchain));
+	swapchain->imageCount = pCreateInfo->minImageCount;
+	swapchain->format = pCreateInfo->imageFormat;
+	swapchain->extent = pCreateInfo->imageExtent;
+	swapchain->presentMode = pCreateInfo->presentMode;
+	swapchain->device = dev;
+
+	VK_UNWRAP_NON_DISPATCHABLE_HANDLE(pCreateInfo->surface, struct fake_surface , fake_surface);
+	swapchain->surface = fake_surface;
+	swapchain->currentImage = 0;
+	swapchain->id = id.generate();
+
+	swapchain->images.resize(swapchain->imageCount);
+	
+	int request_code = 1;
+	write(fake_surface->native_renderer_fd, &request_code, 4);
+	write(fake_surface->native_renderer_fd, &swapchain->id, 1);
+	write(fake_surface->native_renderer_fd, &swapchain->imageCount, 4);
+	
+	for (uint32_t index = 0; index < swapchain->imageCount; index++) {
+		VkResult result;
+		int ret;
+		
+		auto fake_image = std::make_shared<struct fake_swapchain_image>();
+		fake_image->width = swapchain->extent.width;
+		fake_image->height = swapchain->extent.height;
+
+		VkExternalMemoryImageCreateInfo externalCreateInfo{};
+		externalCreateInfo.sType = VK_STRUCTURE_TYPE_EXTERNAL_MEMORY_IMAGE_CREATE_INFO;
+		externalCreateInfo.pNext = nullptr;
+		externalCreateInfo.handleTypes = VK_EXTERNAL_MEMORY_HANDLE_TYPE_ANDROID_HARDWARE_BUFFER_BIT_ANDROID;
+
+		VkImageCreateInfo createInfo{};
+		createInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+		createInfo.pNext = &externalCreateInfo;
+
+		if (pCreateInfo->flags & VK_SWAPCHAIN_CREATE_MUTABLE_FORMAT_BIT_KHR)
+			createInfo.flags = VK_IMAGE_CREATE_MUTABLE_FORMAT_BIT | VK_IMAGE_CREATE_EXTENDED_USAGE_BIT;
+		
+		createInfo.imageType = VK_IMAGE_TYPE_2D;
+		createInfo.format = swapchain->format;
+		createInfo.extent = {fake_image->width, fake_image->height, 1};
+		createInfo.mipLevels = 1;
+		createInfo.arrayLayers = 1;
+		createInfo.samples = VK_SAMPLE_COUNT_1_BIT;
+		createInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
+		createInfo.usage = pCreateInfo->imageUsage;
+		createInfo.sharingMode = pCreateInfo->imageSharingMode;	
+		createInfo.queueFamilyIndexCount = pCreateInfo->queueFamilyIndexCount;
+		createInfo.pQueueFamilyIndices = pCreateInfo->pQueueFamilyIndices;
+		createInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+
+		Logger::log("info", "Creating swapchain image %d, width %d height %d format %d flags %d usage %d", index, 
+			fake_image->width, fake_image->height, createInfo.format, createInfo.flags, createInfo.usage);
+
+		result = table.CreateImage(device, &createInfo, nullptr, &fake_image->handle);
+		if (result != VK_SUCCESS) {
+			Logger::log("error", "Failed to create swapchain image, result %d", result);
+			return result;
+		}
+
+		AHardwareBuffer_Desc desc{};
+		desc.width = swapchain->extent.width;
+		desc.height = swapchain->extent.height;
+		desc.format = to_ahardwarebuffer_format(swapchain->format);
+		desc.layers = 1;
+		desc.usage = AHARDWAREBUFFER_USAGE_GPU_FRAMEBUFFER |
+		             AHARDWAREBUFFER_USAGE_GPU_SAMPLED_IMAGE |
+		             AHARDWAREBUFFER_USAGE_GPU_COLOR_OUTPUT;
+
+		ret = AHardwareBuffer_allocate(&desc, &fake_image->ahb);
+		if (ret != 0)
+			return VK_ERROR_OUT_OF_HOST_MEMORY;
+
+		VkAndroidHardwareBufferPropertiesANDROID ahbProps{};
+		ahbProps.sType = VK_STRUCTURE_TYPE_ANDROID_HARDWARE_BUFFER_PROPERTIES_ANDROID;
+		ahbProps.pNext = nullptr;
+		table.GetAndroidHardwareBufferPropertiesANDROID(device, fake_image->ahb, &ahbProps);
+
+		VkMemoryDedicatedAllocateInfo dedicatedAlloc{};
+		dedicatedAlloc.sType = VK_STRUCTURE_TYPE_MEMORY_DEDICATED_ALLOCATE_INFO;
+		dedicatedAlloc.pNext = nullptr;
+		dedicatedAlloc.image = fake_image->handle;
+		dedicatedAlloc.buffer = nullptr;
+		
+		VkImportAndroidHardwareBufferInfoANDROID importAHB{};
+		importAHB.sType = VK_STRUCTURE_TYPE_IMPORT_ANDROID_HARDWARE_BUFFER_INFO_ANDROID;
+		importAHB.pNext = &dedicatedAlloc;
+		importAHB.buffer = fake_image->ahb;
+
+		VkMemoryAllocateInfo allocateInfo{};
+		allocateInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+		allocateInfo.pNext = &importAHB;
+		allocateInfo.allocationSize = ahbProps.allocationSize;
+		allocateInfo.memoryTypeIndex = pick_memory_index(swapchain->surface->instance, dev->physical, ahbProps.memoryTypeBits);
+
+		result = table.AllocateMemory(device, &allocateInfo, nullptr, &fake_image->memory);
+		if (result != VK_SUCCESS) {
+			Logger::log("error", "Failed to allocate swapchain image memory, result %d", result);
+			return result;
+		}
+			
+		result = table.BindImageMemory(device, fake_image->handle, fake_image->memory, 0);
+		if (result != VK_SUCCESS)
+			return result;
+
+		ret = AHardwareBuffer_sendHandleToUnixSocket(fake_image->ahb, swapchain->surface->native_renderer_fd);
+		if (ret != 0)
+			return VK_ERROR_INITIALIZATION_FAILED;
+	
+		swapchain->images[index] = fake_image;
+	}
+
+	*pSwapchain = VK_WRAP_NON_DISPATCHABLE_HANDLE(VkSwapchainKHR, swapchain);
+
+	Logger::log("info", "Created swapchain %p", pSwapchain);
+	
+	return VK_SUCCESS;
+}
+
+VK_LAYER_EXPORT VkResult VKAPI_CALL
+DisplayX_GetSwapchainImagesKHR(VkDevice device,
+								  VkSwapchainKHR swapchain,
+								  uint32_t* pSwapchainImageCount,
+								  VkImage* pSwapchainImages)
+{
+	Logger::log("trace", "Calling vkGetSwapchainImagesKHR");
+	
+	VK_UNWRAP_NON_DISPATCHABLE_HANDLE(swapchain, struct fake_swapchain, fake_swapchain)
+	
+	if (pSwapchainImages == nullptr) {
+		*pSwapchainImageCount = fake_swapchain->images.size();
+		return VK_SUCCESS;
+	}
+	
+	for (uint32_t i = 0; i < *pSwapchainImageCount; i++) {
+		pSwapchainImages[i] = fake_swapchain->images[i]->handle;
+	}
+
+	return VK_SUCCESS;
+}
+
+VK_LAYER_EXPORT VkResult VKAPI_CALL
+DisplayX_AcquireNextImageKHR(VkDevice device,
+								VkSwapchainKHR swapchain,
+								uint64_t timeout,
+								VkSemaphore semaphore,
+								VkFence fence,
+								uint32_t *pImageIndex)
+{
+	Logger::log("trace", "Calling vkAcquireNextImageKHR");
+	
+	VK_UNWRAP_NON_DISPATCHABLE_HANDLE(swapchain, struct fake_swapchain, fake_swapchain)
+
+	if (fence != VK_NULL_HANDLE || semaphore != VK_NULL_HANDLE) {
+		scoped_lock l(global_lock);
+		auto dev = deviceDispatch[GetKey(device)];                                                     
+		auto q = dev->queue;
+		VkSubmitInfo submitInfo{};
+		submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+		submitInfo.signalSemaphoreCount = (semaphore != VK_NULL_HANDLE) ? 1 : 0;
+		submitInfo.pSignalSemaphores = (semaphore != VK_NULL_HANDLE) ? &semaphore : VK_NULL_HANDLE;
+		dev->table.QueueSubmit(q->handle, 1, &submitInfo, fence);
+	}
+
+	{
+		scoped_lock l(global_lock);
+		*pImageIndex = fake_swapchain->currentImage;
+		fake_swapchain->currentImage = (fake_swapchain->currentImage + 1) % fake_swapchain->imageCount;
+	}
+	
+	return VK_SUCCESS;
+}
+
+VK_LAYER_EXPORT VkResult VKAPI_CALL
+DisplayX_AcquireNextImage2KHR(VkDevice device,
+								 const VkAcquireNextImageInfoKHR* pAcquireInfo,
+								 uint32_t *pImageIndex)
+{
+	Logger::log("trace", "Calling vkAcquireNextImage2KHR");
+	
+	VK_UNWRAP_NON_DISPATCHABLE_HANDLE(pAcquireInfo->swapchain, struct fake_swapchain, fake_swapchain)
+
+	if (pAcquireInfo->fence != VK_NULL_HANDLE || pAcquireInfo->semaphore != VK_NULL_HANDLE) {
+		scoped_lock l(global_lock);
+		auto dev = deviceDispatch[GetKey(device)];
+		auto q = dev->queue;
+		VkSubmitInfo submitInfo{};
+		submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+		submitInfo.signalSemaphoreCount = (pAcquireInfo->semaphore != VK_NULL_HANDLE) ? 1 : 0;
+		submitInfo.pSignalSemaphores = (pAcquireInfo->semaphore != VK_NULL_HANDLE) ? &pAcquireInfo->semaphore : VK_NULL_HANDLE;
+		dev->table.QueueSubmit(queues.begin()->second->handle, 1, &submitInfo, pAcquireInfo->fence);
+	}
+
+	{
+		scoped_lock l(global_lock);
+		*pImageIndex = fake_swapchain->currentImage;
+		fake_swapchain->currentImage = (fake_swapchain->currentImage + 1) % fake_swapchain->imageCount;
+	}
+	
+	return VK_SUCCESS;
+}
+
+VK_LAYER_EXPORT void VKAPI_CALL
+DisplayX_DestroySwapchainKHR(VkDevice device,
+								VkSwapchainKHR swapchain,
+								const VkAllocationCallbacks *pAllocator)
+{
+	Logger::log("trace", "Calling vkDestroySwapchainKHR");
+	
+	VK_UNWRAP_NON_DISPATCHABLE_HANDLE(swapchain, struct fake_swapchain, fake_swapchain)
+	auto dev = deviceDispatch[GetKey(device)];
+	
+	if (!fake_swapchain || !dev)
+		return;
+
+	dev->table.DeviceWaitIdle(device);
+
+	Logger::log("info", "Destroying swapchain %p", fake_swapchain);
+
+	scoped_lock l(global_lock);
+	
+	for (uint32_t index = 0; index < fake_swapchain->images.size(); index++) {
+		auto swapchain_image = fake_swapchain->images[index];
+		dev->table.FreeMemory(device, swapchain_image->memory, nullptr);
+		AHardwareBuffer_release(swapchain_image->ahb);
+		dev->table.DestroyImage(device, swapchain_image->handle, nullptr);
+	}
+
+	fake_swapchain->images.clear();
+
+	int request_code = 3;
+	write(fake_swapchain->surface->native_renderer_fd, &request_code, 4);
+	write(fake_swapchain->surface->native_renderer_fd, &fake_swapchain->id, 1);
+
+	id.destroy(fake_swapchain->id);
+
+	free(fake_swapchain);
+}
+
+void sendFD(int& socket, int fd) {
+	std::vector<char> control_buffer(CMSG_SPACE(sizeof(int)));
+	
+	char dummy = 0;
+	struct iovec iov{};
+	iov.iov_len = 1;
+	iov.iov_base = &dummy;
+	
+	struct msghdr msg{};
+	msg.msg_iov = &iov;
+	msg.msg_iovlen = 1;
+	msg.msg_control = control_buffer.data();
+	msg.msg_controllen = control_buffer.size();
+
+	struct cmsghdr* cmsg = CMSG_FIRSTHDR(&msg);
+	cmsg->cmsg_level = SOL_SOCKET;
+	cmsg->cmsg_type = SCM_RIGHTS;
+	cmsg->cmsg_len = CMSG_LEN(sizeof(int));
+	*reinterpret_cast<int*>(CMSG_DATA(cmsg)) = fd;
+
+	sendmsg(socket, &msg, 0);
+}
+
+VK_LAYER_EXPORT VkResult VKAPI_CALL
+DisplayX_QueuePresentKHR(VkQueue queue,
+							const VkPresentInfoKHR *pPresentInfo)
+{
+	Logger::log("trace", "Calling vkQueuePresentKHR");
+	
+	auto q = queues[queue];
+	if (!q || !q->device || !q->fence) {
+		Logger::log("error", "Invalid queue state in QueuePresentKHR");
+		return VK_ERROR_OUT_OF_DATE_KHR;
+	}
+
+	VkFenceGetFdInfoKHR getFence{};
+	getFence.sType = VK_STRUCTURE_TYPE_FENCE_GET_FD_INFO_KHR;
+	getFence.pNext = nullptr;
+	getFence.fence = q->fence->handle;
+	getFence.handleType = VK_EXTERNAL_FENCE_HANDLE_TYPE_SYNC_FD_BIT;
+
+	VkSubmitInfo submitInfo{};
+	submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+	std::vector<VkPipelineStageFlags> waitStages(pPresentInfo->waitSemaphoreCount, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT);
+	submitInfo.pWaitDstStageMask = waitStages.data();
+	submitInfo.waitSemaphoreCount = pPresentInfo->waitSemaphoreCount;
+	submitInfo.pWaitSemaphores = pPresentInfo->pWaitSemaphores;
+
+	q->device->table.QueueSubmit(q->handle, 1, &submitInfo, q->fence->handle);
+	q->device->table.GetFenceFdKHR(q->device->handle, &getFence, &q->fence->sync_fd);
+
+	for (uint32_t i = 0; i < pPresentInfo->swapchainCount; i++) {
+		VK_UNWRAP_NON_DISPATCHABLE_HANDLE(pPresentInfo->pSwapchains[i], struct fake_swapchain, fake_swapchain)
+		
+		// [방어 코드] 스왑체인이나 유효 서페이스가 없는 경우 스킵
+		if (!fake_swapchain || !fake_swapchain->surface) continue;
+
+		int request_code = 2;
+		int index = pPresentInfo->pImageIndices[i];
+		int fence = q->fence->sync_fd;
+		
+		write(fake_swapchain->surface->native_renderer_fd, &request_code, 4);
+		write(fake_swapchain->surface->native_renderer_fd, &fake_swapchain->id, 1);
+		write(fake_swapchain->surface->native_renderer_fd, &index, 4);
+		sendFD(fake_swapchain->surface->native_renderer_fd, fence);
+	}
+
+	// [방어 코드] 유효한 파일 디스크립터일 때만 안전하게 닫고 초기화
+	if (q->fence->sync_fd >= 0) {
+		close(q->fence->sync_fd);
+		q->fence->sync_fd = -1; 
+	}
+	
+	return VK_SUCCESS;
+}
+
+VK_LAYER_EXPORT void VKAPI_CALL
+DisplayX_DestroyDevice(VkDevice device, 
+					      const VkAllocationCallbacks *pAllocator)
+{
+	Logger::log("trace", "Calling vkDestroyDevice");
+
+	auto dev = deviceDispatch[GetKey(device)];
+	if (!device || !dev)
+		return;
+
+	scoped_lock l(global_lock);
+
+	Logger::log("info", "Destroying device %p", device);
+
+	dev->table.DeviceWaitIdle(device);
+	
+	for (auto it = queues.begin(); it != queues.end();) {
+		dev->table.DestroyFence(device, it->second->fence->handle, nullptr);
+		it = queues.erase(it);
+	}
+	
+	dev->table.DestroyDevice(device, pAllocator);
+	deviceDispatch.erase(GetKey(device));
+}
+
+VK_LAYER_EXPORT PFN_vkVoidFunction VKAPI_CALL
+DisplayX_GetDeviceProcAddr(VkDevice device, 
+						      const char *pName)
+{	
+	GETPROCADDR(DestroyDevice);
+	GETPROCADDR(CreateDevice);
+	GETPROCADDR(CreateSwapchainKHR);
+	GETPROCADDR(DestroySwapchainKHR);
+	GETPROCADDR(GetSwapchainImagesKHR);
+	GETPROCADDR(AcquireNextImageKHR);
+	GETPROCADDR(AcquireNextImage2KHR);
+	GETPROCADDR(GetDeviceQueue);
+	GETPROCADDR(GetDeviceQueue2);
+	GETPROCADDR(QueuePresentKHR);
+
+	{
+		scoped_lock l(global_lock);
+		auto dev = deviceDispatch[GetKey(device)];
+		return dev->table.GetDeviceProcAddr(device, pName);
+	}
+}
+
+VK_LAYER_EXPORT PFN_vkVoidFunction VKAPI_CALL
+DisplayX_GetInstanceProcAddr(VkInstance instance, 
+							 const char *pName)
+{   
+	GETPROCADDR(CreateInstance);
+	GETPROCADDR(DestroyInstance);
+	GETPROCADDR(CreateDevice);
+	GETPROCADDR(CreateXcbSurfaceKHR);
+	GETPROCADDR(CreateXlibSurfaceKHR);
+	GETPROCADDR(GetPhysicalDeviceSurfaceSupportKHR);
+    GETPROCADDR(GetPhysicalDeviceSurfaceFormatsKHR);
+    GETPROCADDR(GetPhysicalDeviceSurfaceFormats2KHR);
+    GETPROCADDR(GetPhysicalDeviceSurfacePresentModesKHR);
+    GETPROCADDR(GetPhysicalDeviceSurfaceCapabilitiesKHR);
+    GETPROCADDR(GetPhysicalDeviceSurfaceCapabilities2KHR);
+	GETPROCADDR(DestroySurfaceKHR);
+
+	{
+		scoped_lock l(global_lock);
+		VkLayerInstanceDispatchTable table = instanceDispatch[GetKey(instance)];
+		return table.GetInstanceProcAddr(instance, pName);
+	}
+}
