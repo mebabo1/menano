@@ -614,6 +614,14 @@ DisplayX_CreateSwapchainKHR(VkDevice device,
 	swapchain->device = dev;
 
 	VK_UNWRAP_NON_DISPATCHABLE_HANDLE(pCreateInfo->surface, struct fake_surface , fake_surface);
+
+	if (fake_surface == nullptr) {
+		Logger::log("error", "Critical: fake_surface is nullptr in CreateSwapchainKHR!");
+		free(swapchain); 
+
+		return VK_ERROR_SURFACE_LOST_KHR; 
+	}
+
 	swapchain->surface = fake_surface;
 	swapchain->currentImage = 0;
 	swapchain->id = id.generate();
