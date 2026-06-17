@@ -683,7 +683,25 @@ DisplayX_CreateSwapchainKHR(VkDevice device,
 		VkAndroidHardwareBufferPropertiesANDROID ahbProps{};
 		ahbProps.sType = VK_STRUCTURE_TYPE_ANDROID_HARDWARE_BUFFER_PROPERTIES_ANDROID;
 		ahbProps.pNext = nullptr;
-		table.GetAndroidHardwareBufferPropertiesANDROID(device, fake_image->ahb, &ahbProps);
+		
+		if (table.GetAndroidHardwareBufferPropertiesANDROID != nullptr) {
+			// 1. 만약 드라이버가 함수 주소를 잘 가지고 있다면 정상 호출
+			table.GetAndroidHardwareBufferPropertiesANDROID(device, fake_image->ahb, &ahbProps);
+		} else {
+			// 2. 만약 포인터가 비어있다면(Null), Vulkan 로더 시스템에 직접 주소를 물어와서 실행 (우회 궤도)
+			Logger::log("warn", "table.GetAndroidHardwareBufferPropertiesANDROID is null! Trying fallback lookup...");
+			
+			auto pfnGetAHBProps = (PFN_vkGetAndroidHardwareBufferPropertiesANDROID)
+				table.GetDeviceProcAddr(device, "vkGetAndroidHardwareBufferPropertiesANDROID");
+				
+			if (pfnGetAHBProps != nullptr) {
+				pfnGetAHBProps(device, fake_image->ahb, &ahbProps);
+			} else {
+				// 3. 이것마저 실패하면 세그폴트로 터트리지 말고 안전하게 에러를 뱉고 종료
+				Logger::log("error", "Critical: vkGetAndroidHardwareBufferPropertiesANDROID cannot be resolved.");
+				return VK_ERROR_INITIALIZATION_FAILED;
+			}
+		}
 
 		VkMemoryDedicatedAllocateInfo dedicatedAlloc{};
 		dedicatedAlloc.sType = VK_STRUCTURE_TYPE_MEMORY_DEDICATED_ALLOCATE_INFO;
