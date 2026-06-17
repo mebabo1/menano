@@ -364,13 +364,6 @@ DisplayX_CreateXlibSurfaceKHR(VkInstance instance,
 	return VK_SUCCESS;
 }
 
-	*pSurface = VK_WRAP_NON_DISPATCHABLE_HANDLE(VkSurfaceKHR, fake_surf);
-
-	Logger::log("info", "Created surface %p", pSurface);
-	
-	return VK_SUCCESS;
-}
-
 VK_LAYER_EXPORT VkResult VKAPI_CALL
 DisplayX_GetPhysicalDeviceSurfaceSupportKHR(VkPhysicalDevice physicalDevice,
     										   uint32_t queueFamilyIndex,
