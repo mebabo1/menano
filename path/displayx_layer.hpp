@@ -72,7 +72,8 @@ struct device {
 };
 
 struct fake_surface {
-    uintptr_t loader_magic; 
+    uintptr_t loader_magic;
+    VkObjectType obj_type;
 
     VkInstance instance;
     int native_renderer_fd;
@@ -90,6 +91,7 @@ struct fake_swapchain_image {
 
 struct fake_swapchain {
     uintptr_t loader_magic;
+    VkObjectType obj_type;
 
     struct fake_surface *surface;
     std::shared_ptr<struct device> device;
