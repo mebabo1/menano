@@ -293,6 +293,7 @@ DisplayX_CreateXcbSurfaceKHR(VkInstance instance,
 	struct fake_surface *fake_surf = (struct fake_surface *)malloc(sizeof(struct fake_surface));
 	if (!fake_surf) return VK_ERROR_OUT_OF_HOST_MEMORY;
 
+	fake_surf->loader_magic = ICD_LOADER_MAGIC;
 	fake_surf->conn = pCreateInfo->connection;
 	fake_surf->window = pCreateInfo->window;
 	fake_surf->native_renderer_fd = socket(AF_UNIX, SOCK_STREAM, 0);                  
@@ -336,6 +337,7 @@ DisplayX_CreateXlibSurfaceKHR(VkInstance instance,
 	struct fake_surface *fake_surf = (struct fake_surface *)malloc(sizeof(struct fake_surface));
 	if (!fake_surf) return VK_ERROR_OUT_OF_HOST_MEMORY;
 
+	fake_surf->loader_magic = ICD_LOADER_MAGIC;
 	fake_surf->conn = XGetXCBConnection(pCreateInfo->dpy);
 	fake_surf->window = pCreateInfo->window;
 	fake_surf->native_renderer_fd = socket(AF_UNIX, SOCK_STREAM, 0);
@@ -620,6 +622,8 @@ DisplayX_CreateSwapchainKHR(VkDevice device,
 	VkLayerDispatchTable table = dev->table;
 	
 	struct fake_swapchain *swapchain = (struct fake_swapchain *)malloc(sizeof(struct fake_swapchain));
+	if (!swapchain) return VK_ERROR_OUT_OF_HOST_MEMORY;
+	swapchain->loader_magic = ICD_LOADER_MAGIC;
 	swapchain->imageCount = pCreateInfo->minImageCount;
 	swapchain->format = pCreateInfo->imageFormat;
 	swapchain->extent = pCreateInfo->imageExtent;
