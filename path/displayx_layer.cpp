@@ -291,6 +291,8 @@ DisplayX_CreateXcbSurfaceKHR(VkInstance instance,
 	int res;
 	  
 	struct fake_surface *fake_surf = (struct fake_surface *)malloc(sizeof(struct fake_surface));
+	if (!fake_surf) return VK_ERROR_OUT_OF_HOST_MEMORY;
+
 	fake_surf->conn = pCreateInfo->connection;
 	fake_surf->window = pCreateInfo->window;
 	fake_surf->native_renderer_fd = socket(AF_UNIX, SOCK_STREAM, 0);                  
@@ -300,18 +302,21 @@ DisplayX_CreateXcbSurfaceKHR(VkInstance instance,
 	addr.sun_family = AF_UNIX;
 	const char *sock_name = "native_renderer";
 	size_t name_len = strlen(sock_name);
-	memcpy(addr.sun_path + 1, sock_name, name_len);
+	
 	addr.sun_path[0] = '\0';
+	memcpy(addr.sun_path + 1, sock_name, name_len);
+	
 	socklen_t len = offsetof(struct sockaddr_un, sun_path) + 1 + name_len;
 	res = connect(fake_surf->native_renderer_fd, (struct sockaddr *)&addr, len);
 
 	if (res != 0) {
-		Logger::log("error", "Failed to connect to native renderer, res %d", res);
+		Logger::log("error", "Failed to connect to native renderer (XCB), res %d", res);
+		close(fake_surf->native_renderer_fd);
+		free(fake_surf); // 🛠️ 메모리 누수 방어
 		return VK_ERROR_INITIALIZATION_FAILED;
 	}
 
 	*pSurface = VK_WRAP_NON_DISPATCHABLE_HANDLE(VkSurfaceKHR, fake_surf);
-
 	Logger::log("info", "Created surface %p", pSurface);
 	
 	return VK_SUCCESS;
@@ -328,6 +333,8 @@ DisplayX_CreateXlibSurfaceKHR(VkInstance instance,
 	int res;
 	
 	struct fake_surface *fake_surf = (struct fake_surface *)malloc(sizeof(struct fake_surface));
+	if (!fake_surf) return VK_ERROR_OUT_OF_HOST_MEMORY;
+
 	fake_surf->conn = XGetXCBConnection(pCreateInfo->dpy);
 	fake_surf->window = pCreateInfo->window;
 	fake_surf->native_renderer_fd = socket(AF_UNIX, SOCK_STREAM, 0);
@@ -337,14 +344,25 @@ DisplayX_CreateXlibSurfaceKHR(VkInstance instance,
 	addr.sun_family = AF_UNIX;
 	const char *sock_name = "native_renderer";
 	size_t name_len = strlen(sock_name);
+	
+	addr.sun_path[0] = '\0';
 	memcpy(addr.sun_path + 1, sock_name, name_len);
+	
 	socklen_t len = offsetof(struct sockaddr_un, sun_path) + 1 + name_len;
 	res = connect(fake_surf->native_renderer_fd, (struct sockaddr *)&addr, len);
 
 	if (res != 0) {                                                                                    
-		Logger::log("error", "Failed to connect to native renderer, res %d", res);                     
+		Logger::log("error", "Failed to connect to native renderer (XLIB), res %d", res);                     
+		close(fake_surf->native_renderer_fd);
+		free(fake_surf); // 🛠️ 메모리 누수 방어                                                 
 		return VK_ERROR_INITIALIZATION_FAILED;                                                     
 	}
+
+	*pSurface = VK_WRAP_NON_DISPATCHABLE_HANDLE(VkSurfaceKHR, fake_surf);
+	Logger::log("info", "Created surface %p", pSurface);
+	
+	return VK_SUCCESS;
+}
 
 	*pSurface = VK_WRAP_NON_DISPATCHABLE_HANDLE(VkSurfaceKHR, fake_surf);
 
