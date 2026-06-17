@@ -13,7 +13,8 @@ jobs:
 
     env:
       ANDROID_NDK_VERSION: r26b
-      API_LEVEL: 30
+      # [변경] 최신 기기(Adreno 840 / Android 14) 환경과의 구조체 오프셋 정합성을 위해 API 레벨을 34로 상향합니다.
+      API_LEVEL: 34
 
     steps:
       - name: Checkout
@@ -31,11 +32,10 @@ jobs:
       - name: Download Android NDK
         run: |
           cd /tmp
-          wget -q https://dl.google.com/android/repository/android-ndk-${ANDROID_NDK_VERSION}-linux.zip
-          unzip -q android-ndk-${ANDROID_NDK_VERSION}-linux.zip
-          echo "ANDROID_NDK=/tmp/android-ndk-${ANDROID_NDK_VERSION}" >> $GITHUB_ENV
+          wget -q https://dl.google.com/android/repository/android-ndk-${{ env.ANDROID_NDK_VERSION }}-linux.zip
+          unzip -q android-ndk-${{ env.ANDROID_NDK_VERSION }}-linux.zip
+          echo "ANDROID_NDK=/tmp/android-ndk-${{ env.ANDROID_NDK_VERSION }}" >> $GITHUB_ENV
 
-      # [순서 변경] termuxfs 패키지를 먼저 추출하여 기본 베이스를 마련합니다.
       - name: Download and extract termuxfs for aarch64
         run: |
           mkdir -p $HOME/termuxfs/aarch64
@@ -46,7 +46,6 @@ jobs:
           echo "TERMUX_PREFIX=$HOME/termuxfs/aarch64/data/data/com.termux/files/usr" >> $GITHUB_ENV
           echo "RUNTIME_PATH=/data/data/com.termux/files/usr" >> $GITHUB_ENV
 
-      # [순서 변경] termuxfs가 완전히 풀린 상태에서 누락된 Vulkan XCB 헤더 3종을 정확히 주입합니다.
       - name: Download Missing Vulkan XCB Headers
         run: |
           TARGET_VULKAN_DIR="$HOME/termuxfs/aarch64/data/data/com.termux/files/usr/include/vulkan"
@@ -65,11 +64,12 @@ jobs:
           NDK_ROOT=$ANDROID_NDK/toolchains/llvm/prebuilt/linux-x86_64
           TOOLCHAIN=$NDK_ROOT/bin
           
-          # 명시적인 크로스 컴파일을 위해 규격을 통일하고 소스파일들이 온전히 포함되도록 설정합니다.
+          # CXXFLAGS와 LDFLAGS에 가리키는 대상 API_LEVEL 변수를 정상 반영하고,
+          # 최신 Android 그래픽 버퍼(NativeWindow) 링킹을 명시하기 위해 -lnativewindow 를 추가합니다.
           make \
-            CXX="$TOOLCHAIN/aarch64-linux-android${API_LEVEL}-clang++" \
-            CXXFLAGS="-std=c++17 -fPIC --target=aarch64-linux-android${API_LEVEL} -D__TERMUX__ -D__USE_GNU -U__ANDROID__ -idirafter$TERMUX_PREFIX/include -include fcntl.h -include unistd.h" \
-            LDFLAGS="-shared --target=aarch64-linux-android${API_LEVEL} -nostdlib++ -L$TERMUX_PREFIX/lib -Wl,-rpath=/system/lib64:$RUNTIME_PATH/lib -landroid-shmem -lc++_shared -lX11-xcb -lxcb -landroid" \
+            CXX="$TOOLCHAIN/aarch64-linux-android${{ env.API_LEVEL }}-clang++" \
+            CXXFLAGS="-std=c++17 -fPIC --target=aarch64-linux-android${{ env.API_LEVEL }} -D__TERMUX__ -D__USE_GNU -U__ANDROID__ -idirafter$TERMUX_PREFIX/include -include fcntl.h -include unistd.h" \
+            LDFLAGS="-shared --target=aarch64-linux-android${{ env.API_LEVEL }} -nostdlib++ -L$TERMUX_PREFIX/lib -Wl,-rpath=/system/lib64:$RUNTIME_PATH/lib -landroid-shmem -lc++_shared -lX11-xcb -lxcb -landroid -lnativewindow" \
             all
 
       - name: Packaging Output
