@@ -93,6 +93,10 @@ struct fake_swapchain {
     uintptr_t loader_magic;
     VkObjectType obj_type;
 
+    VkDevice wsi_device;
+    bool wait_for_present;
+    bool use_prime_blit;
+
     struct fake_surface *surface;
     std::shared_ptr<struct device> device;
     uint32_t imageCount;
