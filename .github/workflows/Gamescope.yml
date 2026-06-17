@@ -135,7 +135,7 @@ jobs:
                 --prefix=/data/data/com.termux/files/usr/glibc
 
               echo '🛠️ Gamescope 컴파일 시작...'
-              meson compile -C build --ninja-args="-w"
+              meson compile -C build
 
               echo '📦 빌드 완료품 아티팩트 분리 수집...'
               rm -rf /tmp/gamescope-stage
