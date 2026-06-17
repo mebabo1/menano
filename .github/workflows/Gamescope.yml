@@ -29,7 +29,7 @@ jobs:
           rm -rf ${{ github.workspace }}/gamescope-dist
           mkdir -p ${{ github.workspace }}/gamescope-dist
 
-      # 2. 메손 크로스 파일 생성 (C++ 헤더 인식 꼬임 방지 및 문법 교정 완료)
+      # 2. 메손 크로스 파일 생성 (Termux 가상 include 경로 완전 제거 및 툴체인 슬림화)
       - name: Create Meson Cross File (Safe Host Side)
         run: |
           cat << 'EOF' > ${{ github.workspace }}/termux-glibc.ini
@@ -39,9 +39,9 @@ jobs:
           pkgconfig = 'pkg-config'
 
           [built-in options]
-          # 🌟 -isystem 뒤에 경로를 올바르게 매칭하고, 누락되었던 필수 헤더 경로들을 안전하게 정돈했습니다.
-          c_args = ['-O2', '-pipe', '--target=aarch64-linux-gnu', '-isystem', '/data/data/com.termux/files/usr/glibc/include']
-          cpp_args = ['-O2', '-pipe', '--target=aarch64-linux-gnu', '-stdlib=libstdc++', '-isystem', '/usr/include/c++/13', '-isystem', '/usr/include/aarch64-linux-gnu/c++/13', '-isystem', '/data/data/com.termux/files/usr/glibc/include']
+          # 🌟 요청하신 대로 존재하지 않는 Termux include 가상 경로를 완전히 제거하고 인자를 깔끔하게 마감했습니다.
+          c_args = ['-O2', '-pipe', '--target=aarch64-linux-gnu']
+          cpp_args = ['-O2', '-pipe', '--target=aarch64-linux-gnu', '-stdlib=libstdc++', '-isystem', '/usr/include/c++/13', '-isystem', '/usr/include/aarch64-linux-gnu/c++/13']
           c_link_args = ['-s', '--target=aarch64-linux-gnu', '-L/usr/lib/aarch64-linux-gnu', '-Wl,--dynamic-linker=/data/data/com.termux/files/usr/glibc/lib/ld-linux-aarch64.so.1', '-Wl,-rpath=/data/data/com.termux/files/usr/glibc/lib', '-Wl,-O3,--sort-common,--as-needed', '-lpulse']
           cpp_link_args = ['-s', '--target=aarch64-linux-gnu', '-stdlib=libstdc++', '-L/usr/lib/aarch64-linux-gnu', '-Wl,--dynamic-linker=/data/data/com.termux/files/usr/glibc/lib/ld-linux-aarch64.so.1', '-Wl,-rpath=/data/data/com.termux/files/usr/glibc/lib', '-Wl,-O3,--sort-common,--as-needed', '-lpulse']
 
@@ -55,7 +55,7 @@ jobs:
           cpu = 'armv8-a'
           endian = 'little'
           EOF
-          echo "✔ Meson Cross File이 완벽하게 교정되었습니다."
+          echo "✔ Meson Cross File이 미니멀하게 정리되었습니다."
 
       - name: Build Gamescope inside Native arm64 Ubuntu Container
         run: |
@@ -125,7 +125,7 @@ jobs:
               echo '⚙️ Running Meson Setup with External Cross File...'
               rm -rf build
               
-              # 빌드 환경 구성
+              # 빌드 환경 구성 (호스트 패키지 인덱스 정상 탐색 유도)
               PKG_CONFIG_SYSROOT_DIR=\"/\" \
               PKG_CONFIG_LIBDIR=\"/usr/lib/pkgconfig:/usr/lib/aarch64-linux-gnu/pkgconfig:/usr/share/pkgconfig\" \
               PKG_CONFIG_PATH=\"/usr/lib/pkgconfig:/usr/lib/aarch64-linux-gnu/pkgconfig\" \
