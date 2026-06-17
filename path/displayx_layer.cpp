@@ -367,7 +367,6 @@ DisplayX_GetPhysicalDeviceSurfaceSupportKHR(VkPhysicalDevice physicalDevice,
 }
 
 VK_LAYER_EXPORT VkResult VKAPI_CALL
-VK_LAYER_EXPORT VkResult VKAPI_CALL
 DisplayX_GetPhysicalDeviceSurfaceCapabilitiesKHR(VkPhysicalDevice physicalDevice,
     												VkSurfaceKHR surface,
     												VkSurfaceCapabilitiesKHR* pSurfaceCapabilities)
