@@ -830,7 +830,7 @@ DisplayX_GetSwapchainImagesKHR(VkDevice device,
 		return VK_ERROR_OUT_OF_DATE_KHR;
 	}
 
-	uint32_t reportCount = fake_swapchain->requestedImageCount;
+	uint32_t reportCount = fake_swapchain->imageCount;
 	if (reportCount == 0) reportCount = fake_swapchain->imageCount;
 
 	// DXVK가 "몇 개 있어?"라고 개수만 조회하러 왔을 때
