@@ -1037,6 +1037,7 @@ DisplayX_GetDeviceProcAddr(VkDevice device,
 	GETPROCADDR(GetDeviceQueue);
 	GETPROCADDR(GetDeviceQueue2);
 	GETPROCADDR(QueuePresentKHR);
+	GETPROCADDR(WaitForPresentKHR);
 
 	{
 		scoped_lock l(global_lock);
