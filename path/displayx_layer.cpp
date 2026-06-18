@@ -1,6 +1,20 @@
 #include "displayx_layer.hpp"
+#define GETPROCADDR(func) \
+if (!strcmp(pName, "vk" #func)) \
+    return (PFN_vkVoidFunction)&DisplayX_##func;
 
 static int prefer_rgba8 = -1;
+
+VK_LAYER_EXPORT VkResult VKAPI_CALL
+DisplayX_WaitForPresentKHR(VkDevice device,
+                           VkSwapchainKHR swapchain,
+                           uint64_t timeout,
+                           uint64_t flags)
+{
+    Logger::log("trace", "DisplayX_WaitForPresentKHR intercepted! Bypassing driver check.");
+
+    return VK_SUCCESS; 
+}
 
 VK_LAYER_EXPORT VkResult VKAPI_CALL
 DisplayX_CreateInstance(const VkInstanceCreateInfo *pCreateInfo,
