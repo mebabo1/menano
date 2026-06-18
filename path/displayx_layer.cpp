@@ -805,21 +805,21 @@ DisplayX_GetSwapchainImagesKHR(VkDevice device,
 		return VK_ERROR_OUT_OF_DATE_KHR;
 	}
 
-	// 🌟 [핵심 수정] DXVK가 최초에 1개만 받을 생각으로 변수에 1을 넣어서 보냈더라도, 
-	// 상위 Presenter에게 우리 레이어가 가상화하여 생성한 진짜 이미지 개수(3)를 역으로 강제 주입합니다.
+	uint32_t reportCount = fake_swapchain->requestedImageCount;
+	if (reportCount == 0) reportCount = fake_swapchain->imageCount;
+
+	// DXVK가 "몇 개 있어?"라고 개수만 조회하러 왔을 때
 	if (pSwapchainImages == nullptr) {
-		*pSwapchainImageCount = fake_swapchain->images.size();
+		*pSwapchainImageCount = reportCount;
 		return VK_SUCCESS;
 	}
 
-	// DXVK의 요청 포인터 버퍼 크기 한계를 우리 가상화 이미지 크기로 동기화
-	uint32_t count = fake_swapchain->images.size();
-	*pSwapchainImageCount = count; 
-
+	uint32_t count = std::min(*pSwapchainImageCount, reportCount);
 	for (uint32_t i = 0; i < count; i++) {
 		pSwapchainImages[i] = fake_swapchain->images[i]->handle;
 	}
 
+	*pSwapchainImageCount = count;
 	return VK_SUCCESS;
 }
 
