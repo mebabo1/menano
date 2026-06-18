@@ -748,46 +748,61 @@ DisplayX_DestroyDevice(VkDevice device, const VkAllocationCallbacks *pAllocator)
 VK_LAYER_EXPORT PFN_vkVoidFunction VKAPI_CALL
 DisplayX_GetDeviceProcAddr(VkDevice device, const char *pName)
 {	
-	GETPROCADDR(DestroyDevice);
-	GETPROCADDR(CreateDevice);
-	GETPROCADDR(CreateSwapchainKHR);
-	GETPROCADDR(DestroySwapchainKHR);
-	GETPROCADDR(GetSwapchainImagesKHR);
-	GETPROCADDR(AcquireNextImageKHR);
-	GETPROCADDR(AcquireNextImage2KHR);
-	GETPROCADDR(GetDeviceQueue);
-	GETPROCADDR(GetDeviceQueue2);
-	GETPROCADDR(QueuePresentKHR);
-	GETPROCADDR(WaitForPresentKHR);
-	GETPROCADDR(GetPhysicalDeviceSurfaceCapabilitiesKHR);
-	GETPROCADDR(GetPhysicalDeviceSurfaceCapabilities2KHR);
+    // 디바이스 단에서도 Capabilities를 요구하는 경우가 있으므로 철저하게 방어
+    if (!strcmp(pName, "vkGetPhysicalDeviceSurfaceCapabilities2KHR") || 
+        !strcmp(pName, "vkGetPhysicalDeviceSurfaceCapabilities2EXT") ||
+        !strcmp(pName, "vkGetPhysicalDeviceSurfaceCapabilitiesKHR")) {
+        return (PFN_vkVoidFunction)&DisplayX_##GetPhysicalDeviceSurfaceCapabilitiesKHR;
+    }
 
-	{
-		scoped_lock l(global_lock);
-		auto dev = deviceDispatch[GetKey(device)];
-		return dev->table.GetDeviceProcAddr(device, pName);
-	}
+    GETPROCADDR(DestroyDevice);
+    GETPROCADDR(CreateDevice);
+    GETPROCADDR(CreateSwapchainKHR);
+    GETPROCADDR(DestroySwapchainKHR);
+    GETPROCADDR(GetSwapchainImagesKHR);
+    GETPROCADDR(AcquireNextImageKHR);
+    GETPROCADDR(AcquireNextImage2KHR);
+    GETPROCADDR(GetDeviceQueue);
+    GETPROCADDR(GetDeviceQueue2);
+    GETPROCADDR(QueuePresentKHR);
+    GETPROCADDR(WaitForPresentKHR);
+
+    {
+        scoped_lock l(global_lock);
+        auto dev = deviceDispatch[GetKey(device)];
+        return dev->table.GetDeviceProcAddr(device, pName);
+    }
+}
+
+VK_LAYER_EXPORT VkResult VKAPI_CALL
+DisplayX_GetPhysicalDeviceSurfaceCapabilities2EXT(VkPhysicalDevice physicalDevice, VkSurfaceKHR surface, VkSurfaceCapabilities2KHR* pSurfaceCapabilities) {
+    return DisplayX_GetPhysicalDeviceSurfaceCapabilitiesKHR(physicalDevice, surface, pSurfaceCapabilities);
 }
 
 VK_LAYER_EXPORT PFN_vkVoidFunction VKAPI_CALL
 DisplayX_GetInstanceProcAddr(VkInstance instance, const char *pName)
 {   
-	GETPROCADDR(CreateInstance);
-	GETPROCADDR(DestroyInstance);
-	GETPROCADDR(CreateDevice);
-	GETPROCADDR(CreateXcbSurfaceKHR);
-	GETPROCADDR(CreateXlibSurfaceKHR);
-	GETPROCADDR(GetPhysicalDeviceSurfaceSupportKHR);
-	GETPROCADDR(GetPhysicalDeviceSurfaceFormatsKHR);
-	GETPROCADDR(GetPhysicalDeviceSurfaceFormats2KHR);
-	GETPROCADDR(GetPhysicalDeviceSurfaceCapabilitiesKHR);
-	GETPROCADDR(GetPhysicalDeviceSurfaceCapabilities2KHR);
-	GETPROCADDR(DestroySurfaceKHR);
-	GETPROCADDR(GetPhysicalDeviceSurfacePresentModesKHR);
+    // 🌟 변종/확장 Capabilities 함수가 들어오면 무조건 우리가 만든 표준 함수로 강제 리디렉션
+    if (!strcmp(pName, "vkGetPhysicalDeviceSurfaceCapabilities2KHR") || 
+        !strcmp(pName, "vkGetPhysicalDeviceSurfaceCapabilities2EXT") ||
+        !strcmp(pName, "vkGetPhysicalDeviceSurfaceCapabilitiesKHR")) {
+        return (PFN_vkVoidFunction)&DisplayX_##GetPhysicalDeviceSurfaceCapabilitiesKHR;
+    }
 
-	{
-		scoped_lock l(global_lock);
-		VkLayerInstanceDispatchTable table = instanceDispatch[GetKey(instance)];
-		return table.GetInstanceProcAddr(instance, pName);
-	}
+    GETPROCADDR(CreateInstance);
+    GETPROCADDR(DestroyInstance);
+    GETPROCADDR(CreateDevice);
+    GETPROCADDR(CreateXcbSurfaceKHR);
+    GETPROCADDR(CreateXlibSurfaceKHR);
+    GETPROCADDR(GetPhysicalDeviceSurfaceSupportKHR);
+    GETPROCADDR(GetPhysicalDeviceSurfaceFormatsKHR);
+    GETPROCADDR(GetPhysicalDeviceSurfaceFormats2KHR);
+    GETPROCADDR(DestroySurfaceKHR);
+    GETPROCADDR(GetPhysicalDeviceSurfacePresentModesKHR);
+
+    {
+        scoped_lock l(global_lock);
+        VkLayerInstanceDispatchTable table = instanceDispatch[GetKey(instance)];
+        return table.GetInstanceProcAddr(instance, pName);
+    }
 }
