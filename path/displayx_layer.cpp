@@ -344,8 +344,8 @@ DisplayX_GetPhysicalDeviceSurfaceCapabilitiesKHR(VkPhysicalDevice physicalDevice
 	VK_UNWRAP_NON_DISPATCHABLE_HANDLE(surface, struct fake_surface, fake_surface)
 	if (!fake_surface || !fake_surface->conn) return VK_ERROR_SURFACE_LOST_KHR;
 
-	pSurfaceCapabilities->minImageCount = 3;
-	pSurfaceCapabilities->maxImageCount = 8;
+	pSurfaceCapabilities->minImageCount = 2;
+	pSurfaceCapabilities->maxImageCount = 4;
 
 	xcb_get_geometry_cookie_t geom_cookie = xcb_get_geometry(fake_surface->conn, fake_surface->window);
 	xcb_get_geometry_reply_t *geom_rep = xcb_get_geometry_reply(fake_surface->conn, geom_cookie, nullptr);
@@ -384,20 +384,21 @@ DisplayX_GetPhysicalDeviceSurfaceCapabilities2KHR(VkPhysicalDevice physicalDevic
 VK_LAYER_EXPORT VkResult VKAPI_CALL 
 DisplayX_GetPhysicalDeviceSurfaceFormatsKHR(VkPhysicalDevice physicalDevice, VkSurfaceKHR surface, uint32_t* pSurfaceFormatCount, VkSurfaceFormatKHR* pSurfaceFormats)
 {
+    // Mali/Android에서 가장 호환성이 높은 순서로 정렬
     static const VkSurfaceFormatKHR formats[] = {
         { VK_FORMAT_R8G8B8A8_UNORM, VK_COLOR_SPACE_SRGB_NONLINEAR_KHR },
-        { VK_FORMAT_R8G8B8A8_SRGB, VK_COLOR_SPACE_SRGB_NONLINEAR_KHR },
         { VK_FORMAT_B8G8R8A8_UNORM, VK_COLOR_SPACE_SRGB_NONLINEAR_KHR },
+        { VK_FORMAT_R8G8B8A8_SRGB, VK_COLOR_SPACE_SRGB_NONLINEAR_KHR },
         { VK_FORMAT_B8G8R8A8_SRGB, VK_COLOR_SPACE_SRGB_NONLINEAR_KHR }
     };
-    uint32_t formatCount = 4;
+    uint32_t totalSupported = 4;
 
     if (pSurfaceFormats == nullptr) {
-        *pSurfaceFormatCount = formatCount;
+        *pSurfaceFormatCount = totalSupported;
         return VK_SUCCESS;
     }
 
-    uint32_t count = (*pSurfaceFormatCount < formatCount) ? *pSurfaceFormatCount : formatCount;
+    uint32_t count = (*pSurfaceFormatCount < totalSupported) ? *pSurfaceFormatCount : totalSupported;
     for (uint32_t i = 0; i < count; i++) {
         pSurfaceFormats[i] = formats[i];
     }
@@ -464,9 +465,8 @@ DisplayX_CreateSwapchainKHR(VkDevice device, const VkSwapchainCreateInfoKHR *pCr
 	VkSwapchainCreateInfoKHR modifiedCreateInfo = *pCreateInfo;
 	uint32_t origRequestedCount = pCreateInfo->minImageCount;
 
-	// 가상 에뮬레이트 레이어 내부 스토리지 3버퍼 정형화 고정
-	if (modifiedCreateInfo.minImageCount < 3) {
-		modifiedCreateInfo.minImageCount = 8; 
+	if (modifiedCreateInfo.minImageCount < 2) {
+		modifiedCreateInfo.minImageCount = 4; 
 	}
 
 	struct fake_swapchain *swapchain = (struct fake_swapchain *)calloc(1, sizeof(struct fake_swapchain));
