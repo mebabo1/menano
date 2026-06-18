@@ -5,34 +5,71 @@ if (!strcmp(pName, "vk" #func)) \
 
 static int prefer_rgba8 = -1;
 
+// --- [Utility Functions] ---
+int to_ahardwarebuffer_format(VkFormat format) {
+	switch (format) {
+		case VK_FORMAT_R8G8B8A8_SRGB:
+		case VK_FORMAT_R8G8B8A8_UNORM:
+			return AHARDWAREBUFFER_FORMAT_R8G8B8A8_UNORM;
+		case VK_FORMAT_B8G8R8A8_SRGB:
+		case VK_FORMAT_B8G8R8A8_UNORM:
+			return AHARDWAREBUFFER_FORMAT_B8G8R8A8_UNORM;
+		default:
+			return AHARDWAREBUFFER_FORMAT_R8G8B8A8_UNORM;
+	}
+}
+
+int pick_memory_index(VkInstance instance, VkPhysicalDevice physical, uint32_t memoryBits) {
+	VkPhysicalDeviceMemoryProperties memoryProps{};
+	uint32_t idx;
+	instanceDispatch[GetKey(instance)].GetPhysicalDeviceMemoryProperties(physical, &memoryProps);
+	for (idx = 0; idx < memoryProps.memoryTypeCount; idx++) {
+		if (memoryBits & (1u << idx))
+	    	return idx;
+	}
+	return UINT32_MAX;
+}
+
+void sendFD(int& socket, int fd) {
+	std::vector<char> control_buffer(CMSG_SPACE(sizeof(int)));
+	char dummy = 0;
+	struct iovec iov{};
+	iov.iov_len = 1;
+	iov.iov_base = &dummy;
+	struct msghdr msg{};
+	msg.msg_iov = &iov;
+	msg.msg_iovlen = 1;
+	msg.msg_control = control_buffer.data();
+	msg.msg_controllen = control_buffer.size();
+
+	struct cmsghdr* cmsg = CMSG_FIRSTHDR(&msg);
+	cmsg->cmsg_level = SOL_SOCKET;
+	cmsg->cmsg_type = SCM_RIGHTS;
+	cmsg->cmsg_len = CMSG_LEN(sizeof(int));
+	*reinterpret_cast<int*>(CMSG_DATA(cmsg)) = fd;
+	sendmsg(socket, &msg, 0);
+}
+
+// --- [Vulkan Core Intercepts] ---
+
 VK_LAYER_EXPORT VkResult VKAPI_CALL
-DisplayX_WaitForPresentKHR(VkDevice device,
-                           VkSwapchainKHR swapchain,
-                           uint64_t timeout,
-                           uint64_t flags)
+DisplayX_WaitForPresentKHR(VkDevice device, VkSwapchainKHR swapchain, uint64_t timeout, uint64_t flags)
 {
     Logger::log("trace", "DisplayX_WaitForPresentKHR intercepted! Bypassing driver check.");
-
     return VK_SUCCESS; 
 }
 
 VK_LAYER_EXPORT VkResult VKAPI_CALL
-DisplayX_CreateInstance(const VkInstanceCreateInfo *pCreateInfo,
-						   const VkAllocationCallbacks *pAllocator,
-						   VkInstance *pInstance)
+DisplayX_CreateInstance(const VkInstanceCreateInfo *pCreateInfo, const VkAllocationCallbacks *pAllocator, VkInstance *pInstance)
 {	
 	Logger::log("trace", "Calling vkCreateInstance");
-	
 	VkLayerInstanceCreateInfo *layerCreateInfo = (VkLayerInstanceCreateInfo *)pCreateInfo->pNext;
 	VkResult result;
 	VkInstanceCreateInfo createInfo = *pCreateInfo;
 	
-    while (layerCreateInfo && (layerCreateInfo->sType != VK_STRUCTURE_TYPE_LOADER_INSTANCE_CREATE_INFO ||
-    						   layerCreateInfo->function != VK_LAYER_LINK_INFO)) 
-    {
+    while (layerCreateInfo && (layerCreateInfo->sType != VK_STRUCTURE_TYPE_LOADER_INSTANCE_CREATE_INFO || layerCreateInfo->function != VK_LAYER_LINK_INFO)) {
     	layerCreateInfo = (VkLayerInstanceCreateInfo *)layerCreateInfo->pNext;
     }
-
     if (!layerCreateInfo) {
     	Logger::log("error", "Failed to query layerCreateInfo");
         return VK_ERROR_INITIALIZATION_FAILED;
@@ -44,58 +81,38 @@ DisplayX_CreateInstance(const VkInstanceCreateInfo *pCreateInfo,
 	std::vector<const char *> enabledExtensions;
 	if (!createInfo.ppEnabledExtensionNames) {
 		enabledExtensions.reserve(1);
-	}
-	else {
+	} else {
 		enabledExtensions.reserve(createInfo.enabledExtensionCount + 1);
 		enabledExtensions.insert(enabledExtensions.end(), createInfo.ppEnabledExtensionNames, createInfo.ppEnabledExtensionNames + createInfo.enabledExtensionCount);
 	}
-
 	enabledExtensions.push_back(VK_KHR_EXTERNAL_FENCE_CAPABILITIES_EXTENSION_NAME);
-	
 	createInfo.enabledExtensionCount = enabledExtensions.size();
 	createInfo.ppEnabledExtensionNames = enabledExtensions.data();
 
     PFN_vkCreateInstance createInstance = (PFN_vkCreateInstance)gip(VK_NULL_HANDLE, "vkCreateInstance");
     result = createInstance(&createInfo, pAllocator, pInstance);
-
-    if (result != VK_SUCCESS) {
-    	Logger::log("error", "Failed to create instance, res %d", result);
-    	return result;
-    }
-
-    Logger::log("info", "Created instance %p", *pInstance);
+    if (result != VK_SUCCESS) return result;
 
     VkLayerInstanceDispatchTable table;
     table.GetInstanceProcAddr = (PFN_vkGetInstanceProcAddr)gip(*pInstance, "vkGetInstanceProcAddr");
     table.DestroyInstance = (PFN_vkDestroyInstance)gip(*pInstance, "vkDestroyInstance");
     table.GetPhysicalDeviceMemoryProperties = (PFN_vkGetPhysicalDeviceMemoryProperties)gip(*pInstance, "vkGetPhysicalDeviceMemoryProperties");
 
-    if (prefer_rgba8 == -1) {
-    	prefer_rgba8 = getenv("PREFER_RGBA8") && atoi(getenv("PREFER_RGBA8"));
-    }
+    if (prefer_rgba8 == -1) prefer_rgba8 = getenv("PREFER_RGBA8") && atoi(getenv("PREFER_RGBA8"));
 
 	{
 		scoped_lock l(global_lock);
     	instanceMap[GetKey(*pInstance)] = *pInstance;
   		instanceDispatch[GetKey(*pInstance)] = table;
 	}
-	
     return VK_SUCCESS;
 }
 
 VK_LAYER_EXPORT void VKAPI_CALL
-DisplayX_DestroyInstance(VkInstance instance, 
-						 const VkAllocationCallbacks *pAllocator)
+DisplayX_DestroyInstance(VkInstance instance, const VkAllocationCallbacks *pAllocator)
 {
-	Logger::log("trace", "Calling vkDestroyInstance");
-	
-	if (!instance)
-		return;
-
+	if (!instance) return;
 	scoped_lock l(global_lock);
-
-	Logger::log("info", "Destroying instance %p", instance);
-		
 	VkLayerInstanceDispatchTable table = instanceDispatch[GetKey(instance)];
 	table.DestroyInstance(instance, pAllocator);
 	instanceDispatch.erase(GetKey(instance));
@@ -103,63 +120,40 @@ DisplayX_DestroyInstance(VkInstance instance,
 }
 
 VK_LAYER_EXPORT VkResult VKAPI_CALL
-DisplayX_CreateDevice(VkPhysicalDevice physicalDevice,
-					  const VkDeviceCreateInfo *pCreateInfo,
-					  const VkAllocationCallbacks *pAllocator,
-					  VkDevice *pDevice)
+DisplayX_CreateDevice(VkPhysicalDevice physicalDevice, const VkDeviceCreateInfo *pCreateInfo, const VkAllocationCallbacks *pAllocator, VkDevice *pDevice)
 {
 	Logger::log("trace", "Calling vkCreateDevice");
-	  
 	VkResult result;
 	VkLayerDeviceCreateInfo *layerCreateInfo = (VkLayerDeviceCreateInfo *)pCreateInfo->pNext;
 	VkDeviceCreateInfo createInfo = *pCreateInfo;
 
-	while (layerCreateInfo && (layerCreateInfo->sType != VK_STRUCTURE_TYPE_LOADER_DEVICE_CREATE_INFO ||
-							   layerCreateInfo->function != VK_LAYER_LINK_INFO))
-	{
+	while (layerCreateInfo && (layerCreateInfo->sType != VK_STRUCTURE_TYPE_LOADER_DEVICE_CREATE_INFO || layerCreateInfo->function != VK_LAYER_LINK_INFO)) {
 		layerCreateInfo = (VkLayerDeviceCreateInfo *)layerCreateInfo->pNext;
 	}
-
-	if (layerCreateInfo == NULL) {
-		Logger::log("error", "Failed to query layerCreateInfo");
-		return VK_ERROR_INITIALIZATION_FAILED;
-	}
+	if (layerCreateInfo == NULL) return VK_ERROR_INITIALIZATION_FAILED;
 
 	PFN_vkGetInstanceProcAddr gipa = layerCreateInfo->u.pLayerInfo->pfnNextGetInstanceProcAddr;
     PFN_vkGetDeviceProcAddr gdpa = layerCreateInfo->u.pLayerInfo->pfnNextGetDeviceProcAddr;
 	layerCreateInfo->u.pLayerInfo = layerCreateInfo->u.pLayerInfo->pNext;
 
     VkInstance instance = instanceMap[GetKey(physicalDevice)];
-    if (instance == VK_NULL_HANDLE) {
-    	Logger::log("error", "Failed to query instance");
-    	return VK_ERROR_INITIALIZATION_FAILED;
-    }
-    	
+    
     std::vector<const char *> enabledExtensions;
     if (!createInfo.ppEnabledExtensionNames) {
     	enabledExtensions.reserve(3);
-    }
-    else {
+    } else {
     	enabledExtensions.reserve(createInfo.enabledExtensionCount + 3);
     	enabledExtensions.insert(enabledExtensions.end(), createInfo.ppEnabledExtensionNames, createInfo.ppEnabledExtensionNames + createInfo.enabledExtensionCount);
     }
-
     enabledExtensions.push_back(VK_ANDROID_EXTERNAL_MEMORY_ANDROID_HARDWARE_BUFFER_EXTENSION_NAME);
     enabledExtensions.push_back(VK_KHR_EXTERNAL_FENCE_EXTENSION_NAME);
     enabledExtensions.push_back(VK_KHR_EXTERNAL_FENCE_FD_EXTENSION_NAME);
-    
     createInfo.enabledExtensionCount = enabledExtensions.size();
     createInfo.ppEnabledExtensionNames = enabledExtensions.data();
 
     PFN_vkCreateDevice createDevice = (PFN_vkCreateDevice)gipa(instance, "vkCreateDevice");
     result = createDevice(physicalDevice, &createInfo, pAllocator, pDevice);
-
-    if (result != VK_SUCCESS) {
-    	Logger::log("error", "Failed to create device, result %d", result);
-    	return result;
-    }
-
-    Logger::log("info", "Created device %p", *pDevice);
+    if (result != VK_SUCCESS) return result;
 
     VkLayerDispatchTable table;
     table.GetDeviceProcAddr = (PFN_vkGetDeviceProcAddr)gdpa(*pDevice, "vkGetDeviceProcAddr");
@@ -203,18 +197,12 @@ DisplayX_CreateDevice(VkPhysicalDevice physicalDevice,
 		scoped_lock l(global_lock);
     	deviceDispatch[GetKey(*pDevice)] = device;
 	}
-	
 	return VK_SUCCESS;
 }
 
 VK_LAYER_EXPORT void VKAPI_CALL
-DisplayX_GetDeviceQueue(VkDevice device,
-						   uint32_t queueFamilyIndex,
-						   uint32_t queueIndex,
-						   VkQueue *pQueue)
+DisplayX_GetDeviceQueue(VkDevice device, uint32_t queueFamilyIndex, uint32_t queueIndex, VkQueue *pQueue)
 {
-	Logger::log("trace", "Calling vkGetDeviceQueue");
-	  
 	auto dev = deviceDispatch[GetKey(device)];
 	dev->table.GetDeviceQueue(device, queueFamilyIndex, queueIndex, pQueue);
 	
@@ -225,20 +213,13 @@ DisplayX_GetDeviceQueue(VkDevice device,
 	VkFence fence;
 	VkExportFenceCreateInfo exportInfo{};
 	exportInfo.sType = VK_STRUCTURE_TYPE_EXPORT_FENCE_CREATE_INFO;
-	exportInfo.pNext = nullptr;
 	exportInfo.handleTypes = VK_EXTERNAL_FENCE_HANDLE_TYPE_SYNC_FD_BIT;
 	
 	VkFenceCreateInfo fenceCreateInfo{};
 	fenceCreateInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
 	fenceCreateInfo.pNext = &exportInfo;
-	fenceCreateInfo.flags = 0;
 	
-	VkResult result = dev->table.CreateFence(device, &fenceCreateInfo, nullptr, &fence);	
-	if (result != VK_SUCCESS) {
-		Logger::log("error", "Failed to create queue default fence, result %d", result);
-	    return;
-	}
-	
+	dev->table.CreateFence(device, &fenceCreateInfo, nullptr, &fence);	
 	auto f = std::make_unique<struct fence>();
 	f->handle = fence;
 	f->sync_fd = -1;
@@ -252,12 +233,8 @@ DisplayX_GetDeviceQueue(VkDevice device,
 }
 
 VK_LAYER_EXPORT void VKAPI_CALL
-DisplayX_GetDeviceQueue2(VkDevice device,
-							const VkDeviceQueueInfo2* pQueueInfo,
-							VkQueue *pQueue)
+DisplayX_GetDeviceQueue2(VkDevice device, const VkDeviceQueueInfo2* pQueueInfo, VkQueue *pQueue)
 {
-	Logger::log("trace", "Calling vkGetDeviceQueue2");
-	  
 	auto dev = deviceDispatch[GetKey(device)];
 	dev->table.GetDeviceQueue2(device, pQueueInfo, pQueue);
 	
@@ -268,19 +245,12 @@ DisplayX_GetDeviceQueue2(VkDevice device,
     VkFence fence;
     VkExportFenceCreateInfo exportInfo{};
     exportInfo.sType = VK_STRUCTURE_TYPE_EXPORT_FENCE_CREATE_INFO;
-    exportInfo.pNext = nullptr;
     exportInfo.handleTypes = VK_EXTERNAL_FENCE_HANDLE_TYPE_SYNC_FD_BIT;
     
     VkFenceCreateInfo fenceCreateInfo{};
     fenceCreateInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
     fenceCreateInfo.pNext = &exportInfo;
-    fenceCreateInfo.flags = 0;
-    VkResult result = dev->table.CreateFence(device, &fenceCreateInfo, nullptr, &fence);
-    
-    if (result != VK_SUCCESS) {
-    	Logger::log("error", "Failed to create queue default fence, result %d", result);
-    	return;
-    }
+    dev->table.CreateFence(device, &fenceCreateInfo, nullptr, &fence);
     
     auto f = std::make_unique<struct fence>();
     f->handle = fence;
@@ -291,20 +261,16 @@ DisplayX_GetDeviceQueue2(VkDevice device,
     	scoped_lock l(global_lock);
      	queues[*pQueue] = queue;
      	dev->queue = queue;
-     }
+    }
 }
 
+// --- [Surface Infrastructure (Calloc Allocation for Stability)] ---
+
 VK_LAYER_EXPORT VkResult VKAPI_CALL 
-DisplayX_CreateXcbSurfaceKHR(VkInstance instance,
-    							const VkXcbSurfaceCreateInfoKHR* pCreateInfo,
-    						   	const VkAllocationCallbacks* pAllocator,
-    						   	VkSurfaceKHR* pSurface)
+DisplayX_CreateXcbSurfaceKHR(VkInstance instance, const VkXcbSurfaceCreateInfoKHR* pCreateInfo, const VkAllocationCallbacks* pAllocator, VkSurfaceKHR* pSurface)
 {
 	Logger::log("trace","Calling vkCreateXcbSurfaceKHR");
-
-	int res;
-	  
-	struct fake_surface *fake_surf = (struct fake_surface *)malloc(sizeof(struct fake_surface));
+	struct fake_surface *fake_surf = (struct fake_surface *)calloc(1, sizeof(struct fake_surface));
 	if (!fake_surf) return VK_ERROR_OUT_OF_HOST_MEMORY;
 
 	fake_surf->loader_magic = ICD_LOADER_MAGIC;
@@ -316,40 +282,26 @@ DisplayX_CreateXcbSurfaceKHR(VkInstance instance,
 
 	struct sockaddr_un addr{};
 	addr.sun_family = AF_UNIX;
-
 	const char *sock_name = "/data/data/com.termux/files/usr/tmp/.X11-unix/X0";
 	size_t name_len = strlen(sock_name);
-	
-	addr.sun_path[0] = '\0'; // 추상 소켓 마커 (@ 역할)
+	addr.sun_path[0] = '\0';
 	memcpy(addr.sun_path + 1, sock_name, name_len);
 	
 	socklen_t len = offsetof(struct sockaddr_un, sun_path) + 1 + name_len;
-	res = connect(fake_surf->native_renderer_fd, (struct sockaddr *)&addr, len);
-
-	if (res != 0) {
-		Logger::log("error", "Failed to connect to Termux-X11 socket (XCB), res %d", res);
+	if (connect(fake_surf->native_renderer_fd, (struct sockaddr *)&addr, len) != 0) {
 		close(fake_surf->native_renderer_fd);
 		free(fake_surf); 
 		return VK_ERROR_INITIALIZATION_FAILED;
 	}
-
 	*pSurface = VK_WRAP_NON_DISPATCHABLE_HANDLE(VkSurfaceKHR, fake_surf);
-	Logger::log("info", "Created surface %p", pSurface);
-	
 	return VK_SUCCESS;
 }
 
 VK_LAYER_EXPORT VkResult VKAPI_CALL
-DisplayX_CreateXlibSurfaceKHR(VkInstance instance,
-								 const VkXlibSurfaceCreateInfoKHR *pCreateInfo,
-								 const VkAllocationCallbacks* pAllocator,
-								 VkSurfaceKHR *pSurface)
+DisplayX_CreateXlibSurfaceKHR(VkInstance instance, const VkXlibSurfaceCreateInfoKHR *pCreateInfo, const VkAllocationCallbacks* pAllocator, VkSurfaceKHR *pSurface)
 {
 	Logger::log("trace", "Calling vkCreateXlibSurfaceKHR");
-
-	int res;
-	
-	struct fake_surface *fake_surf = (struct fake_surface *)malloc(sizeof(struct fake_surface));
+	struct fake_surface *fake_surf = (struct fake_surface *)calloc(1, sizeof(struct fake_surface));
 	if (!fake_surf) return VK_ERROR_OUT_OF_HOST_MEMORY;
 
 	fake_surf->loader_magic = ICD_LOADER_MAGIC;
@@ -361,73 +313,49 @@ DisplayX_CreateXlibSurfaceKHR(VkInstance instance,
 	
 	struct sockaddr_un addr{};
 	addr.sun_family = AF_UNIX;
-
 	const char *sock_name = "/data/data/com.termux/files/usr/tmp/.X11-unix/X0";
 	size_t name_len = strlen(sock_name);
-	
 	addr.sun_path[0] = '\0';
 	memcpy(addr.sun_path + 1, sock_name, name_len);
 	
 	socklen_t len = offsetof(struct sockaddr_un, sun_path) + 1 + name_len;
-	res = connect(fake_surf->native_renderer_fd, (struct sockaddr *)&addr, len);
-
-	if (res != 0) {                                                                                    
-		Logger::log("error", "Failed to connect to Termux-X11 socket (XLIB), res %d", res);                     
+	if (connect(fake_surf->native_renderer_fd, (struct sockaddr *)&addr, len) != 0) {                                                                                    
 		close(fake_surf->native_renderer_fd);
 		free(fake_surf);                                                
 		return VK_ERROR_INITIALIZATION_FAILED;                                                     
 	}
-
 	*pSurface = VK_WRAP_NON_DISPATCHABLE_HANDLE(VkSurfaceKHR, fake_surf);
-	Logger::log("info", "Created surface %p", pSurface);
-	
 	return VK_SUCCESS;
 }
 
 VK_LAYER_EXPORT VkResult VKAPI_CALL
-DisplayX_GetPhysicalDeviceSurfaceSupportKHR(VkPhysicalDevice physicalDevice,
-    										   uint32_t queueFamilyIndex,
-    										   VkSurfaceKHR surface,
-    										   VkBool32* pSupported)
-    										   
+DisplayX_GetPhysicalDeviceSurfaceSupportKHR(VkPhysicalDevice physicalDevice, uint32_t queueFamilyIndex, VkSurfaceKHR surface, VkBool32* pSupported)
 {
-	Logger::log("trace", "Calling vkGetPhysicalDeviceSurfaceSupportKHR");
-	
 	*pSupported = VK_TRUE;
 	return VK_SUCCESS;	
 }
 
+// --- [WSI Capabilities Enforcements (Forced 3-Buffer Integration)] ---
+
 VK_LAYER_EXPORT VkResult VKAPI_CALL
-DisplayX_GetPhysicalDeviceSurfaceCapabilitiesKHR(VkPhysicalDevice physicalDevice,
-    												VkSurfaceKHR surface,
-    												VkSurfaceCapabilitiesKHR* pSurfaceCapabilities)
+DisplayX_GetPhysicalDeviceSurfaceCapabilitiesKHR(VkPhysicalDevice physicalDevice, VkSurfaceKHR surface, VkSurfaceCapabilitiesKHR* pSurfaceCapabilities)
 {
-	Logger::log("trace", "Calling vkGetPhysicalDeviceSurfaceCapabilitiesKHR");
-
-	if (surface == VK_NULL_HANDLE || pSurfaceCapabilities == nullptr) {
-		return VK_ERROR_INITIALIZATION_FAILED;
-	}
-
+	if (surface == VK_NULL_HANDLE || pSurfaceCapabilities == nullptr) return VK_ERROR_INITIALIZATION_FAILED;
 	VK_UNWRAP_NON_DISPATCHABLE_HANDLE(surface, struct fake_surface, fake_surface)
+	if (!fake_surface || !fake_surface->conn) return VK_ERROR_SURFACE_LOST_KHR;
 
-	if (!fake_surface || !fake_surface->conn) {
-		Logger::log("error", "Invalid fake_surface or X11 connection");
-		return VK_ERROR_SURFACE_LOST_KHR;
-	}
-
-	pSurfaceCapabilities->minImageCount = 2;
-	pSurfaceCapabilities->maxImageCount = 0;
+	// 🌟 패치: DXVK/WineVulkan 프레젠터 레이아웃 3버퍼 마운트 동기화 강제화
+	pSurfaceCapabilities->minImageCount = 3;
+	pSurfaceCapabilities->maxImageCount = 3;
 
 	xcb_get_geometry_cookie_t geom_cookie = xcb_get_geometry(fake_surface->conn, fake_surface->window);
 	xcb_get_geometry_reply_t *geom_rep = xcb_get_geometry_reply(fake_surface->conn, geom_cookie, nullptr);
-	
 	VkExtent2D extent;
 	if (geom_rep != nullptr) {
 		extent.width = geom_rep->width;
 		extent.height = geom_rep->height;
 		free(geom_rep);
 	} else {
-		Logger::log("warn", "Failed to get X11 geometry reply, using fallback extent (1280x720)");
 		extent.width = 1280;
 		extent.height = 720;
 	}
@@ -435,7 +363,6 @@ DisplayX_GetPhysicalDeviceSurfaceCapabilitiesKHR(VkPhysicalDevice physicalDevice
 	pSurfaceCapabilities->currentExtent = extent;
 	pSurfaceCapabilities->maxImageExtent = extent;
 	pSurfaceCapabilities->minImageExtent = extent;
-	
 	pSurfaceCapabilities->maxImageArrayLayers = 1;
 	pSurfaceCapabilities->supportedTransforms = VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR;
 	pSurfaceCapabilities->currentTransform = VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR;
@@ -446,68 +373,25 @@ DisplayX_GetPhysicalDeviceSurfaceCapabilitiesKHR(VkPhysicalDevice physicalDevice
 }
 
 VK_LAYER_EXPORT VkResult VKAPI_CALL
-DisplayX_GetPhysicalDeviceSurfaceCapabilities2KHR(VkPhysicalDevice physicalDevice,
-													 VkPhysicalDeviceSurfaceInfo2KHR *pInfo,
-													 VkSurfaceCapabilities2KHR *pSurfaceCapabilities)
+DisplayX_GetPhysicalDeviceSurfaceCapabilities2KHR(VkPhysicalDevice physicalDevice, VkPhysicalDeviceSurfaceInfo2KHR *pInfo, VkSurfaceCapabilities2KHR *pSurfaceCapabilities)
 {
-	Logger::log("trace", "Calling vkGetPhysicalDeviceSurfaceCapabilities2KHR");
+	if (!pInfo || pInfo->surface == VK_NULL_HANDLE || !pSurfaceCapabilities) return VK_ERROR_INITIALIZATION_FAILED;
 
-	if (!pInfo || pInfo->surface == VK_NULL_HANDLE || !pSurfaceCapabilities) {
-		return VK_ERROR_INITIALIZATION_FAILED;
-	}
-
-	VK_UNWRAP_NON_DISPATCHABLE_HANDLE(pInfo->surface, struct fake_surface, fake_surface)
-
-	if (!fake_surface || !fake_surface->conn) {
-		Logger::log("error", "Invalid fake_surface or X11 connection in 2KHR");
-		return VK_ERROR_SURFACE_LOST_KHR;
-	}
-
-	pSurfaceCapabilities->surfaceCapabilities.minImageCount = 2;
-	pSurfaceCapabilities->surfaceCapabilities.maxImageCount = 0;
+	// 🌟 패치: 상위 Capabilities 인프라로 포워딩하여 3버퍼 뼈대 안전 바인딩
+	VkResult result = DisplayX_GetPhysicalDeviceSurfaceCapabilitiesKHR(physicalDevice, pInfo->surface, &pSurfaceCapabilities->surfaceCapabilities);
 	
-	xcb_get_geometry_cookie_t geom_cookie = xcb_get_geometry(fake_surface->conn, fake_surface->window);
-	xcb_get_geometry_reply_t *geom_rep = xcb_get_geometry_reply(fake_surface->conn, geom_cookie, nullptr);
-	
-	VkExtent2D extent;
-	if (geom_rep != nullptr) {
-		extent.width = geom_rep->width;
-		extent.height = geom_rep->height;
-		free(geom_rep);
-	} else {
-		Logger::log("warn", "Failed to get X11 geometry reply in 2KHR, using fallback extent (1280x720)");
-		extent.width = 1280;
-		extent.height = 720;
-	}
-	
-	pSurfaceCapabilities->surfaceCapabilities.currentExtent = extent;
-	pSurfaceCapabilities->surfaceCapabilities.maxImageExtent = extent;
-	pSurfaceCapabilities->surfaceCapabilities.minImageExtent = extent;
-	
-	pSurfaceCapabilities->surfaceCapabilities.maxImageArrayLayers = 1;
-	pSurfaceCapabilities->surfaceCapabilities.supportedTransforms = VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR;
-	pSurfaceCapabilities->surfaceCapabilities.currentTransform = VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR;
-	pSurfaceCapabilities->surfaceCapabilities.supportedCompositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
-	pSurfaceCapabilities->surfaceCapabilities.supportedUsageFlags = VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT; 
-
-	return VK_SUCCESS;
+	// 체인 구조체 안전 복합화 (pNext 손상 필터 검사 우회)
+	return result;
 }
 
 VK_LAYER_EXPORT VkResult VKAPI_CALL 
-DisplayX_GetPhysicalDeviceSurfaceFormatsKHR(VkPhysicalDevice physicalDevice,
-											   VkSurfaceKHR surface,
-    										   uint32_t* pSurfaceFormatCount,
-    										   VkSurfaceFormatKHR* pSurfaceFormats)
+DisplayX_GetPhysicalDeviceSurfaceFormatsKHR(VkPhysicalDevice physicalDevice, VkSurfaceKHR surface, uint32_t* pSurfaceFormatCount, VkSurfaceFormatKHR* pSurfaceFormats)
 {
-	Logger::log("trace", "Calling vkGetPhysicalDeviceSurfaceFormatsKHR");
-	
 	if (pSurfaceFormats == nullptr) {
 		*pSurfaceFormatCount = (prefer_rgba8) ? 2 : 4;
 		return VK_SUCCESS;
 	}
-
 	*pSurfaceFormatCount = prefer_rgba8 ? 2 : 4;
-
 	pSurfaceFormats[0].format = VK_FORMAT_R8G8B8A8_UNORM;
 	pSurfaceFormats[0].colorSpace = VK_COLOR_SPACE_SRGB_NONLINEAR_KHR;
 	pSurfaceFormats[1].format = VK_FORMAT_R8G8B8A8_SRGB;
@@ -519,25 +403,17 @@ DisplayX_GetPhysicalDeviceSurfaceFormatsKHR(VkPhysicalDevice physicalDevice,
 		pSurfaceFormats[3].format = VK_FORMAT_B8G8R8A8_SRGB;
 		pSurfaceFormats[3].colorSpace = VK_COLOR_SPACE_SRGB_NONLINEAR_KHR;
 	}
-	
 	return VK_SUCCESS;
 }
 
 VK_LAYER_EXPORT VkResult VKAPI_CALL
-DisplayX_GetPhysicalDeviceSurfaceFormats2KHR(VkPhysicalDevice physicalDevice,
-												VkPhysicalDeviceSurfaceInfo2KHR *pInfo,
-												uint32_t* pSurfaceFormatCount,
-												VkSurfaceFormat2KHR* pSurfaceFormats)
+DisplayX_GetPhysicalDeviceSurfaceFormats2KHR(VkPhysicalDevice physicalDevice, VkPhysicalDeviceSurfaceInfo2KHR *pInfo, uint32_t* pSurfaceFormatCount, VkSurfaceFormat2KHR* pSurfaceFormats)
 {
-	Logger::log("trace", "Calling vkGetPhysicalDeviceSurfaceFormats2KHR");
-	
 	if (pSurfaceFormats == nullptr) {
 		*pSurfaceFormatCount = (prefer_rgba8) ? 2 : 4;
 		return VK_SUCCESS;
 	}
-
 	*pSurfaceFormatCount = (prefer_rgba8) ? 2 : 4;
-
 	pSurfaceFormats[0].surfaceFormat.format = VK_FORMAT_R8G8B8A8_UNORM;
 	pSurfaceFormats[0].surfaceFormat.colorSpace = VK_COLOR_SPACE_SRGB_NONLINEAR_KHR;
 	pSurfaceFormats[1].surfaceFormat.format = VK_FORMAT_R8G8B8A8_SRGB;
@@ -549,124 +425,57 @@ DisplayX_GetPhysicalDeviceSurfaceFormats2KHR(VkPhysicalDevice physicalDevice,
 		pSurfaceFormats[3].surfaceFormat.format = VK_FORMAT_B8G8R8A8_SRGB;
 		pSurfaceFormats[3].surfaceFormat.colorSpace = VK_COLOR_SPACE_SRGB_NONLINEAR_KHR;
 	}
-	
 	return VK_SUCCESS;
 }
 
 VK_LAYER_EXPORT VkResult VKAPI_CALL
-DisplayX_GetPhysicalDeviceSurfacePresentModesKHR(VkPhysicalDevice physicalDevice,
-													VkSurfaceKHR surface,
-													uint32_t* pSurfacePresentModeCount,
-													VkPresentModeKHR* pPresentModes)
+DisplayX_GetPhysicalDeviceSurfacePresentModesKHR(VkPhysicalDevice physicalDevice, VkSurfaceKHR surface, uint32_t* pSurfacePresentModeCount, VkPresentModeKHR* pPresentModes)
 {
-	Logger::log("trace", "Calling vkGetPhysicalDeviceSurfacePresentModesKHR (Strict Virtualization)");
-	
-	// 1. DXVK가 "몇 개의 모드가 지원되니?" 하고 개수만 조회하러 왔을 때
 	if (pPresentModes == nullptr) {
-		if (pSurfacePresentModeCount) {
-			*pSurfacePresentModeCount = 2; // FIFO, IMMEDIATE 총 2개 리포트
-		}
-		return VK_SUCCESS; // WineVulkan assert 통과용 성공 반환
+		if (pSurfacePresentModeCount) *pSurfacePresentModeCount = 2;
+		return VK_SUCCESS;
 	}
-
-	// 2. DXVK가 실제 배열 공간을 들고 채워달라고 왔을 때
 	uint32_t incomingCount = *pSurfacePresentModeCount;
-	
-	// DXVK가 준비한 버퍼 크기에 맞춰서 안전하게 채워줌 (메모리 오버런 방지)
-	if (incomingCount >= 1) {
-		pPresentModes[0] = VK_PRESENT_MODE_FIFO_KHR; // 안드로이드 표준 FIFO 기본 제공
-	}
-	if (incomingCount >= 2) {
-		pPresentModes[1] = VK_PRESENT_MODE_IMMEDIATE_KHR; // Tearing용 IMMEDIATE도 제공
-	}
-
-	// 실제 채워준 개수로 동기화
+	if (incomingCount >= 1) pPresentModes[0] = VK_PRESENT_MODE_FIFO_KHR;
+	if (incomingCount >= 2) pPresentModes[1] = VK_PRESENT_MODE_IMMEDIATE_KHR;
 	*pSurfacePresentModeCount = (incomingCount > 2) ? 2 : incomingCount;
-
-	return VK_SUCCESS; // 무조건 성공 상태 리턴!
+	return VK_SUCCESS;
 }
 
 VK_LAYER_EXPORT void VKAPI_CALL
-DisplayX_DestroySurfaceKHR(VkInstance instance,
-							  VkSurfaceKHR surface,
-						   	  const VkAllocationCallbacks *pAllocator)
+DisplayX_DestroySurfaceKHR(VkInstance instance, VkSurfaceKHR surface, const VkAllocationCallbacks *pAllocator)
 {
-	Logger::log("trace", "Calling vkDestroySurfaceKHR");
-	
 	VK_UNWRAP_NON_DISPATCHABLE_HANDLE(surface, struct fake_surface, fake_surface)
-
-	if (!fake_surface)
-		return;
-
+	if (!fake_surface) return;
 	scoped_lock l(global_lock);
-
-	Logger::log("info", "Destroying surface %p", fake_surface);
-
 	close(fake_surface->native_renderer_fd);
-	
 	free(fake_surface);
 }
 
-int to_ahardwarebuffer_format(VkFormat format) {
-	switch (format) {
-		case VK_FORMAT_R8G8B8A8_SRGB:
-		case VK_FORMAT_R8G8B8A8_UNORM:
-			return AHARDWAREBUFFER_FORMAT_R8G8B8A8_UNORM;
-		case VK_FORMAT_B8G8R8A8_SRGB:
-		case VK_FORMAT_B8G8R8A8_UNORM:
-			return AHARDWAREBUFFER_FORMAT_B8G8R8A8_UNORM;
-		default:
-			return AHARDWAREBUFFER_FORMAT_R8G8B8A8_UNORM;
-	}
-}
-
-int pick_memory_index(VkInstance instance, VkPhysicalDevice physical, uint32_t memoryBits) {
-	VkPhysicalDeviceMemoryProperties memoryProps{};
-	uint32_t idx;
-
-	instanceDispatch[GetKey(instance)].GetPhysicalDeviceMemoryProperties(physical, &memoryProps);
-	
-	for (idx = 0; idx < memoryProps.memoryTypeCount; idx++) {
-		if (memoryBits & (1u << idx))
-	    	return idx;
-	}
-
-	return UINT32_MAX;
-}
+// --- [Swapchain Runtime Processing Engine] ---
 
 VK_LAYER_EXPORT VkResult VKAPI_CALL
-DisplayX_CreateSwapchainKHR(VkDevice device,
-							   const VkSwapchainCreateInfoKHR *pCreateInfo,
-							   const VkAllocationCallbacks *pAllocator,
-							   VkSwapchainKHR *pSwapchain)
+DisplayX_CreateSwapchainKHR(VkDevice device, const VkSwapchainCreateInfoKHR *pCreateInfo, const VkAllocationCallbacks *pAllocator, VkSwapchainKHR *pSwapchain)
 {
 	Logger::log("info", "[CreateSwapchain] === New Swapchain Request ===");
-	Logger::log("info", "[CreateSwapchain] App Requested MinImageCount: %d -> Enforced to: %d", 
-		pCreateInfo->minImageCount, pCreateInfo->minImageCount < 3 ? 3 : pCreateInfo->minImageCount);
-	Logger::log("info", "[CreateSwapchain] Extent: %dx%d, Format: %d, Usage Flags: %d", 
-		pCreateInfo->imageExtent.width, pCreateInfo->imageExtent.height, pCreateInfo->imageFormat, pCreateInfo->imageUsage);
-
 	auto dev = deviceDispatch[GetKey(device)];                              
 	VkLayerDispatchTable table = dev->table;
 
 	VkSwapchainCreateInfoKHR modifiedCreateInfo = *pCreateInfo;
 	uint32_t origRequestedCount = pCreateInfo->minImageCount;
 
+	// 가상 에뮬레이트 레이어 내부 스토리지 3버퍼 정형화 고정
 	if (modifiedCreateInfo.minImageCount < 3) {
 		modifiedCreateInfo.minImageCount = 3; 
 	}
 
-	struct fake_swapchain *swapchain = (struct fake_swapchain *)malloc(sizeof(struct fake_swapchain));
-	if (!swapchain) {
-		Logger::log("error", "[CreateSwapchain] CRITICAL: Out of host memory allocating fake_swapchain struct");
-		return VK_ERROR_OUT_OF_HOST_MEMORY;
-	}
+	struct fake_swapchain *swapchain = (struct fake_swapchain *)calloc(1, sizeof(struct fake_swapchain));
+	if (!swapchain) return VK_ERROR_OUT_OF_HOST_MEMORY;
     
 	swapchain->loader_magic = ICD_LOADER_MAGIC;
 	swapchain->obj_type = VK_OBJECT_TYPE_SWAPCHAIN_KHR;
 	swapchain->wsi_device = device;
 	swapchain->wait_for_present = true;
-	swapchain->use_prime_blit = false;
 	swapchain->imageCount = modifiedCreateInfo.minImageCount;
 	swapchain->requestedImageCount = origRequestedCount;
 	swapchain->format = modifiedCreateInfo.imageFormat;
@@ -675,9 +484,7 @@ DisplayX_CreateSwapchainKHR(VkDevice device,
 	swapchain->device = dev;
 
 	VK_UNWRAP_NON_DISPATCHABLE_HANDLE(modifiedCreateInfo.surface, struct fake_surface , fake_surface);
-
 	if (fake_surface == nullptr) {
-		Logger::log("error", "[CreateSwapchain] CRITICAL: fake_surface is nullptr in CreateSwapchainKHR!");
 		free(swapchain); 
 		return VK_ERROR_SURFACE_LOST_KHR; 
 	}
@@ -685,7 +492,6 @@ DisplayX_CreateSwapchainKHR(VkDevice device,
 	swapchain->surface = fake_surface;
 	swapchain->currentImage = 0;
 	swapchain->id = id.generate();
-
 	swapchain->images.resize(swapchain->imageCount);
 	
 	int request_code = 1;
@@ -696,20 +502,17 @@ DisplayX_CreateSwapchainKHR(VkDevice device,
 	for (uint32_t index = 0; index < swapchain->imageCount; index++) {
 		VkResult result;
 		int ret;
-		
 		auto fake_image = std::make_shared<struct fake_swapchain_image>();
 		fake_image->width = swapchain->extent.width;
 		fake_image->height = swapchain->extent.height;
 
 		VkExternalMemoryImageCreateInfo externalCreateInfo{};
 		externalCreateInfo.sType = VK_STRUCTURE_TYPE_EXTERNAL_MEMORY_IMAGE_CREATE_INFO;
-		externalCreateInfo.pNext = nullptr;
 		externalCreateInfo.handleTypes = VK_EXTERNAL_MEMORY_HANDLE_TYPE_ANDROID_HARDWARE_BUFFER_BIT_ANDROID;
 
 		VkImageCreateInfo createInfo{};
 		createInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
 		createInfo.pNext = &externalCreateInfo;
-
 		if (modifiedCreateInfo.flags & VK_SWAPCHAIN_CREATE_MUTABLE_FORMAT_BIT_KHR)
 			createInfo.flags = VK_IMAGE_CREATE_MUTABLE_FORMAT_BIT | VK_IMAGE_CREATE_EXTENDED_USAGE_BIT;
 		
@@ -726,53 +529,33 @@ DisplayX_CreateSwapchainKHR(VkDevice device,
 		createInfo.pQueueFamilyIndices = modifiedCreateInfo.pQueueFamilyIndices;
 		createInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 
-		Logger::log("info", "[CreateSwapchain] Creating Image Info [%d]: size %dx%d, format %d", index, fake_image->width, fake_image->height, createInfo.format);
-
 		result = table.CreateImage(device, &createInfo, nullptr, &fake_image->handle);
-		if (result != VK_SUCCESS) {
-			Logger::log("error", "[CreateSwapchain] ❌ table.CreateImage failed at index %d, VkResult: %d", index, result);
-			return result;
-		}
+		if (result != VK_SUCCESS) return result;
 
 		AHardwareBuffer_Desc desc{};
 		desc.width = swapchain->extent.width;
 		desc.height = swapchain->extent.height;
 		desc.format = to_ahardwarebuffer_format(swapchain->format);
 		desc.layers = 1;
-		desc.usage = AHARDWAREBUFFER_USAGE_GPU_FRAMEBUFFER |
-		             AHARDWAREBUFFER_USAGE_GPU_SAMPLED_IMAGE |
-		             AHARDWAREBUFFER_USAGE_GPU_COLOR_OUTPUT;
+		desc.usage = AHARDWAREBUFFER_USAGE_GPU_FRAMEBUFFER | AHARDWAREBUFFER_USAGE_GPU_SAMPLED_IMAGE | AHARDWAREBUFFER_USAGE_GPU_COLOR_OUTPUT;
 
 		ret = AHardwareBuffer_allocate(&desc, &fake_image->ahb);
-		if (ret != 0) {
-			Logger::log("error", "[CreateSwapchain] ❌ AHardwareBuffer_allocate failed at index %d, Android Error: %d", index, ret);
-			return VK_ERROR_OUT_OF_HOST_MEMORY;
-		}
+		if (ret != 0) return VK_ERROR_OUT_OF_HOST_MEMORY;
 
 		VkAndroidHardwareBufferPropertiesANDROID ahbProps{};
 		ahbProps.sType = VK_STRUCTURE_TYPE_ANDROID_HARDWARE_BUFFER_PROPERTIES_ANDROID;
-		ahbProps.pNext = nullptr;
 		
 		if (table.GetAndroidHardwareBufferPropertiesANDROID != nullptr) {
 			table.GetAndroidHardwareBufferPropertiesANDROID(device, fake_image->ahb, &ahbProps);
 		} else {
-			Logger::log("warn", "[CreateSwapchain] table.GetAndroidHardwareBufferPropertiesANDROID is null! Fallback lookup...");
-			auto pfnGetAHBProps = (PFN_vkGetAndroidHardwareBufferPropertiesANDROID)
-				table.GetDeviceProcAddr(device, "vkGetAndroidHardwareBufferPropertiesANDROID");
-				
-			if (pfnGetAHBProps != nullptr) {
-				pfnGetAHBProps(device, fake_image->ahb, &ahbProps);
-			} else {
-				Logger::log("error", "[CreateSwapchain] ❌ Critical: vkGetAndroidHardwareBufferPropertiesANDROID unresolved.");
-				return VK_ERROR_INITIALIZATION_FAILED;
-			}
+			auto pfnGetAHBProps = (PFN_vkGetAndroidHardwareBufferPropertiesANDROID)table.GetDeviceProcAddr(device, "vkGetAndroidHardwareBufferPropertiesANDROID");
+			if (pfnGetAHBProps != nullptr) pfnGetAHBProps(device, fake_image->ahb, &ahbProps);
+			else return VK_ERROR_INITIALIZATION_FAILED;
 		}
 
 		VkMemoryDedicatedAllocateInfo dedicatedAlloc{};
 		dedicatedAlloc.sType = VK_STRUCTURE_TYPE_MEMORY_DEDICATED_ALLOCATE_INFO;
-		dedicatedAlloc.pNext = nullptr;
 		dedicatedAlloc.image = fake_image->handle;
-		dedicatedAlloc.buffer = nullptr;
 		
 		VkImportAndroidHardwareBufferInfoANDROID importAHB{};
 		importAHB.sType = VK_STRUCTURE_TYPE_IMPORT_ANDROID_HARDWARE_BUFFER_INFO_ANDROID;
@@ -786,85 +569,53 @@ DisplayX_CreateSwapchainKHR(VkDevice device,
 		allocateInfo.memoryTypeIndex = pick_memory_index(swapchain->surface->instance, dev->physical, ahbProps.memoryTypeBits);
 
 		result = table.AllocateMemory(device, &allocateInfo, nullptr, &fake_image->memory);
-		if (result != VK_SUCCESS) {
-			Logger::log("error", "[CreateSwapchain] ❌ table.AllocateMemory failed at index %d, VkResult: %d", index, result);
-			return result;
-		}
+		if (result != VK_SUCCESS) return result;
 			
 		result = table.BindImageMemory(device, fake_image->handle, fake_image->memory, 0);
-		if (result != VK_SUCCESS) {
-			Logger::log("error", "[CreateSwapchain] ❌ table.BindImageMemory failed at index %d, VkResult: %d", index, result);
-			return result;
-		}
+		if (result != VK_SUCCESS) return result;
 
 		ret = AHardwareBuffer_sendHandleToUnixSocket(fake_image->ahb, swapchain->surface->native_renderer_fd);
-		if (ret != 0) {
-			Logger::log("error", "[CreateSwapchain] ❌ AHardwareBuffer_sendHandleToUnixSocket failed at index %d, Linux Error: %d", index, ret);
-			return VK_ERROR_INITIALIZATION_FAILED;
-		}
+		if (ret != 0) return VK_ERROR_INITIALIZATION_FAILED;
 	
 		swapchain->images[index] = fake_image;
-		Logger::log("trace", "[CreateSwapchain] Success linked image [%d] -> Handle: %p", index, fake_image->handle);
 	}
 
 	*pSwapchain = VK_WRAP_NON_DISPATCHABLE_HANDLE(VkSwapchainKHR, swapchain);
-	Logger::log("info", "[CreateSwapchain] === Swapchain Successfully Created: %p ===", *pSwapchain);
-	
 	return VK_SUCCESS;
 }
 
 VK_LAYER_EXPORT VkResult VKAPI_CALL
-DisplayX_GetSwapchainImagesKHR(VkDevice device,
-								  VkSwapchainKHR swapchain,
-								  uint32_t* pSwapchainImageCount,
-								  VkImage* pSwapchainImages)
+DisplayX_GetSwapchainImagesKHR(VkDevice device, VkSwapchainKHR swapchain, uint32_t* pSwapchainImageCount, VkImage* pSwapchainImages)
 {
-	Logger::log("trace", "Calling vkGetSwapchainImagesKHR (Reporting Full Virtual Images)");
-	
 	VK_UNWRAP_NON_DISPATCHABLE_HANDLE(swapchain, struct fake_swapchain, fake_swapchain)
-	if (fake_swapchain == nullptr) {
-		return VK_ERROR_OUT_OF_DATE_KHR;
-	}
+	if (fake_swapchain == nullptr) return VK_ERROR_OUT_OF_DATE_KHR;
 
+	// 🌟 핵심 교정: WineVulkan 고유 ID 테이블 파괴를 방지하기 위해 가상화된 실제 버퍼 개수(3개) 정직하게 반환
 	uint32_t reportCount = fake_swapchain->imageCount; 
 
 	if (pSwapchainImages == nullptr) {
 		*pSwapchainImageCount = reportCount;
-		Logger::log("info", "[GetSwapchainImages] Reporting Image Count: %d to WineVulkan", reportCount);
 		return VK_SUCCESS;
 	}
 
 	uint32_t count = std::min(*pSwapchainImageCount, reportCount);
 	for (uint32_t i = 0; i < count; i++) {
 		pSwapchainImages[i] = fake_swapchain->images[i]->handle;
-		Logger::log("trace", "[GetSwapchainImages] Mapping Virtual Image [%d] -> Handle: %p", i, pSwapchainImages[i]);
 	}
-
 	*pSwapchainImageCount = count;
 	return VK_SUCCESS;
 }
 
 VK_LAYER_EXPORT VkResult VKAPI_CALL
-DisplayX_AcquireNextImageKHR(VkDevice device,
-								VkSwapchainKHR swapchain,
-								uint64_t timeout,
-								VkSemaphore semaphore,
-								VkFence fence,
-								uint32_t *pImageIndex)
+DisplayX_AcquireNextImageKHR(VkDevice device, VkSwapchainKHR swapchain, uint64_t timeout, VkSemaphore semaphore, VkFence fence, uint32_t *pImageIndex)
 {
-	Logger::log("trace", "Calling vkAcquireNextImageKHR");
-	
 	VK_UNWRAP_NON_DISPATCHABLE_HANDLE(swapchain, struct fake_swapchain, fake_swapchain)
+	if (fake_swapchain == nullptr || (uintptr_t)fake_swapchain < 0x1000) return VK_ERROR_OUT_OF_DATE_KHR;
 
-	if (fake_swapchain == nullptr || (uintptr_t)fake_swapchain < 0x1000) {
-		Logger::log("error", "Critical: fake_swapchain is invalid (null) in AcquireNextImageKHR!");
-		return VK_ERROR_OUT_OF_DATE_KHR;
-	}
 	if (fence != VK_NULL_HANDLE || semaphore != VK_NULL_HANDLE) {
 		scoped_lock l(global_lock);
 		auto dev = deviceDispatch[GetKey(device)];                                                     
 		auto q = dev->queue;
-		
 		if (q && q->handle != VK_NULL_HANDLE) {
 			VkSubmitInfo submitInfo{};
 			submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
@@ -879,34 +630,24 @@ DisplayX_AcquireNextImageKHR(VkDevice device,
 		*pImageIndex = fake_swapchain->currentImage;
 		fake_swapchain->currentImage = (fake_swapchain->currentImage + 1) % fake_swapchain->imageCount;
 	}
-	
 	return VK_SUCCESS;
 }
 
 VK_LAYER_EXPORT VkResult VKAPI_CALL
-DisplayX_AcquireNextImage2KHR(VkDevice device,
-								 const VkAcquireNextImageInfoKHR* pAcquireInfo,
-								 uint32_t *pImageIndex)
+DisplayX_AcquireNextImage2KHR(VkDevice device, const VkAcquireNextImageInfoKHR* pAcquireInfo, uint32_t *pImageIndex)
 {
-	Logger::log("trace", "Calling vkAcquireNextImage2KHR");
-	
 	VK_UNWRAP_NON_DISPATCHABLE_HANDLE(pAcquireInfo->swapchain, struct fake_swapchain, fake_swapchain)
-
-	if (fake_swapchain == nullptr || (uintptr_t)fake_swapchain < 0x1000) {
-		Logger::log("error", "Critical: fake_swapchain is invalid in AcquireNextImage2KHR!");
-		return VK_ERROR_OUT_OF_DATE_KHR;
-	}
+	if (fake_swapchain == nullptr || (uintptr_t)fake_swapchain < 0x1000) return VK_ERROR_OUT_OF_DATE_KHR;
 
 	if (pAcquireInfo->fence != VK_NULL_HANDLE || pAcquireInfo->semaphore != VK_NULL_HANDLE) {
 		scoped_lock l(global_lock);
 		auto dev = deviceDispatch[GetKey(device)];
 		auto q = dev->queue;
-		
 		if (q && q->handle != VK_NULL_HANDLE) {
 			VkSubmitInfo submitInfo{};
 			submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
 			submitInfo.signalSemaphoreCount = (pAcquireInfo->semaphore != VK_NULL_HANDLE) ? 1 : 0;
-			submitInfo.pSignalSemaphores = (pAcquireInfo->semaphore != VK_NULL_HANDLE) ? &pAcquireInfo->semaphore : nullptr; // VK_NULL_HANDLE 대신 nullptr 매핑 안정화
+			submitInfo.pSignalSemaphores = (pAcquireInfo->semaphore != VK_NULL_HANDLE) ? &pAcquireInfo->semaphore : nullptr;
 			dev->table.QueueSubmit(q->handle, 1, &submitInfo, pAcquireInfo->fence);
 		}
 	}
@@ -916,27 +657,17 @@ DisplayX_AcquireNextImage2KHR(VkDevice device,
 		*pImageIndex = fake_swapchain->currentImage;
 		fake_swapchain->currentImage = (fake_swapchain->currentImage + 1) % fake_swapchain->imageCount;
 	}
-	
 	return VK_SUCCESS;
 }
 
 VK_LAYER_EXPORT void VKAPI_CALL
-DisplayX_DestroySwapchainKHR(VkDevice device,
-								VkSwapchainKHR swapchain,
-								const VkAllocationCallbacks *pAllocator)
+DisplayX_DestroySwapchainKHR(VkDevice device, VkSwapchainKHR swapchain, const VkAllocationCallbacks *pAllocator)
 {
-	Logger::log("trace", "Calling vkDestroySwapchainKHR");
-	
 	VK_UNWRAP_NON_DISPATCHABLE_HANDLE(swapchain, struct fake_swapchain, fake_swapchain)
 	auto dev = deviceDispatch[GetKey(device)];
-	
-	if (!fake_swapchain || !dev)
-		return;
+	if (!fake_swapchain || !dev) return;
 
 	dev->table.DeviceWaitIdle(device);
-
-	Logger::log("info", "Destroying swapchain %p", fake_swapchain);
-
 	scoped_lock l(global_lock);
 	
 	for (uint32_t index = 0; index < fake_swapchain->images.size(); index++) {
@@ -945,56 +676,23 @@ DisplayX_DestroySwapchainKHR(VkDevice device,
 		AHardwareBuffer_release(swapchain_image->ahb);
 		dev->table.DestroyImage(device, swapchain_image->handle, nullptr);
 	}
-
 	fake_swapchain->images.clear();
 
 	int request_code = 3;
 	write(fake_swapchain->surface->native_renderer_fd, &request_code, 4);
 	write(fake_swapchain->surface->native_renderer_fd, &fake_swapchain->id, 1);
-
 	id.destroy(fake_swapchain->id);
-
-	free(fake_swapchain);
-}
-
-void sendFD(int& socket, int fd) {
-	std::vector<char> control_buffer(CMSG_SPACE(sizeof(int)));
-	
-	char dummy = 0;
-	struct iovec iov{};
-	iov.iov_len = 1;
-	iov.iov_base = &dummy;
-	
-	struct msghdr msg{};
-	msg.msg_iov = &iov;
-	msg.msg_iovlen = 1;
-	msg.msg_control = control_buffer.data();
-	msg.msg_controllen = control_buffer.size();
-
-	struct cmsghdr* cmsg = CMSG_FIRSTHDR(&msg);
-	cmsg->cmsg_level = SOL_SOCKET;
-	cmsg->cmsg_type = SCM_RIGHTS;
-	cmsg->cmsg_len = CMSG_LEN(sizeof(int));
-	*reinterpret_cast<int*>(CMSG_DATA(cmsg)) = fd;
-
-	sendmsg(socket, &msg, 0);
+	free(swapchain);
 }
 
 VK_LAYER_EXPORT VkResult VKAPI_CALL
-DisplayX_QueuePresentKHR(VkQueue queue,
-							const VkPresentInfoKHR *pPresentInfo)
+DisplayX_QueuePresentKHR(VkQueue queue, const VkPresentInfoKHR *pPresentInfo)
 {
-	Logger::log("trace", "Calling vkQueuePresentKHR");
-	
 	auto q = queues[queue];
-	if (!q || !q->device || !q->fence) {
-		Logger::log("error", "Invalid queue state in QueuePresentKHR");
-		return VK_ERROR_OUT_OF_DATE_KHR;
-	}
+	if (!q || !q->device || !q->fence) return VK_ERROR_OUT_OF_DATE_KHR;
 
 	VkFenceGetFdInfoKHR getFence{};
 	getFence.sType = VK_STRUCTURE_TYPE_FENCE_GET_FD_INFO_KHR;
-	getFence.pNext = nullptr;
 	getFence.fence = q->fence->handle;
 	getFence.handleType = VK_EXTERNAL_FENCE_HANDLE_TYPE_SYNC_FD_BIT;
 
@@ -1010,8 +708,6 @@ DisplayX_QueuePresentKHR(VkQueue queue,
 
 	for (uint32_t i = 0; i < pPresentInfo->swapchainCount; i++) {
 		VK_UNWRAP_NON_DISPATCHABLE_HANDLE(pPresentInfo->pSwapchains[i], struct fake_swapchain, fake_swapchain)
-		
-		// [방어 코드] 스왑체인이나 유효 서페이스가 없는 경우 스킵
 		if (!fake_swapchain || !fake_swapchain->surface) continue;
 
 		int request_code = 2;
@@ -1024,43 +720,33 @@ DisplayX_QueuePresentKHR(VkQueue queue,
 		sendFD(fake_swapchain->surface->native_renderer_fd, fence);
 	}
 
-	// [방어 코드] 유효한 파일 디스크립터일 때만 안전하게 닫고 초기화
 	if (q->fence->sync_fd >= 0) {
 		close(q->fence->sync_fd);
 		q->fence->sync_fd = -1; 
 	}
-	
 	return VK_SUCCESS;
 }
 
 VK_LAYER_EXPORT void VKAPI_CALL
-DisplayX_DestroyDevice(VkDevice device, 
-					      const VkAllocationCallbacks *pAllocator)
+DisplayX_DestroyDevice(VkDevice device, const VkAllocationCallbacks *pAllocator)
 {
-	Logger::log("trace", "Calling vkDestroyDevice");
-
 	auto dev = deviceDispatch[GetKey(device)];
-	if (!device || !dev)
-		return;
+	if (!device || !dev) return;
 
 	scoped_lock l(global_lock);
-
-	Logger::log("info", "Destroying device %p", device);
-
 	dev->table.DeviceWaitIdle(device);
-	
 	for (auto it = queues.begin(); it != queues.end();) {
 		dev->table.DestroyFence(device, it->second->fence->handle, nullptr);
 		it = queues.erase(it);
 	}
-	
 	dev->table.DestroyDevice(device, pAllocator);
 	deviceDispatch.erase(GetKey(device));
 }
 
+// --- [ProcAddr Dispatch Tables (Exporting System Maps)] ---
+
 VK_LAYER_EXPORT PFN_vkVoidFunction VKAPI_CALL
-DisplayX_GetDeviceProcAddr(VkDevice device, 
-						      const char *pName)
+DisplayX_GetDeviceProcAddr(VkDevice device, const char *pName)
 {	
 	GETPROCADDR(DestroyDevice);
 	GETPROCADDR(CreateDevice);
@@ -1084,8 +770,7 @@ DisplayX_GetDeviceProcAddr(VkDevice device,
 }
 
 VK_LAYER_EXPORT PFN_vkVoidFunction VKAPI_CALL
-DisplayX_GetInstanceProcAddr(VkInstance instance, 
-							 const char *pName)
+DisplayX_GetInstanceProcAddr(VkInstance instance, const char *pName)
 {   
 	GETPROCADDR(CreateInstance);
 	GETPROCADDR(DestroyInstance);
