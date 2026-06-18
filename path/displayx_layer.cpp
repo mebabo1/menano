@@ -837,11 +837,14 @@ DisplayX_AcquireNextImageKHR(VkDevice device,
 		scoped_lock l(global_lock);
 		auto dev = deviceDispatch[GetKey(device)];                                                     
 		auto q = dev->queue;
-		VkSubmitInfo submitInfo{};
-		submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-		submitInfo.signalSemaphoreCount = (semaphore != VK_NULL_HANDLE) ? 1 : 0;
-		submitInfo.pSignalSemaphores = (semaphore != VK_NULL_HANDLE) ? &semaphore : nullptr; // VK_NULL_HANDLE 대신 nullptr 보정
-		dev->table.QueueSubmit(q->handle, 1, &submitInfo, fence);
+		
+		if (q && q->handle != VK_NULL_HANDLE) {
+			VkSubmitInfo submitInfo{};
+			submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+			submitInfo.signalSemaphoreCount = (semaphore != VK_NULL_HANDLE) ? 1 : 0;
+			submitInfo.pSignalSemaphores = (semaphore != VK_NULL_HANDLE) ? &semaphore : nullptr;
+			dev->table.QueueSubmit(q->handle, 1, &submitInfo, fence);
+		}
 	}
 
 	{
