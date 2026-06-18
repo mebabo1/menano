@@ -640,20 +640,27 @@ DisplayX_CreateSwapchainKHR(VkDevice device,
 							   const VkAllocationCallbacks *pAllocator,
 							   VkSwapchainKHR *pSwapchain)
 {
-	Logger::log("trace", "Calling vkCreateSwapchainKHR");
+	Logger::log("info", "[CreateSwapchain] === New Swapchain Request ===");
+	Logger::log("info", "[CreateSwapchain] App Requested MinImageCount: %d -> Enforced to: %d", 
+		pCreateInfo->minImageCount, pCreateInfo->minImageCount < 3 ? 3 : pCreateInfo->minImageCount);
+	Logger::log("info", "[CreateSwapchain] Extent: %dx%d, Format: %d, Usage Flags: %d", 
+		pCreateInfo->imageExtent.width, pCreateInfo->imageExtent.height, pCreateInfo->imageFormat, pCreateInfo->imageUsage);
 
 	auto dev = deviceDispatch[GetKey(device)];                              
 	VkLayerDispatchTable table = dev->table;
 
-    VkSwapchainCreateInfoKHR modifiedCreateInfo = *pCreateInfo;
+	VkSwapchainCreateInfoKHR modifiedCreateInfo = *pCreateInfo;
 	uint32_t origRequestedCount = pCreateInfo->minImageCount;
 
-    if (modifiedCreateInfo.minImageCount < 3) {
-        modifiedCreateInfo.minImageCount = 3; 
-    }
+	if (modifiedCreateInfo.minImageCount < 3) {
+		modifiedCreateInfo.minImageCount = 3; 
+	}
 
 	struct fake_swapchain *swapchain = (struct fake_swapchain *)malloc(sizeof(struct fake_swapchain));
-	if (!swapchain) return VK_ERROR_OUT_OF_HOST_MEMORY;
+	if (!swapchain) {
+		Logger::log("error", "[CreateSwapchain] CRITICAL: Out of host memory allocating fake_swapchain struct");
+		return VK_ERROR_OUT_OF_HOST_MEMORY;
+	}
     
 	swapchain->loader_magic = ICD_LOADER_MAGIC;
 	swapchain->obj_type = VK_OBJECT_TYPE_SWAPCHAIN_KHR;
@@ -670,9 +677,8 @@ DisplayX_CreateSwapchainKHR(VkDevice device,
 	VK_UNWRAP_NON_DISPATCHABLE_HANDLE(modifiedCreateInfo.surface, struct fake_surface , fake_surface);
 
 	if (fake_surface == nullptr) {
-		Logger::log("error", "Critical: fake_surface is nullptr in CreateSwapchainKHR!");
+		Logger::log("error", "[CreateSwapchain] CRITICAL: fake_surface is nullptr in CreateSwapchainKHR!");
 		free(swapchain); 
-
 		return VK_ERROR_SURFACE_LOST_KHR; 
 	}
 
@@ -685,7 +691,7 @@ DisplayX_CreateSwapchainKHR(VkDevice device,
 	int request_code = 1;
 	write(fake_surface->native_renderer_fd, &request_code, 4);
 	write(fake_surface->native_renderer_fd, &swapchain->id, 1);
-	write(fake_surface->native_renderer_fd, &swapchain->imageCount, 4); // 🌟 Termux-X11 측에도 이제 '3'이 전송됩니다.
+	write(fake_surface->native_renderer_fd, &swapchain->imageCount, 4);
 	
 	for (uint32_t index = 0; index < swapchain->imageCount; index++) {
 		VkResult result;
@@ -720,12 +726,11 @@ DisplayX_CreateSwapchainKHR(VkDevice device,
 		createInfo.pQueueFamilyIndices = modifiedCreateInfo.pQueueFamilyIndices;
 		createInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 
-		Logger::log("info", "Creating swapchain image %d, width %d height %d format %d flags %d usage %d", index, 
-			fake_image->width, fake_image->height, createInfo.format, createInfo.flags, createInfo.usage);
+		Logger::log("info", "[CreateSwapchain] Creating Image Info [%d]: size %dx%d, format %d", index, fake_image->width, fake_image->height, createInfo.format);
 
 		result = table.CreateImage(device, &createInfo, nullptr, &fake_image->handle);
 		if (result != VK_SUCCESS) {
-			Logger::log("error", "Failed to create swapchain image, result %d", result);
+			Logger::log("error", "[CreateSwapchain] ❌ table.CreateImage failed at index %d, VkResult: %d", index, result);
 			return result;
 		}
 
@@ -739,8 +744,10 @@ DisplayX_CreateSwapchainKHR(VkDevice device,
 		             AHARDWAREBUFFER_USAGE_GPU_COLOR_OUTPUT;
 
 		ret = AHardwareBuffer_allocate(&desc, &fake_image->ahb);
-		if (ret != 0)
+		if (ret != 0) {
+			Logger::log("error", "[CreateSwapchain] ❌ AHardwareBuffer_allocate failed at index %d, Android Error: %d", index, ret);
 			return VK_ERROR_OUT_OF_HOST_MEMORY;
+		}
 
 		VkAndroidHardwareBufferPropertiesANDROID ahbProps{};
 		ahbProps.sType = VK_STRUCTURE_TYPE_ANDROID_HARDWARE_BUFFER_PROPERTIES_ANDROID;
@@ -749,14 +756,14 @@ DisplayX_CreateSwapchainKHR(VkDevice device,
 		if (table.GetAndroidHardwareBufferPropertiesANDROID != nullptr) {
 			table.GetAndroidHardwareBufferPropertiesANDROID(device, fake_image->ahb, &ahbProps);
 		} else {
-			Logger::log("warn", "table.GetAndroidHardwareBufferPropertiesANDROID is null! Trying fallback lookup...");
+			Logger::log("warn", "[CreateSwapchain] table.GetAndroidHardwareBufferPropertiesANDROID is null! Fallback lookup...");
 			auto pfnGetAHBProps = (PFN_vkGetAndroidHardwareBufferPropertiesANDROID)
 				table.GetDeviceProcAddr(device, "vkGetAndroidHardwareBufferPropertiesANDROID");
 				
 			if (pfnGetAHBProps != nullptr) {
 				pfnGetAHBProps(device, fake_image->ahb, &ahbProps);
 			} else {
-				Logger::log("error", "Critical: vkGetAndroidHardwareBufferPropertiesANDROID cannot be resolved.");
+				Logger::log("error", "[CreateSwapchain] ❌ Critical: vkGetAndroidHardwareBufferPropertiesANDROID unresolved.");
 				return VK_ERROR_INITIALIZATION_FAILED;
 			}
 		}
@@ -780,24 +787,28 @@ DisplayX_CreateSwapchainKHR(VkDevice device,
 
 		result = table.AllocateMemory(device, &allocateInfo, nullptr, &fake_image->memory);
 		if (result != VK_SUCCESS) {
-			Logger::log("error", "Failed to allocate swapchain image memory, result %d", result);
+			Logger::log("error", "[CreateSwapchain] ❌ table.AllocateMemory failed at index %d, VkResult: %d", index, result);
 			return result;
 		}
 			
 		result = table.BindImageMemory(device, fake_image->handle, fake_image->memory, 0);
-		if (result != VK_SUCCESS)
+		if (result != VK_SUCCESS) {
+			Logger::log("error", "[CreateSwapchain] ❌ table.BindImageMemory failed at index %d, VkResult: %d", index, result);
 			return result;
+		}
 
 		ret = AHardwareBuffer_sendHandleToUnixSocket(fake_image->ahb, swapchain->surface->native_renderer_fd);
-		if (ret != 0)
+		if (ret != 0) {
+			Logger::log("error", "[CreateSwapchain] ❌ AHardwareBuffer_sendHandleToUnixSocket failed at index %d, Linux Error: %d", index, ret);
 			return VK_ERROR_INITIALIZATION_FAILED;
+		}
 	
 		swapchain->images[index] = fake_image;
+		Logger::log("trace", "[CreateSwapchain] Success linked image [%d] -> Handle: %p", index, fake_image->handle);
 	}
 
 	*pSwapchain = VK_WRAP_NON_DISPATCHABLE_HANDLE(VkSwapchainKHR, swapchain);
-
-	Logger::log("info", "Created swapchain %p", pSwapchain);
+	Logger::log("info", "[CreateSwapchain] === Swapchain Successfully Created: %p ===", *pSwapchain);
 	
 	return VK_SUCCESS;
 }
