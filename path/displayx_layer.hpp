@@ -107,3 +107,9 @@ struct fake_swapchain {
     uint32_t currentImage;
     uint8_t id;
 };
+
+VK_LAYER_EXPORT VkResult VKAPI_CALL 
+DisplayX_WaitForPresentKHR(VkDevice device, 
+                           VkSwapchainKHR swapchain, 
+                           uint64_t timeout, 
+                           uint64_t flags);
