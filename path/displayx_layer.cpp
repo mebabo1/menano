@@ -798,9 +798,9 @@ DisplayX_GetSwapchainImagesKHR(VkDevice device,
 	if (fake_swapchain == nullptr || (uintptr_t)fake_swapchain < 0x1000) {
 		Logger::log("error", "Critical: fake_swapchain is invalid (null or corrupted) in GetSwapchainImagesKHR!");
 		if (pSwapchainImageCount) {
-			*pSwapchainImageCount = 0; // 이미지가 없다고 안전하게 반환
+			*pSwapchainImageCount = 0;
 		}
-		return VK_ERROR_OUT_OF_DATE_KHR; // 크래시를 내지 않고 Vulkan 규격 에러 코드로 탈출
+		return VK_ERROR_OUT_OF_DATE_KHR;
 	}
 
 	if (pSwapchainImages == nullptr) {
