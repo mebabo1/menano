@@ -865,15 +865,23 @@ DisplayX_AcquireNextImage2KHR(VkDevice device,
 	
 	VK_UNWRAP_NON_DISPATCHABLE_HANDLE(pAcquireInfo->swapchain, struct fake_swapchain, fake_swapchain)
 
+	if (fake_swapchain == nullptr || (uintptr_t)fake_swapchain < 0x1000) {
+		Logger::log("error", "Critical: fake_swapchain is invalid in AcquireNextImage2KHR!");
+		return VK_ERROR_OUT_OF_DATE_KHR;
+	}
+
 	if (pAcquireInfo->fence != VK_NULL_HANDLE || pAcquireInfo->semaphore != VK_NULL_HANDLE) {
 		scoped_lock l(global_lock);
 		auto dev = deviceDispatch[GetKey(device)];
 		auto q = dev->queue;
-		VkSubmitInfo submitInfo{};
-		submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-		submitInfo.signalSemaphoreCount = (pAcquireInfo->semaphore != VK_NULL_HANDLE) ? 1 : 0;
-		submitInfo.pSignalSemaphores = (pAcquireInfo->semaphore != VK_NULL_HANDLE) ? &pAcquireInfo->semaphore : VK_NULL_HANDLE;
-		dev->table.QueueSubmit(queues.begin()->second->handle, 1, &submitInfo, pAcquireInfo->fence);
+		
+		if (q && q->handle != VK_NULL_HANDLE) {
+			VkSubmitInfo submitInfo{};
+			submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+			submitInfo.signalSemaphoreCount = (pAcquireInfo->semaphore != VK_NULL_HANDLE) ? 1 : 0;
+			submitInfo.pSignalSemaphores = (pAcquireInfo->semaphore != VK_NULL_HANDLE) ? &pAcquireInfo->semaphore : nullptr; // VK_NULL_HANDLE 대신 nullptr 매핑 안정화
+			dev->table.QueueSubmit(q->handle, 1, &submitInfo, pAcquireInfo->fence);
+		}
 	}
 
 	{
