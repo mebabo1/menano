@@ -100,6 +100,7 @@ struct fake_swapchain {
     struct fake_surface *surface;
     std::shared_ptr<struct device> device;
     uint32_t imageCount;
+    uint32_t requestedImageCount;
     VkFormat format;
     VkExtent2D extent;
     VkPresentModeKHR presentMode;
