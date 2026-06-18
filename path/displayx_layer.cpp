@@ -344,9 +344,8 @@ DisplayX_GetPhysicalDeviceSurfaceCapabilitiesKHR(VkPhysicalDevice physicalDevice
 	VK_UNWRAP_NON_DISPATCHABLE_HANDLE(surface, struct fake_surface, fake_surface)
 	if (!fake_surface || !fake_surface->conn) return VK_ERROR_SURFACE_LOST_KHR;
 
-	// 🌟 패치: DXVK/WineVulkan 프레젠터 레이아웃 3버퍼 마운트 동기화 강제화
 	pSurfaceCapabilities->minImageCount = 3;
-	pSurfaceCapabilities->maxImageCount = 3;
+	pSurfaceCapabilities->maxImageCount = 8;
 
 	xcb_get_geometry_cookie_t geom_cookie = xcb_get_geometry(fake_surface->conn, fake_surface->window);
 	xcb_get_geometry_reply_t *geom_rep = xcb_get_geometry_reply(fake_surface->conn, geom_cookie, nullptr);
@@ -377,10 +376,8 @@ DisplayX_GetPhysicalDeviceSurfaceCapabilities2KHR(VkPhysicalDevice physicalDevic
 {
 	if (!pInfo || pInfo->surface == VK_NULL_HANDLE || !pSurfaceCapabilities) return VK_ERROR_INITIALIZATION_FAILED;
 
-	// 🌟 패치: 상위 Capabilities 인프라로 포워딩하여 3버퍼 뼈대 안전 바인딩
 	VkResult result = DisplayX_GetPhysicalDeviceSurfaceCapabilitiesKHR(physicalDevice, pInfo->surface, &pSurfaceCapabilities->surfaceCapabilities);
-	
-	// 체인 구조체 안전 복합화 (pNext 손상 필터 검사 우회)
+
 	return result;
 }
 
@@ -469,7 +466,7 @@ DisplayX_CreateSwapchainKHR(VkDevice device, const VkSwapchainCreateInfoKHR *pCr
 
 	// 가상 에뮬레이트 레이어 내부 스토리지 3버퍼 정형화 고정
 	if (modifiedCreateInfo.minImageCount < 3) {
-		modifiedCreateInfo.minImageCount = 3; 
+		modifiedCreateInfo.minImageCount = 8; 
 	}
 
 	struct fake_swapchain *swapchain = (struct fake_swapchain *)calloc(1, sizeof(struct fake_swapchain));
