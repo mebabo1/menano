@@ -461,8 +461,8 @@ DisplayX_CreateSwapchainKHR(VkDevice device, const VkSwapchainCreateInfoKHR *pCr
 	VkSwapchainCreateInfoKHR modifiedCreateInfo = *pCreateInfo;
 	uint32_t origRequestedCount = pCreateInfo->minImageCount;
 
-	if (modifiedCreateInfo.minImageCount < 2) {
-		modifiedCreateInfo.minImageCount = 4; 
+	if (modifiedCreateInfo.minImageCount < 3) {
+		modifiedCreateInfo.minImageCount = 3; 
 	}
 
 	struct fake_swapchain *swapchain = (struct fake_swapchain *)calloc(1, sizeof(struct fake_swapchain));
@@ -586,7 +586,6 @@ DisplayX_GetSwapchainImagesKHR(VkDevice device, VkSwapchainKHR swapchain, uint32
 	VK_UNWRAP_NON_DISPATCHABLE_HANDLE(swapchain, struct fake_swapchain, fake_swapchain)
 	if (fake_swapchain == nullptr) return VK_ERROR_OUT_OF_DATE_KHR;
 
-	// 🌟 핵심 교정: WineVulkan 고유 ID 테이블 파괴를 방지하기 위해 가상화된 실제 버퍼 개수(3개) 정직하게 반환
 	uint32_t reportCount = fake_swapchain->imageCount; 
 
 	if (pSwapchainImages == nullptr) {
