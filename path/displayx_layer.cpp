@@ -796,24 +796,28 @@ DisplayX_GetSwapchainImagesKHR(VkDevice device,
 	
 	VK_UNWRAP_NON_DISPATCHABLE_HANDLE(swapchain, struct fake_swapchain, fake_swapchain)
 	if (fake_swapchain == nullptr || (uintptr_t)fake_swapchain < 0x1000) {
-		Logger::log("error", "Critical: fake_swapchain is invalid (null or corrupted) in GetSwapchainImagesKHR!");
+		Logger::log("error", "Critical: fake_swapchain is invalid in GetSwapchainImagesKHR!");
 		if (pSwapchainImageCount) {
 			*pSwapchainImageCount = 0;
 		}
 		return VK_ERROR_OUT_OF_DATE_KHR;
 	}
 
+	// 🌟 [핵심 수정] DXVK가 최초에 1개만 받을 생각으로 변수에 1을 넣어서 보냈더라도, 
+	// 상위 Presenter에게 우리 레이어가 가상화하여 생성한 진짜 이미지 개수(3)를 역으로 강제 주입합니다.
 	if (pSwapchainImages == nullptr) {
 		*pSwapchainImageCount = fake_swapchain->images.size();
 		return VK_SUCCESS;
 	}
 
-	uint32_t count = std::min(*pSwapchainImageCount, (uint32_t)fake_swapchain->images.size());
+	// DXVK의 요청 포인터 버퍼 크기 한계를 우리 가상화 이미지 크기로 동기화
+	uint32_t count = fake_swapchain->images.size();
+	*pSwapchainImageCount = count; 
+
 	for (uint32_t i = 0; i < count; i++) {
 		pSwapchainImages[i] = fake_swapchain->images[i]->handle;
 	}
 
-	*pSwapchainImageCount = count;
 	return VK_SUCCESS;
 }
 
@@ -1046,6 +1050,9 @@ DisplayX_GetDeviceProcAddr(VkDevice device,
 	GETPROCADDR(GetDeviceQueue2);
 	GETPROCADDR(QueuePresentKHR);
 	GETPROCADDR(WaitForPresentKHR);
+	GETPROCADDR(GetPhysicalDeviceSurfaceCapabilitiesKHR);
+	GETPROCADDR(GetPhysicalDeviceSurfaceCapabilities2KHR);
+
 
 	{
 		scoped_lock l(global_lock);
