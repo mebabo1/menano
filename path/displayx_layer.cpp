@@ -743,48 +743,12 @@ DisplayX_DestroyDevice(VkDevice device, const VkAllocationCallbacks *pAllocator)
 	deviceDispatch.erase(GetKey(device));
 }
 
-// --- [ProcAddr Dispatch Tables (Exporting System Maps)] ---
+// --- [ProcAddr Dispatch Tables (Cleaned)] ---
 
 VK_LAYER_EXPORT PFN_vkVoidFunction VKAPI_CALL
 DisplayX_GetDeviceProcAddr(VkDevice device, const char *pName)
-{	
-    // 디바이스 단에서도 Capabilities를 요구하는 경우가 있으므로 철저하게 방어
-    if (!strcmp(pName, "vkGetPhysicalDeviceSurfaceCapabilities2KHR") || 
-        !strcmp(pName, "vkGetPhysicalDeviceSurfaceCapabilities2EXT") ||
-        !strcmp(pName, "vkGetPhysicalDeviceSurfaceCapabilitiesKHR")) {
-        return (PFN_vkVoidFunction)&DisplayX_##GetPhysicalDeviceSurfaceCapabilitiesKHR;
-    }
-
-    GETPROCADDR(DestroyDevice);
-    GETPROCADDR(CreateDevice);
-    GETPROCADDR(CreateSwapchainKHR);
-    GETPROCADDR(DestroySwapchainKHR);
-    GETPROCADDR(GetSwapchainImagesKHR);
-    GETPROCADDR(AcquireNextImageKHR);
-    GETPROCADDR(AcquireNextImage2KHR);
-    GETPROCADDR(GetDeviceQueue);
-    GETPROCADDR(GetDeviceQueue2);
-    GETPROCADDR(QueuePresentKHR);
-    GETPROCADDR(WaitForPresentKHR);
-
-    {
-        scoped_lock l(global_lock);
-        auto dev = deviceDispatch[GetKey(device)];
-        return dev->table.GetDeviceProcAddr(device, pName);
-    }
-}
-
-// --- [2EXT 가로채기용 포워딩 함수 정의 수정] ---
-VK_LAYER_EXPORT VkResult VKAPI_CALL
-DisplayX_GetPhysicalDeviceSurfaceCapabilities2EXT(VkPhysicalDevice physicalDevice, VkSurfaceKHR surface, void* pSurfaceCapabilities) {
-    // void* 로 받아서 하부 표준 함수로 안전하게 포워딩합니다.
-    return DisplayX_GetPhysicalDeviceSurfaceCapabilitiesKHR(physicalDevice, surface, (VkSurfaceCapabilitiesKHR*)pSurfaceCapabilities);
-}
-
-VK_LAYER_EXPORT PFN_vkVoidFunction VKAPI_CALL
-DisplayX_GetDeviceProcAddr(VkDevice device, const char *pName)
-{	
-    // 🌟 ## 제거 및 정확한 함수 포터 매핑
+{   
+    // 🌟 매크로(##) 제거 완료: 명시적 함수 포인터 주소 전달
     if (!strcmp(pName, "vkGetPhysicalDeviceSurfaceCapabilitiesKHR")) {
         return (PFN_vkVoidFunction)&DisplayX_GetPhysicalDeviceSurfaceCapabilitiesKHR;
     }
@@ -817,7 +781,7 @@ DisplayX_GetDeviceProcAddr(VkDevice device, const char *pName)
 VK_LAYER_EXPORT PFN_vkVoidFunction VKAPI_CALL
 DisplayX_GetInstanceProcAddr(VkInstance instance, const char *pName)
 {   
-    // 🌟 ## 제거 및 정확한 함수 포인터 매핑
+    // 🌟 매크로(##) 제거 완료
     if (!strcmp(pName, "vkGetPhysicalDeviceSurfaceCapabilitiesKHR")) {
         return (PFN_vkVoidFunction)&DisplayX_GetPhysicalDeviceSurfaceCapabilitiesKHR;
     }
