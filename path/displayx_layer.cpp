@@ -774,19 +774,58 @@ DisplayX_GetDeviceProcAddr(VkDevice device, const char *pName)
     }
 }
 
+// --- [2EXT 가로채기용 포워딩 함수 정의 수정] ---
 VK_LAYER_EXPORT VkResult VKAPI_CALL
-DisplayX_GetPhysicalDeviceSurfaceCapabilities2EXT(VkPhysicalDevice physicalDevice, VkSurfaceKHR surface, VkSurfaceCapabilities2KHR* pSurfaceCapabilities) {
-    return DisplayX_GetPhysicalDeviceSurfaceCapabilitiesKHR(physicalDevice, surface, pSurfaceCapabilities);
+DisplayX_GetPhysicalDeviceSurfaceCapabilities2EXT(VkPhysicalDevice physicalDevice, VkSurfaceKHR surface, void* pSurfaceCapabilities) {
+    // void* 로 받아서 하부 표준 함수로 안전하게 포워딩합니다.
+    return DisplayX_GetPhysicalDeviceSurfaceCapabilitiesKHR(physicalDevice, surface, (VkSurfaceCapabilitiesKHR*)pSurfaceCapabilities);
+}
+
+VK_LAYER_EXPORT PFN_vkVoidFunction VKAPI_CALL
+DisplayX_GetDeviceProcAddr(VkDevice device, const char *pName)
+{	
+    // 🌟 ## 제거 및 정확한 함수 포터 매핑
+    if (!strcmp(pName, "vkGetPhysicalDeviceSurfaceCapabilitiesKHR")) {
+        return (PFN_vkVoidFunction)&DisplayX_GetPhysicalDeviceSurfaceCapabilitiesKHR;
+    }
+    if (!strcmp(pName, "vkGetPhysicalDeviceSurfaceCapabilities2KHR")) {
+        return (PFN_vkVoidFunction)&DisplayX_GetPhysicalDeviceSurfaceCapabilities2KHR;
+    }
+    if (!strcmp(pName, "vkGetPhysicalDeviceSurfaceCapabilities2EXT")) {
+        return (PFN_vkVoidFunction)&DisplayX_GetPhysicalDeviceSurfaceCapabilities2EXT;
+    }
+
+    GETPROCADDR(DestroyDevice);
+    GETPROCADDR(CreateDevice);
+    GETPROCADDR(CreateSwapchainKHR);
+    GETPROCADDR(DestroySwapchainKHR);
+    GETPROCADDR(GetSwapchainImagesKHR);
+    GETPROCADDR(AcquireNextImageKHR);
+    GETPROCADDR(AcquireNextImage2KHR);
+    GETPROCADDR(GetDeviceQueue);
+    GETPROCADDR(GetDeviceQueue2);
+    GETPROCADDR(QueuePresentKHR);
+    GETPROCADDR(WaitForPresentKHR);
+
+    {
+        scoped_lock l(global_lock);
+        auto dev = deviceDispatch[GetKey(device)];
+        return dev->table.GetDeviceProcAddr(device, pName);
+    }
 }
 
 VK_LAYER_EXPORT PFN_vkVoidFunction VKAPI_CALL
 DisplayX_GetInstanceProcAddr(VkInstance instance, const char *pName)
 {   
-    // 🌟 변종/확장 Capabilities 함수가 들어오면 무조건 우리가 만든 표준 함수로 강제 리디렉션
-    if (!strcmp(pName, "vkGetPhysicalDeviceSurfaceCapabilities2KHR") || 
-        !strcmp(pName, "vkGetPhysicalDeviceSurfaceCapabilities2EXT") ||
-        !strcmp(pName, "vkGetPhysicalDeviceSurfaceCapabilitiesKHR")) {
-        return (PFN_vkVoidFunction)&DisplayX_##GetPhysicalDeviceSurfaceCapabilitiesKHR;
+    // 🌟 ## 제거 및 정확한 함수 포인터 매핑
+    if (!strcmp(pName, "vkGetPhysicalDeviceSurfaceCapabilitiesKHR")) {
+        return (PFN_vkVoidFunction)&DisplayX_GetPhysicalDeviceSurfaceCapabilitiesKHR;
+    }
+    if (!strcmp(pName, "vkGetPhysicalDeviceSurfaceCapabilities2KHR")) {
+        return (PFN_vkVoidFunction)&DisplayX_GetPhysicalDeviceSurfaceCapabilities2KHR;
+    }
+    if (!strcmp(pName, "vkGetPhysicalDeviceSurfaceCapabilities2EXT")) {
+        return (PFN_vkVoidFunction)&DisplayX_GetPhysicalDeviceSurfaceCapabilities2EXT;
     }
 
     GETPROCADDR(CreateInstance);
