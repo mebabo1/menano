@@ -1055,7 +1055,6 @@ DisplayX_GetDeviceProcAddr(VkDevice device,
 	GETPROCADDR(GetPhysicalDeviceSurfaceCapabilitiesKHR);
 	GETPROCADDR(GetPhysicalDeviceSurfaceCapabilities2KHR);
 
-
 	{
 		scoped_lock l(global_lock);
 		auto dev = deviceDispatch[GetKey(device)];
@@ -1073,12 +1072,12 @@ DisplayX_GetInstanceProcAddr(VkInstance instance,
 	GETPROCADDR(CreateXcbSurfaceKHR);
 	GETPROCADDR(CreateXlibSurfaceKHR);
 	GETPROCADDR(GetPhysicalDeviceSurfaceSupportKHR);
-    GETPROCADDR(GetPhysicalDeviceSurfaceFormatsKHR);
-    GETPROCADDR(GetPhysicalDeviceSurfaceFormats2KHR);
-    GETPROCADDR(GetPhysicalDeviceSurfacePresentModesKHR);
-    GETPROCADDR(GetPhysicalDeviceSurfaceCapabilitiesKHR);
-    GETPROCADDR(GetPhysicalDeviceSurfaceCapabilities2KHR);
+	GETPROCADDR(GetPhysicalDeviceSurfaceFormatsKHR);
+	GETPROCADDR(GetPhysicalDeviceSurfaceFormats2KHR);
+	GETPROCADDR(GetPhysicalDeviceSurfaceCapabilitiesKHR);
+	GETPROCADDR(GetPhysicalDeviceSurfaceCapabilities2KHR);
 	GETPROCADDR(DestroySurfaceKHR);
+	GETPROCADDR(GetPhysicalDeviceSurfacePresentModesKHR);
 
 	{
 		scoped_lock l(global_lock);
