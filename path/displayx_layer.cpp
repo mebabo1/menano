@@ -636,21 +636,28 @@ DisplayX_CreateSwapchainKHR(VkDevice device,
 
 	auto dev = deviceDispatch[GetKey(device)];                              
 	VkLayerDispatchTable table = dev->table;
-	
+
+    VkSwapchainCreateInfoKHR modifiedCreateInfo = *pCreateInfo;
+
+    if (modifiedCreateInfo.minImageCount < 2) {
+        modifiedCreateInfo.minImageCount = 3; 
+    }
+
 	struct fake_swapchain *swapchain = (struct fake_swapchain *)malloc(sizeof(struct fake_swapchain));
 	if (!swapchain) return VK_ERROR_OUT_OF_HOST_MEMORY;
+    
 	swapchain->loader_magic = ICD_LOADER_MAGIC;
 	swapchain->obj_type = VK_OBJECT_TYPE_SWAPCHAIN_KHR;
 	swapchain->wsi_device = device;
 	swapchain->wait_for_present = true;
 	swapchain->use_prime_blit = false;
-	swapchain->imageCount = pCreateInfo->minImageCount;
-	swapchain->format = pCreateInfo->imageFormat;
-	swapchain->extent = pCreateInfo->imageExtent;
-	swapchain->presentMode = pCreateInfo->presentMode;
+	swapchain->imageCount = modifiedCreateInfo.minImageCount;
+	swapchain->format = modifiedCreateInfo.imageFormat;
+	swapchain->extent = modifiedCreateInfo.imageExtent;
+	swapchain->presentMode = modifiedCreateInfo.presentMode;
 	swapchain->device = dev;
 
-	VK_UNWRAP_NON_DISPATCHABLE_HANDLE(pCreateInfo->surface, struct fake_surface , fake_surface);
+	VK_UNWRAP_NON_DISPATCHABLE_HANDLE(modifiedCreateInfo.surface, struct fake_surface , fake_surface);
 
 	if (fake_surface == nullptr) {
 		Logger::log("error", "Critical: fake_surface is nullptr in CreateSwapchainKHR!");
@@ -668,7 +675,7 @@ DisplayX_CreateSwapchainKHR(VkDevice device,
 	int request_code = 1;
 	write(fake_surface->native_renderer_fd, &request_code, 4);
 	write(fake_surface->native_renderer_fd, &swapchain->id, 1);
-	write(fake_surface->native_renderer_fd, &swapchain->imageCount, 4);
+	write(fake_surface->native_renderer_fd, &swapchain->imageCount, 4); // 🌟 Termux-X11 측에도 이제 '3'이 전송됩니다.
 	
 	for (uint32_t index = 0; index < swapchain->imageCount; index++) {
 		VkResult result;
@@ -687,7 +694,7 @@ DisplayX_CreateSwapchainKHR(VkDevice device,
 		createInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
 		createInfo.pNext = &externalCreateInfo;
 
-		if (pCreateInfo->flags & VK_SWAPCHAIN_CREATE_MUTABLE_FORMAT_BIT_KHR)
+		if (modifiedCreateInfo.flags & VK_SWAPCHAIN_CREATE_MUTABLE_FORMAT_BIT_KHR)
 			createInfo.flags = VK_IMAGE_CREATE_MUTABLE_FORMAT_BIT | VK_IMAGE_CREATE_EXTENDED_USAGE_BIT;
 		
 		createInfo.imageType = VK_IMAGE_TYPE_2D;
@@ -697,10 +704,10 @@ DisplayX_CreateSwapchainKHR(VkDevice device,
 		createInfo.arrayLayers = 1;
 		createInfo.samples = VK_SAMPLE_COUNT_1_BIT;
 		createInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
-		createInfo.usage = pCreateInfo->imageUsage;
-		createInfo.sharingMode = pCreateInfo->imageSharingMode;	
-		createInfo.queueFamilyIndexCount = pCreateInfo->queueFamilyIndexCount;
-		createInfo.pQueueFamilyIndices = pCreateInfo->pQueueFamilyIndices;
+		createInfo.usage = modifiedCreateInfo.imageUsage;
+		createInfo.sharingMode = modifiedCreateInfo.imageSharingMode;	
+		createInfo.queueFamilyIndexCount = modifiedCreateInfo.queueFamilyIndexCount;
+		createInfo.pQueueFamilyIndices = modifiedCreateInfo.pQueueFamilyIndices;
 		createInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 
 		Logger::log("info", "Creating swapchain image %d, width %d height %d format %d flags %d usage %d", index, 
@@ -730,19 +737,15 @@ DisplayX_CreateSwapchainKHR(VkDevice device,
 		ahbProps.pNext = nullptr;
 		
 		if (table.GetAndroidHardwareBufferPropertiesANDROID != nullptr) {
-			// 1. 만약 드라이버가 함수 주소를 잘 가지고 있다면 정상 호출
 			table.GetAndroidHardwareBufferPropertiesANDROID(device, fake_image->ahb, &ahbProps);
 		} else {
-			// 2. 만약 포인터가 비어있다면(Null), Vulkan 로더 시스템에 직접 주소를 물어와서 실행 (우회 궤도)
 			Logger::log("warn", "table.GetAndroidHardwareBufferPropertiesANDROID is null! Trying fallback lookup...");
-			
 			auto pfnGetAHBProps = (PFN_vkGetAndroidHardwareBufferPropertiesANDROID)
 				table.GetDeviceProcAddr(device, "vkGetAndroidHardwareBufferPropertiesANDROID");
 				
 			if (pfnGetAHBProps != nullptr) {
 				pfnGetAHBProps(device, fake_image->ahb, &ahbProps);
 			} else {
-				// 3. 이것마저 실패하면 세그폴트로 터트리지 말고 안전하게 에러를 뱉고 종료
 				Logger::log("error", "Critical: vkGetAndroidHardwareBufferPropertiesANDROID cannot be resolved.");
 				return VK_ERROR_INITIALIZATION_FAILED;
 			}
