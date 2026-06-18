@@ -403,32 +403,29 @@ DisplayX_GetPhysicalDeviceSurfaceCapabilitiesKHR(VkPhysicalDevice physicalDevice
     												VkSurfaceCapabilitiesKHR* pSurfaceCapabilities)
 {
 	Logger::log("trace", "Calling vkGetPhysicalDeviceSurfaceCapabilitiesKHR");
-	
-	// [방어 코드] 입력 인자 유효성 검사
+
 	if (surface == VK_NULL_HANDLE || pSurfaceCapabilities == nullptr) {
 		return VK_ERROR_INITIALIZATION_FAILED;
 	}
 
 	VK_UNWRAP_NON_DISPATCHABLE_HANDLE(surface, struct fake_surface, fake_surface)
-	
-	// [방어 코드] fake_surface 및 내부 X11 커넥션 검사
+
 	if (!fake_surface || !fake_surface->conn) {
 		Logger::log("error", "Invalid fake_surface or X11 connection");
 		return VK_ERROR_SURFACE_LOST_KHR;
 	}
 
-	pSurfaceCapabilities->minImageCount = 1;
-	pSurfaceCapabilities->maxImageCount = 1;
+	pSurfaceCapabilities->minImageCount = 2;
+	pSurfaceCapabilities->maxImageCount = 0;
 
 	xcb_get_geometry_cookie_t geom_cookie = xcb_get_geometry(fake_surface->conn, fake_surface->window);
 	xcb_get_geometry_reply_t *geom_rep = xcb_get_geometry_reply(fake_surface->conn, geom_cookie, nullptr);
 	
 	VkExtent2D extent;
-	// [방어 코드] X11 서버 응답이 올바른지 체크 후 처리
 	if (geom_rep != nullptr) {
 		extent.width = geom_rep->width;
 		extent.height = geom_rep->height;
-		free(geom_rep); // 기존 코드에 누락되었던 메모리 해제 추가
+		free(geom_rep);
 	} else {
 		Logger::log("warn", "Failed to get X11 geometry reply, using fallback extent (1280x720)");
 		extent.width = 1280;
