@@ -632,8 +632,9 @@ DisplayX_CreateSwapchainKHR(VkDevice device,
 	VkLayerDispatchTable table = dev->table;
 
     VkSwapchainCreateInfoKHR modifiedCreateInfo = *pCreateInfo;
+	uint32_t origRequestedCount = pCreateInfo->minImageCount;
 
-    if (modifiedCreateInfo.minImageCount < 2) {
+    if (modifiedCreateInfo.minImageCount < 3) {
         modifiedCreateInfo.minImageCount = 3; 
     }
 
@@ -646,6 +647,7 @@ DisplayX_CreateSwapchainKHR(VkDevice device,
 	swapchain->wait_for_present = true;
 	swapchain->use_prime_blit = false;
 	swapchain->imageCount = modifiedCreateInfo.minImageCount;
+	swapchain->requestedImageCount = origRequestedCount;
 	swapchain->format = modifiedCreateInfo.imageFormat;
 	swapchain->extent = modifiedCreateInfo.imageExtent;
 	swapchain->presentMode = modifiedCreateInfo.presentMode;
