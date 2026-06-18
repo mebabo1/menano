@@ -559,27 +559,28 @@ DisplayX_GetPhysicalDeviceSurfacePresentModesKHR(VkPhysicalDevice physicalDevice
 													uint32_t* pSurfacePresentModeCount,
 													VkPresentModeKHR* pPresentModes)
 {
-	Logger::log("trace", "Calling vkGetPhysicalDeviceSurfacePresentModesKHR with strict WineVulkan bypass");
+	Logger::log("trace", "Calling vkGetPhysicalDeviceSurfacePresentModesKHR (Strict Virtualization)");
 
-	VkInstance instance = VK_NULL_HANDLE;
-	{
-		scoped_lock l(global_lock);
-		instance = instanceMap[GetKey(physicalDevice)];
-	}
-
-	if (instance == VK_NULL_HANDLE) {
-		Logger::log("warn", "Instance not found in map, enforcing successful fallback FIFO mode.");
-		if (pSurfacePresentModeCount == nullptr) {
-			return VK_SUCCESS;
+	if (pPresentModes == nullptr) {
+		if (pSurfacePresentModeCount) {
+			*pSurfacePresentModeCount = 2;
 		}
-		if (pPresentModes == nullptr) {
-			*pSurfacePresentModeCount = 1;
-			return VK_SUCCESS;
-		}
-		*pSurfacePresentModeCount = 1;
-		pPresentModes[0] = VK_PRESENT_MODE_FIFO_KHR;
 		return VK_SUCCESS;
 	}
+
+	uint32_t incomingCount = *pSurfacePresentModeCount;
+
+	if (incomingCount >= 1) {
+		pPresentModes[0] = VK_PRESENT_MODE_FIFO_KHR; // 안드로이드 표준 FIFO 기본 제공
+	}
+	if (incomingCount >= 2) {
+		pPresentModes[1] = VK_PRESENT_MODE_IMMEDIATE_KHR; // Tearing용 IMMEDIATE도 제공
+	}
+
+	*pSurfacePresentModeCount = (incomingCount > 2) ? 2 : incomingCount;
+
+	return VK_SUCCESS;
+}
 
 	PFN_vkGetPhysicalDeviceSurfacePresentModesKHR pfnGetModes = nullptr;
 	{
