@@ -345,7 +345,7 @@ DisplayX_GetPhysicalDeviceSurfaceCapabilitiesKHR(VkPhysicalDevice physicalDevice
 	if (!fake_surface || !fake_surface->conn) return VK_ERROR_SURFACE_LOST_KHR;
 
 	pSurfaceCapabilities->minImageCount = 3;
-	pSurfaceCapabilities->maxImageCount = 4;
+	pSurfaceCapabilities->maxImageCount = 3;
 
 	xcb_get_geometry_cookie_t geom_cookie = xcb_get_geometry(fake_surface->conn, fake_surface->window);
 	xcb_get_geometry_reply_t *geom_rep = xcb_get_geometry_reply(fake_surface->conn, geom_cookie, nullptr);
