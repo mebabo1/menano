@@ -384,27 +384,23 @@ DisplayX_GetPhysicalDeviceSurfaceCapabilities2KHR(VkPhysicalDevice physicalDevic
 VK_LAYER_EXPORT VkResult VKAPI_CALL 
 DisplayX_GetPhysicalDeviceSurfaceFormatsKHR(VkPhysicalDevice physicalDevice, VkSurfaceKHR surface, uint32_t* pSurfaceFormatCount, VkSurfaceFormatKHR* pSurfaceFormats)
 {
-    // Mali/Android에서 가장 호환성이 높은 순서로 정렬
-    static const VkSurfaceFormatKHR formats[] = {
-        { VK_FORMAT_R8G8B8A8_UNORM, VK_COLOR_SPACE_SRGB_NONLINEAR_KHR },
-        { VK_FORMAT_B8G8R8A8_UNORM, VK_COLOR_SPACE_SRGB_NONLINEAR_KHR },
-        { VK_FORMAT_R8G8B8A8_SRGB, VK_COLOR_SPACE_SRGB_NONLINEAR_KHR },
-        { VK_FORMAT_B8G8R8A8_SRGB, VK_COLOR_SPACE_SRGB_NONLINEAR_KHR }
-    };
-    uint32_t totalSupported = 4;
-
-    if (pSurfaceFormats == nullptr) {
-        *pSurfaceFormatCount = totalSupported;
-        return VK_SUCCESS;
-    }
-
-    uint32_t count = (*pSurfaceFormatCount < totalSupported) ? *pSurfaceFormatCount : totalSupported;
-    for (uint32_t i = 0; i < count; i++) {
-        pSurfaceFormats[i] = formats[i];
-    }
-    *pSurfaceFormatCount = count;
-
-    return VK_SUCCESS;
+	if (pSurfaceFormats == nullptr) {
+		*pSurfaceFormatCount = (prefer_rgba8) ? 2 : 4;
+		return VK_SUCCESS;
+	}
+	*pSurfaceFormatCount = prefer_rgba8 ? 2 : 4;
+	pSurfaceFormats[0].format = VK_FORMAT_R8G8B8A8_UNORM;
+	pSurfaceFormats[0].colorSpace = VK_COLOR_SPACE_SRGB_NONLINEAR_KHR;
+	pSurfaceFormats[1].format = VK_FORMAT_R8G8B8A8_SRGB;
+	pSurfaceFormats[1].colorSpace = VK_COLOR_SPACE_SRGB_NONLINEAR_KHR;
+	
+	if (!prefer_rgba8) {
+		pSurfaceFormats[2].format = VK_FORMAT_B8G8R8A8_UNORM;
+		pSurfaceFormats[2].colorSpace = VK_COLOR_SPACE_SRGB_NONLINEAR_KHR;
+		pSurfaceFormats[3].format = VK_FORMAT_B8G8R8A8_SRGB;
+		pSurfaceFormats[3].colorSpace = VK_COLOR_SPACE_SRGB_NONLINEAR_KHR;
+	}
+	return VK_SUCCESS;
 }
 
 VK_LAYER_EXPORT VkResult VKAPI_CALL
