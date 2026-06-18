@@ -559,16 +559,26 @@ DisplayX_GetPhysicalDeviceSurfacePresentModesKHR(VkPhysicalDevice physicalDevice
 													uint32_t* pSurfacePresentModeCount,
 													VkPresentModeKHR* pPresentModes)
 {
-	Logger::log("trace", "Calling vkGetPhysicalDeviceSurfacePresentModesKHR");
-	
-	if (pPresentModes == nullptr) {
-		*pSurfacePresentModeCount = 1;
+	Logger::log("trace", "Calling vkGetPhysicalDeviceSurfacePresentModesKHR with Zink bypass logic");
+
+	VkInstance instance = instanceMap[GetKey(physicalDevice)];
+	if (instance == VK_NULL_HANDLE) {
+		Logger::log("warn", "Instance not found in map, using fallback FIFO mode.");
+		if (pPresentModes == nullptr) { *pSurfacePresentModeCount = 1; return VK_SUCCESS; }
+		*pSurfacePresentModeCount = 1; pPresentModes[0] = VK_PRESENT_MODE_FIFO_KHR;
 		return VK_SUCCESS;
 	}
 
-	*pSurfacePresentModeCount = 1;
-	pPresentModes[0] = VK_PRESENT_MODE_IMMEDIATE_KHR;
-	
+	PFN_vkGetPhysicalDeviceSurfacePresentModesKHR pfnGetModes = 
+		(PFN_vkGetPhysicalDeviceSurfacePresentModesKHR)instanceDispatch[GetKey(instance)].GetInstanceProcAddr(instance, "vkGetPhysicalDeviceSurfacePresentModesKHR");
+
+	if (pfnGetModes) {
+		return pfnGetModes(physicalDevice, surface, pSurfacePresentModeCount, pPresentModes);
+	}
+
+	Logger::log("error", "Failed to resolve original vkGetPhysicalDeviceSurfacePresentModesKHR, using fallback FIFO.");
+	if (pPresentModes == nullptr) { *pSurfacePresentModeCount = 1; return VK_SUCCESS; }
+	*pSurfacePresentModeCount = 1; pPresentModes[0] = VK_PRESENT_MODE_FIFO_KHR;
 	return VK_SUCCESS;
 }
 
