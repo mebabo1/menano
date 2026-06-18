@@ -344,7 +344,7 @@ DisplayX_GetPhysicalDeviceSurfaceCapabilitiesKHR(VkPhysicalDevice physicalDevice
 	VK_UNWRAP_NON_DISPATCHABLE_HANDLE(surface, struct fake_surface, fake_surface)
 	if (!fake_surface || !fake_surface->conn) return VK_ERROR_SURFACE_LOST_KHR;
 
-	pSurfaceCapabilities->minImageCount = 2;
+	pSurfaceCapabilities->minImageCount = 3;
 	pSurfaceCapabilities->maxImageCount = 4;
 
 	xcb_get_geometry_cookie_t geom_cookie = xcb_get_geometry(fake_surface->conn, fake_surface->window);
