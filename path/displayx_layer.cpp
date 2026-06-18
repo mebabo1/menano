@@ -819,29 +819,25 @@ DisplayX_GetSwapchainImagesKHR(VkDevice device,
 								  uint32_t* pSwapchainImageCount,
 								  VkImage* pSwapchainImages)
 {
-	Logger::log("trace", "Calling vkGetSwapchainImagesKHR");
+	Logger::log("trace", "Calling vkGetSwapchainImagesKHR (Reporting Full Virtual Images)");
 	
 	VK_UNWRAP_NON_DISPATCHABLE_HANDLE(swapchain, struct fake_swapchain, fake_swapchain)
-	if (fake_swapchain == nullptr || (uintptr_t)fake_swapchain < 0x1000) {
-		Logger::log("error", "Critical: fake_swapchain is invalid in GetSwapchainImagesKHR!");
-		if (pSwapchainImageCount) {
-			*pSwapchainImageCount = 0;
-		}
+	if (fake_swapchain == nullptr) {
 		return VK_ERROR_OUT_OF_DATE_KHR;
 	}
 
-	uint32_t reportCount = fake_swapchain->imageCount;
-	if (reportCount == 0) reportCount = fake_swapchain->imageCount;
+	uint32_t reportCount = fake_swapchain->imageCount; 
 
-	// DXVK가 "몇 개 있어?"라고 개수만 조회하러 왔을 때
 	if (pSwapchainImages == nullptr) {
 		*pSwapchainImageCount = reportCount;
+		Logger::log("info", "[GetSwapchainImages] Reporting Image Count: %d to WineVulkan", reportCount);
 		return VK_SUCCESS;
 	}
 
 	uint32_t count = std::min(*pSwapchainImageCount, reportCount);
 	for (uint32_t i = 0; i < count; i++) {
 		pSwapchainImages[i] = fake_swapchain->images[i]->handle;
+		Logger::log("trace", "[GetSwapchainImages] Mapping Virtual Image [%d] -> Handle: %p", i, pSwapchainImages[i]);
 	}
 
 	*pSwapchainImageCount = count;
