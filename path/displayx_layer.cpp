@@ -560,16 +560,19 @@ DisplayX_GetPhysicalDeviceSurfacePresentModesKHR(VkPhysicalDevice physicalDevice
 													VkPresentModeKHR* pPresentModes)
 {
 	Logger::log("trace", "Calling vkGetPhysicalDeviceSurfacePresentModesKHR (Strict Virtualization)");
-
+	
+	// 1. DXVK가 "몇 개의 모드가 지원되니?" 하고 개수만 조회하러 왔을 때
 	if (pPresentModes == nullptr) {
 		if (pSurfacePresentModeCount) {
-			*pSurfacePresentModeCount = 2;
+			*pSurfacePresentModeCount = 2; // FIFO, IMMEDIATE 총 2개 리포트
 		}
-		return VK_SUCCESS;
+		return VK_SUCCESS; // WineVulkan assert 통과용 성공 반환
 	}
 
+	// 2. DXVK가 실제 배열 공간을 들고 채워달라고 왔을 때
 	uint32_t incomingCount = *pSurfacePresentModeCount;
-
+	
+	// DXVK가 준비한 버퍼 크기에 맞춰서 안전하게 채워줌 (메모리 오버런 방지)
 	if (incomingCount >= 1) {
 		pPresentModes[0] = VK_PRESENT_MODE_FIFO_KHR; // 안드로이드 표준 FIFO 기본 제공
 	}
@@ -577,34 +580,10 @@ DisplayX_GetPhysicalDeviceSurfacePresentModesKHR(VkPhysicalDevice physicalDevice
 		pPresentModes[1] = VK_PRESENT_MODE_IMMEDIATE_KHR; // Tearing용 IMMEDIATE도 제공
 	}
 
+	// 실제 채워준 개수로 동기화
 	*pSurfacePresentModeCount = (incomingCount > 2) ? 2 : incomingCount;
 
-	return VK_SUCCESS;
-}
-
-	PFN_vkGetPhysicalDeviceSurfacePresentModesKHR pfnGetModes = nullptr;
-	{
-		scoped_lock l(global_lock);
-		pfnGetModes = (PFN_vkGetPhysicalDeviceSurfacePresentModesKHR)
-			instanceDispatch[GetKey(instance)].GetInstanceProcAddr(instance, "vkGetPhysicalDeviceSurfacePresentModesKHR");
-	}
-
-	if (pfnGetModes) {
-		VkResult result = pfnGetModes(physicalDevice, surface, pSurfacePresentModeCount, pPresentModes);
-		Logger::log("trace", "Original pfnGetModes returned status %d", result);
-		return result;
-	}
-
-	Logger::log("error", "Failed to resolve original function. Enforcing VK_SUCCESS with FIFO.");
-	if (pSurfacePresentModeCount == nullptr) return VK_SUCCESS;
-	if (pPresentModes == nullptr) {
-		*pSurfacePresentModeCount = 1;
-		return VK_SUCCESS;
-	}
-	*pSurfacePresentModeCount = 1;
-	pPresentModes[0] = VK_PRESENT_MODE_FIFO_KHR;
-	
-	return VK_SUCCESS;
+	return VK_SUCCESS; // 무조건 성공 상태 리턴!
 }
 
 VK_LAYER_EXPORT void VKAPI_CALL
