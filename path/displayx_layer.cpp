@@ -515,26 +515,13 @@ DisplayX_CreateSwapchainKHR(VkDevice device, const VkSwapchainCreateInfoKHR *pCr
     swapchain->id = id.generate();
     swapchain->images.resize(swapchain->imageCount);
     
-    // [수정] 서버 통신용 데이터 정렬 및 타입 통일
-    uint32_t request_code = 1;
-    uint32_t swapchain_id = (uint32_t)swapchain->id;
-    uint32_t image_count = (uint32_t)swapchain->imageCount;
-
-    if (write(fake_surface->native_renderer_fd, &request_code, sizeof(uint32_t)) != sizeof(uint32_t) ||
-        write(fake_surface->native_renderer_fd, &swapchain_id, sizeof(uint32_t)) != sizeof(uint32_t) ||
-        write(fake_surface->native_renderer_fd, &image_count, sizeof(uint32_t)) != sizeof(uint32_t)) {
-        free(swapchain);
-        return VK_ERROR_INITIALIZATION_FAILED;
-    }
-    
+    // [1단계] 모든 이미지 생성 및 자원 할당 루프 (통신 없음)
     for (uint32_t index = 0; index < swapchain->imageCount; index++) {
         VkResult result;
-        int ret;
         auto fake_image = std::make_shared<struct fake_swapchain_image>();
         fake_image->width = swapchain->extent.width;
         fake_image->height = swapchain->extent.height;
 
-        // (기존 이미지 생성 및 AHB 할당 로직 유지)
         VkExternalMemoryImageCreateInfo externalCreateInfo{};
         externalCreateInfo.sType = VK_STRUCTURE_TYPE_EXTERNAL_MEMORY_IMAGE_CREATE_INFO;
         externalCreateInfo.handleTypes = VK_EXTERNAL_MEMORY_HANDLE_TYPE_ANDROID_HARDWARE_BUFFER_BIT_ANDROID;
@@ -563,16 +550,14 @@ DisplayX_CreateSwapchainKHR(VkDevice device, const VkSwapchainCreateInfoKHR *pCr
         desc.layers = 1;
         desc.usage = AHARDWAREBUFFER_USAGE_GPU_FRAMEBUFFER | AHARDWAREBUFFER_USAGE_GPU_SAMPLED_IMAGE | AHARDWAREBUFFER_USAGE_GPU_COLOR_OUTPUT;
 
-        ret = AHardwareBuffer_allocate(&desc, &fake_image->ahb);
+        int ret = AHardwareBuffer_allocate(&desc, &fake_image->ahb);
         if (ret != 0) return VK_ERROR_OUT_OF_HOST_MEMORY;
 
-        // (기존 메모리 바인딩 로직 유지)
         VkAndroidHardwareBufferPropertiesANDROID ahbProps{};
         ahbProps.sType = VK_STRUCTURE_TYPE_ANDROID_HARDWARE_BUFFER_PROPERTIES_ANDROID;
-        
         auto pfnGetAHBProps = (PFN_vkGetAndroidHardwareBufferPropertiesANDROID)table.GetDeviceProcAddr(device, "vkGetAndroidHardwareBufferPropertiesANDROID");
-        if (pfnGetAHBProps) pfnGetAHBProps(device, fake_image->ahb, &ahbProps);
-        else { free(swapchain); return VK_ERROR_INITIALIZATION_FAILED; }
+        if (!pfnGetAHBProps) { free(swapchain); return VK_ERROR_INITIALIZATION_FAILED; }
+        pfnGetAHBProps(device, fake_image->ahb, &ahbProps);
 
         VkMemoryDedicatedAllocateInfo dedicatedAlloc{};
         dedicatedAlloc.sType = VK_STRUCTURE_TYPE_MEMORY_DEDICATED_ALLOCATE_INFO;
@@ -595,10 +580,25 @@ DisplayX_CreateSwapchainKHR(VkDevice device, const VkSwapchainCreateInfoKHR *pCr
         result = table.BindImageMemory(device, fake_image->handle, fake_image->memory, 0);
         if (result != VK_SUCCESS) return result;
 
-        ret = AHardwareBuffer_sendHandleToUnixSocket(fake_image->ahb, swapchain->surface->native_renderer_fd);
-        if (ret != 0) return VK_ERROR_INITIALIZATION_FAILED;
-    
         swapchain->images[index] = fake_image;
+    }
+
+    // [2단계] 생성 완료 후 서버와 통신 (메타데이터 전송)
+    uint32_t request_code = 1;
+    uint32_t swapchain_id = (uint32_t)swapchain->id;
+    uint32_t image_count = (uint32_t)swapchain->imageCount;
+
+    if (write(fake_surface->native_renderer_fd, &request_code, 4) != 4 ||
+        write(fake_surface->native_renderer_fd, &swapchain_id, 4) != 4 ||
+        write(fake_surface->native_renderer_fd, &image_count, 4) != 4) {
+        return VK_ERROR_INITIALIZATION_FAILED;
+    }
+
+    // [3단계] FD 일괄 전송 (루프 내 통신 없음)
+    for (uint32_t index = 0; index < swapchain->imageCount; index++) {
+        if (AHardwareBuffer_sendHandleToUnixSocket(swapchain->images[index]->ahb, fake_surface->native_renderer_fd) != 0) {
+            return VK_ERROR_INITIALIZATION_FAILED;
+        }
     }
 
     *pSwapchain = VK_WRAP_NON_DISPATCHABLE_HANDLE(VkSwapchainKHR, swapchain);
