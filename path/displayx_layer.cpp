@@ -1,4 +1,8 @@
 #include "displayx_layer.hpp"
+#include <sys/socket.h>
+#include <sys/un.h>
+#include <vector>
+#include <unistd.h>
 #define GETPROCADDR(func) \
 if (!strcmp(pName, "vk" #func)) \
     return (PFN_vkVoidFunction)&DisplayX_##func;
@@ -30,7 +34,6 @@ int pick_memory_index(VkInstance instance, VkPhysicalDevice physical, uint32_t m
 	return UINT32_MAX;
 }
 
-void sendFD(int& socket, int fd) {
 struct FrameHeader {
     uint32_t width;
     uint32_t height;
@@ -41,7 +44,12 @@ struct FrameHeader {
 void sendFD(int& socket, int fd, uint32_t width, uint32_t height, uint32_t format, uint32_t frame_index) {
     std::vector<char> control_buffer(CMSG_SPACE(sizeof(int)));
 
-    FrameHeader header = { width, height, (uint32_t)to_ahardwarebuffer_format((VkFormat)format), frame_index };
+    FrameHeader header = { 
+        width, 
+        height, 
+        (uint32_t)to_ahardwarebuffer_format((VkFormat)format), 
+        frame_index 
+    };
     
     struct iovec iov{};
     iov.iov_len = sizeof(FrameHeader);
@@ -58,7 +66,7 @@ void sendFD(int& socket, int fd, uint32_t width, uint32_t height, uint32_t forma
     cmsg->cmsg_type = SCM_RIGHTS;
     cmsg->cmsg_len = CMSG_LEN(sizeof(int));
     *reinterpret_cast<int*>(CMSG_DATA(cmsg)) = fd;
-
+    
     if (sendmsg(socket, &msg, 0) < 0) {
         Logger::log("error", "sendmsg failed (Frame %u): %s", frame_index, strerror(errno));
     }
