@@ -31,23 +31,37 @@ int pick_memory_index(VkInstance instance, VkPhysicalDevice physical, uint32_t m
 }
 
 void sendFD(int& socket, int fd) {
-	std::vector<char> control_buffer(CMSG_SPACE(sizeof(int)));
-	char dummy = 0;
-	struct iovec iov{};
-	iov.iov_len = 1;
-	iov.iov_base = &dummy;
-	struct msghdr msg{};
-	msg.msg_iov = &iov;
-	msg.msg_iovlen = 1;
-	msg.msg_control = control_buffer.data();
-	msg.msg_controllen = control_buffer.size();
+struct FrameHeader {
+    uint32_t width;
+    uint32_t height;
+    uint32_t format;
+    uint32_t frame_index;
+};
 
-	struct cmsghdr* cmsg = CMSG_FIRSTHDR(&msg);
-	cmsg->cmsg_level = SOL_SOCKET;
-	cmsg->cmsg_type = SCM_RIGHTS;
-	cmsg->cmsg_len = CMSG_LEN(sizeof(int));
-	*reinterpret_cast<int*>(CMSG_DATA(cmsg)) = fd;
-	sendmsg(socket, &msg, 0);
+void sendFD(int& socket, int fd, uint32_t width, uint32_t height, uint32_t format, uint32_t frame_index) {
+    std::vector<char> control_buffer(CMSG_SPACE(sizeof(int)));
+
+    FrameHeader header = { width, height, (uint32_t)to_ahardwarebuffer_format((VkFormat)format), frame_index };
+    
+    struct iovec iov{};
+    iov.iov_len = sizeof(FrameHeader);
+    iov.iov_base = &header;
+    
+    struct msghdr msg{};
+    msg.msg_iov = &iov;
+    msg.msg_iovlen = 1;
+    msg.msg_control = control_buffer.data();
+    msg.msg_controllen = control_buffer.size();
+
+    struct cmsghdr* cmsg = CMSG_FIRSTHDR(&msg);
+    cmsg->cmsg_level = SOL_SOCKET;
+    cmsg->cmsg_type = SCM_RIGHTS;
+    cmsg->cmsg_len = CMSG_LEN(sizeof(int));
+    *reinterpret_cast<int*>(CMSG_DATA(cmsg)) = fd;
+
+    if (sendmsg(socket, &msg, 0) < 0) {
+        Logger::log("error", "sendmsg failed (Frame %u): %s", frame_index, strerror(errno));
+    }
 }
 
 // --- [Vulkan Core Intercepts] ---
