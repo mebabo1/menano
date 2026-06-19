@@ -37,7 +37,7 @@ int pick_memory_index(VkInstance instance, VkPhysicalDevice physical, uint32_t m
 struct __attribute__((packed)) FullPacket {
     char magic[4];
     uint32_t request_code;
-    uint8_t id;
+    uint32_t id;
     uint32_t image_index;
     uint32_t width;
     uint32_t height;
@@ -740,7 +740,7 @@ DisplayX_QueuePresentKHR(VkQueue queue, const VkPresentInfoKHR *pPresentInfo)
 		FullPacket packet = {
 		    {'1', '0', 'B', 'G'},
 			2,
-			fake_swapchain->id,
+			(uint32_t)fake_swapchain->id,
 			pPresentInfo->pImageIndices[i],
 			fake_swapchain->extent.width,
 			fake_swapchain->extent.height,
