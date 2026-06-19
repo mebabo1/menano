@@ -43,6 +43,7 @@ struct __attribute__((packed)) FullPacket {
     uint32_t height;
     uint32_t format;
     uint32_t frame_index;
+    char padding[156];
 };
 
 void sendFD(int socket, int fd, const FullPacket& packet) {
