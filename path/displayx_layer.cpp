@@ -38,24 +38,18 @@ struct __attribute__((packed)) FullPacket {
     uint32_t request_code;
     uint8_t id;
     uint32_t image_index;
-    // 이어서 이미지 정보
     uint32_t width;
     uint32_t height;
     uint32_t format;
     uint32_t frame_index;
 };
 
-void sendFD(int socket, int fd, uint32_t width, uint32_t height, uint32_t format, uint32_t frame_index, uint32_t request_code, uint8_t id, uint32_t image_index) {
+void sendFD(int socket, int fd, const FullPacket& packet) {
     std::vector<char> control_buffer(CMSG_SPACE(sizeof(int)));
-
-    FullPacket packet = { 
-        request_code, id, image_index, 
-        width, height, (uint32_t)to_ahardwarebuffer_format((VkFormat)format), frame_index 
-    };
     
     struct iovec iov{};
     iov.iov_len = sizeof(FullPacket);
-    iov.iov_base = &packet;
+    iov.iov_base = const_cast<FullPacket*>(&packet);
     
     struct msghdr msg{};
     msg.msg_iov = &iov;
@@ -70,7 +64,7 @@ void sendFD(int socket, int fd, uint32_t width, uint32_t height, uint32_t format
     *reinterpret_cast<int*>(CMSG_DATA(cmsg)) = fd;
     
     if (sendmsg(socket, &msg, 0) < 0) {
-        Logger::log("error", "sendmsg failed (Frame %u): %s", frame_index, strerror(errno));
+        // Logger::log("error", "sendmsg failed (Frame %u): %s", packet.frame_index, strerror(errno));
     }
 }
 
