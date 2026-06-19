@@ -344,8 +344,8 @@ DisplayX_GetPhysicalDeviceSurfaceCapabilitiesKHR(VkPhysicalDevice physicalDevice
 	VK_UNWRAP_NON_DISPATCHABLE_HANDLE(surface, struct fake_surface, fake_surface)
 	if (!fake_surface || !fake_surface->conn) return VK_ERROR_SURFACE_LOST_KHR;
 
-	pSurfaceCapabilities->minImageCount = 3;
-	pSurfaceCapabilities->maxImageCount = 3;
+	pSurfaceCapabilities->minImageCount = 4;
+	pSurfaceCapabilities->maxImageCount = 4;
 
 	xcb_get_geometry_cookie_t geom_cookie = xcb_get_geometry(fake_surface->conn, fake_surface->window);
 	xcb_get_geometry_reply_t *geom_rep = xcb_get_geometry_reply(fake_surface->conn, geom_cookie, nullptr);
@@ -461,8 +461,8 @@ DisplayX_CreateSwapchainKHR(VkDevice device, const VkSwapchainCreateInfoKHR *pCr
 	VkSwapchainCreateInfoKHR modifiedCreateInfo = *pCreateInfo;
 	uint32_t origRequestedCount = pCreateInfo->minImageCount;
 
-	if (modifiedCreateInfo.minImageCount < 3) {
-		modifiedCreateInfo.minImageCount = 3; 
+	if (modifiedCreateInfo.minImageCount < 4) {
+		modifiedCreateInfo.minImageCount = 4; 
 	}
 
 	struct fake_swapchain *swapchain = (struct fake_swapchain *)calloc(1, sizeof(struct fake_swapchain));
