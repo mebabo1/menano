@@ -3,7 +3,6 @@
 #include <sys/un.h>
 #include <vector>
 #include <unistd.h>
-#include <fcntl.h>
 #define GETPROCADDR(func) \
 if (!strcmp(pName, "vk" #func)) \
     return (PFN_vkVoidFunction)&DisplayX_##func;
@@ -315,28 +314,36 @@ DisplayX_GetDeviceQueue2(VkDevice device, const VkDeviceQueueInfo2* pQueueInfo, 
 static bool connect_to_renderer(int fd) {
     struct sockaddr_un addr{};
     addr.sun_family = AF_UNIX;
-    const char *sock_path = "/data/data/com.termux/files/usr/tmp/.X11-unix/X0";
-    
-    // 추상 네임스페이스 대응
-    addr.sun_path[0] = '\0';
-    strncpy(addr.sun_path + 1, sock_path, sizeof(addr.sun_path) - 2);
 
-    return connect(fd, (struct sockaddr *)&addr, sizeof(addr)) == 0;
+    const char *sock_path = "/data/data/com.termux/files/usr/tmp/.X11-unix/X0";
+    strncpy(addr.sun_path, sock_path, sizeof(addr.sun_path) - 1);
+
+    if (connect(fd, (struct sockaddr *)&addr, sizeof(addr)) != 0) {
+        Logger::log("error", "Connect to '%s' failed! errno=%d", sock_path, errno);
+        return false;
+    }
+    
+    Logger::log("info", "Successfully connected to X11 socket at %s", sock_path);
+    return true;
 }
 
-static VkResult create_fake_surface(VkInstance instance, void* conn, uint32_t window, VkSurfaceKHR* pSurface) {
+VK_LAYER_EXPORT VkResult VKAPI_CALL 
+DisplayX_CreateXcbSurfaceKHR(VkInstance instance, const VkXcbSurfaceCreateInfoKHR* pCreateInfo, const VkAllocationCallbacks* pAllocator, VkSurfaceKHR* pSurface)
+{
+    Logger::log("trace", "Calling vkCreateXcbSurfaceKHR");
     struct fake_surface *fake_surf = (struct fake_surface *)calloc(1, sizeof(struct fake_surface));
     if (!fake_surf) return VK_ERROR_OUT_OF_HOST_MEMORY;
 
     fake_surf->loader_magic = ICD_LOADER_MAGIC;
     fake_surf->obj_type = VK_OBJECT_TYPE_SURFACE_KHR;
-    fake_surf->conn = (xcb_connection_t*)conn;
-    fake_surf->window = (xcb_window_t)window;
-    fake_surf->native_renderer_fd = socket(AF_UNIX, SOCK_STREAM, 0);
+    fake_surf->conn = pCreateInfo->connection;
+    fake_surf->window = pCreateInfo->window;
+    fake_surf->native_renderer_fd = socket(AF_UNIX, SOCK_STREAM, 0);                  
+    fake_surf->instance = instance;
 
-    if (fake_surf->native_renderer_fd < 0 || !connect_to_renderer(fake_surf->native_renderer_fd)) {
-        if (fake_surf->native_renderer_fd >= 0) close(fake_surf->native_renderer_fd);
-        free(fake_surf);
+    if (!connect_to_renderer(fake_surf->native_renderer_fd)) {
+        close(fake_surf->native_renderer_fd);
+        free(fake_surf); 
         return VK_ERROR_INITIALIZATION_FAILED;
     }
 
@@ -344,30 +351,35 @@ static VkResult create_fake_surface(VkInstance instance, void* conn, uint32_t wi
     return VK_SUCCESS;
 }
 
-extern "C" {
+VK_LAYER_EXPORT VkResult VKAPI_CALL
+DisplayX_CreateXlibSurfaceKHR(VkInstance instance, const VkXlibSurfaceCreateInfoKHR *pCreateInfo, const VkAllocationCallbacks* pAllocator, VkSurfaceKHR *pSurface)
+{
+    Logger::log("trace", "Calling vkCreateXlibSurfaceKHR");
+    struct fake_surface *fake_surf = (struct fake_surface *)calloc(1, sizeof(struct fake_surface));
+    if (!fake_surf) return VK_ERROR_OUT_OF_HOST_MEMORY;
 
-VkResult VKAPI_CALL DisplayX_CreateXcbSurfaceKHR(VkInstance instance, const VkXcbSurfaceCreateInfoKHR* pCreateInfo, const VkAllocationCallbacks* pAllocator, VkSurfaceKHR* pSurface) {
-    return create_fake_surface(instance, (void*)pCreateInfo->connection, pCreateInfo->window, pSurface);
-}
-
-VkResult VKAPI_CALL DisplayX_CreateXlibSurfaceKHR(VkInstance instance, const VkXlibSurfaceCreateInfoKHR *pCreateInfo, const VkAllocationCallbacks* pAllocator, VkSurfaceKHR *pSurface) {
-    void* conn = XGetXCBConnection(pCreateInfo->dpy);
-    return create_fake_surface(instance, conn, pCreateInfo->window, pSurface);
-}
-
-void VKAPI_CALL DisplayX_DestroySurfaceKHR(VkInstance instance, VkSurfaceKHR surface, const VkAllocationCallbacks* pAllocator) {
-    VK_UNWRAP_NON_DISPATCHABLE_HANDLE(surface, struct fake_surface, fake_surf)
-    if (fake_surf) {
-        if (fake_surf->native_renderer_fd >= 0) close(fake_surf->native_renderer_fd);
-        free(fake_surf);
+    fake_surf->loader_magic = ICD_LOADER_MAGIC;
+    fake_surf->obj_type = VK_OBJECT_TYPE_SURFACE_KHR;
+    fake_surf->conn = XGetXCBConnection(pCreateInfo->dpy);
+    fake_surf->window = pCreateInfo->window;
+    fake_surf->native_renderer_fd = socket(AF_UNIX, SOCK_STREAM, 0);
+    fake_surf->instance = instance;
+    
+    if (!connect_to_renderer(fake_surf->native_renderer_fd)) {
+        close(fake_surf->native_renderer_fd);
+        free(fake_surf);                                                
+        return VK_ERROR_INITIALIZATION_FAILED;                                                     
     }
+
+    *pSurface = VK_WRAP_NON_DISPATCHABLE_HANDLE(VkSurfaceKHR, fake_surf);
+    return VK_SUCCESS;
 }
 
-VkResult VKAPI_CALL DisplayX_GetPhysicalDeviceSurfaceSupportKHR(VkPhysicalDevice physicalDevice, uint32_t queueFamilyIndex, VkSurfaceKHR surface, VkBool32* pSupported) {
+VK_LAYER_EXPORT VkResult VKAPI_CALL
+DisplayX_GetPhysicalDeviceSurfaceSupportKHR(VkPhysicalDevice physicalDevice, uint32_t queueFamilyIndex, VkSurfaceKHR surface, VkBool32* pSupported)
+{
     *pSupported = VK_TRUE;
     return VK_SUCCESS;    
-}
-
 }
 
 // --- [WSI Capabilities Enforcements (Forced 3-Buffer Integration)] ---
