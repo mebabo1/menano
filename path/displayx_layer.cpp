@@ -731,20 +731,21 @@ DisplayX_QueuePresentKHR(VkQueue queue, const VkPresentInfoKHR *pPresentInfo)
     for (uint32_t i = 0; i < pPresentInfo->swapchainCount; i++) {
         VK_UNWRAP_NON_DISPATCHABLE_HANDLE(pPresentInfo->pSwapchains[i], struct fake_swapchain, fake_swapchain)
         if (!fake_swapchain || !fake_swapchain->surface) continue;
-        if (fake_swapchain->surface->native_renderer_fd < 0) continue;
+        int fd = fake_swapchain->surface->native_renderer_fd;
+        if (fd < 0) continue;
 
-        // 중요: 서버가 이전 프레임의 FD 처리를 끝낼 수 있도록 펜스 대기
-        // sync_fd가 signaled 상태가 될 때까지 기다림 (비차단 대기 또는 폴링)
-        if (q->fence->sync_fd >= 0) {
-            // 서버로 보내기 전 이전 프레임의 GPU 작업이 완료되었는지 확인
-            // 이 호출이 없다면 서버는 패킷 홍수로 인해 연결을 끊습니다.
-            q->device->table.QueueWaitIdle(q->handle); 
-        }
+        // [핵심 변경] 서버의 이전 프레임 처리 완료 신호를 수신
+        // 서버가 프레임을 처리할 때까지 블로킹하여 동기화 (EPIPE 방지)
+        char ack_buffer[32];
+        ssize_t n = recv(fd, ack_buffer, sizeof(ack_buffer), MSG_WAITALL);
+        
+        // 만약 여기서 연결이 끊겼다면(n <= 0), 즉시 종료
+        if (n <= 0) return VK_ERROR_OUT_OF_DATE_KHR;
 
         int fence_fd_dup = dup(q->fence->sync_fd);
         if (fence_fd_dup < 0) continue;
 
-        FullPacket packet = {}; // 전체 메모리 0 초기화 (Padding 포함)
+        FullPacket packet = {}; 
         
         memcpy(packet.magic, "10BG", 4);
         packet.request_code = 2;
@@ -755,7 +756,7 @@ DisplayX_QueuePresentKHR(VkQueue queue, const VkPresentInfoKHR *pPresentInfo)
         packet.format = (uint32_t)to_ahardwarebuffer_format(fake_swapchain->format);
         packet.frame_index = frame_index++;
 
-        sendFD(fake_swapchain->surface->native_renderer_fd, fence_fd_dup, packet);
+        sendFD(fd, fence_fd_dup, packet);
 
         close(fence_fd_dup);
     }
