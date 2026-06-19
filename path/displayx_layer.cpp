@@ -583,22 +583,11 @@ DisplayX_CreateSwapchainKHR(VkDevice device, const VkSwapchainCreateInfoKHR *pCr
 VK_LAYER_EXPORT VkResult VKAPI_CALL
 DisplayX_GetSwapchainImagesKHR(VkDevice device, VkSwapchainKHR swapchain, uint32_t* pSwapchainImageCount, VkImage* pSwapchainImages)
 {
-	VK_UNWRAP_NON_DISPATCHABLE_HANDLE(swapchain, struct fake_swapchain, fake_swapchain)
-	if (fake_swapchain == nullptr) return VK_ERROR_OUT_OF_DATE_KHR;
+    VK_UNWRAP_NON_DISPATCHABLE_HANDLE(swapchain, struct fake_swapchain, fake_swapchain)
+    if (fake_swapchain == nullptr) return VK_ERROR_OUT_OF_DATE_KHR;
 
-	uint32_t reportCount = fake_swapchain->imageCount; 
-
-	if (pSwapchainImages == nullptr) {
-		*pSwapchainImageCount = reportCount;
-		return VK_SUCCESS;
-	}
-
-	uint32_t count = std::min(*pSwapchainImageCount, reportCount);
-	for (uint32_t i = 0; i < count; i++) {
-		pSwapchainImages[i] = fake_swapchain->images[i]->handle;
-	}
-	*pSwapchainImageCount = count;
-	return VK_SUCCESS;
+    auto dev = deviceDispatch[GetKey(device)];
+    return dev->table.GetSwapchainImagesKHR(device, fake_swapchain->real_handle, pSwapchainImageCount, pSwapchainImages);
 }
 
 VK_LAYER_EXPORT VkResult VKAPI_CALL
