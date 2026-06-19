@@ -66,10 +66,8 @@ void sendFD(int socket, int fd, const FullPacket& packet) {
     *reinterpret_cast<int*>(CMSG_DATA(cmsg)) = fd;
     
     if (sendmsg(socket, &msg, 0) < 0) {
-        // Logger::log("error", "sendmsg failed (Frame %u): %s", packet.frame_index, strerror(errno));
     }
 }
-
 // --- [Vulkan Core Intercepts] ---
 
 VK_LAYER_EXPORT VkResult VKAPI_CALL
@@ -710,55 +708,57 @@ DisplayX_DestroySwapchainKHR(VkDevice device, VkSwapchainKHR swapchain, const Vk
 VK_LAYER_EXPORT VkResult VKAPI_CALL
 DisplayX_QueuePresentKHR(VkQueue queue, const VkPresentInfoKHR *pPresentInfo)
 {
-	auto q = queues[queue];
-	if (!q || !q->device || !q->fence) return VK_ERROR_OUT_OF_DATE_KHR;
+    auto q = queues[queue];
+    if (!q || !q->device || !q->fence) return VK_ERROR_OUT_OF_DATE_KHR;
 
-	VkFenceGetFdInfoKHR getFence{};
-	getFence.sType = VK_STRUCTURE_TYPE_FENCE_GET_FD_INFO_KHR;
-	getFence.fence = q->fence->handle;
-	getFence.handleType = VK_EXTERNAL_FENCE_HANDLE_TYPE_SYNC_FD_BIT;
+    VkFenceGetFdInfoKHR getFence{};
+    getFence.sType = VK_STRUCTURE_TYPE_FENCE_GET_FD_INFO_KHR;
+    getFence.fence = q->fence->handle;
+    getFence.handleType = VK_EXTERNAL_FENCE_HANDLE_TYPE_SYNC_FD_BIT;
 
-	VkSubmitInfo submitInfo{};
-	submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-	std::vector<VkPipelineStageFlags> waitStages(pPresentInfo->waitSemaphoreCount, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT);
-	submitInfo.pWaitDstStageMask = waitStages.data();
-	submitInfo.waitSemaphoreCount = pPresentInfo->waitSemaphoreCount;
-	submitInfo.pWaitSemaphores = pPresentInfo->pWaitSemaphores;
+    VkSubmitInfo submitInfo{};
+    submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+    std::vector<VkPipelineStageFlags> waitStages(pPresentInfo->waitSemaphoreCount, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT);
+    submitInfo.pWaitDstStageMask = waitStages.data();
+    submitInfo.waitSemaphoreCount = pPresentInfo->waitSemaphoreCount;
+    submitInfo.pWaitSemaphores = pPresentInfo->pWaitSemaphores;
 
-	q->device->table.QueueSubmit(q->handle, 1, &submitInfo, q->fence->handle);
-	q->device->table.GetFenceFdKHR(q->device->handle, &getFence, &q->fence->sync_fd);
+    q->device->table.QueueSubmit(q->handle, 1, &submitInfo, q->fence->handle);
+    q->device->table.GetFenceFdKHR(q->device->handle, &getFence, &q->fence->sync_fd);
 
-	static uint32_t frame_index = 0;
+    static uint32_t frame_index = 0;
 
-	for (uint32_t i = 0; i < pPresentInfo->swapchainCount; i++) {
-		VK_UNWRAP_NON_DISPATCHABLE_HANDLE(pPresentInfo->pSwapchains[i], struct fake_swapchain, fake_swapchain)
-		if (!fake_swapchain || !fake_swapchain->surface) continue;
-		if (fake_swapchain->surface->native_renderer_fd < 0) continue;
+    for (uint32_t i = 0; i < pPresentInfo->swapchainCount; i++) {
+        VK_UNWRAP_NON_DISPATCHABLE_HANDLE(pPresentInfo->pSwapchains[i], struct fake_swapchain, fake_swapchain)
+        if (!fake_swapchain || !fake_swapchain->surface) continue;
+        if (fake_swapchain->surface->native_renderer_fd < 0) continue;
 
-		int fence_fd_dup = dup(q->fence->sync_fd);
-		if (fence_fd_dup < 0) continue;
+        int fence_fd_dup = dup(q->fence->sync_fd);
+        if (fence_fd_dup < 0) continue;
 
-		FullPacket packet = {
-		    {'1', '0', 'B', 'G'},
-			2,
-			(uint32_t)fake_swapchain->id,
-			pPresentInfo->pImageIndices[i],
-			fake_swapchain->extent.width,
-			fake_swapchain->extent.height,
-			(uint32_t)to_ahardwarebuffer_format(fake_swapchain->format),
-			frame_index++
-		};
+        // 패킷 메모리 전체를 0으로 안전하게 초기화
+        FullPacket packet = {}; 
+        
+        memcpy(packet.magic, "10BG", 4);
+        packet.request_code = 2;
+        packet.id = (uint32_t)fake_swapchain->id;
+        packet.image_index = pPresentInfo->pImageIndices[i];
+        packet.width = fake_swapchain->extent.width;
+        packet.height = fake_swapchain->extent.height;
+        packet.format = (uint32_t)to_ahardwarebuffer_format(fake_swapchain->format);
+        packet.frame_index = frame_index++;
 
-		sendFD(fake_swapchain->surface->native_renderer_fd, fence_fd_dup, packet);
+        // 전송
+        sendFD(fake_swapchain->surface->native_renderer_fd, fence_fd_dup, packet);
 
-		close(fence_fd_dup);
-	}
+        close(fence_fd_dup);
+    }
 
-	if (q->fence->sync_fd >= 0) {
-		close(q->fence->sync_fd);
-		q->fence->sync_fd = -1; 
-	}
-	return VK_SUCCESS;
+    if (q->fence->sync_fd >= 0) {
+        close(q->fence->sync_fd);
+        q->fence->sync_fd = -1; 
+    }
+    return VK_SUCCESS;
 }
 
 VK_LAYER_EXPORT void VKAPI_CALL
