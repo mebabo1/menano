@@ -730,18 +730,28 @@ DisplayX_QueuePresentKHR(VkQueue queue, const VkPresentInfoKHR *pPresentInfo)
 	q->device->table.QueueSubmit(q->handle, 1, &submitInfo, q->fence->handle);
 	q->device->table.GetFenceFdKHR(q->device->handle, &getFence, &q->fence->sync_fd);
 
+	static uint32_t frame_index = 0;
+
 	for (uint32_t i = 0; i < pPresentInfo->swapchainCount; i++) {
 		VK_UNWRAP_NON_DISPATCHABLE_HANDLE(pPresentInfo->pSwapchains[i], struct fake_swapchain, fake_swapchain)
 		if (!fake_swapchain || !fake_swapchain->surface) continue;
 
 		int request_code = 2;
 		int index = pPresentInfo->pImageIndices[i];
-		int fence = q->fence->sync_fd;
-		
+		int fence_fd = q->fence->sync_fd;
+
 		write(fake_swapchain->surface->native_renderer_fd, &request_code, 4);
 		write(fake_swapchain->surface->native_renderer_fd, &fake_swapchain->id, 1);
 		write(fake_swapchain->surface->native_renderer_fd, &index, 4);
-		sendFD(fake_swapchain->surface->native_renderer_fd, fence);
+
+		sendFD(
+			fake_swapchain->surface->native_renderer_fd, 
+			fence_fd, 
+			fake_swapchain->extent.width, 
+			fake_swapchain->extent.height, 
+			(uint32_t)fake_swapchain->format, 
+			frame_index++
+		);
 	}
 
 	if (q->fence->sync_fd >= 0) {
