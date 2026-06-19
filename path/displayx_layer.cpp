@@ -735,10 +735,13 @@ DisplayX_QueuePresentKHR(VkQueue queue, const VkPresentInfoKHR *pPresentInfo)
 	for (uint32_t i = 0; i < pPresentInfo->swapchainCount; i++) {
 		VK_UNWRAP_NON_DISPATCHABLE_HANDLE(pPresentInfo->pSwapchains[i], struct fake_swapchain, fake_swapchain)
 		if (!fake_swapchain || !fake_swapchain->surface) continue;
+		if (fake_swapchain->surface->native_renderer_fd < 0) continue;
+
+		int fence_fd_dup = dup(q->fence->sync_fd);
+		if (fence_fd_dup < 0) continue;
 
 		int request_code = 2;
 		int index = pPresentInfo->pImageIndices[i];
-		int fence_fd = q->fence->sync_fd;
 
 		write(fake_swapchain->surface->native_renderer_fd, &request_code, 4);
 		write(fake_swapchain->surface->native_renderer_fd, &fake_swapchain->id, 1);
@@ -746,12 +749,14 @@ DisplayX_QueuePresentKHR(VkQueue queue, const VkPresentInfoKHR *pPresentInfo)
 
 		sendFD(
 			fake_swapchain->surface->native_renderer_fd, 
-			fence_fd, 
+			fence_fd_dup, 
 			fake_swapchain->extent.width, 
 			fake_swapchain->extent.height, 
 			(uint32_t)fake_swapchain->format, 
 			frame_index++
 		);
+
+		close(fence_fd_dup);
 	}
 
 	if (q->fence->sync_fd >= 0) {
