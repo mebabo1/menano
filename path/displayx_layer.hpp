@@ -114,9 +114,3 @@ DisplayX_WaitForPresentKHR(VkDevice device,
                            VkSwapchainKHR swapchain, 
                            uint64_t timeout, 
                            uint64_t flags);
-
-// --- [Capabilities 2EXT Forward Declaration] ---
-VK_LAYER_EXPORT VkResult VKAPI_CALL
-DisplayX_GetPhysicalDeviceSurfaceCapabilities2EXT(VkPhysicalDevice physicalDevice, 
-                                                   VkSurfaceKHR surface, 
-                                                   void* pSurfaceCapabilities);
