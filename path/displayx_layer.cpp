@@ -711,6 +711,7 @@ DisplayX_QueuePresentKHR(VkQueue queue, const VkPresentInfoKHR *pPresentInfo)
     auto q = queues[queue];
     if (!q || !q->device || !q->fence) return VK_ERROR_OUT_OF_DATE_KHR;
 
+    // 1. 펜스 FD 가져오기 및 큐 제출
     VkFenceGetFdInfoKHR getFence{};
     getFence.sType = VK_STRUCTURE_TYPE_FENCE_GET_FD_INFO_KHR;
     getFence.fence = q->fence->handle;
@@ -727,6 +728,7 @@ DisplayX_QueuePresentKHR(VkQueue queue, const VkPresentInfoKHR *pPresentInfo)
     q->device->table.GetFenceFdKHR(q->device->handle, &getFence, &q->fence->sync_fd);
 
     static uint32_t frame_index = 0;
+    static bool is_first_frame = true; // 첫 프레임 동기화 예외 처리를 위한 플래그
 
     for (uint32_t i = 0; i < pPresentInfo->swapchainCount; i++) {
         VK_UNWRAP_NON_DISPATCHABLE_HANDLE(pPresentInfo->pSwapchains[i], struct fake_swapchain, fake_swapchain)
@@ -734,33 +736,36 @@ DisplayX_QueuePresentKHR(VkQueue queue, const VkPresentInfoKHR *pPresentInfo)
         int fd = fake_swapchain->surface->native_renderer_fd;
         if (fd < 0) continue;
 
-        // [핵심 변경] 서버의 이전 프레임 처리 완료 신호를 수신
-        // 서버가 프레임을 처리할 때까지 블로킹하여 동기화 (EPIPE 방지)
-        char ack_buffer[32];
-        ssize_t n = recv(fd, ack_buffer, sizeof(ack_buffer), MSG_WAITALL);
-        
-        // 만약 여기서 연결이 끊겼다면(n <= 0), 즉시 종료
-        if (n <= 0) return VK_ERROR_OUT_OF_DATE_KHR;
+        // 2. 동기화: 첫 프레임 이후부터는 서버의 '완료 신호'를 기다립니다.
+        // 이것이 없으면 클라이언트가 데이터를 너무 빨리 쏴서 EPIPE(소켓 끊김) 발생
+        if (!is_first_frame) {
+            char ack_buffer[32];
+            // 서버로부터 응답이 올 때까지 대기 (Flow Control)
+            ssize_t n = recv(fd, ack_buffer, sizeof(ack_buffer), MSG_WAITALL);
+            if (n <= 0) return VK_ERROR_OUT_OF_DATE_KHR; // 서버 연결이 끊겼다면 에러 처리
+        }
 
+        // 3. 펜스 FD 복제 및 패킷 전송
         int fence_fd_dup = dup(q->fence->sync_fd);
-        if (fence_fd_dup < 0) continue;
+        if (fence_fd_dup >= 0) {
+            FullPacket packet = {}; 
+            memcpy(packet.magic, "10BG", 4);
+            packet.request_code = 2;
+            packet.id = (uint32_t)fake_swapchain->id;
+            packet.image_index = pPresentInfo->pImageIndices[i];
+            packet.width = fake_swapchain->extent.width;
+            packet.height = fake_swapchain->extent.height;
+            packet.format = (uint32_t)to_ahardwarebuffer_format(fake_swapchain->format);
+            packet.frame_index = frame_index++;
 
-        FullPacket packet = {}; 
+            sendFD(fd, fence_fd_dup, packet);
+            close(fence_fd_dup);
+        }
         
-        memcpy(packet.magic, "10BG", 4);
-        packet.request_code = 2;
-        packet.id = (uint32_t)fake_swapchain->id;
-        packet.image_index = pPresentInfo->pImageIndices[i];
-        packet.width = fake_swapchain->extent.width;
-        packet.height = fake_swapchain->extent.height;
-        packet.format = (uint32_t)to_ahardwarebuffer_format(fake_swapchain->format);
-        packet.frame_index = frame_index++;
-
-        sendFD(fd, fence_fd_dup, packet);
-
-        close(fence_fd_dup);
+        is_first_frame = false; // 첫 프레임 처리 완료
     }
 
+    // 4. 자원 정리
     if (q->fence->sync_fd >= 0) {
         close(q->fence->sync_fd);
         q->fence->sync_fd = -1; 
