@@ -21,11 +21,12 @@
 #include <memory>
 #include <cstring>
 
+// [수정] 링키지 오류 방지 및 심볼 가시성 확보
 #undef VK_LAYER_EXPORT
 #if defined(WIN32)
 #define VK_LAYER_EXPORT extern "C" __declspec(dllexport)
 #else
-#define VK_LAYER_EXPORT extern "C"
+#define VK_LAYER_EXPORT extern "C" __attribute__((visibility("default")))
 #endif
 
 #define AHARDWAREBUFFER_FORMAT_B8G8R8A8_UNORM 5
@@ -40,12 +41,13 @@ void* GetKey(T item) {
 #define VK_UNWRAP_NON_DISPATCHABLE_HANDLE(handle, type, variable) \
 	type *variable = (type *)(uintptr_t)handle;
 
-std::unordered_map<void *, VkLayerInstanceDispatchTable> instanceDispatch;
-std::unordered_map<void *, VkInstance> instanceMap;
-std::unordered_map<void *, std::shared_ptr<struct device>> deviceDispatch;                             
-std::unordered_map<VkQueue, std::shared_ptr<struct queue>> queues;
-ID id;
-std::mutex global_lock;
+// 전역 상태 관리
+extern std::unordered_map<void *, VkLayerInstanceDispatchTable> instanceDispatch;
+extern std::unordered_map<void *, VkInstance> instanceMap;
+extern std::unordered_map<void *, std::shared_ptr<struct device>> deviceDispatch;                             
+extern std::unordered_map<VkQueue, std::shared_ptr<struct queue>> queues;
+extern ID id;
+extern std::mutex global_lock;
 
 typedef std::lock_guard<std::mutex> scoped_lock;
 
@@ -107,10 +109,13 @@ struct fake_swapchain {
     std::vector<std::shared_ptr<struct fake_swapchain_image>> images;
     uint32_t currentImage;
     uint8_t id;
+    
+    // [추가] 동시 렌더링 상황에서 소켓 패킷 꼬임 방지용 뮤텍스
+    std::mutex socket_mutex; 
 };
 
-VK_LAYER_EXPORT VkResult VKAPI_CALL 
-DisplayX_WaitForPresentKHR(VkDevice device, 
-                           VkSwapchainKHR swapchain, 
-                           uint64_t timeout, 
-                           uint64_t flags);
+// API 선언
+extern "C" {
+    VK_LAYER_EXPORT VkResult VKAPI_CALL DisplayX_WaitForPresentKHR(VkDevice device, VkSwapchainKHR swapchain, uint64_t timeout, uint64_t flags);
+    // 필요 시 여기에 다른 함수 선언 추가
+}
