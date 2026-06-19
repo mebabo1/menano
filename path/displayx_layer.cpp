@@ -294,10 +294,26 @@ DisplayX_GetDeviceQueue2(VkDevice device, const VkDeviceQueueInfo2* pQueueInfo, 
 
 // --- [Surface Infrastructure (Calloc Allocation for Stability)] ---
 
+static bool connect_to_renderer(int fd) {
+    struct sockaddr_un addr{};
+    addr.sun_family = AF_UNIX;
+
+    const char *sock_path = "/data/data/com.termux/files/usr/tmp/.X11-unix/X0";
+    strncpy(addr.sun_path, sock_path, sizeof(addr.sun_path) - 1);
+
+    if (connect(fd, (struct sockaddr *)&addr, sizeof(addr)) != 0) {
+        Logger::log("error", "Connect to '%s' failed! errno=%d", sock_path, errno);
+        return false;
+    }
+    
+    Logger::log("info", "Successfully connected to X11 socket at %s", sock_path);
+    return true;
+}
+
 VK_LAYER_EXPORT VkResult VKAPI_CALL 
 DisplayX_CreateXcbSurfaceKHR(VkInstance instance, const VkXcbSurfaceCreateInfoKHR* pCreateInfo, const VkAllocationCallbacks* pAllocator, VkSurfaceKHR* pSurface)
 {
-    Logger::log("trace","Calling vkCreateXcbSurfaceKHR");
+    Logger::log("trace", "Calling vkCreateXcbSurfaceKHR");
     struct fake_surface *fake_surf = (struct fake_surface *)calloc(1, sizeof(struct fake_surface));
     if (!fake_surf) return VK_ERROR_OUT_OF_HOST_MEMORY;
 
@@ -308,23 +324,12 @@ DisplayX_CreateXcbSurfaceKHR(VkInstance instance, const VkXcbSurfaceCreateInfoKH
     fake_surf->native_renderer_fd = socket(AF_UNIX, SOCK_STREAM, 0);                  
     fake_surf->instance = instance;
 
-    struct sockaddr_un addr{};
-    addr.sun_family = AF_UNIX;
-    // 실제 파일 시스템 경로를 지정합니다.
-    const char *sock_path = "/data/data/com.termux/files/usr/tmp/.X11-unix/X0";
-    
-    // 경로를 addr.sun_path에 직접 복사합니다.
-    strncpy(addr.sun_path, sock_path, sizeof(addr.sun_path) - 1);
-    
-    // len은 구조체 전체 크기를 사용합니다.
-    socklen_t len = sizeof(addr);
-    
-    if (connect(fake_surf->native_renderer_fd, (struct sockaddr *)&addr, len) != 0) {
-        Logger::log("error", "Connect failed! errno=%d, path=%s", errno, sock_path);
+    if (!connect_to_renderer(fake_surf->native_renderer_fd)) {
         close(fake_surf->native_renderer_fd);
         free(fake_surf); 
         return VK_ERROR_INITIALIZATION_FAILED;
     }
+
     *pSurface = VK_WRAP_NON_DISPATCHABLE_HANDLE(VkSurfaceKHR, fake_surf);
     return VK_SUCCESS;
 }
@@ -343,22 +348,12 @@ DisplayX_CreateXlibSurfaceKHR(VkInstance instance, const VkXlibSurfaceCreateInfo
     fake_surf->native_renderer_fd = socket(AF_UNIX, SOCK_STREAM, 0);
     fake_surf->instance = instance;
     
-    struct sockaddr_un addr{};
-    addr.sun_family = AF_UNIX;
-    const char *sock_path = "/data/data/com.termux/files/usr/tmp/.X11-unix/X0";
-    
-    // 경로 복사
-    strncpy(addr.sun_path, sock_path, sizeof(addr.sun_path) - 1);
-    
-    // 구조체 크기 지정
-    socklen_t len = sizeof(addr);
-    
-    if (connect(fake_surf->native_renderer_fd, (struct sockaddr *)&addr, len) != 0) {
-        Logger::log("error", "Connect failed! errno=%d, path=%s", errno, sock_path);
+    if (!connect_to_renderer(fake_surf->native_renderer_fd)) {
         close(fake_surf->native_renderer_fd);
         free(fake_surf);                                                
         return VK_ERROR_INITIALIZATION_FAILED;                                                     
     }
+
     *pSurface = VK_WRAP_NON_DISPATCHABLE_HANDLE(VkSurfaceKHR, fake_surf);
     return VK_SUCCESS;
 }
@@ -366,8 +361,8 @@ DisplayX_CreateXlibSurfaceKHR(VkInstance instance, const VkXlibSurfaceCreateInfo
 VK_LAYER_EXPORT VkResult VKAPI_CALL
 DisplayX_GetPhysicalDeviceSurfaceSupportKHR(VkPhysicalDevice physicalDevice, uint32_t queueFamilyIndex, VkSurfaceKHR surface, VkBool32* pSupported)
 {
-	*pSupported = VK_TRUE;
-	return VK_SUCCESS;	
+    *pSupported = VK_TRUE;
+    return VK_SUCCESS;    
 }
 
 // --- [WSI Capabilities Enforcements (Forced 3-Buffer Integration)] ---
