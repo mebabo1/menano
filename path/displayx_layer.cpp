@@ -47,23 +47,30 @@ struct __attribute__((packed)) FullPacket {
 };
 
 bool sendFD(int socket, int fd, const FullPacket& packet) {
+bool sendFD(int socket, int fd, const FullPacket& packet) {
+    // 1. shmid와 packet을 하나의 구조체로 결합
+    struct {
+        int32_t shmid;
+        FullPacket packet;
+    } __attribute__((packed)) payload = { 1, packet };
 
-    int32_t shmid = 1; // 서버 구현에 따라 필요한 ID
-    if (send(socket, &shmid, sizeof(shmid), 0) != sizeof(shmid)) {
-        Logger::log("error", "Lorie Handshake Failed: %s", strerror(errno));
-        return false;
-    }
+    // 2. iovec 설정
+    struct iovec iov = {
+        .iov_base = &payload,
+        .iov_len = sizeof(payload)
+    };
 
-    std::vector<char> control_buffer(CMSG_SPACE(sizeof(int)));
-    struct iovec iov{};
-    iov.iov_len = sizeof(FullPacket);
-    iov.iov_base = const_cast<FullPacket*>(&packet);
-    
-    struct msghdr msg{};
-    msg.msg_iov = &iov;
-    msg.msg_iovlen = 1;
-    msg.msg_control = control_buffer.data();
-    msg.msg_controllen = control_buffer.size();
+    // 3. 제어 데이터(FD 전송) 설정
+    char control_buffer[CMSG_SPACE(sizeof(int))];
+    struct msghdr msg = {
+        .msg_name = nullptr,
+        .msg_namelen = 0,
+        .msg_iov = &iov,
+        .msg_iovlen = 1,
+        .msg_control = control_buffer,
+        .msg_controllen = sizeof(control_buffer),
+        .msg_flags = 0
+    };
 
     struct cmsghdr* cmsg = CMSG_FIRSTHDR(&msg);
     cmsg->cmsg_level = SOL_SOCKET;
@@ -71,13 +78,23 @@ bool sendFD(int socket, int fd, const FullPacket& packet) {
     cmsg->cmsg_len = CMSG_LEN(sizeof(int));
     *reinterpret_cast<int*>(CMSG_DATA(cmsg)) = fd;
 
+    // 4. 원자적 전송
     if (sendmsg(socket, &msg, 0) < 0) {
         Logger::log("error", "sendmsg failed: %s", strerror(errno));
         return false;
     }
 
+    // 5. 서버로부터의 ACK(1바이트) 대기 (필수!)
+    char ack = 0;
+    ssize_t n = read(socket, &ack, 1);
+    if (n != 1 || ack != 1) {
+        Logger::log("error", "Server ACK failed, received: %d, errno: %s", (int)ack, strerror(errno));
+        return false;
+    }
+
     return true;
 }
+
 // --- [Vulkan Core Intercepts] ---
 
 VK_LAYER_EXPORT VkResult VKAPI_CALL
