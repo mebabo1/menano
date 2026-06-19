@@ -46,7 +46,7 @@ struct __attribute__((packed)) FullPacket {
     char padding[156];      // 서버 통신 규격 188바이트를 맞추기 위한 완충 영역
 };
 
-void sendFD(int socket, int fd, const FullPacket& packet) {
+bool sendFD(int socket, int fd, const FullPacket& packet) {
     std::vector<char> control_buffer(CMSG_SPACE(sizeof(int)));
     
     struct iovec iov{};
@@ -64,9 +64,20 @@ void sendFD(int socket, int fd, const FullPacket& packet) {
     cmsg->cmsg_type = SCM_RIGHTS;
     cmsg->cmsg_len = CMSG_LEN(sizeof(int));
     *reinterpret_cast<int*>(CMSG_DATA(cmsg)) = fd;
+
+    if (sendmsg(socket, &msg, 0) < 0) {
+        Logger::log("error", "sendmsg failed: %s", strerror(errno));
+        return false;
+    }
+
+    char ack = 0;
+    ssize_t n = read(socket, &ack, 1);
+    if (n <= 0) {
+        Logger::log("error", "Server did not ACK, connection lost.");
+        return false;
+    }
     
-    // sendmsg 호출
-    sendmsg(socket, &msg, 0);
+    return true;
 }
 // --- [Vulkan Core Intercepts] ---
 
