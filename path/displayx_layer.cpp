@@ -526,7 +526,7 @@ DisplayX_CreateSwapchainKHR(VkDevice device, const VkSwapchainCreateInfoKHR *pCr
     swapchain->id = id.generate();
     swapchain->images.resize(swapchain->imageCount);
     
-    // [1단계] 모든 이미지 생성 및 자원 할당 루프 (통신 없음)
+    // [1단계] 이미지 생성 및 할당
     for (uint32_t index = 0; index < swapchain->imageCount; index++) {
         VkResult result;
         auto fake_image = std::make_shared<struct fake_swapchain_image>();
@@ -552,7 +552,7 @@ DisplayX_CreateSwapchainKHR(VkDevice device, const VkSwapchainCreateInfoKHR *pCr
         createInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 
         result = table.CreateImage(device, &createInfo, nullptr, &fake_image->handle);
-        if (result != VK_SUCCESS) return result;
+        if (result != VK_SUCCESS) { free(swapchain); return result; }
 
         AHardwareBuffer_Desc desc{};
         desc.width = swapchain->extent.width;
@@ -562,7 +562,7 @@ DisplayX_CreateSwapchainKHR(VkDevice device, const VkSwapchainCreateInfoKHR *pCr
         desc.usage = AHARDWAREBUFFER_USAGE_GPU_FRAMEBUFFER | AHARDWAREBUFFER_USAGE_GPU_SAMPLED_IMAGE | AHARDWAREBUFFER_USAGE_GPU_COLOR_OUTPUT;
 
         int ret = AHardwareBuffer_allocate(&desc, &fake_image->ahb);
-        if (ret != 0) return VK_ERROR_OUT_OF_HOST_MEMORY;
+        if (ret != 0) { free(swapchain); return VK_ERROR_OUT_OF_HOST_MEMORY; }
 
         VkAndroidHardwareBufferPropertiesANDROID ahbProps{};
         ahbProps.sType = VK_STRUCTURE_TYPE_ANDROID_HARDWARE_BUFFER_PROPERTIES_ANDROID;
@@ -586,28 +586,41 @@ DisplayX_CreateSwapchainKHR(VkDevice device, const VkSwapchainCreateInfoKHR *pCr
         allocateInfo.memoryTypeIndex = pick_memory_index(swapchain->surface->instance, dev->physical, ahbProps.memoryTypeBits);
 
         result = table.AllocateMemory(device, &allocateInfo, nullptr, &fake_image->memory);
-        if (result != VK_SUCCESS) return result;
+        if (result != VK_SUCCESS) { free(swapchain); return result; }
             
         result = table.BindImageMemory(device, fake_image->handle, fake_image->memory, 0);
-        if (result != VK_SUCCESS) return result;
+        if (result != VK_SUCCESS) { free(swapchain); return result; }
 
         swapchain->images[index] = fake_image;
     }
 
-    // [2단계] 생성 완료 후 서버와 통신 (메타데이터 전송)
-    uint32_t request_code = 1;
-    uint32_t swapchain_id = (uint32_t)swapchain->id;
-    uint32_t image_count = (uint32_t)swapchain->imageCount;
+    // [2단계] 원자적 메타데이터 전송 (구조체로 묶어서 전송)
+    struct __attribute__((packed)) SwapchainInitPacket {
+        uint32_t magic;      // '1', '0', 'B', 'G'에 해당하는 매직 넘버
+        uint32_t request_code;
+        uint32_t id;
+        uint32_t image_count;
+    };
 
-    if (write(fake_surface->native_renderer_fd, &request_code, 4) != 4 ||
-        write(fake_surface->native_renderer_fd, &swapchain_id, 4) != 4 ||
-        write(fake_surface->native_renderer_fd, &image_count, 4) != 4) {
+    SwapchainInitPacket init = { 0x47423031, 1, (uint32_t)swapchain->id, (uint32_t)swapchain->imageCount };
+    
+    if (write(fake_surface->native_renderer_fd, &init, sizeof(init)) != sizeof(init)) {
+        free(swapchain);
         return VK_ERROR_INITIALIZATION_FAILED;
     }
 
-    // [3단계] FD 일괄 전송 (루프 내 통신 없음)
+    // [3단계] FD 전송 및 서버 ACK 확인 (흐름 제어)
     for (uint32_t index = 0; index < swapchain->imageCount; index++) {
         if (AHardwareBuffer_sendHandleToUnixSocket(swapchain->images[index]->ahb, fake_surface->native_renderer_fd) != 0) {
+            free(swapchain);
+            return VK_ERROR_INITIALIZATION_FAILED;
+        }
+
+        // 서버가 각 FD를 잘 받았다는 ACK 신호(1바이트)를 기다림
+        char ack = 0;
+        if (read(fake_surface->native_renderer_fd, &ack, 1) != 1) {
+            Logger::log("error", "Server failed to ACK image index %d", index);
+            free(swapchain);
             return VK_ERROR_INITIALIZATION_FAILED;
         }
     }
