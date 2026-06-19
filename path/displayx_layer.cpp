@@ -740,23 +740,14 @@ DisplayX_DestroyDevice(VkDevice device, const VkAllocationCallbacks *pAllocator)
 
 // --- [ProcAddr Dispatch Tables (Cleaned)] ---
 
-VK_LAYER_EXPORT VkResult VKAPI_CALL
-DisplayX_GetPhysicalDeviceSurfaceCapabilities2EXT(VkPhysicalDevice physicalDevice, VkSurfaceKHR surface, void* pSurfaceCapabilities) {
-    return DisplayX_GetPhysicalDeviceSurfaceCapabilitiesKHR(physicalDevice, surface, (VkSurfaceCapabilitiesKHR*)pSurfaceCapabilities);
-}
-
 VK_LAYER_EXPORT PFN_vkVoidFunction VKAPI_CALL
 DisplayX_GetDeviceProcAddr(VkDevice device, const char *pName)
 {   
-    // 🌟 매크로(##) 제거 완료: 명시적 함수 포인터 주소 전달
     if (!strcmp(pName, "vkGetPhysicalDeviceSurfaceCapabilitiesKHR")) {
         return (PFN_vkVoidFunction)&DisplayX_GetPhysicalDeviceSurfaceCapabilitiesKHR;
     }
     if (!strcmp(pName, "vkGetPhysicalDeviceSurfaceCapabilities2KHR")) {
         return (PFN_vkVoidFunction)&DisplayX_GetPhysicalDeviceSurfaceCapabilities2KHR;
-    }
-    if (!strcmp(pName, "vkGetPhysicalDeviceSurfaceCapabilities2EXT")) {
-        return (PFN_vkVoidFunction)&DisplayX_GetPhysicalDeviceSurfaceCapabilities2EXT;
     }
 
     GETPROCADDR(DestroyDevice);
@@ -781,15 +772,11 @@ DisplayX_GetDeviceProcAddr(VkDevice device, const char *pName)
 VK_LAYER_EXPORT PFN_vkVoidFunction VKAPI_CALL
 DisplayX_GetInstanceProcAddr(VkInstance instance, const char *pName)
 {   
-    // 🌟 매크로(##) 제거 완료
     if (!strcmp(pName, "vkGetPhysicalDeviceSurfaceCapabilitiesKHR")) {
         return (PFN_vkVoidFunction)&DisplayX_GetPhysicalDeviceSurfaceCapabilitiesKHR;
     }
     if (!strcmp(pName, "vkGetPhysicalDeviceSurfaceCapabilities2KHR")) {
         return (PFN_vkVoidFunction)&DisplayX_GetPhysicalDeviceSurfaceCapabilities2KHR;
-    }
-    if (!strcmp(pName, "vkGetPhysicalDeviceSurfaceCapabilities2EXT")) {
-        return (PFN_vkVoidFunction)&DisplayX_GetPhysicalDeviceSurfaceCapabilities2EXT;
     }
 
     GETPROCADDR(CreateInstance);
