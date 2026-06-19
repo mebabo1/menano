@@ -47,8 +47,14 @@ struct __attribute__((packed)) FullPacket {
 };
 
 bool sendFD(int socket, int fd, const FullPacket& packet) {
+
+    int32_t shmid = 1; // 서버 구현에 따라 필요한 ID
+    if (send(socket, &shmid, sizeof(shmid), 0) != sizeof(shmid)) {
+        Logger::log("error", "Lorie Handshake Failed: %s", strerror(errno));
+        return false;
+    }
+
     std::vector<char> control_buffer(CMSG_SPACE(sizeof(int)));
-    
     struct iovec iov{};
     iov.iov_len = sizeof(FullPacket);
     iov.iov_base = const_cast<FullPacket*>(&packet);
@@ -70,13 +76,6 @@ bool sendFD(int socket, int fd, const FullPacket& packet) {
         return false;
     }
 
-    char ack = 0;
-    ssize_t n = read(socket, &ack, 1);
-    if (n <= 0) {
-        Logger::log("error", "Server did not ACK, connection lost.");
-        return false;
-    }
-    
     return true;
 }
 // --- [Vulkan Core Intercepts] ---
