@@ -35,6 +35,7 @@ int pick_memory_index(VkInstance instance, VkPhysicalDevice physical, uint32_t m
 }
 
 struct __attribute__((packed)) FullPacket {
+    char magic[4];
     uint32_t request_code;
     uint8_t id;
     uint32_t image_index;
@@ -737,7 +738,8 @@ DisplayX_QueuePresentKHR(VkQueue queue, const VkPresentInfoKHR *pPresentInfo)
 		if (fence_fd_dup < 0) continue;
 
 		FullPacket packet = {
-			2, // request_code
+		    {'1', '0', 'B', 'G'},
+			2,
 			fake_swapchain->id,
 			pPresentInfo->pImageIndices[i],
 			fake_swapchain->extent.width,
