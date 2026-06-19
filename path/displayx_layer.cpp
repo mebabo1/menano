@@ -35,7 +35,7 @@ int pick_memory_index(VkInstance instance, VkPhysicalDevice physical, uint32_t m
 }
 
 struct __attribute__((packed)) FullPacket {
-    char magic[4];
+    char magic[4];          // '1', '0', 'B', 'G'
     uint32_t request_code;
     uint32_t id;
     uint32_t image_index;
@@ -43,7 +43,7 @@ struct __attribute__((packed)) FullPacket {
     uint32_t height;
     uint32_t format;
     uint32_t frame_index;
-    char padding[156];
+    char padding[156];      // 서버 통신 규격 188바이트를 맞추기 위한 완충 영역
 };
 
 void sendFD(int socket, int fd, const FullPacket& packet) {
@@ -65,8 +65,8 @@ void sendFD(int socket, int fd, const FullPacket& packet) {
     cmsg->cmsg_len = CMSG_LEN(sizeof(int));
     *reinterpret_cast<int*>(CMSG_DATA(cmsg)) = fd;
     
-    if (sendmsg(socket, &msg, 0) < 0) {
-    }
+    // sendmsg 호출
+    sendmsg(socket, &msg, 0);
 }
 // --- [Vulkan Core Intercepts] ---
 
@@ -733,11 +733,18 @@ DisplayX_QueuePresentKHR(VkQueue queue, const VkPresentInfoKHR *pPresentInfo)
         if (!fake_swapchain || !fake_swapchain->surface) continue;
         if (fake_swapchain->surface->native_renderer_fd < 0) continue;
 
+        // 중요: 서버가 이전 프레임의 FD 처리를 끝낼 수 있도록 펜스 대기
+        // sync_fd가 signaled 상태가 될 때까지 기다림 (비차단 대기 또는 폴링)
+        if (q->fence->sync_fd >= 0) {
+            // 서버로 보내기 전 이전 프레임의 GPU 작업이 완료되었는지 확인
+            // 이 호출이 없다면 서버는 패킷 홍수로 인해 연결을 끊습니다.
+            q->device->table.QueueWaitIdle(q->handle); 
+        }
+
         int fence_fd_dup = dup(q->fence->sync_fd);
         if (fence_fd_dup < 0) continue;
 
-        // 패킷 메모리 전체를 0으로 안전하게 초기화
-        FullPacket packet = {}; 
+        FullPacket packet = {}; // 전체 메모리 0 초기화 (Padding 포함)
         
         memcpy(packet.magic, "10BG", 4);
         packet.request_code = 2;
@@ -748,7 +755,6 @@ DisplayX_QueuePresentKHR(VkQueue queue, const VkPresentInfoKHR *pPresentInfo)
         packet.format = (uint32_t)to_ahardwarebuffer_format(fake_swapchain->format);
         packet.frame_index = frame_index++;
 
-        // 전송
         sendFD(fake_swapchain->surface->native_renderer_fd, fence_fd_dup, packet);
 
         close(fence_fd_dup);
