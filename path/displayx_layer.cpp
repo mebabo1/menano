@@ -34,26 +34,28 @@ int pick_memory_index(VkInstance instance, VkPhysicalDevice physical, uint32_t m
 	return UINT32_MAX;
 }
 
-struct FrameHeader {
+struct __attribute__((packed)) FullPacket {
+    uint32_t request_code;
+    uint8_t id;
+    uint32_t image_index;
+    // 이어서 이미지 정보
     uint32_t width;
     uint32_t height;
     uint32_t format;
     uint32_t frame_index;
 };
 
-void sendFD(int& socket, int fd, uint32_t width, uint32_t height, uint32_t format, uint32_t frame_index) {
+void sendFD(int socket, int fd, uint32_t width, uint32_t height, uint32_t format, uint32_t frame_index, uint32_t request_code, uint8_t id, uint32_t image_index) {
     std::vector<char> control_buffer(CMSG_SPACE(sizeof(int)));
 
-    FrameHeader header = { 
-        width, 
-        height, 
-        (uint32_t)to_ahardwarebuffer_format((VkFormat)format), 
-        frame_index 
+    FullPacket packet = { 
+        request_code, id, image_index, 
+        width, height, (uint32_t)to_ahardwarebuffer_format((VkFormat)format), frame_index 
     };
     
     struct iovec iov{};
-    iov.iov_len = sizeof(FrameHeader);
-    iov.iov_base = &header;
+    iov.iov_len = sizeof(FullPacket);
+    iov.iov_base = &packet;
     
     struct msghdr msg{};
     msg.msg_iov = &iov;
@@ -740,21 +742,17 @@ DisplayX_QueuePresentKHR(VkQueue queue, const VkPresentInfoKHR *pPresentInfo)
 		int fence_fd_dup = dup(q->fence->sync_fd);
 		if (fence_fd_dup < 0) continue;
 
-		int request_code = 2;
-		int index = pPresentInfo->pImageIndices[i];
-
-		write(fake_swapchain->surface->native_renderer_fd, &request_code, 4);
-		write(fake_swapchain->surface->native_renderer_fd, &fake_swapchain->id, 1);
-		write(fake_swapchain->surface->native_renderer_fd, &index, 4);
-
-		sendFD(
-			fake_swapchain->surface->native_renderer_fd, 
-			fence_fd_dup, 
-			fake_swapchain->extent.width, 
-			fake_swapchain->extent.height, 
-			(uint32_t)fake_swapchain->format, 
+		FullPacket packet = {
+			2, // request_code
+			fake_swapchain->id,
+			pPresentInfo->pImageIndices[i],
+			fake_swapchain->extent.width,
+			fake_swapchain->extent.height,
+			(uint32_t)to_ahardwarebuffer_format(fake_swapchain->format),
 			frame_index++
-		);
+		};
+
+		sendFD(fake_swapchain->surface->native_renderer_fd, fence_fd_dup, packet);
 
 		close(fence_fd_dup);
 	}
