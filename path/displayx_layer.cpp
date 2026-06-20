@@ -137,16 +137,7 @@ DisplayX_CreateDevice(VkPhysicalDevice physicalDevice, const VkDeviceCreateInfo 
     table.AllocateMemory = (PFN_vkAllocateMemory)gdpa(*pDevice, "vkAllocateMemory");
     table.BindImageMemory = (PFN_vkBindImageMemory)gdpa(*pDevice, "vkBindImageMemory");
     
-    // 가속화 테이블 아래(auto device = std::make_shared<struct device>(); 근처)에 작성
-    device->handle = *pDevice;
-    device->physical = physicalDevice;
-    device->table = table;
-
-    // ⭐ 수정: 헤더 구조체에 맞춤 바인딩 진행
-    device->GetMemoryFdKHR = (PFN_vkGetMemoryFdKHR)gdpa(*pDevice, "vkGetMemoryFdKHR");
-    device->MapMemory      = (PFN_vkMapMemory)gdpa(*pDevice, "vkMapMemory");
-    device->UnmapMemory    = (PFN_vkUnmapMemory)gdpa(*pDevice, "vkUnmapMemory");
-    
+    // 하부 드라이버 주소 할당부 테이블 등록
     table.GetImageMemoryRequirements = (PFN_vkGetImageMemoryRequirements)gdpa(*pDevice, "vkGetImageMemoryRequirements");
     table.QueueSubmit2 = (PFN_vkQueueSubmit2)gdpa(*pDevice, "vkQueueSubmit2");
     table.DeviceWaitIdle = (PFN_vkDeviceWaitIdle)gdpa(*pDevice, "vkDeviceWaitIdle");
@@ -173,23 +164,23 @@ DisplayX_CreateDevice(VkPhysicalDevice physicalDevice, const VkDeviceCreateInfo 
     table.GetDeviceQueue2 = (PFN_vkGetDeviceQueue2)gdpa(*pDevice, "vkGetDeviceQueue2");
     table.DestroyDevice = (PFN_vkDestroyDevice)gdpa(*pDevice, "vkDestroyDevice");
 
-    auto device = std::make_shared<struct device>();
-    device->handle = *pDevice;
-    device->physical = physicalDevice;
-    device->table = table;
+    // ⭐ 수정: 변수명을 dev_node로 선언하여 매개변수 device와의 충돌 완전 방지
+    auto dev_node = std::make_shared<struct device>();
+    dev_node->handle = *pDevice;
+    dev_node->physical = physicalDevice;
+    dev_node->table = table;
+
+    // ⭐ 수정: 헤더파일 구조체에 선언한 포인터 필드에 안전하게 정렬 바인딩
+    dev_node->GetMemoryFdKHR = (PFN_vkGetMemoryFdKHR)gdpa(*pDevice, "vkGetMemoryFdKHR");
+    dev_node->MapMemory      = (PFN_vkMapMemory)gdpa(*pDevice, "vkMapMemory");
+    dev_node->UnmapMemory    = (PFN_vkUnmapMemory)gdpa(*pDevice, "vkUnmapMemory");
 
 	{
 		scoped_lock l(global_lock);
-    	deviceDispatch[GetKey(*pDevice)] = device;
+    	deviceDispatch[GetKey(*pDevice)] = dev_node; // 맵에 노드 주입
 	}
 	return VK_SUCCESS;
 }
-
-// GetDeviceQueue / GetDeviceQueue2 는 기존 펜스 바인딩 유지하되 소켓 흔적 제거된 상태로 그대로 상속
-
-// --- [Surface Infrastructure (X11 주소록 확보용 경량 구조)] ---
-
-// 소켓 통신 함수(connect_to_renderer)는 완전히 폐기합니다.
 
 VK_LAYER_EXPORT VkResult VKAPI_CALL 
 DisplayX_CreateXcbSurfaceKHR(VkInstance instance, const VkXcbSurfaceCreateInfoKHR* pCreateInfo, const VkAllocationCallbacks* pAllocator, VkSurfaceKHR* pSurface)
