@@ -19,19 +19,25 @@
 
 #define ICD_LOADER_MAGIC 0x01D01010
 
+// 🛠️ [보안 & MTE 대응 패치] 디스패처블 핸들의 내부 포인터 오염을 방지하기 위한 안전한 키 변환 함수
 template <typename T>
-void* GetKey(T item) {
-    return *(void**) item;
+uint64_t GetKey(T item) {
+    if (!item) return 0;
+    return (uint64_t)(uintptr_t)(*(void**)item);
 }
+
+// 🛠️ 안드로이드 64비트 주소 정형화를 위한 단일 변환 매크로 정의
+#define SAFE_KEY(handle) ((uint64_t)(uintptr_t)(handle))
 
 #define VK_WRAP_NON_DISPATCHABLE_HANDLE(type, obj) ((type)(uintptr_t)(obj))
 #define VK_UNWRAP_NON_DISPATCHABLE_HANDLE(handle, type, variable) \
 	type *variable = (type *)(uintptr_t)handle;
 
-extern std::unordered_map<void *, VkLayerInstanceDispatchTable> instanceDispatch;
-extern std::unordered_map<void *, VkInstance> instanceMap;
-extern std::unordered_map<void *, std::shared_ptr<struct device>> deviceDispatch;                             
-extern std::unordered_map<VkQueue, std::shared_ptr<struct queue>> queues;
+// 🛠️ [컴파일 에러 해결의 핵심] 전역 맵들의 Key 타입을 cpp와 동일하게 uint64_t로 단일화
+extern std::unordered_map<uint64_t, VkLayerInstanceDispatchTable> instanceDispatch;
+extern std::unordered_map<uint64_t, VkInstance> instanceMap;
+extern std::unordered_map<uint64_t, std::shared_ptr<struct device>> deviceDispatch;                             
+extern std::unordered_map<uint64_t, std::shared_ptr<struct queue>> queues;
 extern ID id;
 extern std::mutex global_lock;
 
