@@ -19,7 +19,7 @@ std::unordered_map<uint64_t, VkInstance> instanceMap;
 std::unordered_map<uint64_t, std::shared_ptr<struct device>> deviceDispatch;                             
 std::unordered_map<uint64_t, std::shared_ptr<struct queue>> queues;
 
-// 🛠️ 물리 장치 핸들이 어떤 인스턴스에 속해 있는지 추적하기 위한 전역 매핑 추가
+// 물리 장치 핸들이 어떤 인스턴스에 속해 있는지 추적하기 위한 전역 매핑
 std::unordered_map<uint64_t, VkInstance> physDevToInstance; 
 
 std::mutex global_lock;
@@ -38,6 +38,7 @@ int pick_memory_index(VkInstance instance, VkPhysicalDevice physical, uint32_t m
     uint32_t idx;
     
     std::lock_guard<std::mutex> l(global_lock);
+    // 🔑 디스패치 테이블 조회는 GetKey를 사용합니다.
     auto it = instanceDispatch.find(GetKey(instance)); 
     if (it != instanceDispatch.end()) {
         it->second.GetPhysicalDeviceMemoryProperties(physical, &memoryProps);
@@ -174,7 +175,8 @@ DisplayX_CreateInstance(const VkInstanceCreateInfo *pCreateInfo, const VkAllocat
 
     {
         std::lock_guard<std::mutex> l(global_lock);
-        instanceMap[GetKey(*pInstance)] = *pInstance;
+        // 🛠️ 수정: 오브젝트 매핑용은 SAFE_KEY, 디스패치 테이블용은 GetKey를 명확히 구분합니다.
+        instanceMap[SAFE_KEY(*pInstance)] = *pInstance;
         instanceDispatch[GetKey(*pInstance)] = table;
     }
     return VK_SUCCESS;
@@ -185,12 +187,15 @@ DisplayX_DestroyInstance(VkInstance instance, const VkAllocationCallbacks *pAllo
 {
     if (!instance) return;
     std::lock_guard<std::mutex> l(global_lock);
+    
+    // 🔑 디스패치 테이블 해제는 GetKey
     auto it = instanceDispatch.find(GetKey(instance));
     if (it != instanceDispatch.end()) {
         it->second.DestroyInstance(instance, pAllocator);
         instanceDispatch.erase(it);
     }
-    instanceMap.erase(GetKey(instance));
+    // 🛠️ 수정: 오브젝트 추적용 맵 삭제는 SAFE_KEY 사용
+    instanceMap.erase(SAFE_KEY(instance));
     
     // 연관된 physicalDevice 매핑도 정리
     for (auto itPhys = physDevToInstance.begin(); itPhys != physDevToInstance.end();) {
@@ -202,11 +207,11 @@ DisplayX_DestroyInstance(VkInstance instance, const VkAllocationCallbacks *pAllo
     }
 }
 
-// 🛠️ 추가: 물리 장치와 인스턴스 관계를 동적으로 바인딩해주는 헬퍼 함수
+// 🛠️ 수정: 물리 장치 매핑 저장 헬퍼 함수는 고유 주소 추적을 위해 SAFE_KEY를 사용해야 합니다.
 static void BindPhysicalDeviceToInstance(VkPhysicalDevice physicalDevice, VkInstance instance) {
     if (physicalDevice == VK_NULL_HANDLE || instance == VK_NULL_HANDLE) return;
     std::lock_guard<std::mutex> l(global_lock);
-    physDevToInstance[GetKey(physicalDevice)] = instance;
+    physDevToInstance[SAFE_KEY(physicalDevice)] = instance;
 }
 
 VK_LAYER_EXPORT VkResult VKAPI_CALL
@@ -228,14 +233,13 @@ DisplayX_CreateDevice(VkPhysicalDevice physicalDevice, const VkDeviceCreateInfo 
     VkInstance instance = VK_NULL_HANDLE;
     {
         std::lock_guard<std::mutex> l(global_lock);
-        // 🛠️ 수정: physDevToInstance 맵을 거쳐서 속해있는 instance 핸들을 추적함
-        auto it = physDevToInstance.find(GetKey(physicalDevice));
+        // 🛠️ 수정: 물리 장치-인스턴스 고유 관계 추적은 고유 핸들 매핑 테이블이므로 SAFE_KEY를 사용합니다.
+        auto it = physDevToInstance.find(SAFE_KEY(physicalDevice));
         if (it != physDevToInstance.end()) {
             instance = it->second;
         } else if (!instanceMap.empty()) {
-            // 안전장치: 맵이 비어있지 않다면 첫 번째 활성화된 인스턴스를 fallback으로 지정
             instance = instanceMap.begin()->second;
-            physDevToInstance[GetKey(physicalDevice)] = instance;
+            physDevToInstance[SAFE_KEY(physicalDevice)] = instance;
         }
     }
     
@@ -302,6 +306,7 @@ DisplayX_CreateDevice(VkPhysicalDevice physicalDevice, const VkDeviceCreateInfo 
 
     {
         std::lock_guard<std::mutex> l(global_lock);
+        // 🔑 디바이스 디스패치 저장소 등록은 GetKey를 사용합니다.
         deviceDispatch[GetKey(*pDevice)] = dev_node;
     }
     return VK_SUCCESS;
@@ -312,6 +317,7 @@ DisplayX_DestroyDevice(VkDevice device, const VkAllocationCallbacks *pAllocator)
 {
     if (!device) return;
     std::lock_guard<std::mutex> l(global_lock);
+    // 🔑 디바이스 디스패치 검색은 GetKey를 사용합니다.
     auto it = deviceDispatch.find(GetKey(device));
     if (it != deviceDispatch.end()) {
         it->second->table.DestroyDevice(device, pAllocator);
@@ -323,6 +329,7 @@ VK_LAYER_EXPORT void VKAPI_CALL
 DisplayX_GetDeviceQueue(VkDevice device, uint32_t queueFamilyIndex, uint32_t queueIndex, VkQueue *pQueue)
 {
     std::lock_guard<std::mutex> l(global_lock);
+    // 🔑 디바이스 디스패치 테이블 접근은 GetKey
     auto dev = deviceDispatch[GetKey(device)];
     if (!dev) return;
 
@@ -338,7 +345,8 @@ DisplayX_GetDeviceQueue(VkDevice device, uint32_t queueFamilyIndex, uint32_t que
     fenceInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
     dev->table.CreateFence(device, &fenceInfo, nullptr, &q_node->fence->handle);
 
-    queues[GetKey(*pQueue)] = q_node;
+    // 🛠️ 수정: 동일한 디바이스 내 다중 큐들의 키 충돌을 방지하기 위해 SAFE_KEY(*pQueue)를 사용합니다.
+    queues[SAFE_KEY(*pQueue)] = q_node;
     dev->queue = q_node; 
 }
 
@@ -346,6 +354,7 @@ VK_LAYER_EXPORT void VKAPI_CALL
 DisplayX_GetDeviceQueue2(VkDevice device, const VkDeviceQueueInfo2* pQueueInfo, VkQueue *pQueue)
 {
     std::lock_guard<std::mutex> l(global_lock);
+    // 🔑 디바이스 디스패치 테이블 접근은 GetKey
     auto dev = deviceDispatch[GetKey(device)];
     if (!dev) return;
 
@@ -361,7 +370,8 @@ DisplayX_GetDeviceQueue2(VkDevice device, const VkDeviceQueueInfo2* pQueueInfo, 
     fenceInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
     dev->table.CreateFence(device, &fenceInfo, nullptr, &q_node->fence->handle);
 
-    queues[GetKey(*pQueue)] = q_node;
+    // 🛠️ 수정: 동일한 디바이스 내 다중 큐들의 키 충돌을 방지하기 위해 SAFE_KEY(*pQueue)를 사용합니다.
+    queues[SAFE_KEY(*pQueue)] = q_node;
     dev->queue = q_node;
 }
 
@@ -419,6 +429,7 @@ DisplayX_CreateSwapchainKHR(VkDevice device, const VkSwapchainCreateInfoKHR *pCr
     std::shared_ptr<struct device> dev;
     {
         std::lock_guard<std::mutex> l(global_lock);
+        // 🔑 디바이스 디스패치 테이블 획득은 GetKey
         dev = deviceDispatch[GetKey(device)];
     }
     VkLayerDispatchTable table = dev->table;
@@ -521,6 +532,7 @@ DisplayX_AcquireNextImageKHR(VkDevice device, VkSwapchainKHR swapchain, uint64_t
 
     if (fence != VK_NULL_HANDLE || semaphore != VK_NULL_HANDLE) {
         std::lock_guard<std::mutex> l(global_lock);
+        // 🔑 디바이스 디스패치 테이블 검색은 GetKey
         auto dev = deviceDispatch[GetKey(device)];                                                     
         auto q = dev->queue;
         if (q && q->handle != VK_NULL_HANDLE) {
@@ -548,6 +560,7 @@ DisplayX_AcquireNextImage2KHR(VkDevice device, const VkAcquireNextImageInfoKHR* 
 
     if (pAcquireInfo->fence != VK_NULL_HANDLE || pAcquireInfo->semaphore != VK_NULL_HANDLE) {
         std::lock_guard<std::mutex> l(global_lock);
+        // 🔑 디바이스 디스패치 테이블 검색은 GetKey
         auto dev = deviceDispatch[GetKey(device)];
         auto q = dev->queue;
         if (q && q->handle != VK_NULL_HANDLE) {
@@ -574,6 +587,7 @@ DisplayX_DestroySwapchainKHR(VkDevice device, VkSwapchainKHR swapchain, const Vk
     std::shared_ptr<struct device> dev;
     {
         std::lock_guard<std::mutex> l(global_lock);
+        // 🔑 디바이스 디스패치 테이블 검색은 GetKey
         dev = deviceDispatch[GetKey(device)];
     }
     if (!fake_swapchain || !dev) return;
@@ -596,7 +610,8 @@ DisplayX_QueuePresentKHR(VkQueue queue, const VkPresentInfoKHR *pPresentInfo)
     std::shared_ptr<struct queue> q = nullptr;
     {
         std::lock_guard<std::mutex> l(global_lock);
-        auto it = queues.find(GetKey(queue));
+        // 🛠️ 수정: 큐 추적 맵 검색은 고유 핸들 기반이므로 SAFE_KEY를 사용해야 올바르게 바인딩됩니다.
+        auto it = queues.find(SAFE_KEY(queue));
         if (it != queues.end()) {
             q = it->second;
         }
@@ -668,21 +683,26 @@ VK_LAYER_EXPORT VkResult VKAPI_CALL DisplayX_GetPhysicalDeviceSurfaceCapabilitie
 {
     std::lock_guard<std::mutex> l(global_lock);
 
-    // 🛠️ 수정: physicalDevice를 통해 소속된 instance를 먼저 역추적합니다.
     VkInstance instance = VK_NULL_HANDLE;
-    auto itPhys = physDevToInstance.find(GetKey(physicalDevice));
+    // 🛠️ 수정: 물리 장치는 고유 관계 매핑용이므로 SAFE_KEY를 사용해 인스턴스를 역추적합니다.
+    auto itPhys = physDevToInstance.find(SAFE_KEY(physicalDevice));
     if (itPhys != physDevToInstance.end()) {
         instance = itPhys->second;
     } else if (!instanceMap.empty()) {
         instance = instanceMap.begin()->second; // fallback
-        physDevToInstance[GetKey(physicalDevice)] = instance;
+        physDevToInstance[SAFE_KEY(physicalDevice)] = instance;
     }
 
     if (instance == VK_NULL_HANDLE) return VK_ERROR_INITIALIZATION_FAILED;
 
-    // 인스턴스 키를 기반으로 디스패치 테이블 조회
+    // 🔑 인스턴스 소속 디스패치 테이블을 가리키는 고유 키 조하에는 GetKey를 적용합니다.
     auto it = instanceDispatch.find(GetKey(instance));
     if (it == instanceDispatch.end()) return VK_ERROR_INITIALIZATION_FAILED;
+
+    // 🛠️ 보안/안정성 보강: 하부 드라이버로 전달하기 전에 이미 디스패치 테이블에 준비된 함수 포인터가 있다면 그것을 우선 사용합니다.
+    if (it->second.GetPhysicalDeviceSurfaceCapabilities2KHR) {
+        return it->second.GetPhysicalDeviceSurfaceCapabilities2KHR(physicalDevice, pSurfaceInfo, pSurfaceCapabilities);
+    }
 
     PFN_vkGetPhysicalDeviceSurfaceCapabilities2KHR pfn = 
         (PFN_vkGetPhysicalDeviceSurfaceCapabilities2KHR)it->second.GetInstanceProcAddr(
@@ -702,7 +722,6 @@ extern "C" {
 VK_LAYER_EXPORT PFN_vkVoidFunction VKAPI_CALL
 DisplayX_GetInstanceProcAddr(VkInstance instance, const char *pName)
 {
-    // 디버깅 목적으로 들어오는 상위 인스턴스에 종속된 핸들이 감지될 때 동적 바인딩 가동 가능하도록 설계
     GETPROCADDR(CreateInstance);
     GETPROCADDR(DestroyInstance);
     GETPROCADDR(CreateDevice);
@@ -724,6 +743,7 @@ DisplayX_GetInstanceProcAddr(VkInstance instance, const char *pName)
     if (instance == VK_NULL_HANDLE) return nullptr;
     
     std::lock_guard<std::mutex> l(global_lock);
+    // 🔑 디스패치 테이블 조회이므로 GetKey 사용 (올바름)
     auto it = instanceDispatch.find(GetKey(instance));
     if (it == instanceDispatch.end()) return nullptr;
     
@@ -750,11 +770,9 @@ DisplayX_GetDeviceProcAddr(VkDevice device, const char *pName)
     if (device == VK_NULL_HANDLE) return nullptr;
 
     std::lock_guard<std::mutex> l(global_lock);
+    // 🔑 디바이스 디스패치 테이블 조회이므로 GetKey 사용 (올바름)
     auto it = deviceDispatch.find(GetKey(device));
     if (it == deviceDispatch.end()) return nullptr;
-
-    if (it->second && it->second->physical && it->second->handle) {
-    }
 
     return it->second->table.GetDeviceProcAddr(device, pName);
 }
