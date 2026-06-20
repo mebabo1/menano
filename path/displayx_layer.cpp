@@ -1,8 +1,7 @@
 #include "displayx_layer.hpp"
 #include <vector>
 #include <unistd.h>
-// #include <sys/socket.h> -> 폐기 (IPC 필요 없음)
-// #include <sys/un.h>     -> 폐기
+#include <algorithm> // std::min 사용을 위해 추가
 
 #define GETPROCADDR(func) \
 if (!strcmp(pName, "vk" #func)) \
@@ -57,7 +56,6 @@ DisplayX_CreateInstance(const VkInstanceCreateInfo *pCreateInfo, const VkAllocat
 		enabledExtensions.reserve(createInfo.enabledExtensionCount + 2);
 		enabledExtensions.insert(enabledExtensions.end(), createInfo.ppEnabledExtensionNames, createInfo.ppEnabledExtensionNames + createInfo.enabledExtensionCount);
 	}
-    // 하드웨어 버퍼(FD)를 주고받기 위해 리눅스 표준 인스턴스 확장 셋업
 	enabledExtensions.push_back(VK_KHR_EXTERNAL_MEMORY_CAPABILITIES_EXTENSION_NAME);
 	enabledExtensions.push_back(VK_KHR_EXTERNAL_FENCE_CAPABILITIES_EXTENSION_NAME);
 	createInfo.enabledExtensionCount = enabledExtensions.size();
@@ -117,7 +115,6 @@ DisplayX_CreateDevice(VkPhysicalDevice physicalDevice, const VkDeviceCreateInfo 
     	enabledExtensions.insert(enabledExtensions.end(), createInfo.ppEnabledExtensionNames, createInfo.ppEnabledExtensionNames + createInfo.enabledExtensionCount);
     }
     
-    // ⭐ 핵심 변경: 안드로이드 AHB를 걷어내고 리눅스 표준 dma-buf 패싱용 확장 주입
     enabledExtensions.push_back(VK_KHR_EXTERNAL_MEMORY_EXTENSION_NAME);
     enabledExtensions.push_back(VK_KHR_EXTERNAL_MEMORY_FD_EXTENSION_NAME);
     enabledExtensions.push_back(VK_KHR_EXTERNAL_FENCE_EXTENSION_NAME);
@@ -137,7 +134,6 @@ DisplayX_CreateDevice(VkPhysicalDevice physicalDevice, const VkDeviceCreateInfo 
     table.AllocateMemory = (PFN_vkAllocateMemory)gdpa(*pDevice, "vkAllocateMemory");
     table.BindImageMemory = (PFN_vkBindImageMemory)gdpa(*pDevice, "vkBindImageMemory");
     
-    // 하부 드라이버 주소 할당부 테이블 등록
     table.GetImageMemoryRequirements = (PFN_vkGetImageMemoryRequirements)gdpa(*pDevice, "vkGetImageMemoryRequirements");
     table.QueueSubmit2 = (PFN_vkQueueSubmit2)gdpa(*pDevice, "vkQueueSubmit2");
     table.DeviceWaitIdle = (PFN_vkDeviceWaitIdle)gdpa(*pDevice, "vkDeviceWaitIdle");
@@ -164,35 +160,91 @@ DisplayX_CreateDevice(VkPhysicalDevice physicalDevice, const VkDeviceCreateInfo 
     table.GetDeviceQueue2 = (PFN_vkGetDeviceQueue2)gdpa(*pDevice, "vkGetDeviceQueue2");
     table.DestroyDevice = (PFN_vkDestroyDevice)gdpa(*pDevice, "vkDestroyDevice");
 
-    // ⭐ 수정: 변수명을 dev_node로 선언하여 매개변수 device와의 충돌 완전 방지
     auto dev_node = std::make_shared<struct device>();
     dev_node->handle = *pDevice;
     dev_node->physical = physicalDevice;
     dev_node->table = table;
 
-    // ⭐ 수정: 헤더파일 구조체에 선언한 포인터 필드에 안전하게 정렬 바인딩
     dev_node->GetMemoryFdKHR = (PFN_vkGetMemoryFdKHR)gdpa(*pDevice, "vkGetMemoryFdKHR");
     dev_node->MapMemory      = (PFN_vkMapMemory)gdpa(*pDevice, "vkMapMemory");
     dev_node->UnmapMemory    = (PFN_vkUnmapMemory)gdpa(*pDevice, "vkUnmapMemory");
 
 	{
 		scoped_lock l(global_lock);
-    	deviceDispatch[GetKey(*pDevice)] = dev_node; // 맵에 노드 주입
+    	deviceDispatch[GetKey(*pDevice)] = dev_node;
 	}
 	return VK_SUCCESS;
+}
+
+VK_LAYER_EXPORT void VKAPI_CALL
+DisplayX_DestroyDevice(VkDevice device, const VkAllocationCallbacks *pAllocator)
+{
+    if (!device) return;
+    scoped_lock l(global_lock);
+    auto it = deviceDispatch.find(GetKey(device));
+    if (it != deviceDispatch.end()) {
+        it->second->table.DestroyDevice(device, pAllocator);
+        deviceDispatch.erase(it);
+    }
+}
+
+// ⭐ [필수 구현 추가] 큐 요청을 낚아채서 내부 인프라에 바인딩하는 엔진
+VK_LAYER_EXPORT void VKAPI_CALL
+DisplayX_GetDeviceQueue(VkDevice device, uint32_t queueFamilyIndex, uint32_t queueIndex, VkQueue *pQueue)
+{
+    scoped_lock l(global_lock);
+    auto dev = deviceDispatch[GetKey(device)];
+    if (!dev) return;
+
+    dev->table.GetDeviceQueue(device, queueFamilyIndex, queueIndex, pQueue);
+    if (!pQueue || *pQueue == VK_NULL_HANDLE) return;
+
+    auto q_node = std::make_shared<struct queue>();
+    q_node->device = dev;
+    q_node->handle = *pQueue;
+
+    q_node->fence = std::make_unique<struct fence>();
+    VkFenceCreateInfo fenceInfo{};
+    fenceInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
+    dev->table.CreateFence(device, &fenceInfo, nullptr, &q_node->fence->handle);
+
+    queues[*pQueue] = q_node;
+    dev->queue = q_node; 
+}
+
+VK_LAYER_EXPORT void VKAPI_CALL
+DisplayX_GetDeviceQueue2(VkDevice device, const VkDeviceQueueInfo2* pQueueInfo, VkQueue *pQueue)
+{
+    scoped_lock l(global_lock);
+    auto dev = deviceDispatch[GetKey(device)];
+    if (!dev) return;
+
+    dev->table.GetDeviceQueue2(device, pQueueInfo, pQueue);
+    if (!pQueue || *pQueue == VK_NULL_HANDLE) return;
+
+    auto q_node = std::make_shared<struct queue>();
+    q_node->device = dev;
+    q_node->handle = *pQueue;
+
+    q_node->fence = std::make_unique<struct fence>();
+    VkFenceCreateInfo fenceInfo{};
+    fenceInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
+    dev->table.CreateFence(device, &fenceInfo, nullptr, &q_node->fence->handle);
+
+    queues[*pQueue] = q_node;
+    dev->queue = q_node;
 }
 
 VK_LAYER_EXPORT VkResult VKAPI_CALL 
 DisplayX_CreateXcbSurfaceKHR(VkInstance instance, const VkXcbSurfaceCreateInfoKHR* pCreateInfo, const VkAllocationCallbacks* pAllocator, VkSurfaceKHR* pSurface)
 {
-    // 외부 프로세스 대기 없이 즉시 통과
     struct fake_surface *fake_surf = (struct fake_surface *)calloc(1, sizeof(struct fake_surface));
     if (!fake_surf) return VK_ERROR_OUT_OF_HOST_MEMORY;
 
     fake_surf->loader_magic = ICD_LOADER_MAGIC;
     fake_surf->obj_type = VK_OBJECT_TYPE_SURFACE_KHR;
-    fake_surf->conn = pCreateInfo->connection; // ⭐ 낚아채기 1: X11 연결 포인터
-    fake_surf->window = pCreateInfo->window;   // ⭐ 낚아채기 2: X11 윈도우 ID
+    fake_surf->conn = pCreateInfo->connection; 
+    fake_surf->window = pCreateInfo->window;   
     fake_surf->instance = instance;
 
     *pSurface = VK_WRAP_NON_DISPATCHABLE_HANDLE(VkSurfaceKHR, fake_surf);
@@ -207,7 +259,7 @@ DisplayX_CreateXlibSurfaceKHR(VkInstance instance, const VkXlibSurfaceCreateInfo
 
     fake_surf->loader_magic = ICD_LOADER_MAGIC;
     fake_surf->obj_type = VK_OBJECT_TYPE_SURFACE_KHR;
-    fake_surf->conn = XGetXCBConnection(pCreateInfo->dpy); // Xlib 구조도 XCB 커넥션으로 환원
+    fake_surf->conn = XGetXCBConnection(pCreateInfo->dpy); 
     fake_surf->window = pCreateInfo->window;
     fake_surf->instance = instance;
     
@@ -222,12 +274,14 @@ DisplayX_GetPhysicalDeviceSurfaceSupportKHR(VkPhysicalDevice physicalDevice, uin
     return VK_SUCCESS;    
 }
 
-// --- [WSI Capabilities Enforcements] ---
-// GetPhysicalDeviceSurfaceCapabilitiesKHR / GetPhysicalDeviceSurfaceFormatsKHR 등의 메타데이터 쿼리 함수들은 
-// 기존의 형식을 그대로 유지하되 안전하게 작동합니다. (코드가 길어 생략하나 기존 형태 유지)
+VK_LAYER_EXPORT void VKAPI_CALL
+DisplayX_DestroySurfaceKHR(VkInstance instance, VkSurfaceKHR surface, const VkAllocationCallbacks *pAllocator)
+{
+    VK_UNWRAP_NON_DISPATCHABLE_HANDLE(surface, struct fake_surface, fake_surf);
+    if (fake_surf) free(fake_surf);
+}
 
-
-// --- [Swapchain Runtime Processing Engine - 리눅스 dma-buf 기반 재설계] ---
+// --- [Swapchain Runtime Processing Engine] ---
 
 VK_LAYER_EXPORT VkResult VKAPI_CALL
 DisplayX_CreateSwapchainKHR(VkDevice device, const VkSwapchainCreateInfoKHR *pCreateInfo, const VkAllocationCallbacks *pAllocator, VkSwapchainKHR *pSwapchain)
@@ -241,7 +295,7 @@ DisplayX_CreateSwapchainKHR(VkDevice device, const VkSwapchainCreateInfoKHR *pCr
     swapchain->loader_magic = ICD_LOADER_MAGIC;
     swapchain->obj_type = VK_OBJECT_TYPE_SWAPCHAIN_KHR;
     swapchain->wsi_device = device;
-    swapchain->imageCount = pCreateInfo->minImageCount < 3 ? 3 : pCreateInfo->minImageCount; // 안정적인 3버퍼 체제 최소 보장
+    swapchain->imageCount = pCreateInfo->minImageCount < 3 ? 3 : pCreateInfo->minImageCount; 
     swapchain->format = pCreateInfo->imageFormat;
     swapchain->extent = pCreateInfo->imageExtent;
     swapchain->device = dev;
@@ -251,17 +305,15 @@ DisplayX_CreateSwapchainKHR(VkDevice device, const VkSwapchainCreateInfoKHR *pCr
     swapchain->surface = fake_surface;
     swapchain->images.resize(swapchain->imageCount);
     
-    // 리눅스 dma-buf (External Memory Handle FD) 추출 구조로 이미지 생성
     for (uint32_t index = 0; index < swapchain->imageCount; index++) {
         VkResult result;
         auto fake_image = std::make_shared<struct fake_swapchain_image>();
         fake_image->width = swapchain->extent.width;
         fake_image->height = swapchain->extent.height;
 
-        // 리눅스 표준 외부 메모리 내보내기 구조체 설정
         VkExternalMemoryImageCreateInfo externalCreateInfo{};
         externalCreateInfo.sType = VK_STRUCTURE_TYPE_EXTERNAL_MEMORY_IMAGE_CREATE_INFO;
-        externalCreateInfo.handleTypes = VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_FD_BIT; // dma-buf 호환 구조
+        externalCreateInfo.handleTypes = VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_FD_BIT; 
 
         VkImageCreateInfo createInfo{};
         createInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
@@ -273,14 +325,13 @@ DisplayX_CreateSwapchainKHR(VkDevice device, const VkSwapchainCreateInfoKHR *pCr
         createInfo.arrayLayers = 1;
         createInfo.samples = VK_SAMPLE_COUNT_1_BIT;
         createInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
-        createInfo.usage = pCreateInfo->imageUsage | VK_IMAGE_USAGE_TRANSFER_SRC_BIT; // 읽기 복사 대비 여유 플래그 추가
+        createInfo.usage = pCreateInfo->imageUsage | VK_IMAGE_USAGE_TRANSFER_SRC_BIT; 
         createInfo.sharingMode = pCreateInfo->imageSharingMode;    
         createInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 
         result = table.CreateImage(device, &createInfo, nullptr, &fake_image->handle);
         if (result != VK_SUCCESS) { free(swapchain); return result; }
 
-        // 메모리 요구사항 쿼리 및 전용 메모리 할당
         VkMemoryRequirements memReqs;
         table.GetImageMemoryRequirements(device, fake_image->handle, &memReqs);
 
@@ -303,13 +354,9 @@ DisplayX_CreateSwapchainKHR(VkDevice device, const VkSwapchainCreateInfoKHR *pCr
         swapchain->images[index] = fake_image;
     }
 
-    // 소켓 전송 패킷 및 ACK 루프 제거 (인프로세스 다이렉트 전환으로 불필요)
-
     *pSwapchain = VK_WRAP_NON_DISPATCHABLE_HANDLE(VkSwapchainKHR, swapchain);
     return VK_SUCCESS;
 }
-
-// --- [X11 Direct Injection Engine (Re-architected)] ---
 
 VK_LAYER_EXPORT VkResult VKAPI_CALL
 DisplayX_GetSwapchainImagesKHR(VkDevice device, VkSwapchainKHR swapchain, uint32_t* pSwapchainImageCount, VkImage* pSwapchainImages)
@@ -399,21 +446,34 @@ DisplayX_DestroySwapchainKHR(VkDevice device, VkSwapchainKHR swapchain, const Vk
 	for (uint32_t index = 0; index < fake_swapchain->images.size(); index++) {
 		auto swapchain_image = fake_swapchain->images[index];
 		dev->table.FreeMemory(device, swapchain_image->memory, nullptr);
-        // 안드로이드 AHB 해제부 제거
 		dev->table.DestroyImage(device, swapchain_image->handle, nullptr);
 	}
 	fake_swapchain->images.clear();
-    // 소켓 소멸 패킷 전송부 완전히 삭제
 	free(fake_swapchain);
 }
 
 VK_LAYER_EXPORT VkResult VKAPI_CALL
 DisplayX_QueuePresentKHR(VkQueue queue, const VkPresentInfoKHR *pPresentInfo)
 {
-    auto q = queues[queue];
-    if (!q || !q->device || !q->fence) return VK_ERROR_OUT_OF_HOST_MEMORY;
+    std::shared_ptr<struct queue> q = nullptr;
+    {
+        scoped_lock l(global_lock);
+        auto it = queues.find(queue);
+        if (it != queues.end()) {
+            q = it->second;
+        }
+    }
 
-    // 1. 기존 드라이버 동기화 가속화 처리
+    // ⭐ 안전장치 보완: 큐 맵 매핑이 정상적이지 않다면 에러를 피하고 하부 드라이버로 안전하게 우회 통과시킴
+    if (!q || !q->device || !q->fence || !q->fence->handle) {
+        for (auto& pair : deviceDispatch) {
+            if (pair.second->table.QueuePresentKHR) {
+                return pair.second->table.QueuePresentKHR(queue, pPresentInfo);
+            }
+        }
+        return VK_ERROR_OUT_OF_HOST_MEMORY;
+    }
+
     q->device->table.ResetFences(q->device->handle, 1, &q->fence->handle);
 
     VkSubmitInfo submitInfo{};
@@ -423,13 +483,8 @@ DisplayX_QueuePresentKHR(VkQueue queue, const VkPresentInfoKHR *pPresentInfo)
     submitInfo.waitSemaphoreCount = pPresentInfo->waitSemaphoreCount;
     submitInfo.pWaitSemaphores = pPresentInfo->pWaitSemaphores;
 
-    // GPU 연산 명령 제출
     q->device->table.QueueSubmit(q->handle, 1, &submitInfo, q->fence->handle);
-
-    // ⭐ 인프로세스 직접 찔러넣기를 위해 GPU 작업이 끝날 때까지 CPU가 완벽히 보장 대기 (Host Wait)
     q->device->table.WaitForFences(q->device->handle, 1, &q->fence->handle, VK_TRUE, UINT64_MAX); 
-
-    // 기존의 무겁고 느린 fence_fd 추출 및 dup, 소켓 루프 전면 삭제!!
 
     for (uint32_t i = 0; i < pPresentInfo->swapchainCount; i++) {
         VK_UNWRAP_NON_DISPATCHABLE_HANDLE(pPresentInfo->pSwapchains[i], struct fake_swapchain, fake_swapchain)
@@ -438,45 +493,39 @@ DisplayX_QueuePresentKHR(VkQueue queue, const VkPresentInfoKHR *pPresentInfo)
         uint32_t imgIdx = pPresentInfo->pImageIndices[i];
         auto target_image = fake_swapchain->images[imgIdx];
 
-        // 2부에서 낚아챈 소중한 X11 자원 연결
         xcb_connection_t* conn = (xcb_connection_t*)fake_swapchain->surface->conn;
         xcb_window_t window = fake_swapchain->surface->window;
         if (!conn || window == 0) continue;
 
-       // ⭐ 안전 보정: 디스패치 테이블에 보관한 포인터로 드라이버를 직접 호출하여 픽셀 주소 확보
         void* pixel_data = nullptr;
         VkResult res = q->device->MapMemory 
             ? q->device->MapMemory(q->device->handle, target_image->memory, 0, VK_WHOLE_SIZE, 0, &pixel_data)
             : VK_ERROR_INITIALIZATION_FAILED;
 
         if (res == VK_SUCCESS && pixel_data != nullptr) {
-            // X11에서 그리기 도구 역할을 할 기본 임시 그래픽 컨텍스트(GC) 생성
             xcb_gcontext_t gc = xcb_generate_id(conn);
             xcb_create_gc(conn, gc, window, 0, nullptr);
 
             uint32_t width = fake_swapchain->extent.width;
             uint32_t height = fake_swapchain->extent.height;
-            uint32_t image_size = width * height * 4; // RGBA 32bpp 표준 데이터 크기
+            uint32_t image_size = width * height * 4; 
 
-            // 🚀 가로챈 X11 윈도우 창 핸들에 원본 픽셀 데이터 즉시 투하
             xcb_put_image(
                 conn,
                 XCB_IMAGE_FORMAT_Z_PIXMAP,
                 window,
                 gc,
-                width, height,     // 캔버스 가로, 세로 해상도
-                0, 0,              // 목적지 오프셋 좌표 (X, Y)
-                0,                 // 레프트 패딩 값
-                24,                // 컬러 뎁스 (화면 표시 깊이)
-                image_size,        // 투하할 바이트 크기
-                (const uint8_t*)pixel_data // GPU 드라이버가 그린 실시간 픽셀 포인터!
+                width, height,     
+                0, 0,              
+                0,                 
+                24,                
+                image_size,        
+                (const uint8_t*)pixel_data 
             );
 
-            // X11 서버에 명령을 즉시 전송하여 화면에 동기화 구현
             xcb_flush(conn);
             xcb_free_gc(conn, gc);
 
-            // ⭐ 수정: 다음 프레임을 위해 언맵 함수도 테이블 경유 호출로 안전하게 해제
             q->device->UnmapMemory(q->device->handle, target_image->memory);
         } else {
             Logger::log("error", "Direct injection failed: Unable to map memory of image index %d", imgIdx);
@@ -489,22 +538,23 @@ DisplayX_QueuePresentKHR(VkQueue queue, const VkPresentInfoKHR *pPresentInfo)
 extern "C" {
 
 // 1. Instance 레벨 함수 주소 중계 인터셉터
-__attribute__((visibility("default"))) VK_LAYER_EXPORT PFN_vkVoidFunction VKAPI_CALL
+VK_LAYER_EXPORT PFN_vkVoidFunction VKAPI_CALL
 DisplayX_GetInstanceProcAddr(VkInstance instance, const char *pName)
 {
-    // 매크로를 이용해 가로챌 핵심 함수 매핑
     GETPROCADDR(CreateInstance);
     GETPROCADDR(DestroyInstance);
     GETPROCADDR(CreateDevice);
+    GETPROCADDR(DestroyDevice);
     GETPROCADDR(CreateXcbSurfaceKHR);
     GETPROCADDR(CreateXlibSurfaceKHR);
     GETPROCADDR(GetPhysicalDeviceSurfaceSupportKHR);
+    // ⭐ 중요: 로더가 큐를 가져갈 수 있도록 큐 인터셉터 함수 포인터도 바인딩 노출
+    GETPROCADDR(GetDeviceQueue);
+    GETPROCADDR(GetDeviceQueue2);
     
-    // 자기 자신(GetInstanceProcAddr)의 주소를 요청받을 때 반환
     if (!strcmp(pName, "vkGetInstanceProcAddr")) 
         return (PFN_vkVoidFunction)&DisplayX_GetInstanceProcAddr;
 
-    // 가로채지 않는 나머지 일반 함수들은 하부 Vulkan 드라이버 체인으로 바이패스(Pass-through)
     if (instance == VK_NULL_HANDLE) return nullptr;
     
     scoped_lock l(global_lock);
@@ -514,8 +564,8 @@ DisplayX_GetInstanceProcAddr(VkInstance instance, const char *pName)
     return it->second.GetInstanceProcAddr(instance, pName);
 }
 
-// 2. Device 레벨 (GPU 내부) 함수 주소 중계 인터셉터
-__attribute__((visibility("default"))) VK_LAYER_EXPORT PFN_vkVoidFunction VKAPI_CALL
+// 2. Device 레벨 함수 주소 중계 인터셉터
+VK_LAYER_EXPORT PFN_vkVoidFunction VKAPI_CALL
 DisplayX_GetDeviceProcAddr(VkDevice device, const char *pName)
 {
     GETPROCADDR(GetSwapchainImagesKHR);
@@ -525,6 +575,10 @@ DisplayX_GetDeviceProcAddr(VkDevice device, const char *pName)
     GETPROCADDR(DestroySwapchainKHR);
     GETPROCADDR(QueuePresentKHR);
     GETPROCADDR(WaitForPresentKHR);
+    // ⭐ Device 단위 내부 질의 대응
+    GETPROCADDR(GetDeviceQueue);
+    GETPROCADDR(GetDeviceQueue2);
+    GETPROCADDR(DestroyDevice);
 
     if (!strcmp(pName, "vkGetDeviceProcAddr")) 
         return (PFN_vkVoidFunction)&DisplayX_GetDeviceProcAddr;
@@ -536,6 +590,15 @@ DisplayX_GetDeviceProcAddr(VkDevice device, const char *pName)
     if (it == deviceDispatch.end()) return nullptr;
 
     return it->second->table.GetDeviceProcAddr(device, pName);
+}
+
+// ⭐ [완전 중요] Vulkan 로더가 심볼 테이블 바인딩 시 최종 탐색하는 실제 공식 엔트리포인트 래퍼 매핑
+VK_LAYER_EXPORT PFN_vkVoidFunction VKAPI_CALL vkGetInstanceProcAddr(VkInstance instance, const char *pName) {
+    return DisplayX_GetInstanceProcAddr(instance, pName);
+}
+
+VK_LAYER_EXPORT PFN_vkVoidFunction VKAPI_CALL vkGetDeviceProcAddr(VkDevice device, const char *pName) {
+    return DisplayX_GetDeviceProcAddr(device, pName);
 }
 
 }
