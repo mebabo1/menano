@@ -46,12 +46,15 @@ struct __attribute__((packed)) FullPacket {
     char padding[156];      // 서버 통신 규격 188바이트를 맞추기 위한 완충 영역
 };
 
+// [스타일 유지 해결책] 함수 내 문법 꼬임을 막기 위해 페이로드 구조체 정의만 한 칸 밖으로 독립시켰습니다.
+struct __attribute__((packed)) RenderPayload {
+    int32_t shmid;
+    FullPacket packet;
+};
+
 bool sendFD(int socket, int fd, const FullPacket& packet) {
-    // 1. shmid와 packet을 하나의 구조체로 결합
-    struct {
-        int32_t shmid;
-        FullPacket packet;
-    } __attribute__((packed)) payload = { 1, packet };
+    // 깔끔하고 안정적으로 전역 정의된 구조체 인스턴스를 생성합니다.
+    RenderPayload payload = { 1, packet };
 
     // 2. iovec 설정
     struct iovec iov = {
@@ -390,7 +393,8 @@ DisplayX_GetPhysicalDeviceSurfaceCapabilitiesKHR(VkPhysicalDevice physicalDevice
 	VK_UNWRAP_NON_DISPATCHABLE_HANDLE(surface, struct fake_surface, fake_surface)
 	if (!fake_surface || !fake_surface->conn) return VK_ERROR_SURFACE_LOST_KHR;
 
-	pSurfaceCapabilities->minImageCount = 4;
+    // [안정성 수정] 드라이버 내부 자원 체인의 유연성을 위해 최소 버퍼 요구치를 3으로 열어줍니다.
+	pSurfaceCapabilities->minImageCount = 3;
 	pSurfaceCapabilities->maxImageCount = 4;
 
 	xcb_get_geometry_cookie_t geom_cookie = xcb_get_geometry(fake_surface->conn, fake_surface->window);
@@ -604,15 +608,20 @@ DisplayX_CreateSwapchainKHR(VkDevice device, const VkSwapchainCreateInfoKHR *pCr
         swapchain->images[index] = fake_image;
     }
 
-    // [2단계] 원자적 메타데이터 전송 (구조체로 묶어서 전송)
+    // [2단계] 원자적 메타데이터 전송 (서버 규격 188바이트 패딩 의무 준수 고정)
     struct __attribute__((packed)) SwapchainInitPacket {
-        uint32_t magic;      // '1', '0', 'B', 'G'에 해당하는 매직 넘버
+        uint32_t magic;         // '1', '0', 'B', 'G'
         uint32_t request_code;
         uint32_t id;
         uint32_t image_count;
+        char padding[172];      // 188바이트 정렬을 정확히 보장하기 위한 완충 패딩 영역
     };
 
-    SwapchainInitPacket init = { 0x47423031, 1, (uint32_t)swapchain->id, (uint32_t)swapchain->imageCount };
+    SwapchainInitPacket init{};
+    init.magic = 0x47423031;
+    init.request_code = 1;
+    init.id = (uint32_t)swapchain->id;
+    init.image_count = (uint32_t)swapchain->imageCount;
     
     if (write(fake_surface->native_renderer_fd, &init, sizeof(init)) != sizeof(init)) {
         free(swapchain);
@@ -658,7 +667,7 @@ DisplayX_GetSwapchainImagesKHR(VkDevice device, VkSwapchainKHR swapchain, uint32
 	}
 	*pSwapchainImageCount = count;
 	return VK_SUCCESS;
-}
+	}
 
 VK_LAYER_EXPORT VkResult VKAPI_CALL
 DisplayX_AcquireNextImageKHR(VkDevice device, VkSwapchainKHR swapchain, uint64_t timeout, VkSemaphore semaphore, VkFence fence, uint32_t *pImageIndex)
@@ -732,11 +741,19 @@ DisplayX_DestroySwapchainKHR(VkDevice device, VkSwapchainKHR swapchain, const Vk
 	}
 	fake_swapchain->images.clear();
 
-	int request_code = 3;
-	write(fake_swapchain->surface->native_renderer_fd, &request_code, 4);
-	write(fake_swapchain->surface->native_renderer_fd, &fake_swapchain->id, 1);
+    // [서버 싱크 수정] 규격 규정에 맞추어 전체 데이터 패킷 형태로 정렬하여 안전하게 닫습니다.
+    struct __attribute__((packed)) SwapchainDestroyPacket {
+        uint32_t request_code;
+        uint32_t id;
+        char padding[180];
+    };
+    SwapchainDestroyPacket destroy_pack{};
+    destroy_pack.request_code = 3;
+    destroy_pack.id = (uint32_t)fake_swapchain->id;
+
+	write(fake_swapchain->surface->native_renderer_fd, &destroy_pack, sizeof(destroy_pack));
 	id.destroy(fake_swapchain->id);
-	free(swapchain);
+	free(fake_swapchain);
 }
 
 VK_LAYER_EXPORT VkResult VKAPI_CALL
@@ -762,7 +779,6 @@ DisplayX_QueuePresentKHR(VkQueue queue, const VkPresentInfoKHR *pPresentInfo)
     q->device->table.GetFenceFdKHR(q->device->handle, &getFence, &q->fence->sync_fd);
 
     static uint32_t frame_index = 0;
-    static bool is_first_frame = true; // 첫 프레임 동기화 예외 처리를 위한 플래그
 
     for (uint32_t i = 0; i < pPresentInfo->swapchainCount; i++) {
         VK_UNWRAP_NON_DISPATCHABLE_HANDLE(pPresentInfo->pSwapchains[i], struct fake_swapchain, fake_swapchain)
@@ -770,13 +786,12 @@ DisplayX_QueuePresentKHR(VkQueue queue, const VkPresentInfoKHR *pPresentInfo)
         int fd = fake_swapchain->surface->native_renderer_fd;
         if (fd < 0) continue;
 
-        // 2. 동기화: 첫 프레임 이후부터는 서버의 '완료 신호'를 기다립니다.
-        // 이것이 없으면 클라이언트가 데이터를 너무 빨리 쏴서 EPIPE(소켓 끊김) 발생
-        if (!is_first_frame) {
+        // [데드락 방지 수정] static 전역 변수 대신, 스왑체인 자체 구조체 내부에 플래그를 두어 
+        // 스왑체인이 리사이즈되어 재생성되더라도 무한 블로킹에 빠지지 않도록 처리 스타일을 유지했습니다.
+        if (fake_swapchain->frame_count > 0) {
             char ack_buffer[32];
-            // 서버로부터 응답이 올 때까지 대기 (Flow Control)
             ssize_t n = recv(fd, ack_buffer, sizeof(ack_buffer), MSG_WAITALL);
-            if (n <= 0) return VK_ERROR_OUT_OF_DATE_KHR; // 서버 연결이 끊겼다면 에러 처리
+            if (n <= 0) return VK_ERROR_OUT_OF_DATE_KHR; 
         }
 
         // 3. 펜스 FD 복제 및 패킷 전송
@@ -796,7 +811,7 @@ DisplayX_QueuePresentKHR(VkQueue queue, const VkPresentInfoKHR *pPresentInfo)
             close(fence_fd_dup);
         }
         
-        is_first_frame = false; // 첫 프레임 처리 완료
+        fake_swapchain->frame_count++; // 프레임 카운트 가산
     }
 
     // 4. 자원 정리
