@@ -16,7 +16,16 @@ ID id;
 std::mutex global_lock;
 
 // --- [Utility Functions] ---
-// 안드로이드 버퍼 포맷 변환 함수(to_ahardwarebuffer_format) 및 sendFD 폐기
+int pick_memory_index(VkInstance instance, VkPhysicalDevice physical, uint32_t memoryBits) {
+    VkPhysicalDeviceMemoryProperties memoryProps{};
+    uint32_t idx;
+    instanceDispatch[GetKey(instance)].GetPhysicalDeviceMemoryProperties(physical, &memoryProps);
+    for (idx = 0; idx < memoryProps.memoryTypeCount; idx++) {
+        if (memoryBits & (1u << idx))
+            return idx;
+    }
+    return UINT32_MAX;
+}
 
 // --- [Vulkan Core Intercepts] ---
 
