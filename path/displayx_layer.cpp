@@ -1,7 +1,10 @@
 #include "displayx_layer.hpp"
 #include <vector>
 #include <unistd.h>
-#include <algorithm> // std::min 사용을 위해 추가
+#include <algorithm>
+#include <sys/socket.h>
+#include <sys/un.h>
+#include <cstring>
 
 #define GETPROCADDR(func) \
 if (!strcmp(pName, "vk" #func)) \
@@ -13,6 +16,15 @@ std::unordered_map<void *, std::shared_ptr<struct device>> deviceDispatch;
 std::unordered_map<VkQueue, std::shared_ptr<struct queue>> queues;
 ID id;
 std::mutex global_lock;
+
+// 외부 X11 앱과 통신하기 위한 IPC 전송 데이터 규격
+struct PresentationPacket {
+    uint32_t window_id;
+    uint32_t image_index;
+    uint32_t width;
+    uint32_t height;
+    uint32_t format;
+};
 
 // --- [Utility Functions] ---
 int pick_memory_index(VkInstance instance, VkPhysicalDevice physical, uint32_t memoryBits) {
@@ -26,12 +38,95 @@ int pick_memory_index(VkInstance instance, VkPhysicalDevice physical, uint32_t m
     return UINT32_MAX;
 }
 
+// Unix Domain Socket을 통해 dma-buf File Descriptor를 외부 X11 앱으로 전달하는 헬퍼 함수
+static int send_dma_buf_to_x11_app(int window_id, int img_idx, int fd_to_send, uint32_t w, uint32_t h, uint32_t fmt) {
+    // Termux 환경 사양에 맞춘 임시 소켓 경로 (실제 외부 X11 앱이 Listen 중인 경로로 매칭 필요)
+    const char* socket_path = "/data/data/com.termux/files/usr/tmp/displayx_compositor.sock";
+    
+    int sock = ::socket(AF_UNIX, SOCK_STREAM, 0);
+    if (sock < 0) return -1;
+
+    struct sockaddr_un addr{};
+    addr.sun_family = AF_UNIX;
+    ::strncpy(addr.sun_path, socket_path, sizeof(addr.sun_path) - 1);
+
+    if (::connect(sock, (struct sockaddr*)&addr, sizeof(addr)) < 0) {
+        ::close(sock);
+        return -2; 
+    }
+
+    PresentationPacket packet{ (uint32_t)window_id, (uint32_t)img_idx, w, h, fmt };
+
+    struct msghdr msg{};
+    struct iovec iov[1];
+    iov[0].iov_base = &packet;
+    iov[0].iov_len = sizeof(packet);
+    msg.msg_iov = iov;
+    msg.msg_iovlen = 1;
+
+    char cmsghdbuf[CMSG_SPACE(sizeof(int))];
+    msg.msg_control = cmsghdbuf;
+    msg.msg_controllen = sizeof(cmsghdbuf);
+
+    struct cmsghdr* cmsg = CMSG_FIRSTHDR(&msg);
+    cmsg->cmsg_level = SOL_SOCKET;
+    cmsg->cmsg_type = SCM_RIGHTS;
+    cmsg->cmsg_len = CMSG_LEN(sizeof(int));
+    ::memcpy(CMSG_DATA(cmsg), &fd_to_send, sizeof(int));
+
+    ::sendmsg(sock, &msg, 0);
+    ::close(sock);
+    return 0;
+}
+
 // --- [Vulkan Core Intercepts] ---
 
 VK_LAYER_EXPORT VkResult VKAPI_CALL
 DisplayX_WaitForPresentKHR(VkDevice device, VkSwapchainKHR swapchain, uint64_t timeout, uint64_t flags)
 {
     return VK_SUCCESS; 
+}
+
+// ⭐ [세그폴트 방지용 핵심 추가] 앱이 서피스 정보를 요구할 때 가짜 Mocking 데이터를 주어 하부 드라이버 붕괴를 원천 차단
+VK_LAYER_EXPORT VkResult VKAPI_CALL
+DisplayX_GetPhysicalDeviceSurfaceCapabilitiesKHR(VkPhysicalDevice physicalDevice, VkSurfaceKHR surface, VkSurfaceCapabilitiesKHR* pSurfaceCapabilities)
+{
+    pSurfaceCapabilities->minImageCount = 2;
+    pSurfaceCapabilities->maxImageCount = 8;
+    pSurfaceCapabilities->currentExtent = {0xFFFFFFFF, 0xFFFFFFFF}; 
+    pSurfaceCapabilities->minImageExtent = {1, 1};
+    pSurfaceCapabilities->maxImageExtent = {8112, 8112};
+    pSurfaceCapabilities->maxImageArrayLayers = 1;
+    pSurfaceCapabilities->supportedTransforms = VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR;
+    pSurfaceCapabilities->currentTransform = VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR;
+    pSurfaceCapabilities->supportedCompositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
+    pSurfaceCapabilities->supportedUsageFlags = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
+    return VK_SUCCESS;
+}
+
+VK_LAYER_EXPORT VkResult VKAPI_CALL
+DisplayX_GetPhysicalDeviceSurfaceFormatsKHR(VkPhysicalDevice physicalDevice, VkSurfaceKHR surface, uint32_t* pSurfaceFormatCount, VkSurfaceFormatKHR* pSurfaceFormats)
+{
+    if (pSurfaceFormats == nullptr) {
+        *pSurfaceFormatCount = 1;
+        return VK_SUCCESS;
+    }
+    pSurfaceFormats[0].format = VK_FORMAT_B8G8R8A8_UNORM; 
+    pSurfaceFormats[0].colorSpace = VK_COLOR_SPACE_SRGB_NONLINEAR_KHR;
+    *pSurfaceFormatCount = 1;
+    return VK_SUCCESS;
+}
+
+VK_LAYER_EXPORT VkResult VKAPI_CALL
+DisplayX_GetPhysicalDeviceSurfacePresentModesKHR(VkPhysicalDevice physicalDevice, VkSurfaceKHR surface, uint32_t* pPresentModeCount, VkPresentModeKHR* pPresentModes)
+{
+    if (pPresentModes == nullptr) {
+        *pPresentModeCount = 1;
+        return VK_SUCCESS;
+    }
+    pPresentModes[0] = VK_PRESENT_MODE_FIFO_KHR;
+    *pPresentModeCount = 1;
+    return VK_SUCCESS;
 }
 
 VK_LAYER_EXPORT VkResult VKAPI_CALL
@@ -188,7 +283,6 @@ DisplayX_DestroyDevice(VkDevice device, const VkAllocationCallbacks *pAllocator)
     }
 }
 
-// ⭐ [필수 구현 추가] 큐 요청을 낚아채서 내부 인프라에 바인딩하는 엔진
 VK_LAYER_EXPORT void VKAPI_CALL
 DisplayX_GetDeviceQueue(VkDevice device, uint32_t queueFamilyIndex, uint32_t queueIndex, VkQueue *pQueue)
 {
@@ -452,6 +546,7 @@ DisplayX_DestroySwapchainKHR(VkDevice device, VkSwapchainKHR swapchain, const Vk
 	free(fake_swapchain);
 }
 
+// 🚀 [구조 전면 혁신] 레이어가 직접 X11 드로잉을 하지 않고 하드웨어 버퍼 핸들(dma-buf)을 IPC로 전송
 VK_LAYER_EXPORT VkResult VKAPI_CALL
 DisplayX_QueuePresentKHR(VkQueue queue, const VkPresentInfoKHR *pPresentInfo)
 {
@@ -464,7 +559,6 @@ DisplayX_QueuePresentKHR(VkQueue queue, const VkPresentInfoKHR *pPresentInfo)
         }
     }
 
-    // ⭐ 안전장치 보완: 큐 맵 매핑이 정상적이지 않다면 에러를 피하고 하부 드라이버로 안전하게 우회 통과시킴
     if (!q || !q->device || !q->fence || !q->fence->handle) {
         for (auto& pair : deviceDispatch) {
             if (pair.second->table.QueuePresentKHR) {
@@ -493,42 +587,33 @@ DisplayX_QueuePresentKHR(VkQueue queue, const VkPresentInfoKHR *pPresentInfo)
         uint32_t imgIdx = pPresentInfo->pImageIndices[i];
         auto target_image = fake_swapchain->images[imgIdx];
 
-        xcb_connection_t* conn = (xcb_connection_t*)fake_swapchain->surface->conn;
-        xcb_window_t window = fake_swapchain->surface->window;
-        if (!conn || window == 0) continue;
+        uint32_t window = fake_swapchain->surface->window;
+        if (window == 0) continue;
 
-        void* pixel_data = nullptr;
-        VkResult res = q->device->MapMemory 
-            ? q->device->MapMemory(q->device->handle, target_image->memory, 0, VK_WHOLE_SIZE, 0, &pixel_data)
-            : VK_ERROR_INITIALIZATION_FAILED;
+        // GPU 메모리로부터 리눅스 표준 dma-buf FD 추출
+        int dma_buf_fd = -1;
+        if (q->device->GetMemoryFdKHR) {
+            VkMemoryGetFdInfoKHR getFdInfo{};
+            getFdInfo.sType = VK_STRUCTURE_TYPE_MEMORY_GET_FD_INFO_KHR;
+            getFdInfo.memory = target_image->memory;
+            getFdInfo.handleType = VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_FD_BIT;
+            
+            q->device->GetMemoryFdKHR(q->device->handle, &getFdInfo, &dma_buf_fd);
+        }
 
-        if (res == VK_SUCCESS && pixel_data != nullptr) {
-            xcb_gcontext_t gc = xcb_generate_id(conn);
-            xcb_create_gc(conn, gc, window, 0, nullptr);
-
-            uint32_t width = fake_swapchain->extent.width;
-            uint32_t height = fake_swapchain->extent.height;
-            uint32_t image_size = width * height * 4; 
-
-            xcb_put_image(
-                conn,
-                XCB_IMAGE_FORMAT_Z_PIXMAP,
-                window,
-                gc,
-                width, height,     
-                0, 0,              
-                0,                 
-                24,                
-                image_size,        
-                (const uint8_t*)pixel_data 
+        // 픽셀 복사 없이 완벽한 제로카피(Zero-Copy) 파일 디스크립터 패싱 수행
+        if (dma_buf_fd != -1) {
+            send_dma_buf_to_x11_app(
+                window, 
+                imgIdx, 
+                dma_buf_fd, 
+                fake_swapchain->extent.width, 
+                fake_swapchain->extent.height,
+                (uint32_t)fake_swapchain->format
             );
-
-            xcb_flush(conn);
-            xcb_free_gc(conn, gc);
-
-            q->device->UnmapMemory(q->device->handle, target_image->memory);
+            ::close(dma_buf_fd); // 내보낸 후 로컬 복사본 FD 폐쇄
         } else {
-            Logger::log("error", "Direct injection failed: Unable to map memory of image index %d", imgIdx);
+            Logger::log("error", "Failed to export dma-buf FD for image index %d", imgIdx);
         }
     }
 
@@ -537,7 +622,6 @@ DisplayX_QueuePresentKHR(VkQueue queue, const VkPresentInfoKHR *pPresentInfo)
 
 extern "C" {
 
-// 1. Instance 레벨 함수 주소 중계 인터셉터
 VK_LAYER_EXPORT PFN_vkVoidFunction VKAPI_CALL
 DisplayX_GetInstanceProcAddr(VkInstance instance, const char *pName)
 {
@@ -548,9 +632,14 @@ DisplayX_GetInstanceProcAddr(VkInstance instance, const char *pName)
     GETPROCADDR(CreateXcbSurfaceKHR);
     GETPROCADDR(CreateXlibSurfaceKHR);
     GETPROCADDR(GetPhysicalDeviceSurfaceSupportKHR);
-    // ⭐ 중요: 로더가 큐를 가져갈 수 있도록 큐 인터셉터 함수 포인터도 바인딩 노출
     GETPROCADDR(GetDeviceQueue);
     GETPROCADDR(GetDeviceQueue2);
+    
+    // ⭐ [세그폴트 해결을 위한 매핑 등록] 로더에 기믹 인터셉터 주소 반환 유도
+    GETPROCADDR(GetPhysicalDeviceSurfaceCapabilitiesKHR);
+    GETPROCADDR(GetPhysicalDeviceSurfaceFormatsKHR);
+    GETPROCADDR(GetPhysicalDeviceSurfacePresentModesKHR);
+    GETPROCADDR(DestroySurfaceKHR);
     
     if (!strcmp(pName, "vkGetInstanceProcAddr")) 
         return (PFN_vkVoidFunction)&DisplayX_GetInstanceProcAddr;
@@ -564,7 +653,6 @@ DisplayX_GetInstanceProcAddr(VkInstance instance, const char *pName)
     return it->second.GetInstanceProcAddr(instance, pName);
 }
 
-// 2. Device 레벨 함수 주소 중계 인터셉터
 VK_LAYER_EXPORT PFN_vkVoidFunction VKAPI_CALL
 DisplayX_GetDeviceProcAddr(VkDevice device, const char *pName)
 {
@@ -575,7 +663,6 @@ DisplayX_GetDeviceProcAddr(VkDevice device, const char *pName)
     GETPROCADDR(DestroySwapchainKHR);
     GETPROCADDR(QueuePresentKHR);
     GETPROCADDR(WaitForPresentKHR);
-    // ⭐ Device 단위 내부 질의 대응
     GETPROCADDR(GetDeviceQueue);
     GETPROCADDR(GetDeviceQueue2);
     GETPROCADDR(DestroyDevice);
@@ -592,7 +679,6 @@ DisplayX_GetDeviceProcAddr(VkDevice device, const char *pName)
     return it->second->table.GetDeviceProcAddr(device, pName);
 }
 
-// ⭐ [완전 중요] Vulkan 로더가 심볼 테이블 바인딩 시 최종 탐색하는 실제 공식 엔트리포인트 래퍼 매핑
 VK_LAYER_EXPORT PFN_vkVoidFunction VKAPI_CALL vkGetInstanceProcAddr(VkInstance instance, const char *pName) {
     return DisplayX_GetInstanceProcAddr(instance, pName);
 }
