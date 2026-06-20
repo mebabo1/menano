@@ -645,19 +645,17 @@ VK_LAYER_EXPORT VkResult VKAPI_CALL DisplayX_GetPhysicalDeviceSurfaceCapabilitie
 {
     scoped_lock lock(global_lock);
     
-    // 인스턴스 디스패치 테이블에서 실제 드라이버의 함수 포인터를 찾음
+    // 인스턴스 디스패치 테이블에서 실제 드라이버의 주소를 찾음
     auto it = instanceDispatch.find(SAFE_KEY(physicalDevice));
     if (it == instanceDispatch.end()) return VK_ERROR_INITIALIZATION_FAILED;
 
-    // 만약 드라이버가 2KHR 함수를 지원하면 호출하고, 없으면 기본형으로 에뮬레이션하거나 패스
-    if (it->second.GetPhysicalDeviceSurfaceCapabilities2KHR) {
-        return it->second.GetPhysicalDeviceSurfaceCapabilities2KHR(physicalDevice, pSurfaceInfo, pSurfaceCapabilities);
-    }
-    
-    // 호환성 대비용 폴백 (드라이버가 2KHR을 직접 지원 안 할 경우 기본 포인터 사용)
+    // 🛠️ 구조체 멤버를 직접 참조하지 않고, GetInstanceProcAddr를 통해 함수 포인터를 동적으로 획득
     PFN_vkGetPhysicalDeviceSurfaceCapabilities2KHR pfn = 
-        (PFN_vkGetPhysicalDeviceSurfaceCapabilities2KHR)it->second.GetInstanceProcAddr(instanceMap[SAFE_KEY(physicalDevice)], "vkGetPhysicalDeviceSurfaceCapabilities2KHR");
-        
+        (PFN_vkGetPhysicalDeviceSurfaceCapabilities2KHR)it->second.GetInstanceProcAddr(
+            instanceMap[SAFE_KEY(physicalDevice)], 
+            "vkGetPhysicalDeviceSurfaceCapabilities2KHR"
+        );
+
     if (pfn) {
         return pfn(physicalDevice, pSurfaceInfo, pSurfaceCapabilities);
     }
