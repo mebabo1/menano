@@ -560,15 +560,19 @@ DisplayX_AcquireNextImage2KHR(VkDevice device, const VkAcquireNextImageInfoKHR* 
 
     if (pAcquireInfo->fence != VK_NULL_HANDLE || pAcquireInfo->semaphore != VK_NULL_HANDLE) {
         std::lock_guard<std::mutex> l(global_lock);
-        // 🔑 디바이스 디스패치 테이블 검색은 GetKey
-        auto dev = deviceDispatch[GetKey(device)];
-        auto q = dev->queue;
-        if (q && q->handle != VK_NULL_HANDLE) {
-            VkSubmitInfo submitInfo{};
-            submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-            submitInfo.signalSemaphoreCount = (pAcquireInfo->semaphore != VK_NULL_HANDLE) ? 1 : 0;
-            submitInfo.pSignalSemaphores = (pAcquireInfo->semaphore != VK_NULL_HANDLE) ? &pAcquireInfo->semaphore : nullptr;
-            dev->table.QueueSubmit(q->handle, 1, &submitInfo, pAcquireInfo->fence);
+        
+        // 🛠️ 안전성 보강: [] 연산자 대신 find()를 사용하여 존재 여부 체크 및 크래시 방지
+        auto it = deviceDispatch.find(GetKey(device));
+        if (it != deviceDispatch.end() && it->second) {
+            auto dev = it->second;
+            auto q = dev->queue;
+            if (q && q->handle != VK_NULL_HANDLE) {
+                VkSubmitInfo submitInfo{};
+                submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+                submitInfo.signalSemaphoreCount = (pAcquireInfo->semaphore != VK_NULL_HANDLE) ? 1 : 0;
+                submitInfo.pSignalSemaphores = (pAcquireInfo->semaphore != VK_NULL_HANDLE) ? &pAcquireInfo->semaphore : nullptr;
+                dev->table.QueueSubmit(q->handle, 1, &submitInfo, pAcquireInfo->fence);
+            }
         }
     }
 
@@ -610,7 +614,6 @@ DisplayX_QueuePresentKHR(VkQueue queue, const VkPresentInfoKHR *pPresentInfo)
     std::shared_ptr<struct queue> q = nullptr;
     {
         std::lock_guard<std::mutex> l(global_lock);
-        // 🛠️ 수정: 큐 추적 맵 검색은 고유 핸들 기반이므로 SAFE_KEY를 사용해야 올바르게 바인딩됩니다.
         auto it = queues.find(SAFE_KEY(queue));
         if (it != queues.end()) {
             q = it->second;
@@ -621,7 +624,17 @@ DisplayX_QueuePresentKHR(VkQueue queue, const VkPresentInfoKHR *pPresentInfo)
         std::lock_guard<std::mutex> l(global_lock);
         for (auto& pair : deviceDispatch) {
             if (pair.second->table.QueuePresentKHR) {
-                return pair.second->table.QueuePresentKHR(queue, pPresentInfo);
+                VkResult result = pair.second->table.QueuePresentKHR(queue, pPresentInfo);
+                // 🛠️ 예외 경로 필터링: 하부 드라이버가 Suboptimal을 반환해도 SUCCESS로 숨김
+                if (result == VK_SUBOPTIMAL_KHR) {
+                    if (pPresentInfo->pResults) {
+                        for (uint32_t i = 0; i < pPresentInfo->swapchainCount; i++) {
+                            pPresentInfo->pResults[i] = VK_SUCCESS;
+                        }
+                    }
+                    return VK_SUCCESS;
+                }
+                return result;
             }
         }
         return VK_ERROR_OUT_OF_HOST_MEMORY;
@@ -670,6 +683,12 @@ DisplayX_QueuePresentKHR(VkQueue queue, const VkPresentInfoKHR *pPresentInfo)
                 (uint32_t)fake_swapchain->format
             );
             ::close(dma_buf_fd); 
+        }
+    }
+
+    if (pPresentInfo->pResults) {
+        for (uint32_t i = 0; i < pPresentInfo->swapchainCount; i++) {
+            pPresentInfo->pResults[i] = VK_SUCCESS;
         }
     }
 
