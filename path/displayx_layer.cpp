@@ -452,10 +452,10 @@ DisplayX_QueuePresentKHR(VkQueue queue, const VkPresentInfoKHR *pPresentInfo)
         xcb_window_t window = fake_swapchain->surface->window;
         if (!conn || window == 0) continue;
 
-        // ⭐ 핵심 역전: GPU 버퍼 메모리를 맵핑하여 X11 창에 수직 주입
+       // ⭐ 안전 보정: 디스패치 테이블에 보관한 포인터로 드라이버를 직접 호출하여 픽셀 주소 확보
         void* pixel_data = nullptr;
-        VkResult res = q->device->table.GetDeviceProcAddr(q->device->handle, "vkMapMemory") 
-            ? vkMapMemory(q->device->handle, target_image->memory, 0, VK_WHOLE_SIZE, 0, &pixel_data)
+        VkResult res = q->device->MapMemory 
+            ? q->device->MapMemory(q->device->handle, target_image->memory, 0, VK_WHOLE_SIZE, 0, &pixel_data)
             : VK_ERROR_INITIALIZATION_FAILED;
 
         if (res == VK_SUCCESS && pixel_data != nullptr) {
@@ -481,12 +481,12 @@ DisplayX_QueuePresentKHR(VkQueue queue, const VkPresentInfoKHR *pPresentInfo)
                 (const uint8_t*)pixel_data // GPU 드라이버가 그린 실시간 픽셀 포인터!
             );
 
-            // 그래픽 카드 패킷 버퍼 강제 플러시 ➔ 즉시 화면에 구현
+            // X11 서버에 명령을 즉시 전송하여 화면에 동기화 구현
             xcb_flush(conn);
             xcb_free_gc(conn, gc);
 
-            // 다음 프레임을 위해 맵핑 해제
-            vkUnmapMemory(q->device->handle, target_image->memory);
+            // ⭐ 수정: 다음 프레임을 위해 언맵 함수도 테이블 경유 호출로 안전하게 해제
+            q->device->UnmapMemory(q->device->handle, target_image->memory);
         } else {
             Logger::log("error", "Direct injection failed: Unable to map memory of image index %d", imgIdx);
         }
