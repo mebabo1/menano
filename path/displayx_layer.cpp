@@ -326,31 +326,38 @@ static bool connect_to_renderer(int fd) {
     const char *sock_path = "/data/data/com.termux/files/usr/tmp/.displayx-render.sock";
     strncpy(addr.sun_path, sock_path, sizeof(addr.sun_path) - 1);
 
-    // 1단계: 기존에 다른 프로세스가 열어둔 소켓이 있는지 먼저 연결 시도
     if (connect(fd, (struct sockaddr *)&addr, sizeof(addr)) == 0) {
         Logger::log("info", "Successfully connected to existing DisplayX Renderer socket at %s", sock_path);
         return true;
     }
 
-    // 2단계: 연결에 실패한 경우 (소켓 파일이 없거나(ENOENT) 들어주는 주체가 없을 때)
-    Logger::log("info", "Renderer socket not found or connection refused. Creating a new socket file at %s", sock_path);
-    
-    // 안전하게 기존에 꼬여있던 잔여 파일이 있다면 제거
+    Logger::log("info", "Renderer socket not found. Creating a host socket file at %s", sock_path);
     unlink(sock_path);
 
-    // 소켓 바인딩 (이 시점에 Termux 파일 시스템에 .displayx-render.sock 파일이 생성됩니다)
     if (bind(fd, (struct sockaddr *)&addr, sizeof(addr)) != 0) {
         Logger::log("error", "Failed to bind socket to '%s'! errno=%d", sock_path, errno);
         return false;
     }
 
-    // 소켓 리슨 상태로 전환하여 상대방(네이티브 백엔드 등)이 접속해올 수 있는 통로로 만듦
     if (listen(fd, 5) != 0) {
         Logger::log("error", "Failed to listen on socket '%s'! errno=%d", sock_path, errno);
         return false;
     }
 
-    Logger::log("info", "Successfully created and listening on DisplayX Renderer socket at %s", sock_path);
+    Logger::log("info", "Waiting for External Renderer Backend to connect at %s...", sock_path);
+
+    struct sockaddr_un client_addr;
+    socklen_t client_len = sizeof(client_addr);
+    int session_fd = accept(fd, (struct sockaddr *)&client_addr, &client_len);
+    if (session_fd < 0) {
+        Logger::log("error", "Failed to accept renderer backend! errno=%d", errno);
+        return false;
+    }
+
+    dup2(session_fd, fd);
+    close(session_fd);
+
+    Logger::log("info", "External Renderer Backend successfully handshake-connected via %s", sock_path);
     return true;
 }
 
@@ -785,13 +792,10 @@ VK_LAYER_EXPORT VkResult VKAPI_CALL
 DisplayX_QueuePresentKHR(VkQueue queue, const VkPresentInfoKHR *pPresentInfo)
 {
     auto q = queues[queue];
-    if (!q || !q->device || !q->fence) return VK_ERROR_OUT_OF_DATE_KHR;
+    if (!q || !q->device || !q->fence) return VK_ERROR_OUT_OF_HOST_MEMORY;
 
-    // 1. 펜스 FD 가져오기 및 큐 제출
-    VkFenceGetFdInfoKHR getFence{};
-    getFence.sType = VK_STRUCTURE_TYPE_FENCE_GET_FD_INFO_KHR;
-    getFence.fence = q->fence->handle;
-    getFence.handleType = VK_EXTERNAL_FENCE_HANDLE_TYPE_SYNC_FD_BIT;
+    // 1. 커맨드 버퍼 제출 전 기존 펜스 리셋 의무 준수
+    q->device->table.ResetFences(q->device->handle, 1, &q->fence->handle);
 
     VkSubmitInfo submitInfo{};
     submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
@@ -800,8 +804,22 @@ DisplayX_QueuePresentKHR(VkQueue queue, const VkPresentInfoKHR *pPresentInfo)
     submitInfo.waitSemaphoreCount = pPresentInfo->waitSemaphoreCount;
     submitInfo.pWaitSemaphores = pPresentInfo->pWaitSemaphores;
 
+    // GPU에 연산 제출
     q->device->table.QueueSubmit(q->handle, 1, &submitInfo, q->fence->handle);
-    q->device->table.GetFenceFdKHR(q->device->handle, &getFence, &q->fence->sync_fd);
+
+    // [데드락 방지 보정]: 드라이버가 커널 내부에 sync_fd를 생성할 수 있도록 명시적으로 명령을 밀어 넣거나(플러시 효과),
+    // vkWaitForFences를 타임아웃 0으로 아주 살짝 호출하여 핸들이 완전히 유효화되도록 유도합니다.
+    q->device->table.WaitForFences(q->device->handle, 1, &q->fence->handle, VK_TRUE, 0); 
+
+    // 이제 안전하게 펜스 FD를 내보냅니다.
+    VkFenceGetFdInfoKHR getFence{};
+    getFence.sType = VK_STRUCTURE_TYPE_FENCE_GET_FD_INFO_KHR;
+    getFence.fence = q->fence->handle;
+    getFence.handleType = VK_EXTERNAL_FENCE_HANDLE_TYPE_SYNC_FD_BIT;
+    
+    if (q->device->table.GetFenceFdKHR(q->device->handle, &getFence, &q->fence->sync_fd) != VK_SUCCESS) {
+        q->fence->sync_fd = -1;
+    }
 
     static uint32_t frame_index = 0;
 
@@ -811,17 +829,33 @@ DisplayX_QueuePresentKHR(VkQueue queue, const VkPresentInfoKHR *pPresentInfo)
         int fd = fake_swapchain->surface->native_renderer_fd;
         if (fd < 0) continue;
 
-        // [데드락 방지 수정] static 전역 변수 대신, 스왑체인 자체 구조체 내부에 플래그를 두어 
-        // 스왑체인이 리사이즈되어 재생성되더라도 무한 블로킹에 빠지지 않도록 처리 스타일을 유지했습니다.
         if (fake_swapchain->frame_count > 0) {
             char ack_buffer[32];
             ssize_t n = recv(fd, ack_buffer, sizeof(ack_buffer), MSG_WAITALL);
             if (n <= 0) return VK_ERROR_OUT_OF_DATE_KHR; 
         }
 
-        // 3. 펜스 FD 복제 및 패킷 전송
-        int fence_fd_dup = dup(q->fence->sync_fd);
-        if (fence_fd_dup >= 0) {
+        // 유효한 sync_fd가 확보되었을 때만 전송 진행
+        if (q->fence->sync_fd >= 0) {
+            int fence_fd_dup = dup(q->fence->sync_fd);
+            if (fence_fd_dup >= 0) {
+                FullPacket packet = {}; 
+                memcpy(packet.magic, "10BG", 4);
+                packet.request_code = 2;
+                packet.id = (uint32_t)fake_swapchain->id;
+                packet.image_index = pPresentInfo->pImageIndices[i];
+                packet.width = fake_swapchain->extent.width;
+                packet.height = fake_swapchain->extent.height;
+                packet.format = (uint32_t)to_ahardwarebuffer_format(fake_swapchain->format);
+                packet.frame_index = frame_index++;
+
+                sendFD(fd, fence_fd_dup, packet);
+                close(fence_fd_dup);
+            }
+        } else {
+            // [폴백 아키텍처]: 만약 시스템이 sync_fd 추출을 실패했다면, 
+            // 안전하게 하드웨어 대기(WaitIdle)를 걸어 강제로 동기화한 뒤 -1을 들고 백엔드에 렌더링이 완료되었음을 알립니다.
+            q->device->table.DeviceWaitIdle(q->device->handle);
             FullPacket packet = {}; 
             memcpy(packet.magic, "10BG", 4);
             packet.request_code = 2;
@@ -831,15 +865,13 @@ DisplayX_QueuePresentKHR(VkQueue queue, const VkPresentInfoKHR *pPresentInfo)
             packet.height = fake_swapchain->extent.height;
             packet.format = (uint32_t)to_ahardwarebuffer_format(fake_swapchain->format);
             packet.frame_index = frame_index++;
-
-            sendFD(fd, fence_fd_dup, packet);
-            close(fence_fd_dup);
+            
+            sendFD(fd, -1, packet);
         }
         
-        fake_swapchain->frame_count++; // 프레임 카운트 가산
+        fake_swapchain->frame_count++;
     }
 
-    // 4. 자원 정리
     if (q->fence->sync_fd >= 0) {
         close(q->fence->sync_fd);
         q->fence->sync_fd = -1; 
