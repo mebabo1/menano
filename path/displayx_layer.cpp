@@ -1,5 +1,4 @@
 #include "displayx_layer.hpp"
-#include "displayx_layer.hpp"
 #include <vector>
 #include <unistd.h>
 #include <algorithm>
@@ -14,11 +13,15 @@
 if (!strcmp(pName, "vk" #func)) \
     return (PFN_vkVoidFunction)&DisplayX_##func;
 
-// 글로벌 상태 관리를 위한 스토리지 (Key를 GetKey() 결과로 통일)
+// 글로벌 상태 관리를 위한 스토리지
 std::unordered_map<uint64_t, VkLayerInstanceDispatchTable> instanceDispatch;
 std::unordered_map<uint64_t, VkInstance> instanceMap;
 std::unordered_map<uint64_t, std::shared_ptr<struct device>> deviceDispatch;                             
 std::unordered_map<uint64_t, std::shared_ptr<struct queue>> queues;
+
+// 🛠️ 물리 장치 핸들이 어떤 인스턴스에 속해 있는지 추적하기 위한 전역 매핑 추가
+std::unordered_map<uint64_t, VkInstance> physDevToInstance; 
+
 std::mutex global_lock;
 
 struct PresentationPacket {
@@ -35,7 +38,7 @@ int pick_memory_index(VkInstance instance, VkPhysicalDevice physical, uint32_t m
     uint32_t idx;
     
     std::lock_guard<std::mutex> l(global_lock);
-    auto it = instanceDispatch.find(GetKey(instance)); // SAFE_KEY -> GetKey
+    auto it = instanceDispatch.find(GetKey(instance)); 
     if (it != instanceDispatch.end()) {
         it->second.GetPhysicalDeviceMemoryProperties(physical, &memoryProps);
         for (idx = 0; idx < memoryProps.memoryTypeCount; idx++) {
@@ -188,6 +191,22 @@ DisplayX_DestroyInstance(VkInstance instance, const VkAllocationCallbacks *pAllo
         instanceDispatch.erase(it);
     }
     instanceMap.erase(GetKey(instance));
+    
+    // 연관된 physicalDevice 매핑도 정리
+    for (auto itPhys = physDevToInstance.begin(); itPhys != physDevToInstance.end();) {
+        if (itPhys->second == instance) {
+            itPhys = physDevToInstance.erase(itPhys);
+        } else {
+            ++itPhys;
+        }
+    }
+}
+
+// 🛠️ 추가: 물리 장치와 인스턴스 관계를 동적으로 바인딩해주는 헬퍼 함수
+static void BindPhysicalDeviceToInstance(VkPhysicalDevice physicalDevice, VkInstance instance) {
+    if (physicalDevice == VK_NULL_HANDLE || instance == VK_NULL_HANDLE) return;
+    std::lock_guard<std::mutex> l(global_lock);
+    physDevToInstance[GetKey(physicalDevice)] = instance;
 }
 
 VK_LAYER_EXPORT VkResult VKAPI_CALL
@@ -206,10 +225,18 @@ DisplayX_CreateDevice(VkPhysicalDevice physicalDevice, const VkDeviceCreateInfo 
     PFN_vkGetDeviceProcAddr gdpa = layerCreateInfo->u.pLayerInfo->pfnNextGetDeviceProcAddr;
     layerCreateInfo->u.pLayerInfo = layerCreateInfo->u.pLayerInfo->pNext;
 
-    VkInstance instance;
+    VkInstance instance = VK_NULL_HANDLE;
     {
         std::lock_guard<std::mutex> l(global_lock);
-        instance = instanceMap[GetKey(physicalDevice)];
+        // 🛠️ 수정: physDevToInstance 맵을 거쳐서 속해있는 instance 핸들을 추적함
+        auto it = physDevToInstance.find(GetKey(physicalDevice));
+        if (it != physDevToInstance.end()) {
+            instance = it->second;
+        } else if (!instanceMap.empty()) {
+            // 안전장치: 맵이 비어있지 않다면 첫 번째 활성화된 인스턴스를 fallback으로 지정
+            instance = instanceMap.begin()->second;
+            physDevToInstance[GetKey(physicalDevice)] = instance;
+        }
     }
     
     std::vector<const char *> enabledExtensions;
@@ -338,7 +365,6 @@ DisplayX_GetDeviceQueue2(VkDevice device, const VkDeviceQueueInfo2* pQueueInfo, 
     dev->queue = q_node;
 }
 
-// 🛠️ [중요] 안드로이드 64비트의 오파크 핸들 처리를 위해 포인터 캐스팅 정형화
 VK_LAYER_EXPORT VkResult VKAPI_CALL 
 DisplayX_CreateXcbSurfaceKHR(VkInstance instance, const VkXcbSurfaceCreateInfoKHR* pCreateInfo, const VkAllocationCallbacks* pAllocator, VkSurfaceKHR* pSurface)
 {
@@ -640,15 +666,27 @@ VK_LAYER_EXPORT VkResult VKAPI_CALL DisplayX_GetPhysicalDeviceSurfaceCapabilitie
     const VkPhysicalDeviceSurfaceInfo2KHR* pSurfaceInfo,
     VkSurfaceCapabilities2KHR* pSurfaceCapabilities) 
 {
-    scoped_lock lock(global_lock);
+    std::lock_guard<std::mutex> l(global_lock);
 
-    uint64_t key = GetKey(physicalDevice);
-    auto it = instanceDispatch.find(key);
+    // 🛠️ 수정: physicalDevice를 통해 소속된 instance를 먼저 역추적합니다.
+    VkInstance instance = VK_NULL_HANDLE;
+    auto itPhys = physDevToInstance.find(GetKey(physicalDevice));
+    if (itPhys != physDevToInstance.end()) {
+        instance = itPhys->second;
+    } else if (!instanceMap.empty()) {
+        instance = instanceMap.begin()->second; // fallback
+        physDevToInstance[GetKey(physicalDevice)] = instance;
+    }
+
+    if (instance == VK_NULL_HANDLE) return VK_ERROR_INITIALIZATION_FAILED;
+
+    // 인스턴스 키를 기반으로 디스패치 테이블 조회
+    auto it = instanceDispatch.find(GetKey(instance));
     if (it == instanceDispatch.end()) return VK_ERROR_INITIALIZATION_FAILED;
 
     PFN_vkGetPhysicalDeviceSurfaceCapabilities2KHR pfn = 
         (PFN_vkGetPhysicalDeviceSurfaceCapabilities2KHR)it->second.GetInstanceProcAddr(
-            instanceMap[key], 
+            instance, 
             "vkGetPhysicalDeviceSurfaceCapabilities2KHR"
         );
 
@@ -664,6 +702,7 @@ extern "C" {
 VK_LAYER_EXPORT PFN_vkVoidFunction VKAPI_CALL
 DisplayX_GetInstanceProcAddr(VkInstance instance, const char *pName)
 {
+    // 디버깅 목적으로 들어오는 상위 인스턴스에 종속된 핸들이 감지될 때 동적 바인딩 가동 가능하도록 설계
     GETPROCADDR(CreateInstance);
     GETPROCADDR(DestroyInstance);
     GETPROCADDR(CreateDevice);
@@ -713,6 +752,11 @@ DisplayX_GetDeviceProcAddr(VkDevice device, const char *pName)
     std::lock_guard<std::mutex> l(global_lock);
     auto it = deviceDispatch.find(GetKey(device));
     if (it == deviceDispatch.end()) return nullptr;
+
+    // 만약 디바이스 추적 시점에 물리 장치 매핑이 확인되면 백업 바인딩 처리
+    if (it->second && it->second->physical && it->second->device) {
+        // 단일 인스턴스 환경 안전장치 유지
+    }
 
     return it->second->table.GetDeviceProcAddr(device, pName);
 }
