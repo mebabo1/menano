@@ -137,8 +137,15 @@ DisplayX_CreateDevice(VkPhysicalDevice physicalDevice, const VkDeviceCreateInfo 
     table.AllocateMemory = (PFN_vkAllocateMemory)gdpa(*pDevice, "vkAllocateMemory");
     table.BindImageMemory = (PFN_vkBindImageMemory)gdpa(*pDevice, "vkBindImageMemory");
     
-    // ⭐ 하부 드라이버에서 메모리 FD를 추출하기 위한 핵심 표준 함수 받아오기
-    table.GetMemoryFdKHR = (PFN_vkGetMemoryFdKHR)gdpa(*pDevice, "vkGetMemoryFdKHR");
+    // 가속화 테이블 아래(auto device = std::make_shared<struct device>(); 근처)에 작성
+    device->handle = *pDevice;
+    device->physical = physicalDevice;
+    device->table = table;
+
+    // ⭐ 수정: 헤더 구조체에 맞춤 바인딩 진행
+    device->GetMemoryFdKHR = (PFN_vkGetMemoryFdKHR)gdpa(*pDevice, "vkGetMemoryFdKHR");
+    device->MapMemory      = (PFN_vkMapMemory)gdpa(*pDevice, "vkMapMemory");
+    device->UnmapMemory    = (PFN_vkUnmapMemory)gdpa(*pDevice, "vkUnmapMemory");
     
     table.GetImageMemoryRequirements = (PFN_vkGetImageMemoryRequirements)gdpa(*pDevice, "vkGetImageMemoryRequirements");
     table.QueueSubmit2 = (PFN_vkQueueSubmit2)gdpa(*pDevice, "vkQueueSubmit2");
