@@ -753,9 +753,7 @@ DisplayX_GetDeviceProcAddr(VkDevice device, const char *pName)
     auto it = deviceDispatch.find(GetKey(device));
     if (it == deviceDispatch.end()) return nullptr;
 
-    // 만약 디바이스 추적 시점에 물리 장치 매핑이 확인되면 백업 바인딩 처리
-    if (it->second && it->second->physical && it->second->device) {
-        // 단일 인스턴스 환경 안전장치 유지
+    if (it->second && it->second->physical && it->second->handle) {
     }
 
     return it->second->table.GetDeviceProcAddr(device, pName);
