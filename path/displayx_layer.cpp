@@ -47,7 +47,6 @@ struct __attribute__((packed)) FullPacket {
 };
 
 bool sendFD(int socket, int fd, const FullPacket& packet) {
-bool sendFD(int socket, int fd, const FullPacket& packet) {
     // 1. shmid와 packet을 하나의 구조체로 결합
     struct {
         int32_t shmid;
