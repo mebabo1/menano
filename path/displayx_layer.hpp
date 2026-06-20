@@ -103,7 +103,11 @@ struct fake_swapchain {
     uint32_t frame_count; 
 };
 
-// --- [Vulkan 레이어 엑스포트 함수 선언 목록] ---
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+// --- [Vulkan 레이어 엑스포트 함수 선언 목록 - C-Linkage 고정] ---
 VK_LAYER_EXPORT VkResult VKAPI_CALL DisplayX_CreateInstance(const VkInstanceCreateInfo *pCreateInfo, const VkAllocationCallbacks *pAllocator, VkInstance *pInstance);
 VK_LAYER_EXPORT void VKAPI_CALL DisplayX_DestroyInstance(VkInstance instance, const VkAllocationCallbacks *pAllocator);
 VK_LAYER_EXPORT VkResult VKAPI_CALL DisplayX_CreateDevice(VkPhysicalDevice physicalDevice, const VkDeviceCreateInfo *pCreateInfo, const VkAllocationCallbacks *pAllocator, VkDevice *pDevice);
@@ -129,8 +133,13 @@ VK_LAYER_EXPORT VkResult VKAPI_CALL DisplayX_AcquireNextImage2KHR(VkDevice devic
 VK_LAYER_EXPORT VkResult VKAPI_CALL DisplayX_QueuePresentKHR(VkQueue queue, const VkPresentInfoKHR *pPresentInfo);
 VK_LAYER_EXPORT VkResult VKAPI_CALL DisplayX_WaitForPresentKHR(VkDevice device, VkSwapchainKHR swapchain, uint64_t timeout, uint64_t flags);
 
+// ⭐ [에러 핵심 포인트] 로더가 찾는 이 두 함수도 C 링크로 감싸야 코드가 꼬이지 않습니다.
 VK_LAYER_EXPORT PFN_vkVoidFunction VKAPI_CALL DisplayX_GetDeviceProcAddr(VkDevice device, const char *pName);
 VK_LAYER_EXPORT PFN_vkVoidFunction VKAPI_CALL DisplayX_GetInstanceProcAddr(VkInstance instance, const char *pName);
 
-extern "C" VK_LAYER_EXPORT PFN_vkVoidFunction VKAPI_CALL vkGetDeviceProcAddr(VkDevice device, const char *pName);
-extern "C" VK_LAYER_EXPORT PFN_vkVoidFunction VKAPI_CALL vkGetInstanceProcAddr(VkInstance instance, const char *pName);
+VK_LAYER_EXPORT PFN_vkVoidFunction VKAPI_CALL vkGetDeviceProcAddr(VkDevice device, const char *pName);
+VK_LAYER_EXPORT PFN_vkVoidFunction VKAPI_CALL vkGetInstanceProcAddr(VkInstance instance, const char *pName);
+
+#ifdef __cplusplus
+}
+#endif
