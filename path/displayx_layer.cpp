@@ -212,7 +212,7 @@ DisplayX_CreateDevice(VkPhysicalDevice physicalDevice, const VkDeviceCreateInfo 
     VkInstance instance;
     {
         std::lock_guard<std::mutex> l(global_lock);
-        instance = instanceMap[SAFE_KEY(physicalDevice)];
+        instance = instanceMap[GetKey(physicalDevice)];
     }
     
     std::vector<const char *> enabledExtensions;
