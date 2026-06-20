@@ -5,19 +5,24 @@
 #include <sys/socket.h>
 #include <sys/un.h>
 #include <cstring>
+#include <mutex>
+#include <unordered_map>
+#include <memory>
+
+// 안드로이드 64비트 환경의 주소 유효성 보장을 위한 캐스팅 매크로 재정의
+#define SAFE_KEY(handle) ((uint64_t)(uintptr_t)(handle))
 
 #define GETPROCADDR(func) \
 if (!strcmp(pName, "vk" #func)) \
     return (PFN_vkVoidFunction)&DisplayX_##func;
 
-std::unordered_map<void *, VkLayerInstanceDispatchTable> instanceDispatch;
-std::unordered_map<void *, VkInstance> instanceMap;
-std::unordered_map<void *, std::shared_ptr<struct device>> deviceDispatch;                             
-std::unordered_map<VkQueue, std::shared_ptr<struct queue>> queues;
-ID id;
+// 글로벌 상태 관리를 위한 스토리지 (Key를 uint64_t로 단일화하여 MTE 태그 오염 방지)
+std::unordered_map<uint64_t, VkLayerInstanceDispatchTable> instanceDispatch;
+std::unordered_map<uint64_t, VkInstance> instanceMap;
+std::unordered_map<uint64_t, std::shared_ptr<struct device>> deviceDispatch;                             
+std::unordered_map<uint64_t, std::shared_ptr<struct queue>> queues;
 std::mutex global_lock;
 
-// 외부 X11 앱과 통신하기 위한 IPC 전송 데이터 규격
 struct PresentationPacket {
     uint32_t window_id;
     uint32_t image_index;
@@ -30,15 +35,19 @@ struct PresentationPacket {
 int pick_memory_index(VkInstance instance, VkPhysicalDevice physical, uint32_t memoryBits) {
     VkPhysicalDeviceMemoryProperties memoryProps{};
     uint32_t idx;
-    instanceDispatch[GetKey(instance)].GetPhysicalDeviceMemoryProperties(physical, &memoryProps);
-    for (idx = 0; idx < memoryProps.memoryTypeCount; idx++) {
-        if (memoryBits & (1u << idx))
-            return idx;
+    
+    std::lock_guard<std::mutex> l(global_lock);
+    auto it = instanceDispatch.find(SAFE_KEY(instance));
+    if (it != instanceDispatch.end()) {
+        it->second.GetPhysicalDeviceMemoryProperties(physical, &memoryProps);
+        for (idx = 0; idx < memoryProps.memoryTypeCount; idx++) {
+            if (memoryBits & (1u << idx))
+                return idx;
+        }
     }
     return UINT32_MAX;
 }
 
-// Unix Domain Socket을 통해 dma-buf File Descriptor를 외부 X11 앱으로 전달하는 헬퍼 함수
 static int send_dma_buf_to_x11_app(int window_id, int img_idx, int fd_to_send, uint32_t w, uint32_t h, uint32_t fmt) {
     const char* socket_path = "/data/data/com.termux/files/usr/tmp/displayx_compositor.sock";
     
@@ -164,9 +173,9 @@ DisplayX_CreateInstance(const VkInstanceCreateInfo *pCreateInfo, const VkAllocat
     table.GetPhysicalDeviceMemoryProperties = (PFN_vkGetPhysicalDeviceMemoryProperties)gip(*pInstance, "vkGetPhysicalDeviceMemoryProperties");
 
     {
-        scoped_lock l(global_lock);
-        instanceMap[GetKey(*pInstance)] = *pInstance;
-        instanceDispatch[GetKey(*pInstance)] = table;
+        std::lock_guard<std::mutex> l(global_lock);
+        instanceMap[SAFE_KEY(*pInstance)] = *pInstance;
+        instanceDispatch[SAFE_KEY(*pInstance)] = table;
     }
     return VK_SUCCESS;
 }
@@ -175,11 +184,13 @@ VK_LAYER_EXPORT void VKAPI_CALL
 DisplayX_DestroyInstance(VkInstance instance, const VkAllocationCallbacks *pAllocator)
 {
     if (!instance) return;
-    scoped_lock l(global_lock);
-    VkLayerInstanceDispatchTable table = instanceDispatch[GetKey(instance)];
-    table.DestroyInstance(instance, pAllocator);
-    instanceDispatch.erase(GetKey(instance));
-    instanceMap.erase(GetKey(instance));
+    std::lock_guard<std::mutex> l(global_lock);
+    auto it = instanceDispatch.find(SAFE_KEY(instance));
+    if (it != instanceDispatch.end()) {
+        it->second.DestroyInstance(instance, pAllocator);
+        instanceDispatch.erase(it);
+    }
+    instanceMap.erase(SAFE_KEY(instance));
 }
 
 VK_LAYER_EXPORT VkResult VKAPI_CALL
@@ -198,7 +209,11 @@ DisplayX_CreateDevice(VkPhysicalDevice physicalDevice, const VkDeviceCreateInfo 
     PFN_vkGetDeviceProcAddr gdpa = layerCreateInfo->u.pLayerInfo->pfnNextGetDeviceProcAddr;
     layerCreateInfo->u.pLayerInfo = layerCreateInfo->u.pLayerInfo->pNext;
 
-    VkInstance instance = instanceMap[GetKey(physicalDevice)];
+    VkInstance instance;
+    {
+        std::lock_guard<std::mutex> l(global_lock);
+        instance = instanceMap[SAFE_KEY(physicalDevice)];
+    }
     
     std::vector<const char *> enabledExtensions;
     if (!createInfo.ppEnabledExtensionNames) {
@@ -221,7 +236,6 @@ DisplayX_CreateDevice(VkPhysicalDevice physicalDevice, const VkDeviceCreateInfo 
     if (result != VK_SUCCESS) return result;
 
     VkLayerDispatchTable table;
-    // 🛠️ [보안 강화] 디바이스 종속적인 정확한 gdpa 컨텍스트 연결 보장
     table.GetDeviceProcAddr = (PFN_vkGetDeviceProcAddr)gdpa(*pDevice, "vkGetDeviceProcAddr");
     table.CreateImage = (PFN_vkCreateImage)gdpa(*pDevice, "vkCreateImage");
     table.CreateImageView = (PFN_vkCreateImageView)gdpa(*pDevice, "vkCreateImageView");
@@ -258,14 +272,13 @@ DisplayX_CreateDevice(VkPhysicalDevice physicalDevice, const VkDeviceCreateInfo 
     dev_node->physical = physicalDevice;
     dev_node->table = table;
 
-    // 🛠️ [SEGV_ACCERR 방지] 디바이스 기반으로 직접 메모리 FD 주소 추출
     dev_node->GetMemoryFdKHR = (PFN_vkGetMemoryFdKHR)gdpa(*pDevice, "vkGetMemoryFdKHR");
     dev_node->MapMemory      = (PFN_vkMapMemory)gdpa(*pDevice, "vkMapMemory");
     dev_node->UnmapMemory    = (PFN_vkUnmapMemory)gdpa(*pDevice, "vkUnmapMemory");
 
     {
-        scoped_lock l(global_lock);
-        deviceDispatch[GetKey(*pDevice)] = dev_node;
+        std::lock_guard<std::mutex> l(global_lock);
+        deviceDispatch[SAFE_KEY(*pDevice)] = dev_node;
     }
     return VK_SUCCESS;
 }
@@ -274,8 +287,8 @@ VK_LAYER_EXPORT void VKAPI_CALL
 DisplayX_DestroyDevice(VkDevice device, const VkAllocationCallbacks *pAllocator)
 {
     if (!device) return;
-    scoped_lock l(global_lock);
-    auto it = deviceDispatch.find(GetKey(device));
+    std::lock_guard<std::mutex> l(global_lock);
+    auto it = deviceDispatch.find(SAFE_KEY(device));
     if (it != deviceDispatch.end()) {
         it->second->table.DestroyDevice(device, pAllocator);
         deviceDispatch.erase(it);
@@ -285,8 +298,8 @@ DisplayX_DestroyDevice(VkDevice device, const VkAllocationCallbacks *pAllocator)
 VK_LAYER_EXPORT void VKAPI_CALL
 DisplayX_GetDeviceQueue(VkDevice device, uint32_t queueFamilyIndex, uint32_t queueIndex, VkQueue *pQueue)
 {
-    scoped_lock l(global_lock);
-    auto dev = deviceDispatch[GetKey(device)];
+    std::lock_guard<std::mutex> l(global_lock);
+    auto dev = deviceDispatch[SAFE_KEY(device)];
     if (!dev) return;
 
     dev->table.GetDeviceQueue(device, queueFamilyIndex, queueIndex, pQueue);
@@ -299,18 +312,17 @@ DisplayX_GetDeviceQueue(VkDevice device, uint32_t queueFamilyIndex, uint32_t que
     q_node->fence = std::make_unique<struct fence>();
     VkFenceCreateInfo fenceInfo{};
     fenceInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
-    fenceInfo.pNext = nullptr;
     dev->table.CreateFence(device, &fenceInfo, nullptr, &q_node->fence->handle);
 
-    queues[*pQueue] = q_node;
+    queues[SAFE_KEY(*pQueue)] = q_node;
     dev->queue = q_node; 
 }
 
 VK_LAYER_EXPORT void VKAPI_CALL
 DisplayX_GetDeviceQueue2(VkDevice device, const VkDeviceQueueInfo2* pQueueInfo, VkQueue *pQueue)
 {
-    scoped_lock l(global_lock);
-    auto dev = deviceDispatch[GetKey(device)];
+    std::lock_guard<std::mutex> l(global_lock);
+    auto dev = deviceDispatch[SAFE_KEY(device)];
     if (!dev) return;
 
     dev->table.GetDeviceQueue2(device, pQueueInfo, pQueue);
@@ -323,17 +335,17 @@ DisplayX_GetDeviceQueue2(VkDevice device, const VkDeviceQueueInfo2* pQueueInfo, 
     q_node->fence = std::make_unique<struct fence>();
     VkFenceCreateInfo fenceInfo{};
     fenceInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
-    fenceInfo.pNext = nullptr;
     dev->table.CreateFence(device, &fenceInfo, nullptr, &q_node->fence->handle);
 
-    queues[*pQueue] = q_node;
+    queues[SAFE_KEY(*pQueue)] = q_node;
     dev->queue = q_node;
 }
 
+// 🛠️ [중요] 안드로이드 64비트의 오파크 핸들 처리를 위해 포인터 캐스팅 정형화
 VK_LAYER_EXPORT VkResult VKAPI_CALL 
 DisplayX_CreateXcbSurfaceKHR(VkInstance instance, const VkXcbSurfaceCreateInfoKHR* pCreateInfo, const VkAllocationCallbacks* pAllocator, VkSurfaceKHR* pSurface)
 {
-    struct fake_surface *fake_surf = (struct fake_surface *)calloc(1, sizeof(struct fake_surface));
+    struct fake_surface *fake_surf = (struct fake_surface *)::calloc(1, sizeof(struct fake_surface));
     if (!fake_surf) return VK_ERROR_OUT_OF_HOST_MEMORY;
 
     fake_surf->loader_magic = ICD_LOADER_MAGIC;
@@ -342,14 +354,14 @@ DisplayX_CreateXcbSurfaceKHR(VkInstance instance, const VkXcbSurfaceCreateInfoKH
     fake_surf->window = pCreateInfo->window;   
     fake_surf->instance = instance;
 
-    *pSurface = VK_WRAP_NON_DISPATCHABLE_HANDLE(VkSurfaceKHR, fake_surf);
+    *pSurface = (VkSurfaceKHR)(uintptr_t)fake_surf; 
     return VK_SUCCESS;
 }
 
 VK_LAYER_EXPORT VkResult VKAPI_CALL
 DisplayX_CreateXlibSurfaceKHR(VkInstance instance, const VkXlibSurfaceCreateInfoKHR *pCreateInfo, const VkAllocationCallbacks* pAllocator, VkSurfaceKHR *pSurface)
 {
-    struct fake_surface *fake_surf = (struct fake_surface *)calloc(1, sizeof(struct fake_surface));
+    struct fake_surface *fake_surf = (struct fake_surface *)::calloc(1, sizeof(struct fake_surface));
     if (!fake_surf) return VK_ERROR_OUT_OF_HOST_MEMORY;
 
     fake_surf->loader_magic = ICD_LOADER_MAGIC;
@@ -358,7 +370,7 @@ DisplayX_CreateXlibSurfaceKHR(VkInstance instance, const VkXlibSurfaceCreateInfo
     fake_surf->window = pCreateInfo->window;
     fake_surf->instance = instance;
     
-    *pSurface = VK_WRAP_NON_DISPATCHABLE_HANDLE(VkSurfaceKHR, fake_surf);
+    *pSurface = (VkSurfaceKHR)(uintptr_t)fake_surf;
     return VK_SUCCESS;
 }
 
@@ -372,8 +384,8 @@ DisplayX_GetPhysicalDeviceSurfaceSupportKHR(VkPhysicalDevice physicalDevice, uin
 VK_LAYER_EXPORT void VKAPI_CALL
 DisplayX_DestroySurfaceKHR(VkInstance instance, VkSurfaceKHR surface, const VkAllocationCallbacks *pAllocator)
 {
-    VK_UNWRAP_NON_DISPATCHABLE_HANDLE(surface, struct fake_surface, fake_surf);
-    if (fake_surf) free(fake_surf);
+    struct fake_surface *fake_surf = (struct fake_surface *)(uintptr_t)surface;
+    if (fake_surf) ::free(fake_surf);
 }
 
 // --- [Swapchain Runtime Processing Engine] ---
@@ -381,10 +393,14 @@ DisplayX_DestroySurfaceKHR(VkInstance instance, VkSurfaceKHR surface, const VkAl
 VK_LAYER_EXPORT VkResult VKAPI_CALL
 DisplayX_CreateSwapchainKHR(VkDevice device, const VkSwapchainCreateInfoKHR *pCreateInfo, const VkAllocationCallbacks *pAllocator, VkSwapchainKHR *pSwapchain)
 {
-    auto dev = deviceDispatch[GetKey(device)];                              
+    std::shared_ptr<struct device> dev;
+    {
+        std::lock_guard<std::mutex> l(global_lock);
+        dev = deviceDispatch[SAFE_KEY(device)];
+    }
     VkLayerDispatchTable table = dev->table;
 
-    struct fake_swapchain *swapchain = (struct fake_swapchain *)calloc(1, sizeof(struct fake_swapchain));
+    struct fake_swapchain *swapchain = (struct fake_swapchain *)::calloc(1, sizeof(struct fake_swapchain));
     if (!swapchain) return VK_ERROR_OUT_OF_HOST_MEMORY;
     
     swapchain->loader_magic = ICD_LOADER_MAGIC;
@@ -395,8 +411,8 @@ DisplayX_CreateSwapchainKHR(VkDevice device, const VkSwapchainCreateInfoKHR *pCr
     swapchain->extent = pCreateInfo->imageExtent;
     swapchain->device = dev;
 
-    VK_UNWRAP_NON_DISPATCHABLE_HANDLE(pCreateInfo->surface, struct fake_surface , fake_surface);
-    if (fake_surface == nullptr) { free(swapchain); return VK_ERROR_SURFACE_LOST_KHR; }
+    struct fake_surface *fake_surface = (struct fake_surface *)(uintptr_t)pCreateInfo->surface;
+    if (fake_surface == nullptr) { ::free(swapchain); return VK_ERROR_SURFACE_LOST_KHR; }
     swapchain->surface = fake_surface;
     swapchain->images.resize(swapchain->imageCount);
     
@@ -408,7 +424,6 @@ DisplayX_CreateSwapchainKHR(VkDevice device, const VkSwapchainCreateInfoKHR *pCr
 
         VkExternalMemoryImageCreateInfo externalCreateInfo{};
         externalCreateInfo.sType = VK_STRUCTURE_TYPE_EXTERNAL_MEMORY_IMAGE_CREATE_INFO;
-        externalCreateInfo.pNext = nullptr;
         externalCreateInfo.handleTypes = VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_FD_BIT; 
 
         VkImageCreateInfo createInfo{};
@@ -426,14 +441,13 @@ DisplayX_CreateSwapchainKHR(VkDevice device, const VkSwapchainCreateInfoKHR *pCr
         createInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 
         result = table.CreateImage(device, &createInfo, nullptr, &fake_image->handle);
-        if (result != VK_SUCCESS) { free(swapchain); return result; }
+        if (result != VK_SUCCESS) { ::free(swapchain); return result; }
 
         VkMemoryRequirements memReqs;
         table.GetImageMemoryRequirements(device, fake_image->handle, &memReqs);
 
         VkExportMemoryAllocateInfo exportAllocInfo{};
         exportAllocInfo.sType = VK_STRUCTURE_TYPE_EXPORT_MEMORY_ALLOCATE_INFO;
-        exportAllocInfo.pNext = nullptr;
         exportAllocInfo.handleTypes = VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_FD_BIT;
 
         VkMemoryAllocateInfo allocateInfo{};
@@ -443,22 +457,22 @@ DisplayX_CreateSwapchainKHR(VkDevice device, const VkSwapchainCreateInfoKHR *pCr
         allocateInfo.memoryTypeIndex = pick_memory_index(swapchain->surface->instance, dev->physical, memReqs.memoryTypeBits);
 
         result = table.AllocateMemory(device, &allocateInfo, nullptr, &fake_image->memory);
-        if (result != VK_SUCCESS) { free(swapchain); return result; }
+        if (result != VK_SUCCESS) { ::free(swapchain); return result; }
             
         result = table.BindImageMemory(device, fake_image->handle, fake_image->memory, 0);
-        if (result != VK_SUCCESS) { free(swapchain); return result; }
+        if (result != VK_SUCCESS) { ::free(swapchain); return result; }
 
         swapchain->images[index] = fake_image;
     }
 
-    *pSwapchain = VK_WRAP_NON_DISPATCHABLE_HANDLE(VkSwapchainKHR, swapchain);
+    *pSwapchain = (VkSwapchainKHR)(uintptr_t)swapchain;
     return VK_SUCCESS;
 }
 
 VK_LAYER_EXPORT VkResult VKAPI_CALL
 DisplayX_GetSwapchainImagesKHR(VkDevice device, VkSwapchainKHR swapchain, uint32_t* pSwapchainImageCount, VkImage* pSwapchainImages)
 {
-    VK_UNWRAP_NON_DISPATCHABLE_HANDLE(swapchain, struct fake_swapchain, fake_swapchain)
+    struct fake_swapchain *fake_swapchain = (struct fake_swapchain *)(uintptr_t)swapchain;
     if (fake_swapchain == nullptr) return VK_ERROR_OUT_OF_DATE_KHR;
 
     uint32_t reportCount = fake_swapchain->imageCount; 
@@ -479,17 +493,16 @@ DisplayX_GetSwapchainImagesKHR(VkDevice device, VkSwapchainKHR swapchain, uint32
 VK_LAYER_EXPORT VkResult VKAPI_CALL
 DisplayX_AcquireNextImageKHR(VkDevice device, VkSwapchainKHR swapchain, uint64_t timeout, VkSemaphore semaphore, VkFence fence, uint32_t *pImageIndex)
 {
-    VK_UNWRAP_NON_DISPATCHABLE_HANDLE(swapchain, struct fake_swapchain, fake_swapchain)
+    struct fake_swapchain *fake_swapchain = (struct fake_swapchain *)(uintptr_t)swapchain;
     if (fake_swapchain == nullptr || (uintptr_t)fake_swapchain < 0x1000) return VK_ERROR_OUT_OF_DATE_KHR;
 
     if (fence != VK_NULL_HANDLE || semaphore != VK_NULL_HANDLE) {
-        scoped_lock l(global_lock);
-        auto dev = deviceDispatch[GetKey(device)];                                                     
+        std::lock_guard<std::mutex> l(global_lock);
+        auto dev = deviceDispatch[SAFE_KEY(device)];                                                     
         auto q = dev->queue;
         if (q && q->handle != VK_NULL_HANDLE) {
             VkSubmitInfo submitInfo{};
             submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-            submitInfo.pNext = nullptr;
             submitInfo.signalSemaphoreCount = (semaphore != VK_NULL_HANDLE) ? 1 : 0;
             submitInfo.pSignalSemaphores = (semaphore != VK_NULL_HANDLE) ? &semaphore : nullptr;
             dev->table.QueueSubmit(q->handle, 1, &submitInfo, fence);
@@ -497,7 +510,7 @@ DisplayX_AcquireNextImageKHR(VkDevice device, VkSwapchainKHR swapchain, uint64_t
     }
 
     {
-        scoped_lock l(global_lock);
+        std::lock_guard<std::mutex> l(global_lock);
         *pImageIndex = fake_swapchain->currentImage;
         fake_swapchain->currentImage = (fake_swapchain->currentImage + 1) % fake_swapchain->imageCount;
     }
@@ -507,17 +520,16 @@ DisplayX_AcquireNextImageKHR(VkDevice device, VkSwapchainKHR swapchain, uint64_t
 VK_LAYER_EXPORT VkResult VKAPI_CALL
 DisplayX_AcquireNextImage2KHR(VkDevice device, const VkAcquireNextImageInfoKHR* pAcquireInfo, uint32_t *pImageIndex)
 {
-    VK_UNWRAP_NON_DISPATCHABLE_HANDLE(pAcquireInfo->swapchain, struct fake_swapchain, fake_swapchain)
+    struct fake_swapchain *fake_swapchain = (struct fake_swapchain *)(uintptr_t)pAcquireInfo->swapchain;
     if (fake_swapchain == nullptr || (uintptr_t)fake_swapchain < 0x1000) return VK_ERROR_OUT_OF_DATE_KHR;
 
     if (pAcquireInfo->fence != VK_NULL_HANDLE || pAcquireInfo->semaphore != VK_NULL_HANDLE) {
-        scoped_lock l(global_lock);
-        auto dev = deviceDispatch[GetKey(device)];
+        std::lock_guard<std::mutex> l(global_lock);
+        auto dev = deviceDispatch[SAFE_KEY(device)];
         auto q = dev->queue;
         if (q && q->handle != VK_NULL_HANDLE) {
             VkSubmitInfo submitInfo{};
             submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-            submitInfo.pNext = nullptr;
             submitInfo.signalSemaphoreCount = (pAcquireInfo->semaphore != VK_NULL_HANDLE) ? 1 : 0;
             submitInfo.pSignalSemaphores = (pAcquireInfo->semaphore != VK_NULL_HANDLE) ? &pAcquireInfo->semaphore : nullptr;
             dev->table.QueueSubmit(q->handle, 1, &submitInfo, pAcquireInfo->fence);
@@ -525,7 +537,7 @@ DisplayX_AcquireNextImage2KHR(VkDevice device, const VkAcquireNextImageInfoKHR* 
     }
 
     {
-        scoped_lock l(global_lock);
+        std::lock_guard<std::mutex> l(global_lock);
         *pImageIndex = fake_swapchain->currentImage;
         fake_swapchain->currentImage = (fake_swapchain->currentImage + 1) % fake_swapchain->imageCount;
     }
@@ -535,12 +547,16 @@ DisplayX_AcquireNextImage2KHR(VkDevice device, const VkAcquireNextImageInfoKHR* 
 VK_LAYER_EXPORT void VKAPI_CALL
 DisplayX_DestroySwapchainKHR(VkDevice device, VkSwapchainKHR swapchain, const VkAllocationCallbacks *pAllocator)
 {
-    VK_UNWRAP_NON_DISPATCHABLE_HANDLE(swapchain, struct fake_swapchain, fake_swapchain)
-    auto dev = deviceDispatch[GetKey(device)];
+    struct fake_swapchain *fake_swapchain = (struct fake_swapchain *)(uintptr_t)swapchain;
+    std::shared_ptr<struct device> dev;
+    {
+        std::lock_guard<std::mutex> l(global_lock);
+        dev = deviceDispatch[SAFE_KEY(device)];
+    }
     if (!fake_swapchain || !dev) return;
 
     dev->table.DeviceWaitIdle(device);
-    scoped_lock l(global_lock);
+    std::lock_guard<std::mutex> l(global_lock);
 	
     for (uint32_t index = 0; index < fake_swapchain->images.size(); index++) {
         auto swapchain_image = fake_swapchain->images[index];
@@ -548,7 +564,7 @@ DisplayX_DestroySwapchainKHR(VkDevice device, VkSwapchainKHR swapchain, const Vk
         dev->table.DestroyImage(device, swapchain_image->handle, nullptr);
     }
     fake_swapchain->images.clear();
-    free(fake_swapchain);
+    ::free(fake_swapchain);
 }
 
 VK_LAYER_EXPORT VkResult VKAPI_CALL
@@ -556,14 +572,15 @@ DisplayX_QueuePresentKHR(VkQueue queue, const VkPresentInfoKHR *pPresentInfo)
 {
     std::shared_ptr<struct queue> q = nullptr;
     {
-        scoped_lock l(global_lock);
-        auto it = queues.find(queue);
+        std::lock_guard<std::mutex> l(global_lock);
+        auto it = queues.find(SAFE_KEY(queue));
         if (it != queues.end()) {
             q = it->second;
         }
     }
 
     if (!q || !q->device || !q->fence || !q->fence->handle) {
+        std::lock_guard<std::mutex> l(global_lock);
         for (auto& pair : deviceDispatch) {
             if (pair.second->table.QueuePresentKHR) {
                 return pair.second->table.QueuePresentKHR(queue, pPresentInfo);
@@ -576,7 +593,6 @@ DisplayX_QueuePresentKHR(VkQueue queue, const VkPresentInfoKHR *pPresentInfo)
 
     VkSubmitInfo submitInfo{};
     submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-    submitInfo.pNext = nullptr;
     std::vector<VkPipelineStageFlags> waitStages(pPresentInfo->waitSemaphoreCount, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT);
     submitInfo.pWaitDstStageMask = waitStages.data();
     submitInfo.waitSemaphoreCount = pPresentInfo->waitSemaphoreCount;
@@ -586,7 +602,7 @@ DisplayX_QueuePresentKHR(VkQueue queue, const VkPresentInfoKHR *pPresentInfo)
     q->device->table.WaitForFences(q->device->handle, 1, &q->fence->handle, VK_TRUE, UINT64_MAX); 
 
     for (uint32_t i = 0; i < pPresentInfo->swapchainCount; i++) {
-        VK_UNWRAP_NON_DISPATCHABLE_HANDLE(pPresentInfo->pSwapchains[i], struct fake_swapchain, fake_swapchain)
+        struct fake_swapchain *fake_swapchain = (struct fake_swapchain *)(uintptr_t)pPresentInfo->pSwapchains[i];
         if (!fake_swapchain || !fake_swapchain->surface) continue;
         
         uint32_t imgIdx = pPresentInfo->pImageIndices[i];
@@ -597,15 +613,12 @@ DisplayX_QueuePresentKHR(VkQueue queue, const VkPresentInfoKHR *pPresentInfo)
 
         int dma_buf_fd = -1;
         
-        // 🛠️ [핵심 수정부] 드라이버 소유의 안전한 장치 컨텍스트를 동반하여 호출 (`q->device->handle`)
         if (q->device && q->device->GetMemoryFdKHR) {
             VkMemoryGetFdInfoKHR getFdInfo{};
             getFdInfo.sType = VK_STRUCTURE_TYPE_MEMORY_GET_FD_INFO_KHR;
-            getFdInfo.pNext = nullptr; 
             getFdInfo.memory = target_image->memory;
             getFdInfo.handleType = VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_FD_BIT;
             
-            // 안드로이드 하부 Wrapper가 승인할 수 있도록 로더 컨텍스트 핸들 유지
             q->device->GetMemoryFdKHR(q->device->handle, &getFdInfo, &dma_buf_fd);
         }
 
@@ -649,8 +662,8 @@ DisplayX_GetInstanceProcAddr(VkInstance instance, const char *pName)
 
     if (instance == VK_NULL_HANDLE) return nullptr;
     
-    scoped_lock l(global_lock);
-    auto it = instanceDispatch.find(GetKey(instance));
+    std::lock_guard<std::mutex> l(global_lock);
+    auto it = instanceDispatch.find(SAFE_KEY(instance));
     if (it == instanceDispatch.end()) return nullptr;
     
     return it->second.GetInstanceProcAddr(instance, pName);
@@ -675,8 +688,8 @@ DisplayX_GetDeviceProcAddr(VkDevice device, const char *pName)
 
     if (device == VK_NULL_HANDLE) return nullptr;
 
-    scoped_lock l(global_lock);
-    auto it = deviceDispatch.find(GetKey(device));
+    std::lock_guard<std::mutex> l(global_lock);
+    auto it = deviceDispatch.find(SAFE_KEY(device));
     if (it == deviceDispatch.end()) return nullptr;
 
     return it->second->table.GetDeviceProcAddr(device, pName);
