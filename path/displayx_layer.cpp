@@ -40,7 +40,6 @@ int pick_memory_index(VkInstance instance, VkPhysicalDevice physical, uint32_t m
 
 // Unix Domain Socket을 통해 dma-buf File Descriptor를 외부 X11 앱으로 전달하는 헬퍼 함수
 static int send_dma_buf_to_x11_app(int window_id, int img_idx, int fd_to_send, uint32_t w, uint32_t h, uint32_t fmt) {
-    // Termux 환경 사양에 맞춘 임시 소켓 경로 (실제 외부 X11 앱이 Listen 중인 경로로 매칭 필요)
     const char* socket_path = "/data/data/com.termux/files/usr/tmp/displayx_compositor.sock";
     
     int sock = ::socket(AF_UNIX, SOCK_STREAM, 0);
@@ -87,7 +86,6 @@ DisplayX_WaitForPresentKHR(VkDevice device, VkSwapchainKHR swapchain, uint64_t t
     return VK_SUCCESS; 
 }
 
-// ⭐ [세그폴트 방지용 핵심 추가] 앱이 서피스 정보를 요구할 때 가짜 Mocking 데이터를 주어 하부 드라이버 붕괴를 원천 차단
 VK_LAYER_EXPORT VkResult VKAPI_CALL
 DisplayX_GetPhysicalDeviceSurfaceCapabilitiesKHR(VkPhysicalDevice physicalDevice, VkSurfaceKHR surface, VkSurfaceCapabilitiesKHR* pSurfaceCapabilities)
 {
@@ -132,29 +130,29 @@ DisplayX_GetPhysicalDeviceSurfacePresentModesKHR(VkPhysicalDevice physicalDevice
 VK_LAYER_EXPORT VkResult VKAPI_CALL
 DisplayX_CreateInstance(const VkInstanceCreateInfo *pCreateInfo, const VkAllocationCallbacks *pAllocator, VkInstance *pInstance)
 {	
-	VkLayerInstanceCreateInfo *layerCreateInfo = (VkLayerInstanceCreateInfo *)pCreateInfo->pNext;
-	VkResult result;
-	VkInstanceCreateInfo createInfo = *pCreateInfo;
+    VkLayerInstanceCreateInfo *layerCreateInfo = (VkLayerInstanceCreateInfo *)pCreateInfo->pNext;
+    VkResult result;
+    VkInstanceCreateInfo createInfo = *pCreateInfo;
 	
     while (layerCreateInfo && (layerCreateInfo->sType != VK_STRUCTURE_TYPE_LOADER_INSTANCE_CREATE_INFO || layerCreateInfo->function != VK_LAYER_LINK_INFO)) {
-    	layerCreateInfo = (VkLayerInstanceCreateInfo *)layerCreateInfo->pNext;
+        layerCreateInfo = (VkLayerInstanceCreateInfo *)layerCreateInfo->pNext;
     }
     if (!layerCreateInfo) return VK_ERROR_INITIALIZATION_FAILED;
     
     PFN_vkGetInstanceProcAddr gip = layerCreateInfo->u.pLayerInfo->pfnNextGetInstanceProcAddr;
-	layerCreateInfo->u.pLayerInfo = layerCreateInfo->u.pLayerInfo->pNext;
+    layerCreateInfo->u.pLayerInfo = layerCreateInfo->u.pLayerInfo->pNext;
 
-	std::vector<const char *> enabledExtensions;
-	if (!createInfo.ppEnabledExtensionNames) {
-		enabledExtensions.reserve(2);
-	} else {
-		enabledExtensions.reserve(createInfo.enabledExtensionCount + 2);
-		enabledExtensions.insert(enabledExtensions.end(), createInfo.ppEnabledExtensionNames, createInfo.ppEnabledExtensionNames + createInfo.enabledExtensionCount);
-	}
-	enabledExtensions.push_back(VK_KHR_EXTERNAL_MEMORY_CAPABILITIES_EXTENSION_NAME);
-	enabledExtensions.push_back(VK_KHR_EXTERNAL_FENCE_CAPABILITIES_EXTENSION_NAME);
-	createInfo.enabledExtensionCount = enabledExtensions.size();
-	createInfo.ppEnabledExtensionNames = enabledExtensions.data();
+    std::vector<const char *> enabledExtensions;
+    if (!createInfo.ppEnabledExtensionNames) {
+        enabledExtensions.reserve(2);
+    } else {
+        enabledExtensions.reserve(createInfo.enabledExtensionCount + 2);
+        enabledExtensions.insert(enabledExtensions.end(), createInfo.ppEnabledExtensionNames, createInfo.ppEnabledExtensionNames + createInfo.enabledExtensionCount);
+    }
+    enabledExtensions.push_back(VK_KHR_EXTERNAL_MEMORY_CAPABILITIES_EXTENSION_NAME);
+    enabledExtensions.push_back(VK_KHR_EXTERNAL_FENCE_CAPABILITIES_EXTENSION_NAME);
+    createInfo.enabledExtensionCount = enabledExtensions.size();
+    createInfo.ppEnabledExtensionNames = enabledExtensions.data();
 
     PFN_vkCreateInstance createInstance = (PFN_vkCreateInstance)gip(VK_NULL_HANDLE, "vkCreateInstance");
     result = createInstance(&createInfo, pAllocator, pInstance);
@@ -165,49 +163,49 @@ DisplayX_CreateInstance(const VkInstanceCreateInfo *pCreateInfo, const VkAllocat
     table.DestroyInstance = (PFN_vkDestroyInstance)gip(*pInstance, "vkDestroyInstance");
     table.GetPhysicalDeviceMemoryProperties = (PFN_vkGetPhysicalDeviceMemoryProperties)gip(*pInstance, "vkGetPhysicalDeviceMemoryProperties");
 
-	{
-		scoped_lock l(global_lock);
-    	instanceMap[GetKey(*pInstance)] = *pInstance;
-  		instanceDispatch[GetKey(*pInstance)] = table;
-	}
+    {
+        scoped_lock l(global_lock);
+        instanceMap[GetKey(*pInstance)] = *pInstance;
+        instanceDispatch[GetKey(*pInstance)] = table;
+    }
     return VK_SUCCESS;
 }
 
 VK_LAYER_EXPORT void VKAPI_CALL
 DisplayX_DestroyInstance(VkInstance instance, const VkAllocationCallbacks *pAllocator)
 {
-	if (!instance) return;
-	scoped_lock l(global_lock);
-	VkLayerInstanceDispatchTable table = instanceDispatch[GetKey(instance)];
-	table.DestroyInstance(instance, pAllocator);
-	instanceDispatch.erase(GetKey(instance));
-	instanceMap.erase(GetKey(instance));
+    if (!instance) return;
+    scoped_lock l(global_lock);
+    VkLayerInstanceDispatchTable table = instanceDispatch[GetKey(instance)];
+    table.DestroyInstance(instance, pAllocator);
+    instanceDispatch.erase(GetKey(instance));
+    instanceMap.erase(GetKey(instance));
 }
 
 VK_LAYER_EXPORT VkResult VKAPI_CALL
 DisplayX_CreateDevice(VkPhysicalDevice physicalDevice, const VkDeviceCreateInfo *pCreateInfo, const VkAllocationCallbacks *pAllocator, VkDevice *pDevice)
 {
-	VkResult result;
-	VkLayerDeviceCreateInfo *layerCreateInfo = (VkLayerDeviceCreateInfo *)pCreateInfo->pNext;
-	VkDeviceCreateInfo createInfo = *pCreateInfo;
+    VkResult result;
+    VkLayerDeviceCreateInfo *layerCreateInfo = (VkLayerDeviceCreateInfo *)pCreateInfo->pNext;
+    VkDeviceCreateInfo createInfo = *pCreateInfo;
 
-	while (layerCreateInfo && (layerCreateInfo->sType != VK_STRUCTURE_TYPE_LOADER_DEVICE_CREATE_INFO || layerCreateInfo->function != VK_LAYER_LINK_INFO)) {
-		layerCreateInfo = (VkLayerDeviceCreateInfo *)layerCreateInfo->pNext;
-	}
-	if (layerCreateInfo == NULL) return VK_ERROR_INITIALIZATION_FAILED;
+    while (layerCreateInfo && (layerCreateInfo->sType != VK_STRUCTURE_TYPE_LOADER_DEVICE_CREATE_INFO || layerCreateInfo->function != VK_LAYER_LINK_INFO)) {
+        layerCreateInfo = (VkLayerDeviceCreateInfo *)layerCreateInfo->pNext;
+    }
+    if (layerCreateInfo == NULL) return VK_ERROR_INITIALIZATION_FAILED;
 
-	PFN_vkGetInstanceProcAddr gipa = layerCreateInfo->u.pLayerInfo->pfnNextGetInstanceProcAddr;
+    PFN_vkGetInstanceProcAddr gipa = layerCreateInfo->u.pLayerInfo->pfnNextGetInstanceProcAddr;
     PFN_vkGetDeviceProcAddr gdpa = layerCreateInfo->u.pLayerInfo->pfnNextGetDeviceProcAddr;
-	layerCreateInfo->u.pLayerInfo = layerCreateInfo->u.pLayerInfo->pNext;
+    layerCreateInfo->u.pLayerInfo = layerCreateInfo->u.pLayerInfo->pNext;
 
     VkInstance instance = instanceMap[GetKey(physicalDevice)];
     
     std::vector<const char *> enabledExtensions;
     if (!createInfo.ppEnabledExtensionNames) {
-    	enabledExtensions.reserve(4);
+        enabledExtensions.reserve(4);
     } else {
-    	enabledExtensions.reserve(createInfo.enabledExtensionCount + 4);
-    	enabledExtensions.insert(enabledExtensions.end(), createInfo.ppEnabledExtensionNames, createInfo.ppEnabledExtensionNames + createInfo.enabledExtensionCount);
+        enabledExtensions.reserve(createInfo.enabledExtensionCount + 4);
+        enabledExtensions.insert(enabledExtensions.end(), createInfo.ppEnabledExtensionNames, createInfo.ppEnabledExtensionNames + createInfo.enabledExtensionCount);
     }
     
     enabledExtensions.push_back(VK_KHR_EXTERNAL_MEMORY_EXTENSION_NAME);
@@ -223,12 +221,12 @@ DisplayX_CreateDevice(VkPhysicalDevice physicalDevice, const VkDeviceCreateInfo 
     if (result != VK_SUCCESS) return result;
 
     VkLayerDispatchTable table;
+    // 🛠️ [보안 강화] 디바이스 종속적인 정확한 gdpa 컨텍스트 연결 보장
     table.GetDeviceProcAddr = (PFN_vkGetDeviceProcAddr)gdpa(*pDevice, "vkGetDeviceProcAddr");
     table.CreateImage = (PFN_vkCreateImage)gdpa(*pDevice, "vkCreateImage");
     table.CreateImageView = (PFN_vkCreateImageView)gdpa(*pDevice, "vkCreateImageView");
     table.AllocateMemory = (PFN_vkAllocateMemory)gdpa(*pDevice, "vkAllocateMemory");
     table.BindImageMemory = (PFN_vkBindImageMemory)gdpa(*pDevice, "vkBindImageMemory");
-    
     table.GetImageMemoryRequirements = (PFN_vkGetImageMemoryRequirements)gdpa(*pDevice, "vkGetImageMemoryRequirements");
     table.QueueSubmit2 = (PFN_vkQueueSubmit2)gdpa(*pDevice, "vkQueueSubmit2");
     table.DeviceWaitIdle = (PFN_vkDeviceWaitIdle)gdpa(*pDevice, "vkDeviceWaitIdle");
@@ -260,15 +258,16 @@ DisplayX_CreateDevice(VkPhysicalDevice physicalDevice, const VkDeviceCreateInfo 
     dev_node->physical = physicalDevice;
     dev_node->table = table;
 
+    // 🛠️ [SEGV_ACCERR 방지] 디바이스 기반으로 직접 메모리 FD 주소 추출
     dev_node->GetMemoryFdKHR = (PFN_vkGetMemoryFdKHR)gdpa(*pDevice, "vkGetMemoryFdKHR");
     dev_node->MapMemory      = (PFN_vkMapMemory)gdpa(*pDevice, "vkMapMemory");
     dev_node->UnmapMemory    = (PFN_vkUnmapMemory)gdpa(*pDevice, "vkUnmapMemory");
 
-	{
-		scoped_lock l(global_lock);
-    	deviceDispatch[GetKey(*pDevice)] = dev_node;
-	}
-	return VK_SUCCESS;
+    {
+        scoped_lock l(global_lock);
+        deviceDispatch[GetKey(*pDevice)] = dev_node;
+    }
+    return VK_SUCCESS;
 }
 
 VK_LAYER_EXPORT void VKAPI_CALL
@@ -300,6 +299,7 @@ DisplayX_GetDeviceQueue(VkDevice device, uint32_t queueFamilyIndex, uint32_t que
     q_node->fence = std::make_unique<struct fence>();
     VkFenceCreateInfo fenceInfo{};
     fenceInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
+    fenceInfo.pNext = nullptr;
     dev->table.CreateFence(device, &fenceInfo, nullptr, &q_node->fence->handle);
 
     queues[*pQueue] = q_node;
@@ -323,6 +323,7 @@ DisplayX_GetDeviceQueue2(VkDevice device, const VkDeviceQueueInfo2* pQueueInfo, 
     q_node->fence = std::make_unique<struct fence>();
     VkFenceCreateInfo fenceInfo{};
     fenceInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
+    fenceInfo.pNext = nullptr;
     dev->table.CreateFence(device, &fenceInfo, nullptr, &q_node->fence->handle);
 
     queues[*pQueue] = q_node;
@@ -407,6 +408,7 @@ DisplayX_CreateSwapchainKHR(VkDevice device, const VkSwapchainCreateInfoKHR *pCr
 
         VkExternalMemoryImageCreateInfo externalCreateInfo{};
         externalCreateInfo.sType = VK_STRUCTURE_TYPE_EXTERNAL_MEMORY_IMAGE_CREATE_INFO;
+        externalCreateInfo.pNext = nullptr;
         externalCreateInfo.handleTypes = VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_FD_BIT; 
 
         VkImageCreateInfo createInfo{};
@@ -431,6 +433,7 @@ DisplayX_CreateSwapchainKHR(VkDevice device, const VkSwapchainCreateInfoKHR *pCr
 
         VkExportMemoryAllocateInfo exportAllocInfo{};
         exportAllocInfo.sType = VK_STRUCTURE_TYPE_EXPORT_MEMORY_ALLOCATE_INFO;
+        exportAllocInfo.pNext = nullptr;
         exportAllocInfo.handleTypes = VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_FD_BIT;
 
         VkMemoryAllocateInfo allocateInfo{};
@@ -455,98 +458,99 @@ DisplayX_CreateSwapchainKHR(VkDevice device, const VkSwapchainCreateInfoKHR *pCr
 VK_LAYER_EXPORT VkResult VKAPI_CALL
 DisplayX_GetSwapchainImagesKHR(VkDevice device, VkSwapchainKHR swapchain, uint32_t* pSwapchainImageCount, VkImage* pSwapchainImages)
 {
-	VK_UNWRAP_NON_DISPATCHABLE_HANDLE(swapchain, struct fake_swapchain, fake_swapchain)
-	if (fake_swapchain == nullptr) return VK_ERROR_OUT_OF_DATE_KHR;
+    VK_UNWRAP_NON_DISPATCHABLE_HANDLE(swapchain, struct fake_swapchain, fake_swapchain)
+    if (fake_swapchain == nullptr) return VK_ERROR_OUT_OF_DATE_KHR;
 
-	uint32_t reportCount = fake_swapchain->imageCount; 
+    uint32_t reportCount = fake_swapchain->imageCount; 
 
-	if (pSwapchainImages == nullptr) {
-		*pSwapchainImageCount = reportCount;
-		return VK_SUCCESS;
-	}
+    if (pSwapchainImages == nullptr) {
+        *pSwapchainImageCount = reportCount;
+        return VK_SUCCESS;
+    }
 
-	uint32_t count = std::min(*pSwapchainImageCount, reportCount);
-	for (uint32_t i = 0; i < count; i++) {
-		pSwapchainImages[i] = fake_swapchain->images[i]->handle;
-	}
-	*pSwapchainImageCount = count;
-	return VK_SUCCESS;
+    uint32_t count = std::min(*pSwapchainImageCount, reportCount);
+    for (uint32_t i = 0; i < count; i++) {
+        pSwapchainImages[i] = fake_swapchain->images[i]->handle;
+    }
+    *pSwapchainImageCount = count;
+    return VK_SUCCESS;
 }
 
 VK_LAYER_EXPORT VkResult VKAPI_CALL
 DisplayX_AcquireNextImageKHR(VkDevice device, VkSwapchainKHR swapchain, uint64_t timeout, VkSemaphore semaphore, VkFence fence, uint32_t *pImageIndex)
 {
-	VK_UNWRAP_NON_DISPATCHABLE_HANDLE(swapchain, struct fake_swapchain, fake_swapchain)
-	if (fake_swapchain == nullptr || (uintptr_t)fake_swapchain < 0x1000) return VK_ERROR_OUT_OF_DATE_KHR;
+    VK_UNWRAP_NON_DISPATCHABLE_HANDLE(swapchain, struct fake_swapchain, fake_swapchain)
+    if (fake_swapchain == nullptr || (uintptr_t)fake_swapchain < 0x1000) return VK_ERROR_OUT_OF_DATE_KHR;
 
-	if (fence != VK_NULL_HANDLE || semaphore != VK_NULL_HANDLE) {
-		scoped_lock l(global_lock);
-		auto dev = deviceDispatch[GetKey(device)];                                                     
-		auto q = dev->queue;
-		if (q && q->handle != VK_NULL_HANDLE) {
-			VkSubmitInfo submitInfo{};
-			submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-			submitInfo.signalSemaphoreCount = (semaphore != VK_NULL_HANDLE) ? 1 : 0;
-			submitInfo.pSignalSemaphores = (semaphore != VK_NULL_HANDLE) ? &semaphore : nullptr;
-			dev->table.QueueSubmit(q->handle, 1, &submitInfo, fence);
-		}
-	}
+    if (fence != VK_NULL_HANDLE || semaphore != VK_NULL_HANDLE) {
+        scoped_lock l(global_lock);
+        auto dev = deviceDispatch[GetKey(device)];                                                     
+        auto q = dev->queue;
+        if (q && q->handle != VK_NULL_HANDLE) {
+            VkSubmitInfo submitInfo{};
+            submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+            submitInfo.pNext = nullptr;
+            submitInfo.signalSemaphoreCount = (semaphore != VK_NULL_HANDLE) ? 1 : 0;
+            submitInfo.pSignalSemaphores = (semaphore != VK_NULL_HANDLE) ? &semaphore : nullptr;
+            dev->table.QueueSubmit(q->handle, 1, &submitInfo, fence);
+        }
+    }
 
-	{
-		scoped_lock l(global_lock);
-		*pImageIndex = fake_swapchain->currentImage;
-		fake_swapchain->currentImage = (fake_swapchain->currentImage + 1) % fake_swapchain->imageCount;
-	}
-	return VK_SUCCESS;
+    {
+        scoped_lock l(global_lock);
+        *pImageIndex = fake_swapchain->currentImage;
+        fake_swapchain->currentImage = (fake_swapchain->currentImage + 1) % fake_swapchain->imageCount;
+    }
+    return VK_SUCCESS;
 }
 
 VK_LAYER_EXPORT VkResult VKAPI_CALL
 DisplayX_AcquireNextImage2KHR(VkDevice device, const VkAcquireNextImageInfoKHR* pAcquireInfo, uint32_t *pImageIndex)
 {
-	VK_UNWRAP_NON_DISPATCHABLE_HANDLE(pAcquireInfo->swapchain, struct fake_swapchain, fake_swapchain)
-	if (fake_swapchain == nullptr || (uintptr_t)fake_swapchain < 0x1000) return VK_ERROR_OUT_OF_DATE_KHR;
+    VK_UNWRAP_NON_DISPATCHABLE_HANDLE(pAcquireInfo->swapchain, struct fake_swapchain, fake_swapchain)
+    if (fake_swapchain == nullptr || (uintptr_t)fake_swapchain < 0x1000) return VK_ERROR_OUT_OF_DATE_KHR;
 
-	if (pAcquireInfo->fence != VK_NULL_HANDLE || pAcquireInfo->semaphore != VK_NULL_HANDLE) {
-		scoped_lock l(global_lock);
-		auto dev = deviceDispatch[GetKey(device)];
-		auto q = dev->queue;
-		if (q && q->handle != VK_NULL_HANDLE) {
-			VkSubmitInfo submitInfo{};
-			submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-			submitInfo.signalSemaphoreCount = (pAcquireInfo->semaphore != VK_NULL_HANDLE) ? 1 : 0;
-			submitInfo.pSignalSemaphores = (pAcquireInfo->semaphore != VK_NULL_HANDLE) ? &pAcquireInfo->semaphore : nullptr;
-			dev->table.QueueSubmit(q->handle, 1, &submitInfo, pAcquireInfo->fence);
-		}
-	}
+    if (pAcquireInfo->fence != VK_NULL_HANDLE || pAcquireInfo->semaphore != VK_NULL_HANDLE) {
+        scoped_lock l(global_lock);
+        auto dev = deviceDispatch[GetKey(device)];
+        auto q = dev->queue;
+        if (q && q->handle != VK_NULL_HANDLE) {
+            VkSubmitInfo submitInfo{};
+            submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+            submitInfo.pNext = nullptr;
+            submitInfo.signalSemaphoreCount = (pAcquireInfo->semaphore != VK_NULL_HANDLE) ? 1 : 0;
+            submitInfo.pSignalSemaphores = (pAcquireInfo->semaphore != VK_NULL_HANDLE) ? &pAcquireInfo->semaphore : nullptr;
+            dev->table.QueueSubmit(q->handle, 1, &submitInfo, pAcquireInfo->fence);
+        }
+    }
 
-	{
-		scoped_lock l(global_lock);
-		*pImageIndex = fake_swapchain->currentImage;
-		fake_swapchain->currentImage = (fake_swapchain->currentImage + 1) % fake_swapchain->imageCount;
-	}
-	return VK_SUCCESS;
+    {
+        scoped_lock l(global_lock);
+        *pImageIndex = fake_swapchain->currentImage;
+        fake_swapchain->currentImage = (fake_swapchain->currentImage + 1) % fake_swapchain->imageCount;
+    }
+    return VK_SUCCESS;
 }
 
 VK_LAYER_EXPORT void VKAPI_CALL
 DisplayX_DestroySwapchainKHR(VkDevice device, VkSwapchainKHR swapchain, const VkAllocationCallbacks *pAllocator)
 {
-	VK_UNWRAP_NON_DISPATCHABLE_HANDLE(swapchain, struct fake_swapchain, fake_swapchain)
-	auto dev = deviceDispatch[GetKey(device)];
-	if (!fake_swapchain || !dev) return;
+    VK_UNWRAP_NON_DISPATCHABLE_HANDLE(swapchain, struct fake_swapchain, fake_swapchain)
+    auto dev = deviceDispatch[GetKey(device)];
+    if (!fake_swapchain || !dev) return;
 
-	dev->table.DeviceWaitIdle(device);
-	scoped_lock l(global_lock);
+    dev->table.DeviceWaitIdle(device);
+    scoped_lock l(global_lock);
 	
-	for (uint32_t index = 0; index < fake_swapchain->images.size(); index++) {
-		auto swapchain_image = fake_swapchain->images[index];
-		dev->table.FreeMemory(device, swapchain_image->memory, nullptr);
-		dev->table.DestroyImage(device, swapchain_image->handle, nullptr);
-	}
-	fake_swapchain->images.clear();
-	free(fake_swapchain);
+    for (uint32_t index = 0; index < fake_swapchain->images.size(); index++) {
+        auto swapchain_image = fake_swapchain->images[index];
+        dev->table.FreeMemory(device, swapchain_image->memory, nullptr);
+        dev->table.DestroyImage(device, swapchain_image->handle, nullptr);
+    }
+    fake_swapchain->images.clear();
+    free(fake_swapchain);
 }
 
-// 🚀 [구조 전면 혁신] 레이어가 직접 X11 드로잉을 하지 않고 하드웨어 버퍼 핸들(dma-buf)을 IPC로 전송
 VK_LAYER_EXPORT VkResult VKAPI_CALL
 DisplayX_QueuePresentKHR(VkQueue queue, const VkPresentInfoKHR *pPresentInfo)
 {
@@ -572,6 +576,7 @@ DisplayX_QueuePresentKHR(VkQueue queue, const VkPresentInfoKHR *pPresentInfo)
 
     VkSubmitInfo submitInfo{};
     submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+    submitInfo.pNext = nullptr;
     std::vector<VkPipelineStageFlags> waitStages(pPresentInfo->waitSemaphoreCount, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT);
     submitInfo.pWaitDstStageMask = waitStages.data();
     submitInfo.waitSemaphoreCount = pPresentInfo->waitSemaphoreCount;
@@ -590,19 +595,21 @@ DisplayX_QueuePresentKHR(VkQueue queue, const VkPresentInfoKHR *pPresentInfo)
         uint32_t window = fake_swapchain->surface->window;
         if (window == 0) continue;
 
-        // GPU 메모리로부터 리눅스 표준 dma-buf FD 추출
         int dma_buf_fd = -1;
-        if (q->device->GetMemoryFdKHR) {
+        
+        // 🛠️ [핵심 수정부] 드라이버 소유의 안전한 장치 컨텍스트를 동반하여 호출 (`q->device->handle`)
+        if (q->device && q->device->GetMemoryFdKHR) {
             VkMemoryGetFdInfoKHR getFdInfo{};
             getFdInfo.sType = VK_STRUCTURE_TYPE_MEMORY_GET_FD_INFO_KHR;
+            getFdInfo.pNext = nullptr; 
             getFdInfo.memory = target_image->memory;
             getFdInfo.handleType = VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_FD_BIT;
             
+            // 안드로이드 하부 Wrapper가 승인할 수 있도록 로더 컨텍스트 핸들 유지
             q->device->GetMemoryFdKHR(q->device->handle, &getFdInfo, &dma_buf_fd);
         }
 
-        // 픽셀 복사 없이 완벽한 제로카피(Zero-Copy) 파일 디스크립터 패싱 수행
-        if (dma_buf_fd != -1) {
+        if (dma_buf_fd >= 0) { 
             send_dma_buf_to_x11_app(
                 window, 
                 imgIdx, 
@@ -611,9 +618,7 @@ DisplayX_QueuePresentKHR(VkQueue queue, const VkPresentInfoKHR *pPresentInfo)
                 fake_swapchain->extent.height,
                 (uint32_t)fake_swapchain->format
             );
-            ::close(dma_buf_fd); // 내보낸 후 로컬 복사본 FD 폐쇄
-        } else {
-            Logger::log("error", "Failed to export dma-buf FD for image index %d", imgIdx);
+            ::close(dma_buf_fd); 
         }
     }
 
@@ -634,8 +639,6 @@ DisplayX_GetInstanceProcAddr(VkInstance instance, const char *pName)
     GETPROCADDR(GetPhysicalDeviceSurfaceSupportKHR);
     GETPROCADDR(GetDeviceQueue);
     GETPROCADDR(GetDeviceQueue2);
-    
-    // ⭐ [세그폴트 해결을 위한 매핑 등록] 로더에 기믹 인터셉터 주소 반환 유도
     GETPROCADDR(GetPhysicalDeviceSurfaceCapabilitiesKHR);
     GETPROCADDR(GetPhysicalDeviceSurfaceFormatsKHR);
     GETPROCADDR(GetPhysicalDeviceSurfacePresentModesKHR);
