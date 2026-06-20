@@ -38,6 +38,10 @@ extern std::unordered_map<uint64_t, VkLayerInstanceDispatchTable> instanceDispat
 extern std::unordered_map<uint64_t, VkInstance> instanceMap;
 extern std::unordered_map<uint64_t, std::shared_ptr<struct device>> deviceDispatch;                             
 extern std::unordered_map<uint64_t, std::shared_ptr<struct queue>> queues;
+
+// 🛠️ [추가] 물리 장치(VkPhysicalDevice)를 통해 소속 인스턴스(VkInstance)를 역추적하기 위한 전역 맵 선언
+extern std::unordered_map<uint64_t, VkInstance> physDevToInstance; 
+
 extern ID id;
 extern std::mutex global_lock;
 
