@@ -485,3 +485,57 @@ DisplayX_QueuePresentKHR(VkQueue queue, const VkPresentInfoKHR *pPresentInfo)
 
     return VK_SUCCESS;
 }
+
+extern "C" {
+
+// 1. Instance 레벨 함수 주소 중계 인터셉터
+__attribute__((visibility("default"))) VK_LAYER_EXPORT PFN_vkVoidFunction VKAPI_CALL
+DisplayX_GetInstanceProcAddr(VkInstance instance, const char *pName)
+{
+    // 매크로를 이용해 가로챌 핵심 함수 매핑
+    GETPROCADDR(CreateInstance);
+    GETPROCADDR(DestroyInstance);
+    GETPROCADDR(CreateDevice);
+    GETPROCADDR(CreateXcbSurfaceKHR);
+    GETPROCADDR(CreateXlibSurfaceKHR);
+    GETPROCADDR(GetPhysicalDeviceSurfaceSupportKHR);
+    
+    // 자기 자신(GetInstanceProcAddr)의 주소를 요청받을 때 반환
+    if (!strcmp(pName, "vkGetInstanceProcAddr")) 
+        return (PFN_vkVoidFunction)&DisplayX_GetInstanceProcAddr;
+
+    // 가로채지 않는 나머지 일반 함수들은 하부 Vulkan 드라이버 체인으로 바이패스(Pass-through)
+    if (instance == VK_NULL_HANDLE) return nullptr;
+    
+    scoped_lock l(global_lock);
+    auto it = instanceDispatch.find(GetKey(instance));
+    if (it == instanceDispatch.end()) return nullptr;
+    
+    return it->second.GetInstanceProcAddr(instance, pName);
+}
+
+// 2. Device 레벨 (GPU 내부) 함수 주소 중계 인터셉터
+__attribute__((visibility("default"))) VK_LAYER_EXPORT PFN_vkVoidFunction VKAPI_CALL
+DisplayX_GetDeviceProcAddr(VkDevice device, const char *pName)
+{
+    GETPROCADDR(GetSwapchainImagesKHR);
+    GETPROCADDR(AcquireNextImageKHR);
+    GETPROCADDR(AcquireNextImage2KHR);
+    GETPROCADDR(CreateSwapchainKHR);
+    GETPROCADDR(DestroySwapchainKHR);
+    GETPROCADDR(QueuePresentKHR);
+    GETPROCADDR(WaitForPresentKHR);
+
+    if (!strcmp(pName, "vkGetDeviceProcAddr")) 
+        return (PFN_vkVoidFunction)&DisplayX_GetDeviceProcAddr;
+
+    if (device == VK_NULL_HANDLE) return nullptr;
+
+    scoped_lock l(global_lock);
+    auto it = deviceDispatch.find(GetKey(device));
+    if (it == deviceDispatch.end()) return nullptr;
+
+    return it->second->table.GetDeviceProcAddr(device, pName);
+}
+
+}
