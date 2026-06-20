@@ -171,8 +171,8 @@ DisplayX_CreateInstance(const VkInstanceCreateInfo *pCreateInfo, const VkAllocat
 
     {
         std::lock_guard<std::mutex> l(global_lock);
-        instanceMap[SAFE_KEY(*pInstance)] = *pInstance;
-        instanceDispatch[SAFE_KEY(*pInstance)] = table;
+        instanceMap[GetKey(*pInstance)] = *pInstance;
+        instanceDispatch[GetKey(*pInstance)] = table;
     }
     return VK_SUCCESS;
 }
@@ -182,12 +182,12 @@ DisplayX_DestroyInstance(VkInstance instance, const VkAllocationCallbacks *pAllo
 {
     if (!instance) return;
     std::lock_guard<std::mutex> l(global_lock);
-    auto it = instanceDispatch.find(SAFE_KEY(instance));
+    auto it = instanceDispatch.find(GetKey(instance));
     if (it != instanceDispatch.end()) {
         it->second.DestroyInstance(instance, pAllocator);
         instanceDispatch.erase(it);
     }
-    instanceMap.erase(SAFE_KEY(instance));
+    instanceMap.erase(GetKey(instance));
 }
 
 VK_LAYER_EXPORT VkResult VKAPI_CALL
@@ -275,7 +275,7 @@ DisplayX_CreateDevice(VkPhysicalDevice physicalDevice, const VkDeviceCreateInfo 
 
     {
         std::lock_guard<std::mutex> l(global_lock);
-        deviceDispatch[SAFE_KEY(*pDevice)] = dev_node;
+        deviceDispatch[GetKey(*pDevice)] = dev_node;
     }
     return VK_SUCCESS;
 }
@@ -285,7 +285,7 @@ DisplayX_DestroyDevice(VkDevice device, const VkAllocationCallbacks *pAllocator)
 {
     if (!device) return;
     std::lock_guard<std::mutex> l(global_lock);
-    auto it = deviceDispatch.find(SAFE_KEY(device));
+    auto it = deviceDispatch.find(GetKey(device));
     if (it != deviceDispatch.end()) {
         it->second->table.DestroyDevice(device, pAllocator);
         deviceDispatch.erase(it);
@@ -296,7 +296,7 @@ VK_LAYER_EXPORT void VKAPI_CALL
 DisplayX_GetDeviceQueue(VkDevice device, uint32_t queueFamilyIndex, uint32_t queueIndex, VkQueue *pQueue)
 {
     std::lock_guard<std::mutex> l(global_lock);
-    auto dev = deviceDispatch[SAFE_KEY(device)];
+    auto dev = deviceDispatch[GetKey(device)];
     if (!dev) return;
 
     dev->table.GetDeviceQueue(device, queueFamilyIndex, queueIndex, pQueue);
@@ -311,7 +311,7 @@ DisplayX_GetDeviceQueue(VkDevice device, uint32_t queueFamilyIndex, uint32_t que
     fenceInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
     dev->table.CreateFence(device, &fenceInfo, nullptr, &q_node->fence->handle);
 
-    queues[SAFE_KEY(*pQueue)] = q_node;
+    queues[GetKey(*pQueue)] = q_node;
     dev->queue = q_node; 
 }
 
@@ -319,7 +319,7 @@ VK_LAYER_EXPORT void VKAPI_CALL
 DisplayX_GetDeviceQueue2(VkDevice device, const VkDeviceQueueInfo2* pQueueInfo, VkQueue *pQueue)
 {
     std::lock_guard<std::mutex> l(global_lock);
-    auto dev = deviceDispatch[SAFE_KEY(device)];
+    auto dev = deviceDispatch[GetKey(device)];
     if (!dev) return;
 
     dev->table.GetDeviceQueue2(device, pQueueInfo, pQueue);
@@ -334,7 +334,7 @@ DisplayX_GetDeviceQueue2(VkDevice device, const VkDeviceQueueInfo2* pQueueInfo, 
     fenceInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
     dev->table.CreateFence(device, &fenceInfo, nullptr, &q_node->fence->handle);
 
-    queues[SAFE_KEY(*pQueue)] = q_node;
+    queues[GetKey(*pQueue)] = q_node;
     dev->queue = q_node;
 }
 
@@ -393,7 +393,7 @@ DisplayX_CreateSwapchainKHR(VkDevice device, const VkSwapchainCreateInfoKHR *pCr
     std::shared_ptr<struct device> dev;
     {
         std::lock_guard<std::mutex> l(global_lock);
-        dev = deviceDispatch[SAFE_KEY(device)];
+        dev = deviceDispatch[GetKey(device)];
     }
     VkLayerDispatchTable table = dev->table;
 
@@ -495,7 +495,7 @@ DisplayX_AcquireNextImageKHR(VkDevice device, VkSwapchainKHR swapchain, uint64_t
 
     if (fence != VK_NULL_HANDLE || semaphore != VK_NULL_HANDLE) {
         std::lock_guard<std::mutex> l(global_lock);
-        auto dev = deviceDispatch[SAFE_KEY(device)];                                                     
+        auto dev = deviceDispatch[GetKey(device)];                                                     
         auto q = dev->queue;
         if (q && q->handle != VK_NULL_HANDLE) {
             VkSubmitInfo submitInfo{};
@@ -522,7 +522,7 @@ DisplayX_AcquireNextImage2KHR(VkDevice device, const VkAcquireNextImageInfoKHR* 
 
     if (pAcquireInfo->fence != VK_NULL_HANDLE || pAcquireInfo->semaphore != VK_NULL_HANDLE) {
         std::lock_guard<std::mutex> l(global_lock);
-        auto dev = deviceDispatch[SAFE_KEY(device)];
+        auto dev = deviceDispatch[GetKey(device)];
         auto q = dev->queue;
         if (q && q->handle != VK_NULL_HANDLE) {
             VkSubmitInfo submitInfo{};
@@ -548,7 +548,7 @@ DisplayX_DestroySwapchainKHR(VkDevice device, VkSwapchainKHR swapchain, const Vk
     std::shared_ptr<struct device> dev;
     {
         std::lock_guard<std::mutex> l(global_lock);
-        dev = deviceDispatch[SAFE_KEY(device)];
+        dev = deviceDispatch[GetKey(device)];
     }
     if (!fake_swapchain || !dev) return;
 
@@ -570,7 +570,7 @@ DisplayX_QueuePresentKHR(VkQueue queue, const VkPresentInfoKHR *pPresentInfo)
     std::shared_ptr<struct queue> q = nullptr;
     {
         std::lock_guard<std::mutex> l(global_lock);
-        auto it = queues.find(SAFE_KEY(queue));
+        auto it = queues.find(GetKey(queue));
         if (it != queues.end()) {
             q = it->second;
         }
@@ -685,7 +685,7 @@ DisplayX_GetInstanceProcAddr(VkInstance instance, const char *pName)
     if (instance == VK_NULL_HANDLE) return nullptr;
     
     std::lock_guard<std::mutex> l(global_lock);
-    auto it = instanceDispatch.find(SAFE_KEY(instance));
+    auto it = instanceDispatch.find(GetKey(instance));
     if (it == instanceDispatch.end()) return nullptr;
     
     return it->second.GetInstanceProcAddr(instance, pName);
@@ -711,7 +711,7 @@ DisplayX_GetDeviceProcAddr(VkDevice device, const char *pName)
     if (device == VK_NULL_HANDLE) return nullptr;
 
     std::lock_guard<std::mutex> l(global_lock);
-    auto it = deviceDispatch.find(SAFE_KEY(device));
+    auto it = deviceDispatch.find(GetKey(device));
     if (it == deviceDispatch.end()) return nullptr;
 
     return it->second->table.GetDeviceProcAddr(device, pName);
