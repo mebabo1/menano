@@ -323,15 +323,34 @@ static bool connect_to_renderer(int fd) {
     struct sockaddr_un addr{};
     addr.sun_family = AF_UNIX;
 
-    const char *sock_path = "/data/data/com.termux/files/usr/tmp/.X11-unix/X0";
+    const char *sock_path = "/data/data/com.termux/files/usr/tmp/.displayx-render.sock";
     strncpy(addr.sun_path, sock_path, sizeof(addr.sun_path) - 1);
 
-    if (connect(fd, (struct sockaddr *)&addr, sizeof(addr)) != 0) {
-        Logger::log("error", "Connect to '%s' failed! errno=%d", sock_path, errno);
+    // 1단계: 기존에 다른 프로세스가 열어둔 소켓이 있는지 먼저 연결 시도
+    if (connect(fd, (struct sockaddr *)&addr, sizeof(addr)) == 0) {
+        Logger::log("info", "Successfully connected to existing DisplayX Renderer socket at %s", sock_path);
+        return true;
+    }
+
+    // 2단계: 연결에 실패한 경우 (소켓 파일이 없거나(ENOENT) 들어주는 주체가 없을 때)
+    Logger::log("info", "Renderer socket not found or connection refused. Creating a new socket file at %s", sock_path);
+    
+    // 안전하게 기존에 꼬여있던 잔여 파일이 있다면 제거
+    unlink(sock_path);
+
+    // 소켓 바인딩 (이 시점에 Termux 파일 시스템에 .displayx-render.sock 파일이 생성됩니다)
+    if (bind(fd, (struct sockaddr *)&addr, sizeof(addr)) != 0) {
+        Logger::log("error", "Failed to bind socket to '%s'! errno=%d", sock_path, errno);
         return false;
     }
-    
-    Logger::log("info", "Successfully connected to X11 socket at %s", sock_path);
+
+    // 소켓 리슨 상태로 전환하여 상대방(네이티브 백엔드 등)이 접속해올 수 있는 통로로 만듦
+    if (listen(fd, 5) != 0) {
+        Logger::log("error", "Failed to listen on socket '%s'! errno=%d", sock_path, errno);
+        return false;
+    }
+
+    Logger::log("info", "Successfully created and listening on DisplayX Renderer socket at %s", sock_path);
     return true;
 }
 
