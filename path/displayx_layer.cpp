@@ -684,7 +684,7 @@ VK_LAYER_EXPORT VkResult VKAPI_CALL DisplayX_GetPhysicalDeviceSurfaceCapabilitie
     std::lock_guard<std::mutex> l(global_lock);
 
     VkInstance instance = VK_NULL_HANDLE;
-    // 🛠️ 수정: 물리 장치는 고유 관계 매핑용이므로 SAFE_KEY를 사용해 인스턴스를 역추적합니다.
+    // 🛠️ 물리 장치 고유 주소 추적을 위해 SAFE_KEY 사용
     auto itPhys = physDevToInstance.find(SAFE_KEY(physicalDevice));
     if (itPhys != physDevToInstance.end()) {
         instance = itPhys->second;
@@ -695,26 +695,46 @@ VK_LAYER_EXPORT VkResult VKAPI_CALL DisplayX_GetPhysicalDeviceSurfaceCapabilitie
 
     if (instance == VK_NULL_HANDLE) return VK_ERROR_INITIALIZATION_FAILED;
 
-    // 🔑 인스턴스 소속 디스패치 테이블을 가리키는 고유 키 조하에는 GetKey를 적용합니다.
+    // 🔑 인스턴스 디스패치 테이블 조회용 GetKey 사용
     auto it = instanceDispatch.find(GetKey(instance));
     if (it == instanceDispatch.end()) return VK_ERROR_INITIALIZATION_FAILED;
 
-    // 🛠️ 보안/안정성 보강: 하부 드라이버로 전달하기 전에 이미 디스패치 테이블에 준비된 함수 포인터가 있다면 그것을 우선 사용합니다.
-    if (it->second.GetPhysicalDeviceSurfaceCapabilities2KHR) {
-        return it->second.GetPhysicalDeviceSurfaceCapabilities2KHR(physicalDevice, pSurfaceInfo, pSurfaceCapabilities);
-    }
-
+    // 🛠️ 에러 해결: 구조체 멤버를 직접 참조하지 않고, GetInstanceProcAddr로 함수 포인터를 동적 로드합니다.
     PFN_vkGetPhysicalDeviceSurfaceCapabilities2KHR pfn = 
         (PFN_vkGetPhysicalDeviceSurfaceCapabilities2KHR)it->second.GetInstanceProcAddr(
             instance, 
             "vkGetPhysicalDeviceSurfaceCapabilities2KHR"
         );
 
+    VkResult result = VK_SUCCESS;
     if (pfn) {
-        return pfn(physicalDevice, pSurfaceInfo, pSurfaceCapabilities);
+        // 하부 하드웨어 드라이버가 기능을 지원한다면 먼저 호출하여 기본적인 정보와 pNext 체인을 채우도록 합니다.
+        result = pfn(physicalDevice, pSurfaceInfo, pSurfaceCapabilities);
+        if (result != VK_SUCCESS) return result;
+    } else {
+        // 만약 하부 드라이버가 이 확장을 지원하지 않더라도, 상위 앱 요청에 대응하기 위해 구조체 타입을 초기화합니다.
+        if (pSurfaceCapabilities) {
+            pSurfaceCapabilities->sType = VK_STRUCTURE_TYPE_SURFACE_CAPABILITIES_2_KHR;
+        }
     }
 
-    return VK_ERROR_EXTENSION_NOT_PRESENT;
+    // ⚠️ 가상 스왑체인 안정성 확보: 하부 드라이버가 돌려준 원본 화면 정보가 아니라,
+    // DisplayX 레이어가 관리하는 X11 Compositor 환경용 커스텀 가상 스펙으로 덮어씁니다.
+    if (pSurfaceCapabilities) {
+        VkSurfaceCapabilitiesKHR* caps = &pSurfaceCapabilities->surfaceCapabilities;
+        caps->minImageCount = 2;
+        caps->maxImageCount = 8;
+        caps->currentExtent = {0xFFFFFFFF, 0xFFFFFFFF}; // 오프스크린/가상 윈도우 대응용 유연한 Extent 설정
+        caps->minImageExtent = {1, 1};
+        caps->maxImageExtent = {8112, 8112};
+        caps->maxImageArrayLayers = 1;
+        caps->supportedTransforms = VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR;
+        caps->currentTransform = VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR;
+        caps->supportedCompositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
+        caps->supportedUsageFlags = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
+    }
+
+    return result;
 }
 
 extern "C" {
