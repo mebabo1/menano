@@ -21,12 +21,7 @@
 #include <memory>
 #include <cstring>
 
-#undef VK_LAYER_EXPORT
-#if defined(WIN32)
-#define VK_LAYER_EXPORT extern "C" __declspec(dllexport)
-#else
-#define VK_LAYER_EXPORT extern "C"
-#endif
+#define VK_LAYER_EXPORT extern "C" __attribute__((visibility("default")))
 
 #define AHARDWAREBUFFER_FORMAT_B8G8R8A8_UNORM 5
 #define ICD_LOADER_MAGIC 0x01D01010
@@ -114,3 +109,8 @@ DisplayX_WaitForPresentKHR(VkDevice device,
                            VkSwapchainKHR swapchain, 
                            uint64_t timeout, 
                            uint64_t flags);
+
+VK_LAYER_EXPORT VkResult VKAPI_CALL DisplayX_CreateXcbSurfaceKHR(VkInstance, const VkXcbSurfaceCreateInfoKHR*, const VkAllocationCallbacks*, VkSurfaceKHR*);
+VK_LAYER_EXPORT VkResult VKAPI_CALL DisplayX_CreateXlibSurfaceKHR(VkInstance, const VkXlibSurfaceCreateInfoKHR*, const VkAllocationCallbacks*, VkSurfaceKHR*);
+VK_LAYER_EXPORT void VKAPI_CALL DisplayX_DestroySurfaceKHR(VkInstance, VkSurfaceKHR, const VkAllocationCallbacks*);
+VK_LAYER_EXPORT VkResult VKAPI_CALL DisplayX_GetPhysicalDeviceSurfaceSupportKHR(VkPhysicalDevice, uint32_t, VkSurfaceKHR, VkBool32*);
