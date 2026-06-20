@@ -69,11 +69,10 @@ jobs:
           NDK_ROOT=$ANDROID_NDK/toolchains/llvm/prebuilt/linux-x86_64
           TOOLCHAIN=$NDK_ROOT/bin
           
-          # CXXFLAGS에 -g(디버그 심볼)를 추가하고, -O0(최적화 끔)을 명시합니다.
           make \
             CXX="$TOOLCHAIN/aarch64-linux-android${{ env.API_LEVEL }}-clang++" \
             CXXFLAGS="-g -O0 -std=c++17 -fPIC --target=aarch64-linux-android${{ env.API_LEVEL }} -D__TERMUX__ -D__USE_GNU -U__ANDROID__ -idirafter$TERMUX_PREFIX/include -include fcntl.h -include unistd.h" \
-            LDFLAGS="-shared --target=aarch64-linux-android${{ env.API_LEVEL }} -nostdlib++ -L$TERMUX_PREFIX/lib -Wl,-rpath=/system/lib64:$RUNTIME_PATH/lib -landroid-shmem -lc++_shared -lX11-xcb -lxcb -landroid -lnativewindow" \
+            LDFLAGS="-shared --target=aarch64-linux-android${{ env.API_LEVEL }} -nostdlib++ -L$TERMUX_PREFIX/lib -Wl,-rpath=$RUNTIME_PATH/lib -landroid-shmem -lc++_shared -lX11-xcb -lxcb" \
             all
 
       - name: Packaging Output
