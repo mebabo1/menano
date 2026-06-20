@@ -133,3 +133,6 @@ VK_LAYER_EXPORT VkResult VKAPI_CALL DisplayX_WaitForPresentKHR(VkDevice device, 
 
 VK_LAYER_EXPORT PFN_vkVoidFunction VKAPI_CALL DisplayX_GetDeviceProcAddr(VkDevice device, const char *pName);
 VK_LAYER_EXPORT PFN_vkVoidFunction VKAPI_CALL DisplayX_GetInstanceProcAddr(VkInstance instance, const char *pName);
+
+extern "C" VK_LAYER_EXPORT PFN_vkVoidFunction VKAPI_CALL vkGetDeviceProcAddr(VkDevice device, const char *pName);
+extern "C" VK_LAYER_EXPORT PFN_vkVoidFunction VKAPI_CALL vkGetInstanceProcAddr(VkInstance instance, const char *pName);
