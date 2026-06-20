@@ -902,3 +902,21 @@ DisplayX_GetInstanceProcAddr(VkInstance instance, const char *pName)
         return table.GetInstanceProcAddr(instance, pName);
     }
 }
+
+extern "C" {
+
+VK_LAYER_EXPORT PFN_vkVoidFunction VKAPI_CALL
+vkGetDeviceProcAddr(VkDevice device, const char *pName)
+{
+    // Vulkan 로더가 호출하면 질문자님이 작성하신 내부 진입점으로 그대로 토스합니다.
+    return DisplayX_GetDeviceProcAddr(device, pName);
+}
+
+VK_LAYER_EXPORT PFN_vkVoidFunction VKAPI_CALL
+vkGetInstanceProcAddr(VkInstance instance, const char *pName)
+{
+    // Vulkan 로더가 호출하면 질문자님이 작성하신 내부 진입점으로 그대로 토스합니다.
+    return DisplayX_GetInstanceProcAddr(instance, pName);
+}
+
+}
