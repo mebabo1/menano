@@ -58,7 +58,7 @@ struct device {
 	VkLayerDispatchTable table;
 	std::shared_ptr<struct queue> queue;
 
-	// ⭐ [컴파일 에러 해결을 위해 추가] 인프로세스 메모리 제어 함수 포인터 직접 보관
+	// ⭐ [하드웨어 dma-buf FD 추출 엔진 전용 함수 포인터 보관]
 	PFN_vkGetMemoryFdKHR GetMemoryFdKHR;
 	PFN_vkMapMemory MapMemory;
 	PFN_vkUnmapMemory UnmapMemory;
@@ -69,13 +69,12 @@ struct fake_surface {
     VkObjectType obj_type;
 
     VkInstance instance;
-    int native_renderer_fd; // 기존 호환성을 위해 유지 (사용은 안 함)
+    int native_renderer_fd; 
     xcb_connection_t *conn;
     xcb_window_t window;
 };
 
 struct fake_swapchain_image {
-	// AHardwareBuffer *ahb; ➔ 🗑️ 폐기 (더 이상 안드로이드 API를 쓰지 않음)
 	VkDeviceMemory memory;
 	uint32_t width;
 	uint32_t height;
@@ -107,7 +106,7 @@ struct fake_swapchain {
 extern "C" {
 #endif
 
-// --- [Vulkan 레이어 엑스포트 함수 선언 목록 - C-Linkage 고정] ---
+// --- [Vulkan 레이어 엑스포트 함수 선언 목록] ---
 VK_LAYER_EXPORT VkResult VKAPI_CALL DisplayX_CreateInstance(const VkInstanceCreateInfo *pCreateInfo, const VkAllocationCallbacks *pAllocator, VkInstance *pInstance);
 VK_LAYER_EXPORT void VKAPI_CALL DisplayX_DestroyInstance(VkInstance instance, const VkAllocationCallbacks *pAllocator);
 VK_LAYER_EXPORT VkResult VKAPI_CALL DisplayX_CreateDevice(VkPhysicalDevice physicalDevice, const VkDeviceCreateInfo *pCreateInfo, const VkAllocationCallbacks *pAllocator, VkDevice *pDevice);
@@ -119,10 +118,10 @@ VK_LAYER_EXPORT VkResult VKAPI_CALL DisplayX_CreateXcbSurfaceKHR(VkInstance inst
 VK_LAYER_EXPORT VkResult VKAPI_CALL DisplayX_CreateXlibSurfaceKHR(VkInstance instance, const VkXlibSurfaceCreateInfoKHR *pCreateInfo, const VkAllocationCallbacks* pAllocator, VkSurfaceKHR *pSurface);
 VK_LAYER_EXPORT void VKAPI_CALL DisplayX_DestroySurfaceKHR(VkInstance instance, VkSurfaceKHR surface, const VkAllocationCallbacks *pAllocator);
 VK_LAYER_EXPORT VkResult VKAPI_CALL DisplayX_GetPhysicalDeviceSurfaceSupportKHR(VkPhysicalDevice physicalDevice, uint32_t queueFamilyIndex, VkSurfaceKHR surface, VkBool32* pSupported);
+
+// ⭐ [중요 추가] 세그폴트 방지 및 WSI Mocking용으로 소스 파일에 정의된 인터셉터들과 완벽 대응 싱크 맞춤
 VK_LAYER_EXPORT VkResult VKAPI_CALL DisplayX_GetPhysicalDeviceSurfaceCapabilitiesKHR(VkPhysicalDevice physicalDevice, VkSurfaceKHR surface, VkSurfaceCapabilitiesKHR* pSurfaceCapabilities);
-VK_LAYER_EXPORT VkResult VKAPI_CALL DisplayX_GetPhysicalDeviceSurfaceCapabilities2KHR(VkPhysicalDevice physicalDevice, VkPhysicalDeviceSurfaceInfo2KHR *pInfo, VkSurfaceCapabilities2KHR *pSurfaceCapabilities);
 VK_LAYER_EXPORT VkResult VKAPI_CALL DisplayX_GetPhysicalDeviceSurfaceFormatsKHR(VkPhysicalDevice physicalDevice, VkSurfaceKHR surface, uint32_t* pSurfaceFormatCount, VkSurfaceFormatKHR* pSurfaceFormats);
-VK_LAYER_EXPORT VkResult VKAPI_CALL DisplayX_GetPhysicalDeviceSurfaceFormats2KHR(VkPhysicalDevice physicalDevice, VkPhysicalDeviceSurfaceInfo2KHR *pInfo, uint32_t* pSurfaceFormatCount, VkSurfaceFormat2KHR* pSurfaceFormats);
 VK_LAYER_EXPORT VkResult VKAPI_CALL DisplayX_GetPhysicalDeviceSurfacePresentModesKHR(VkPhysicalDevice physicalDevice, VkSurfaceKHR surface, uint32_t* pSurfacePresentModeCount, VkPresentModeKHR* pPresentModes);
 
 VK_LAYER_EXPORT VkResult VKAPI_CALL DisplayX_CreateSwapchainKHR(VkDevice device, const VkSwapchainCreateInfoKHR *pCreateInfo, const VkAllocationCallbacks *pAllocator, VkSwapchainKHR *pSwapchain);
@@ -133,7 +132,6 @@ VK_LAYER_EXPORT VkResult VKAPI_CALL DisplayX_AcquireNextImage2KHR(VkDevice devic
 VK_LAYER_EXPORT VkResult VKAPI_CALL DisplayX_QueuePresentKHR(VkQueue queue, const VkPresentInfoKHR *pPresentInfo);
 VK_LAYER_EXPORT VkResult VKAPI_CALL DisplayX_WaitForPresentKHR(VkDevice device, VkSwapchainKHR swapchain, uint64_t timeout, uint64_t flags);
 
-// ⭐ [에러 핵심 포인트] 로더가 찾는 이 두 함수도 C 링크로 감싸야 코드가 꼬이지 않습니다.
 VK_LAYER_EXPORT PFN_vkVoidFunction VKAPI_CALL DisplayX_GetDeviceProcAddr(VkDevice device, const char *pName);
 VK_LAYER_EXPORT PFN_vkVoidFunction VKAPI_CALL DisplayX_GetInstanceProcAddr(VkInstance instance, const char *pName);
 
