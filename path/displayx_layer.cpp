@@ -681,60 +681,53 @@ VK_LAYER_EXPORT VkResult VKAPI_CALL DisplayX_GetPhysicalDeviceSurfaceCapabilitie
     const VkPhysicalDeviceSurfaceInfo2KHR* pSurfaceInfo,
     VkSurfaceCapabilities2KHR* pSurfaceCapabilities) 
 {
-    std::lock_guard<std::mutex> l(global_lock);
+    if (!pSurfaceCapabilities) return VK_SUCCESS;
 
-    VkInstance instance = VK_NULL_HANDLE;
-    // 🛠️ 물리 장치 고유 주소 추적을 위해 SAFE_KEY 사용
-    auto itPhys = physDevToInstance.find(SAFE_KEY(physicalDevice));
-    if (itPhys != physDevToInstance.end()) {
-        instance = itPhys->second;
-    } else if (!instanceMap.empty()) {
-        instance = instanceMap.begin()->second; // fallback
-        physDevToInstance[SAFE_KEY(physicalDevice)] = instance;
-    }
+    pSurfaceCapabilities->sType = VK_STRUCTURE_TYPE_SURFACE_CAPABILITIES_2_KHR;
+    
+    VkSurfaceCapabilitiesKHR* caps = &pSurfaceCapabilities->surfaceCapabilities;
+    caps->minImageCount = 2;
+    caps->maxImageCount = 8;
+    caps->currentExtent = {0xFFFFFFFF, 0xFFFFFFFF};
+    caps->minImageExtent = {1, 1};
+    caps->maxImageExtent = {8112, 8112};
+    caps->maxImageArrayLayers = 1;
+    caps->supportedTransforms = VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR;
+    caps->currentTransform = VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR;
+    caps->supportedCompositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
+    caps->supportedUsageFlags = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
 
-    if (instance == VK_NULL_HANDLE) return VK_ERROR_INITIALIZATION_FAILED;
-
-    // 🔑 인스턴스 디스패치 테이블 조회용 GetKey 사용
-    auto it = instanceDispatch.find(GetKey(instance));
-    if (it == instanceDispatch.end()) return VK_ERROR_INITIALIZATION_FAILED;
-
-    // 🛠️ 에러 해결: 구조체 멤버를 직접 참조하지 않고, GetInstanceProcAddr로 함수 포인터를 동적 로드합니다.
-    PFN_vkGetPhysicalDeviceSurfaceCapabilities2KHR pfn = 
-        (PFN_vkGetPhysicalDeviceSurfaceCapabilities2KHR)it->second.GetInstanceProcAddr(
-            instance, 
-            "vkGetPhysicalDeviceSurfaceCapabilities2KHR"
-        );
-
-    VkResult result = VK_SUCCESS;
-    if (pfn) {
-        // 하부 하드웨어 드라이버가 기능을 지원한다면 먼저 호출하여 기본적인 정보와 pNext 체인을 채우도록 합니다.
-        result = pfn(physicalDevice, pSurfaceInfo, pSurfaceCapabilities);
-        if (result != VK_SUCCESS) return result;
-    } else {
-        // 만약 하부 드라이버가 이 확장을 지원하지 않더라도, 상위 앱 요청에 대응하기 위해 구조체 타입을 초기화합니다.
-        if (pSurfaceCapabilities) {
-            pSurfaceCapabilities->sType = VK_STRUCTURE_TYPE_SURFACE_CAPABILITIES_2_KHR;
+    void* pNext = pSurfaceCapabilities->pNext;
+    while (pNext) {
+        VkBaseOutStructure* outStruct = reinterpret_cast<VkBaseOutStructure*>(pNext);
+        if (outStruct->sType == VK_STRUCTURE_TYPE_SURFACE_PROTECTED_CAPABILITIES_KHR) {
+            VkSurfaceProtectedCapabilitiesKHR* protectedCaps = reinterpret_cast<VkSurfaceProtectedCapabilitiesKHR*>(pNext);
+            protectedCaps->supportsProtected = VK_FALSE;
         }
+        pNext = outStruct->pNext;
     }
 
-    // ⚠️ 가상 스왑체인 안정성 확보: 하부 드라이버가 돌려준 원본 화면 정보가 아니라,
-    // DisplayX 레이어가 관리하는 X11 Compositor 환경용 커스텀 가상 스펙으로 덮어씁니다.
-    if (pSurfaceCapabilities) {
-        VkSurfaceCapabilitiesKHR* caps = &pSurfaceCapabilities->surfaceCapabilities;
-        caps->minImageCount = 2;
-        caps->maxImageCount = 8;
-        caps->currentExtent = {0xFFFFFFFF, 0xFFFFFFFF}; // 오프스크린/가상 윈도우 대응용 유연한 Extent 설정
-        caps->minImageExtent = {1, 1};
-        caps->maxImageExtent = {8112, 8112};
-        caps->maxImageArrayLayers = 1;
-        caps->supportedTransforms = VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR;
-        caps->currentTransform = VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR;
-        caps->supportedCompositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
-        caps->supportedUsageFlags = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
-    }
+    return VK_SUCCESS;
+}
 
-    return result;
+VK_LAYER_EXPORT VkResult VKAPI_CALL DisplayX_GetPhysicalDeviceSurfaceFormats2KHR(
+    VkPhysicalDevice physicalDevice,
+    const VkPhysicalDeviceSurfaceInfo2KHR* pSurfaceInfo,
+    uint32_t* pSurfaceFormatCount,
+    VkSurfaceFormat2KHR* pSurfaceFormats)
+{
+    if (pSurfaceFormats == nullptr) {
+        *pSurfaceFormatCount = 1;
+        return VK_SUCCESS;
+    }
+    
+    pSurfaceFormats[0].sType = VK_STRUCTURE_TYPE_SURFACE_FORMAT_2_KHR;
+    pSurfaceFormats[0].pNext = nullptr;
+    pSurfaceFormats[0].surfaceFormat.format = VK_FORMAT_B8G8R8A8_UNORM; 
+    pSurfaceFormats[0].surfaceFormat.colorSpace = VK_COLOR_SPACE_SRGB_NONLINEAR_KHR;
+    *pSurfaceFormatCount = 1;
+    
+    return VK_SUCCESS;
 }
 
 extern "C" {
@@ -756,6 +749,7 @@ DisplayX_GetInstanceProcAddr(VkInstance instance, const char *pName)
     GETPROCADDR(GetPhysicalDeviceSurfacePresentModesKHR);
     GETPROCADDR(DestroySurfaceKHR);
     GETPROCADDR(GetPhysicalDeviceSurfaceCapabilities2KHR);
+    GETPROCADDR(GetPhysicalDeviceSurfaceFormats2KHR);
     
     if (!strcmp(pName, "vkGetInstanceProcAddr")) 
         return (PFN_vkVoidFunction)&DisplayX_GetInstanceProcAddr;
