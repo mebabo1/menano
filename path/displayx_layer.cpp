@@ -7,6 +7,12 @@
 if (!strcmp(pName, "vk" #func)) \
     return (PFN_vkVoidFunction)&DisplayX_##func;
 
+std::unordered_map<void *, VkLayerInstanceDispatchTable> instanceDispatch;
+std::unordered_map<void *, VkInstance> instanceMap;
+std::unordered_map<void *, std::shared_ptr<struct device>> deviceDispatch;                             
+std::unordered_map<VkQueue, std::shared_ptr<struct queue>> queues;
+ID id;
+std::mutex global_lock;
 static int prefer_rgba8 = -1;
 
 // --- [Utility Functions] ---
