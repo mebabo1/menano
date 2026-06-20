@@ -849,6 +849,8 @@ DisplayX_DestroyDevice(VkDevice device, const VkAllocationCallbacks *pAllocator)
 VK_LAYER_EXPORT PFN_vkVoidFunction VKAPI_CALL
 DisplayX_GetDeviceProcAddr(VkDevice device, const char *pName)
 {   
+    if (!device) return nullptr; // 안전장치 추가
+
     if (!strcmp(pName, "vkGetPhysicalDeviceSurfaceCapabilitiesKHR")) {
         return (PFN_vkVoidFunction)&DisplayX_GetPhysicalDeviceSurfaceCapabilitiesKHR;
     }
@@ -867,6 +869,9 @@ DisplayX_GetDeviceProcAddr(VkDevice device, const char *pName)
     GETPROCADDR(GetDeviceQueue2);
     GETPROCADDR(QueuePresentKHR);
     GETPROCADDR(WaitForPresentKHR);
+
+    // 자기 자신의 표준 함수명으로 요청이 들어왔을 때 루프(재귀)에 빠지지 않도록 처리
+    if (!strcmp(pName, "vkGetDeviceProcAddr")) return (PFN_vkVoidFunction)&vkGetDeviceProcAddr;
 
     {
         scoped_lock l(global_lock);
@@ -896,6 +901,15 @@ DisplayX_GetInstanceProcAddr(VkInstance instance, const char *pName)
     GETPROCADDR(DestroySurfaceKHR);
     GETPROCADDR(GetPhysicalDeviceSurfacePresentModesKHR);
 
+    // 자기 자신의 표준 함수명으로 요청이 들어왔을 때의 예외 처리
+    if (!strcmp(pName, "vkGetInstanceProcAddr")) return (PFN_vkVoidFunction)&vkGetInstanceProcAddr;
+    if (!strcmp(pName, "vkGetDeviceProcAddr")) return (PFN_vkVoidFunction)&vkGetDeviceProcAddr;
+
+    // [중요 수정] 인스턴스가 생성되기 전(VK_NULL_HANDLE) 전역 함수 요청이 올 때 맵 접근을 방지합니다.
+    if (instance == VK_NULL_HANDLE) {
+        return nullptr;
+    }
+
     {
         scoped_lock l(global_lock);
         VkLayerInstanceDispatchTable table = instanceDispatch[GetKey(instance)];
@@ -908,14 +922,12 @@ extern "C" {
 VK_LAYER_EXPORT PFN_vkVoidFunction VKAPI_CALL
 vkGetDeviceProcAddr(VkDevice device, const char *pName)
 {
-    // Vulkan 로더가 호출하면 질문자님이 작성하신 내부 진입점으로 그대로 토스합니다.
     return DisplayX_GetDeviceProcAddr(device, pName);
 }
 
 VK_LAYER_EXPORT PFN_vkVoidFunction VKAPI_CALL
 vkGetInstanceProcAddr(VkInstance instance, const char *pName)
 {
-    // Vulkan 로더가 호출하면 질문자님이 작성하신 내부 진입점으로 그대로 토스합니다.
     return DisplayX_GetInstanceProcAddr(instance, pName);
 }
 
