@@ -1,4 +1,5 @@
 #include "displayx_layer.hpp"
+#include "displayx_layer.hpp"
 #include <vector>
 #include <unistd.h>
 #include <algorithm>
@@ -9,14 +10,11 @@
 #include <unordered_map>
 #include <memory>
 
-// 안드로이드 64비트 환경의 주소 유효성 보장을 위한 캐스팅 매크로 재정의
-#define SAFE_KEY(handle) ((uint64_t)(uintptr_t)(handle))
-
 #define GETPROCADDR(func) \
 if (!strcmp(pName, "vk" #func)) \
     return (PFN_vkVoidFunction)&DisplayX_##func;
 
-// 글로벌 상태 관리를 위한 스토리지 (Key를 uint64_t로 단일화하여 MTE 태그 오염 방지)
+// 글로벌 상태 관리를 위한 스토리지 (Key를 GetKey() 결과로 통일)
 std::unordered_map<uint64_t, VkLayerInstanceDispatchTable> instanceDispatch;
 std::unordered_map<uint64_t, VkInstance> instanceMap;
 std::unordered_map<uint64_t, std::shared_ptr<struct device>> deviceDispatch;                             
@@ -31,18 +29,17 @@ struct PresentationPacket {
     uint32_t format;
 };
 
-// --- [Utility Functions] ---
+// [Utility Functions]
 int pick_memory_index(VkInstance instance, VkPhysicalDevice physical, uint32_t memoryBits) {
     VkPhysicalDeviceMemoryProperties memoryProps{};
     uint32_t idx;
     
     std::lock_guard<std::mutex> l(global_lock);
-    auto it = instanceDispatch.find(SAFE_KEY(instance));
+    auto it = instanceDispatch.find(GetKey(instance)); // SAFE_KEY -> GetKey
     if (it != instanceDispatch.end()) {
         it->second.GetPhysicalDeviceMemoryProperties(physical, &memoryProps);
         for (idx = 0; idx < memoryProps.memoryTypeCount; idx++) {
-            if (memoryBits & (1u << idx))
-                return idx;
+            if (memoryBits & (1u << idx)) return idx;
         }
     }
     return UINT32_MAX;
