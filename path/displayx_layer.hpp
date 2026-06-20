@@ -7,21 +7,16 @@
 #include <vulkan/vulkan.h>
 #include <unistd.h>
 #include <unordered_map>
-#include <android/hardware_buffer.h>
 #include <mutex>
 #include <X11/Xlib-xcb.h>
 #include <X11/Xlib.h>
 #include <xcb/xcb.h>
-#include <libsync.h>
 #include <vulkan/vulkan_xcb.h>
 #include <vulkan/vulkan_xlib.h>
 #include <vector>
-#include <sys/socket.h>
-#include <sys/un.h>
 #include <memory>
 #include <cstring>
 
-#define AHARDWAREBUFFER_FORMAT_B8G8R8A8_UNORM 5
 #define ICD_LOADER_MAGIC 0x01D01010
 
 template <typename T>
@@ -33,7 +28,6 @@ void* GetKey(T item) {
 #define VK_UNWRAP_NON_DISPATCHABLE_HANDLE(handle, type, variable) \
 	type *variable = (type *)(uintptr_t)handle;
 
-// [링킹 에러 방지 수정] 중복 정의 에러를 막기 위해 extern 선언으로 스타일을 정돈합니다.
 extern std::unordered_map<void *, VkLayerInstanceDispatchTable> instanceDispatch;
 extern std::unordered_map<void *, VkInstance> instanceMap;
 extern std::unordered_map<void *, std::shared_ptr<struct device>> deviceDispatch;                             
@@ -63,6 +57,11 @@ struct device {
 	VkDevice handle;
 	VkLayerDispatchTable table;
 	std::shared_ptr<struct queue> queue;
+
+	// ⭐ [컴파일 에러 해결을 위해 추가] 인프로세스 메모리 제어 함수 포인터 직접 보관
+	PFN_vkGetMemoryFdKHR GetMemoryFdKHR;
+	PFN_vkMapMemory MapMemory;
+	PFN_vkUnmapMemory UnmapMemory;
 };
 
 struct fake_surface {
@@ -70,13 +69,13 @@ struct fake_surface {
     VkObjectType obj_type;
 
     VkInstance instance;
-    int native_renderer_fd;
+    int native_renderer_fd; // 기존 호환성을 위해 유지 (사용은 안 함)
     xcb_connection_t *conn;
     xcb_window_t window;
 };
 
 struct fake_swapchain_image {
-	AHardwareBuffer *ahb;
+	// AHardwareBuffer *ahb; ➔ 🗑️ 폐기 (더 이상 안드로이드 API를 쓰지 않음)
 	VkDeviceMemory memory;
 	uint32_t width;
 	uint32_t height;
@@ -101,11 +100,10 @@ struct fake_swapchain {
     std::vector<std::shared_ptr<struct fake_swapchain_image>> images;
     uint32_t currentImage;
     uint8_t id;
-    
-    // [데드락 방지 수정] 재생성 시 큐 싱크를 위한 카운터를 구조체 내부에 안전하게 포함합니다.
     uint32_t frame_count; 
 };
 
+// --- [Vulkan 레이어 엑스포트 함수 선언 목록] ---
 VK_LAYER_EXPORT VkResult VKAPI_CALL DisplayX_CreateInstance(const VkInstanceCreateInfo *pCreateInfo, const VkAllocationCallbacks *pAllocator, VkInstance *pInstance);
 VK_LAYER_EXPORT void VKAPI_CALL DisplayX_DestroyInstance(VkInstance instance, const VkAllocationCallbacks *pAllocator);
 VK_LAYER_EXPORT VkResult VKAPI_CALL DisplayX_CreateDevice(VkPhysicalDevice physicalDevice, const VkDeviceCreateInfo *pCreateInfo, const VkAllocationCallbacks *pAllocator, VkDevice *pDevice);
