@@ -644,15 +644,14 @@ VK_LAYER_EXPORT VkResult VKAPI_CALL DisplayX_GetPhysicalDeviceSurfaceCapabilitie
     VkSurfaceCapabilities2KHR* pSurfaceCapabilities) 
 {
     scoped_lock lock(global_lock);
-    
-    // 인스턴스 디스패치 테이블에서 실제 드라이버의 주소를 찾음
-    auto it = instanceDispatch.find(SAFE_KEY(physicalDevice));
+
+    uint64_t key = GetKey(physicalDevice);
+    auto it = instanceDispatch.find(key);
     if (it == instanceDispatch.end()) return VK_ERROR_INITIALIZATION_FAILED;
 
-    // 🛠️ 구조체 멤버를 직접 참조하지 않고, GetInstanceProcAddr를 통해 함수 포인터를 동적으로 획득
     PFN_vkGetPhysicalDeviceSurfaceCapabilities2KHR pfn = 
         (PFN_vkGetPhysicalDeviceSurfaceCapabilities2KHR)it->second.GetInstanceProcAddr(
-            instanceMap[SAFE_KEY(physicalDevice)], 
+            instanceMap[key], 
             "vkGetPhysicalDeviceSurfaceCapabilities2KHR"
         );
 
