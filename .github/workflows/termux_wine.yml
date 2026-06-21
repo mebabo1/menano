@@ -360,7 +360,8 @@ jobs:
           export TARGET=aarch64-linux-android28
           export CC=$TOOLCHAIN/$TARGET-clang
           # export AS=$CC
-          export CXX=$TOOLCHAIN/$TARGET-clang++      
+          export CXX=$TOOLCHAIN/$TARGET-clang++
+          export WAYLAND_SCANNER=$deps/bin
           
           export PKG_CONFIG_LIBDIR=$deps/lib/pkgconfig:$deps/share/pkgconfig
           export ACLOCAL_PATH=$deps/lib/aclocal:$deps/share/aclocal
