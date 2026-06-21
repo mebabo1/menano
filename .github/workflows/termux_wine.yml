@@ -426,6 +426,7 @@ jobs:
             --without-usb \
             --without-v4l2 \
             --without-inotify \
+            --with-wayland \
             --with-xshm \
             --with-vkd3d \
             --with-xinput \
