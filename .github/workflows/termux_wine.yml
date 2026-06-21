@@ -79,10 +79,6 @@ jobs:
           cd $HOME/termuxfs/aarch64
           wget -q https://github.com/ziad9267/termux-on-gha/releases/download/test/termuxfs.tar
           tar -xf termuxfs.tar
-          cd $HOME/termuxfs/aarch64/data/data/com.termux/files
-          wget -q https://github.com/mebabo1/menano/releases/download/Box/wayland_scanner.tar.gz
-          tar xf wayland_scanner.tar.gz
-          rm wayland_scanner.tar.gz
           
           echo "TERMUX_PREFIX=$HOME/termuxfs/aarch64/data/data/com.termux/files/usr" >> $GITHUB_ENV
           echo "TERMUX_SYSROOT=$HOME/termuxfs/aarch64" >> $GITHUB_ENV
