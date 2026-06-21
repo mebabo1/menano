@@ -349,7 +349,7 @@ jobs:
           export CC=$TOOLCHAIN/$TARGET-clang
           # export AS=$CC
           export CXX=$TOOLCHAIN/$TARGET-clang++
-          export WAYLAND_SCANNER=$deps/bin
+          export WAYLAND_SCANNER=$HOME/termuxfs/aarch64/data/data/com.termux/files/usr/bin
           
           export PKG_CONFIG_LIBDIR=$deps/lib/pkgconfig:$deps/share/pkgconfig
           export ACLOCAL_PATH=$deps/lib/aclocal:$deps/share/aclocal
