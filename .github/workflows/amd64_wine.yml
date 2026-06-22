@@ -340,7 +340,6 @@ jobs:
             --without-udev \
             --without-usb \
             --without-v4l2 \
-            --without-wayland \
             --without-inotify \
             --with-xshm \
             --with-vkd3d \
