@@ -72,7 +72,7 @@ jobs:
           make \
             CXX="$TOOLCHAIN/aarch64-linux-android${{ env.API_LEVEL }}-clang++" \
             CXXFLAGS="-g -O0 -std=c++17 -fPIC --target=aarch64-linux-android${{ env.API_LEVEL }} -D__TERMUX__ -D__USE_GNU -U__ANDROID__ -idirafter$TERMUX_PREFIX/include -include fcntl.h -include unistd.h" \
-            LDFLAGS="-shared --target=aarch64-linux-android${{ env.API_LEVEL }} -nostdlib++ -L$TERMUX_PREFIX/lib -Wl,-rpath=$RUNTIME_PATH/lib -landroid-shmem -lc++_shared -lX11-xcb -lxcb" \
+            LDFLAGS="-shared --target=aarch64-linux-android${{ env.API_LEVEL }} -nostdlib++ -L$TERMUX_PREFIX/lib -Wl,-rpath=/system/lib64:/vendor/lib64:/vendor/lib64/egl:$RUNTIME_PATH/lib -Wl,--no-as-needed -landroid -lEGL -landroid-shmem -lc++_shared -lX11-xcb -lxcb" \
             all
 
       - name: Packaging Output
