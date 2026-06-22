@@ -26,7 +26,7 @@ jobs:
       - name: Download Modified Source Code
         run: |
           curl -L "https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/path/displayx_layer.cpp" -o "displayx-src/src/displayx_layer.cpp"
-          curl -L "https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/path/displayx_layer.hpp" -o "displayx-src/src/displayx_layer.hpp"
+          # curl -L "https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/path/displayx_layer.hpp" -o "displayx-src/src/displayx_layer.hpp"
           echo "Modified displayx_layer.cpp has been successfully applied."
 
       - name: Install Host Dependencies
