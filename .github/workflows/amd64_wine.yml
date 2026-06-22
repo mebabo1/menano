@@ -89,7 +89,8 @@ jobs:
             libvulkan-dev \
             libgstreamer1.0-dev \
             libgstreamer-plugins-base1.0-dev \
-            libgettextpo-dev
+            libgettextpo-dev \
+            pkg-config wayland-protocols libxkbcommon-dev
 
       - name: llvm-mingw
         run: |
