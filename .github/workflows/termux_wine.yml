@@ -351,6 +351,10 @@ jobs:
           # export AS=$CC
           export CXX=$TOOLCHAIN/$TARGET-clang++
 
+          export SCANNER_PATH=$(which wayland-scanner)
+          export WAYLAND_SCANNER="$SCANNER_PATH"
+          export ac_cv_prog_wayland_scanner="$SCANNER_PATH"
+
           cat > "$deps/lib/pkgconfig/wayland-client.pc" << EOF
           prefix=$deps
           exec_prefix=\${prefix}
@@ -385,11 +389,16 @@ jobs:
           wayland_scanner=$SCANNER_PATH
           EOF
 
-          export WAYLAND_SCANNER="$deps/bin"
-          export ac_cv_prog_wayland_scanner="$SCANNER_PATH"
           export ac_cv_header_wayland_client_h=yes
           export ac_cv_lib_wayland_client_wl_display_connect=yes
-          
+          export ac_cv_header_wayland_egl_h=yes
+          export ac_cv_lib_wayland_egl_wl_egl_window_create=yes
+
+          export ac_cv_header_xkbcommon_xkbcommon_h=yes
+          export ac_cv_lib_xkbcommon_xkb_context_new=yes
+          export ac_cv_header_xkbcommon_xkbregistry_h=yes
+          export ac_cv_lib_xkbregistry_rxkb_context_new=yes
+
           export WAYLAND_CLIENT_CFLAGS="-I$deps/include"
           export WAYLAND_CLIENT_LIBS="-L$deps/lib -lwayland-client"
           export WAYLAND_EGL_CFLAGS="-I$deps/include"
@@ -463,6 +472,7 @@ jobs:
             --with-vkd3d \
             --with-xinput \
             --with-xinput2 \
+            --with-wayland \
             --without-xxf86vm
             
           make -j$(nproc) > build.log 2>&1 || (tail -n 100 build.log && exit 1)
