@@ -84,7 +84,7 @@ jobs:
             libjpeg-dev \
             libpng-dev \
             libtiff-dev libunwind-dev libopenal-dev libmpg123-dev \
-            libxml2-dev \
+            libxml2-dev libwayland-dev libwayland-egl-backend-dev \
             gettext curl \
             libvulkan-dev \
             libgstreamer1.0-dev \
@@ -343,6 +343,7 @@ jobs:
             --without-inotify \
             --with-xshm \
             --with-vkd3d \
+            --with-wayland \
             --without-xxf86vm
             
           make -j$(nproc) > /dev/null
