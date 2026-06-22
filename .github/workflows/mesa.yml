@@ -144,7 +144,7 @@ jobs:
         meson setup builddir \
            --libdir=lib \
            -Dprefix=/data/data/com.termux/files/usr/glibc \
-           -Dplatforms=x11 \
+           -Dplatforms=x11,wayland \
            -Dbuildtype=release \
            -Degl-native-platform=x11 \
            -Dvulkan-beta=true \
