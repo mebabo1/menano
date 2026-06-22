@@ -45,6 +45,7 @@ jobs:
 
       - name: apt-amd64
         run: |
+          apt-get update
           apt-get install -y python3 python3-minimal \
             debootstrap \
             perl \
@@ -88,7 +89,7 @@ jobs:
             gettext curl \
             libvulkan-dev \
             libgstreamer1.0-dev \
-            libgstreamer-plugins-base1.0-dev \
+            libgstreamer-plugins-base10-dev \
             libgettextpo-dev \
             pkg-config wayland-protocols libxkbcommon-dev
 
