@@ -376,7 +376,7 @@ jobs:
           EOF
 
           cat > "$deps/lib/pkgconfig/wayland-scanner.pc" << EOF
-          prefix=/usr
+          prefix=$deps/usr
           exec_prefix=\${prefix}
           bindir=\${exec_prefix}/bin
           Name: wayland-scanner
