@@ -384,6 +384,11 @@ jobs:
           Version: 1.22.0
           wayland_scanner=$SCANNER_PATH
           EOF
+
+          export WAYLAND_SCANNER="$deps/bin"
+          export ac_cv_prog_wayland_scanner="$SCANNER_PATH"
+          export ac_cv_header_wayland_client_h=yes
+          export ac_cv_lib_wayland_client_wl_display_connect=yes
           
           export WAYLAND_CLIENT_CFLAGS="-I$deps/include"
           export WAYLAND_CLIENT_LIBS="-L$deps/lib -lwayland-client"
