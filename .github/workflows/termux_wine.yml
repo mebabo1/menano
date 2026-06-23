@@ -379,16 +379,6 @@ jobs:
           Cflags: -I\${includedir}
           EOF
 
-          cat > "$deps/lib/pkgconfig/wayland-scanner.pc" << EOF
-          prefix=$deps
-          exec_prefix=\${prefix}
-          bindir=\${exec_prefix}/bin
-          Name: wayland-scanner
-          Description: Wayland scanner (system binary)
-          Version: 1.22.0
-          wayland_scanner=$SCANNER_PATH
-          EOF
-
           export ac_cv_header_wayland_client_h=yes
           export ac_cv_lib_wayland_client_wl_display_connect=yes
           export ac_cv_header_wayland_egl_h=yes
