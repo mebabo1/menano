@@ -65,6 +65,8 @@ jobs:
             libxres-dev \
             libxtst-dev \
             libvulkan-dev \
+            libinput-dev \
+            libudev-dev \
             libwayland-dev
 
           python -m pip install --upgrade pip
