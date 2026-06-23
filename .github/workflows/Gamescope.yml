@@ -133,6 +133,23 @@ jobs:
           Libs: -L\${libdir} -lXres
           Cflags: -I\${includedir}
           EOF
+
+      - name: Install wayland-protocols into Termux Sysroot
+        run: |
+          echo "=== 1. 공식 오피셜 wayland-protocols 소스 다운로드 ==="
+          # 구버전 Gamescope와 호환성이 좋은 버전으로 안전하게 가져옵니다.
+          git clone --depth 1 --branch 1.36 https://gitlab.freedesktop.org/wayland/wayland-protocols.git
+          
+          cd wayland-protocols
+          
+          echo "=== 2. 호스트 Meson을 사용해 Termux 가상 경로에 텍스트 파일들 설치 ==="
+          # 기계어 컴파일이 없는 순수 데이터 패키지이므로, 크로스 파일 없이 호스트 환경에서 
+          # 경로만 $TERMUX_PREFIX로 지정하여 깡으로 설치하면 됩니다.
+          meson setup build --prefix=$TERMUX_PREFIX
+          ninja -C build install
+          
+          echo "✅ wayland-protocols 진짜 명세서 주입 완료!"
+          cd ..
                 
       - name: Create Android Cross File
         run: |
