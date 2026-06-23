@@ -299,22 +299,19 @@ DisplayX_CreateXcbSurfaceKHR(VkInstance instance,
 
 	struct sockaddr_un addr{};
 	addr.sun_family = AF_UNIX;
-
 	const char *sock_path = "/data/data/com.termux/files/usr/tmp/displayx_compositor.sock";
-
 	strncpy(addr.sun_path, sock_path, sizeof(addr.sun_path) - 1);
-
 	socklen_t len = offsetof(struct sockaddr_un, sun_path) + strlen(addr.sun_path);
 
 	res = connect(fake_surf->native_renderer_fd, (struct sockaddr *)&addr, len);
 
 	if (res != 0) {
 		Logger::log("error", "Failed to connect to native renderer socket, res %d", res);
+		free(fake_surf);
 		return VK_ERROR_INITIALIZATION_FAILED;
 	}
 
 	*pSurface = VK_WRAP_NON_DISPATCHABLE_HANDLE(VkSurfaceKHR, fake_surf);
-
 	Logger::log("info", "Created surface %p", pSurface);
 	
 	return VK_SUCCESS;
@@ -347,11 +344,11 @@ DisplayX_CreateXlibSurfaceKHR(VkInstance instance,
 
 	if (res != 0) {                                                                                    
 		Logger::log("error", "Failed to connect to native renderer, res %d", res);                     
+		free(fake_surf);
 		return VK_ERROR_INITIALIZATION_FAILED;                                                     
 	}
 
 	*pSurface = VK_WRAP_NON_DISPATCHABLE_HANDLE(VkSurfaceKHR, fake_surf);
-
 	Logger::log("info", "Created surface %p", pSurface);
 	
 	return VK_SUCCESS;
@@ -379,8 +376,10 @@ DisplayX_GetPhysicalDeviceSurfaceCapabilitiesKHR(VkPhysicalDevice physicalDevice
 	
 	VK_UNWRAP_NON_DISPATCHABLE_HANDLE(surface, struct fake_surface, fake_surface)
 	
-	pSurfaceCapabilities->minImageCount = 1;
-	pSurfaceCapabilities->maxImageCount = 1;
+	// 💡 중요 최적화: 기존 코드는 이미지 개수를 무조건 1개(Single Buffering)로 강제하여 외부 화면에서 엄청난 찢어짐이 발생합니다.
+	// wlroots(Wayland) 외부 디스플레이 가속을 위해 더블/트리플 버퍼링이 가능하도록 유연성을 부여합니다.
+	pSurfaceCapabilities->minImageCount = 2; 
+	pSurfaceCapabilities->maxImageCount = 4;
 
 	xcb_get_geometry_cookie_t geom_cookie = xcb_get_geometry(fake_surface->conn, fake_surface->window);
 	xcb_get_geometry_reply_t *geom_rep = xcb_get_geometry_reply(fake_surface->conn, geom_cookie, nullptr);
@@ -397,7 +396,6 @@ DisplayX_GetPhysicalDeviceSurfaceCapabilitiesKHR(VkPhysicalDevice physicalDevice
 	pSurfaceCapabilities->supportedUsageFlags = VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
 
 	free(geom_rep);
-
 	return VK_SUCCESS;	
 }
 
@@ -410,8 +408,9 @@ DisplayX_GetPhysicalDeviceSurfaceCapabilities2KHR(VkPhysicalDevice physicalDevic
 	
 	VK_UNWRAP_NON_DISPATCHABLE_HANDLE(pInfo->surface, struct fake_surface, fake_surface)
 
-	pSurfaceCapabilities->surfaceCapabilities.minImageCount = 1;
-	pSurfaceCapabilities->surfaceCapabilities.maxImageCount = 1;
+	// 💡 상동 최적화 (2KHR 버전 확장 API 대응)
+	pSurfaceCapabilities->surfaceCapabilities.minImageCount = 2;
+	pSurfaceCapabilities->surfaceCapabilities.maxImageCount = 4;
 	
 	xcb_get_geometry_cookie_t geom_cookie = xcb_get_geometry(fake_surface->conn, fake_surface->window);
 	xcb_get_geometry_reply_t *geom_rep = xcb_get_geometry_reply(fake_surface->conn, geom_cookie, nullptr);
@@ -426,6 +425,7 @@ DisplayX_GetPhysicalDeviceSurfaceCapabilities2KHR(VkPhysicalDevice physicalDevic
 	pSurfaceCapabilities->surfaceCapabilities.supportedCompositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
 	pSurfaceCapabilities->surfaceCapabilities.supportedUsageFlags = VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT; 
 
+	free(geom_rep);
 	return VK_SUCCESS;
 }
 
@@ -524,7 +524,9 @@ DisplayX_DestroySurfaceKHR(VkInstance instance,
 
 	Logger::log("info", "Destroying surface %p", fake_surface);
 
-	close(fake_surface->native_renderer_fd);
+	if (fake_surface->native_renderer_fd >= 0) {
+		close(fake_surface->native_renderer_fd);
+	}
 	
 	free(fake_surface);
 }
@@ -681,7 +683,6 @@ DisplayX_CreateSwapchainKHR(VkDevice device,
 	}
 
 	*pSwapchain = VK_WRAP_NON_DISPATCHABLE_HANDLE(VkSwapchainKHR, swapchain);
-
 	Logger::log("info", "Created swapchain %p", pSwapchain);
 	
 	return VK_SUCCESS;
@@ -729,6 +730,8 @@ DisplayX_AcquireNextImageKHR(VkDevice device,
 		submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
 		submitInfo.signalSemaphoreCount = (semaphore != VK_NULL_HANDLE) ? 1 : 0;
 		submitInfo.pSignalSemaphores = (semaphore != VK_NULL_HANDLE) ? &semaphore : VK_NULL_HANDLE;
+		
+		// 💡 가상 Swapchain이므로 큐 서브밋을 통해 앱이 대기하는 Fence/Semaphore를 강제로 Signal 상태로 만들어줍니다.
 		dev->table.QueueSubmit(q->handle, 1, &submitInfo, fence);
 	}
 
@@ -758,7 +761,7 @@ DisplayX_AcquireNextImage2KHR(VkDevice device,
 		submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
 		submitInfo.signalSemaphoreCount = (pAcquireInfo->semaphore != VK_NULL_HANDLE) ? 1 : 0;
 		submitInfo.pSignalSemaphores = (pAcquireInfo->semaphore != VK_NULL_HANDLE) ? &pAcquireInfo->semaphore : VK_NULL_HANDLE;
-		dev->table.QueueSubmit(queues.begin()->second->handle, 1, &submitInfo, pAcquireInfo->fence);
+		dev->table.QueueSubmit(q->handle, 1, &submitInfo, pAcquireInfo->fence);
 	}
 
 	{
@@ -784,7 +787,6 @@ DisplayX_DestroySwapchainKHR(VkDevice device,
 		return;
 
 	dev->table.DeviceWaitIdle(device);
-
 	Logger::log("info", "Destroying swapchain %p", fake_swapchain);
 
 	scoped_lock l(global_lock);
@@ -803,7 +805,6 @@ DisplayX_DestroySwapchainKHR(VkDevice device,
 	write(fake_swapchain->surface->native_renderer_fd, &fake_swapchain->id, 1);
 
 	id.destroy(fake_swapchain->id);
-
 	free(fake_swapchain);
 }
 
@@ -851,6 +852,9 @@ DisplayX_QueuePresentKHR(VkQueue queue,
 	submitInfo.waitSemaphoreCount = pPresentInfo->waitSemaphoreCount;
 	submitInfo.pWaitSemaphores = pPresentInfo->pWaitSemaphores;
 
+	// 💡 버그 수정 1: Vulkan 스펙상 Signaled 상태이거나 사용 중인 Fence를 Reset 없이 QueueSubmit에 재사용하면 안 됩니다.
+	q->device->table.ResetFences(q->device->handle, 1, &q->fence->handle);
+
 	q->device->table.QueueSubmit(q->handle, 1, &submitInfo, q->fence->handle);
 	q->device->table.GetFenceFdKHR(q->device->handle, &getFence, &q->fence->sync_fd);
 
@@ -866,7 +870,12 @@ DisplayX_QueuePresentKHR(VkQueue queue,
 		sendFD(fake_swapchain->surface->native_renderer_fd, fence);
 	}
 
-	close(q->fence->sync_fd);
+	// 💡 버그 수정 2: GetFenceFdKHR가 성공하면 내보낸 sync_fd의 소유권은 시스템(호스트)으로 넘어옵니다.
+	// 그러나 이 FD를 sendmsg(SCM_RIGHTS)로 보낼 때 커널이 한 번 더 복사(dup)하므로, 보낸 직후 현재 프로세스의 fence FD는 반드시 닫아야 누수가 안 생깁니다.
+	if (q->fence->sync_fd >= 0) {
+		close(q->fence->sync_fd);
+		q->fence->sync_fd = -1;
+	}
 	
 	return VK_SUCCESS;
 }
@@ -882,7 +891,6 @@ DisplayX_DestroyDevice(VkDevice device,
 		return;
 
 	scoped_lock l(global_lock);
-
 	Logger::log("info", "Destroying device %p", device);
 
 	dev->table.DeviceWaitIdle(device);
