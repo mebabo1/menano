@@ -591,44 +591,29 @@ jobs:
           # 혹시 share/pkgconfig 폴더 쪽에 원본 찌꺼기가 남아있을 수 있으므로 양쪽 모두 덮어씌웁니다.
           cp $TERMUX_PREFIX/lib/pkgconfig/wayland-scanner.pc $TERMUX_PREFIX/share/pkgconfig/wayland-scanner.pc
 
-      - name: Force Disable libinput Backend in wlroots
+      - name: Wipe Out libinput Backend Source Files
         run: |
-          cat << 'EOF' > disable_libinput_backend.py
+          cat << 'EOF' > wipe_libinput.py
           import os
 
-          # 1. libinput 백엔드 전용 빌드 파일(meson.build)의 내용을 완전히 비워버림 (소스 컴파일 대상에서 제외)
-          libinput_meson = 'subprojects/wlroots/backend/libinput/meson.build'
-          if os.path.exists(libinput_meson):
-              with open(libinput_meson, 'w') as f:
-                  f.write('# Disabled completely for Termux build\n')
-              print(f"✅ 성공적으로 {libinput_meson} 내부 빌드 스크립트를 비웠습니다.")
+          # 에러를 유발하는 libinput 관련 C 소스 파일 목록
+          target_files = [
+              'subprojects/wlroots/backend/libinput/backend.c',
+              'subprojects/wlroots/backend/libinput/events.c',
+              'subprojects/wlroots/backend/libinput/switch.c',
+              'subprojects/wlroots/backend/libinput/tablet.c'
+          ]
 
-          # 2. wlroots 내부의 모든 설정 파일에서 libinput 폴더 참조 및 활성화 플래그 강제 종료
-          for root, dirs, files in os.walk('subprojects/wlroots'):
-              for file in files:
-                  if file == 'meson.build':
-                      path = os.path.join(root, file)
-                      with open(path, 'r') as f:
-                          content = f.read()
-                      
-                      original = content
-                      
-                      # libinput 하위 디렉토리 탐색(subdir) 명령어를 전부 주석 처리
-                      content = content.replace("subdir('libinput')", "# subdir('libinput')")
-                      content = content.replace('subdir("libinput")', '# subdir("libinput")')
-                      
-                      # 내부 기능 딕셔너리에 하드코딩된 활성화 플래그를전부 false로 강제 전환
-                      content = content.replace("'libinput-backend': true", "'libinput-backend': false")
-                      content = content.replace('"libinput-backend": true', '"libinput-backend": false')
-                      content = content.replace("'libinput': true", "'libinput': false")
-                      content = content.replace('"libinput": true', '"libinput": false')
-                      
-                      if content != original:
-                          with open(path, 'w') as f:
-                              f.write(content)
-                          print(f"✅ 설정 파일 무력화 완료: {path}")
+          # 파일들을 하나씩 찾아서 컴파일러가 무시할 수 있는 빈 껍데기로 교체
+          for file_path in target_files:
+              if os.path.exists(file_path):
+                  with open(file_path, 'w') as f:
+                      f.write('// Empty file for Termux build to prevent libinput errors\n')
+                  print(f"✅ 소스 파일 소멸 완료: {file_path}")
+              else:
+                  print(f"⚠️ 파일을 찾을 수 없음 (이미 없거나 경로 다름): {file_path}")
           EOF
-          python3 disable_libinput_backend.py
+          python3 wipe_libinput.py
                 
       - name: Create Android Cross File
         run: |
