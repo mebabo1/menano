@@ -87,20 +87,6 @@ jobs:
           echo "TERMUX_SYSROOT=$HOME/termuxfs/aarch64" >> $GITHUB_ENV
           echo "RUNTIME_PATH=/data/data/com.termux/files/usr" >> $GITHUB_ENV
 
-      - name: Download and extract termuxfs for aarch64
-        run: |
-          mkdir -p $HOME/termuxfs/aarch64
-          cd $HOME/termuxfs/aarch64
-          wget -q https://github.com/ziad9267/termux-on-gha/releases/download/test/termuxfs.tar
-          tar -xf termuxfs.tar
-          
-          echo "TERMUX_PREFIX=$HOME/termuxfs/aarch64/data/data/com.termux/files/usr" >> $GITHUB_ENV
-          echo "TERMUX_SYSROOT=$HOME/termuxfs/aarch64" >> $GITHUB_ENV
-          echo "RUNTIME_PATH=/data/data/com.termux/files/usr" >> $GITHUB_ENV
-
-      # =======================================================================
-      # ⭐ [여기서부터 복사해서 붙여넣으세요!] 부족한 Termux 오피셜 패키지 강제 주입 단계
-      # =======================================================================
       - name: Inject Missing Termux X11 Dependencies
         run: |
           REPO_URL="https://packages-cf.termux.dev/apt/termux-x11"
