@@ -437,6 +437,115 @@ jobs:
           Libs: -L\${libdir} -lseat
           Cflags: -I\${includedir}
           EOF
+          
+      - name: Create Dummy libgbm Stub for Termux
+        run: |
+          TOOLCHAIN=$ANDROID_NDK/toolchains/llvm/prebuilt/linux-x86_64/bin
+
+          echo "=== 1. wlroots 컴파일용 가짜 gbm.h 헤더 파일 생성 ==="
+          mkdir -p $TERMUX_PREFIX/include
+          cat << 'EOF' > $TERMUX_PREFIX/include/gbm.h
+          #pragma once
+          #include <stdint.h>
+
+          #ifdef __cplusplus
+          extern "C" {
+          #endif
+
+          struct gbm_device;
+          struct gbm_bo;
+          struct gbm_surface;
+
+          union gbm_bo_handle {
+             void *ptr;
+             int32_t s32;
+             uint32_t u32;
+             int64_t s64;
+             uint64_t u64;
+          };
+
+          #define GBM_BO_USE_SCANOUT      (1 << 0)
+          #define GBM_BO_USE_CURSOR       (1 << 1)
+          #define GBM_BO_USE_RENDERING    (1 << 2)
+          #define GBM_BO_USE_WRITE        (1 << 3)
+          #define GBM_BO_USE_LINEAR       (1 << 4)
+
+          struct gbm_device *gbm_create_device(int fd);
+          void gbm_device_destroy(struct gbm_device *gbm);
+          struct gbm_bo *gbm_bo_create(struct gbm_device *gbm, uint32_t width, uint32_t height, uint32_t format, uint32_t flags);
+          struct gbm_bo *gbm_bo_create_with_modifiers(struct gbm_device *gbm, uint32_t width, uint32_t height, uint32_t format, const uint64_t *modifiers, const unsigned int count);
+          void gbm_bo_destroy(struct gbm_bo *bo);
+          int gbm_bo_get_fd(struct gbm_bo *bo);
+          union gbm_bo_handle gbm_bo_get_handle(struct gbm_bo *bo);
+          union gbm_bo_handle gbm_bo_get_handle_for_plane(struct gbm_bo *bo, int plane);
+          uint64_t gbm_bo_get_modifier(struct gbm_bo *bo);
+          int gbm_bo_get_plane_count(struct gbm_bo *bo);
+          uint32_t gbm_bo_get_stride_for_plane(struct gbm_bo *bo, int plane);
+          uint32_t gbm_bo_get_offset(struct gbm_bo *bo, int plane);
+          uint32_t gbm_bo_get_stride(struct gbm_bo *bo);
+          uint32_t gbm_bo_get_width(struct gbm_bo *bo);
+          uint32_t gbm_bo_get_height(struct gbm_bo *bo);
+          uint32_t gbm_bo_get_format(struct gbm_bo *bo);
+          int gbm_device_is_format_supported(struct gbm_device *gbm, uint32_t format, uint32_t flags);
+
+          struct gbm_surface *gbm_surface_create(struct gbm_device *gbm, uint32_t width, uint32_t height, uint32_t format, uint32_t flags);
+          void gbm_surface_destroy(struct gbm_surface *surface);
+          struct gbm_bo *gbm_surface_lock_front_buffer(struct gbm_surface *surface);
+          void gbm_surface_release_buffer(struct gbm_surface *surface, struct gbm_bo *bo);
+
+          #ifdef __cplusplus
+          }
+          #endif
+          EOF
+
+          echo "=== 2. 링커를 속이기 위한 알맹이 없는 가짜 libgbm.so 빌드 ==="
+          cat << 'EOF' > /tmp/dummy_gbm.c
+          #include <stdlib.h>
+          #include <stdint.h>
+
+          union gbm_bo_handle { void *ptr; int32_t s32; uint32_t u32; int64_t s64; uint64_t u64; };
+
+          void *gbm_create_device(int fd) { return NULL; }
+          void gbm_device_destroy(void *gbm) {}
+          void *gbm_bo_create(void *gbm, uint32_t w, uint32_t h, uint32_t f, uint32_t fl) { return NULL; }
+          void *gbm_bo_create_with_modifiers(void *gbm, uint32_t w, uint32_t h, uint32_t f, const uint64_t *m, const unsigned int c) { return NULL; }
+          void gbm_bo_destroy(void *bo) {}
+          int gbm_bo_get_fd(void *bo) { return -1; }
+          union gbm_bo_handle gbm_bo_get_handle(void *bo) { union gbm_bo_handle h = {0}; return h; }
+          union gbm_bo_handle gbm_bo_get_handle_for_plane(void *bo, int p) { union gbm_bo_handle h = {0}; return h; }
+          uint64_t gbm_bo_get_modifier(void *bo) { return 0; }
+          int gbm_bo_get_plane_count(void *bo) { return 1; }
+          uint32_t gbm_bo_get_stride_for_plane(void *bo, int p) { return 0; }
+          uint32_t gbm_bo_get_offset(void *bo, int p) { return 0; }
+          uint32_t gbm_bo_get_stride(void *bo) { return 0; }
+          uint32_t gbm_bo_get_width(void *bo) { return 0; }
+          uint32_t gbm_bo_get_height(void *bo) { return 0; }
+          uint32_t gbm_bo_get_format(void *bo) { return 0; }
+          int gbm_device_is_format_supported(void *gbm, uint32_t f, uint32_t fl) { return 0; }
+
+          void *gbm_surface_create(void *gbm, uint32_t w, uint32_t h, uint32_t f, uint32_t fl) { return NULL; }
+          void gbm_surface_destroy(void *s) {}
+          void *gbm_surface_lock_front_buffer(void *s) { return NULL; }
+          void gbm_surface_release_buffer(void *s, void *bo) {}
+          EOF
+
+          # NDK 컴파일러를 이용해 안드로이드 aarch64 전용 가짜 libgbm.so 추출
+          $TOOLCHAIN/aarch64-linux-android${API_LEVEL}-clang -shared -fPIC /tmp/dummy_gbm.c -o $TERMUX_PREFIX/lib/libgbm.so
+
+          echo "=== 3. Meson을 속이기 위한 가짜 pkg-config (.pc) 파일 생성 ==="
+          mkdir -p $TERMUX_PREFIX/lib/pkgconfig
+          cat << EOF > $TERMUX_PREFIX/lib/pkgconfig/gbm.pc
+          prefix=$TERMUX_PREFIX
+          exec_prefix=\${prefix}
+          libdir=\${exec_prefix}/lib
+          includedir=\${prefix}/include
+
+          Name: gbm
+          Description: Dummy gbm Stub for Termux Porting
+          Version: 23.1.0
+          Libs: -L\${libdir} -lgbm
+          Cflags: -I\${includedir}
+          EOF
 
       - name: Install wayland-protocols into Termux Sysroot
         run: |
