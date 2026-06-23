@@ -591,11 +591,19 @@ jobs:
           # 혹시 share/pkgconfig 폴더 쪽에 원본 찌꺼기가 남아있을 수 있으므로 양쪽 모두 덮어씌웁니다.
           cp $TERMUX_PREFIX/lib/pkgconfig/wayland-scanner.pc $TERMUX_PREFIX/share/pkgconfig/wayland-scanner.pc
 
-      - name: Force Disable libinput in wlroots Source
+      - name: Force Disable libinput Backend in wlroots
         run: |
-          cat << 'EOF' > disable_libinput.py
+          cat << 'EOF' > disable_libinput_backend.py
           import os
 
+          # 1. libinput 백엔드 전용 빌드 파일(meson.build)의 내용을 완전히 비워버림 (소스 컴파일 대상에서 제외)
+          libinput_meson = 'subprojects/wlroots/backend/libinput/meson.build'
+          if os.path.exists(libinput_meson):
+              with open(libinput_meson, 'w') as f:
+                  f.write('# Disabled completely for Termux build\n')
+              print(f"✅ 성공적으로 {libinput_meson} 내부 빌드 스크립트를 비웠습니다.")
+
+          # 2. wlroots 내부의 모든 설정 파일에서 libinput 폴더 참조 및 활성화 플래그 강제 종료
           for root, dirs, files in os.walk('subprojects/wlroots'):
               for file in files:
                   if file == 'meson.build':
@@ -604,39 +612,23 @@ jobs:
                           content = f.read()
                       
                       original = content
-                      # 싱글/더블 쿼테이션 모두 대응
-                      for target in ["dependency('libinput'", 'dependency("libinput"']:
-                          start_idx = 0
-                          while True:
-                              idx = content.find(target, start_idx)
-                              if idx == -1:
-                                  break
-                              
-                              # dependency 호출의 시작 괄호 '(' 위치 확인
-                              open_paren = content.find('(', idx)
-                              if open_paren != -1:
-                                  paren_count = 1
-                                  current_idx = open_paren + 1
-                                  # 중첩된 괄호가 완전히 닫힐 때까지 추적 (멀티라인/함수 중첩 완벽 대응)
-                                  while paren_count > 0 and current_idx < len(content):
-                                      if content[current_idx] == '(':
-                                          paren_count += 1
-                                      elif content[current_idx] == ')':
-                                          paren_count -= 1
-                                      current_idx += 1
-                                  
-                                  # 찾아낸 dependency(...) 구문 전체를 깡통 의존성으로 변경
-                                  full_call = content[idx:current_idx]
-                                  content = content.replace(full_call, "dependency('', required: false)")
-                              
-                              start_idx = idx + 1
+                      
+                      # libinput 하위 디렉토리 탐색(subdir) 명령어를 전부 주석 처리
+                      content = content.replace("subdir('libinput')", "# subdir('libinput')")
+                      content = content.replace('subdir("libinput")', '# subdir("libinput")')
+                      
+                      # 내부 기능 딕셔너리에 하드코딩된 활성화 플래그를전부 false로 강제 전환
+                      content = content.replace("'libinput-backend': true", "'libinput-backend': false")
+                      content = content.replace('"libinput-backend": true', '"libinput-backend": false')
+                      content = content.replace("'libinput': true", "'libinput': false")
+                      content = content.replace('"libinput": true', '"libinput": false')
                       
                       if content != original:
                           with open(path, 'w') as f:
                               f.write(content)
-                          print(f"✅ 성공적으로 libinput 디텍션 차단됨: {path}")
+                          print(f"✅ 설정 파일 무력화 완료: {path}")
           EOF
-          python3 disable_libinput.py
+          python3 disable_libinput_backend.py
                 
       - name: Create Android Cross File
         run: |
