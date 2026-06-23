@@ -306,6 +306,31 @@ jobs:
           
           echo "✅ wayland-protocols 진짜 명세서 주입 완료!"
           cd ..
+
+      - name: Patch wayland-scanner.pc for wlroots Cross-Compilation
+        run: |
+          # 1. 우분투 호스트에 설치된 진짜 스캐너 경로를 알아냅니다. (예: /usr/bin/wayland-scanner)
+          HOST_SCANNER=$(which wayland-scanner)
+          echo "Real Host Scanner: $HOST_SCANNER"
+
+          # 2. Termux의 pkgconfig 디렉토리가 없다면 생성합니다.
+          mkdir -p $TERMUX_PREFIX/lib/pkgconfig
+          mkdir -p $TERMUX_PREFIX/share/pkgconfig
+
+          # 3. wlroots가 가짜 변수($SCANNER_PATH) 대신 호스트 스캐너를 강제로 바라보도록 .pc 파일을 새로 작성합니다.
+          cat << EOF > $TERMUX_PREFIX/lib/pkgconfig/wayland-scanner.pc
+          prefix=$TERMUX_PREFIX
+          exec_prefix=\${prefix}
+          bindir=\${exec_prefix}/bin
+          wayland_scanner=$HOST_SCANNER
+
+          Name: Wayland Scanner
+          Description: Wayland scanner stub redirecting to host for cross-compilation
+          Version: 1.22.0
+          EOF
+
+          # 혹시 share/pkgconfig 폴더 쪽에 원본 찌꺼기가 남아있을 수 있으므로 양쪽 모두 덮어씌웁니다.
+          cp $TERMUX_PREFIX/lib/pkgconfig/wayland-scanner.pc $TERMUX_PREFIX/share/pkgconfig/wayland-scanner.pc
                 
       - name: Create Android Cross File
         run: |
