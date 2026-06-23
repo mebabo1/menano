@@ -497,6 +497,18 @@ jobs:
         run: |
           cd gamescope-src
 
+          if [ -f "subprojects/wlroots/meson.build" ]; then
+            sed -i "s/dependency('libinput',/dependency('libinput', required: false,/g" subprojects/wlroots/meson.build
+          fi
+          if [ -f "subprojects/wlroots/backend/meson.build" ]; then
+            sed -i "s/dependency('libinput',/dependency('libinput', required: false,/g" subprojects/wlroots/backend/meson.build
+          fi
+          
+          # 추가로 libinput 백엔드 디렉토리 진입 자체를 주석 처리하거나 무력화
+          if [ -f "subprojects/wlroots/backend/meson.build" ]; then
+            sed -i "s/subdir('libinput')/# subdir('libinput')/g" subprojects/wlroots/backend/meson.build
+          fi
+
           # 구버전 내부에 포함된 내장 라이브러리(subprojects) 소스를 안전하게 수집합니다.
           meson subprojects download || true
 
