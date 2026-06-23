@@ -300,7 +300,7 @@ jobs:
         run: |
           TOOLCHAIN=$ANDROID_NDK/toolchains/llvm/prebuilt/linux-x86_64/bin
 
-          echo "=== 1. wlroots 컴파일용 가짜 libinput.h 헤더 파일 생성 ==="
+          echo "=== 1. wlroots 컴파일용 완벽한 가짜 libinput.h 헤더 파일 생성 ==="
           mkdir -p $TERMUX_PREFIX/include
           cat << 'EOF' > $TERMUX_PREFIX/include/libinput.h
           #pragma once
@@ -314,11 +314,24 @@ jobs:
           struct libinput_device;
           struct libinput_interface;
           struct udev;
+          struct libinput_event_switch;
+
+          // [추가] 로그 우선순위 열거형
+          enum libinput_log_priority {
+              LIBINPUT_LOG_PRIORITY_ERROR = 0,
+              LIBINPUT_LOG_PRIORITY_INFO = 1
+          };
 
           // wlroots 내부 열거형 에러 방지용 기본값
           enum libinput_event_type {
               LIBINPUT_EVENT_NONE = 0
           };
+
+          // [추가] 스위치 및 상태 매크로 정의
+          #define LIBINPUT_SWITCH_LID 1
+          #define LIBINPUT_SWITCH_TABLET_MODE 2
+          #define LIBINPUT_SWITCH_STATE_OFF 0
+          #define LIBINPUT_SWITCH_STATE_ON 1
 
           // wlroots가 요구하는 최소한의 핵심 함수 형태 선언
           struct libinput *libinput_udev_create_context(const struct libinput_interface *interface, void *user_data, struct udev *udev);
@@ -331,6 +344,24 @@ jobs:
           struct libinput *libinput_unref(struct libinput *libinput);
           struct libinput_device *libinput_event_get_device(struct libinput_event *event);
           void *libinput_get_user_data(struct libinput *libinput);
+          
+          // [추가] 시스템 및 로그 관련 제어 함수
+          int libinput_get_fd(struct libinput *libinput);
+          void libinput_log_set_handler(struct libinput *libinput, void *handler);
+          void libinput_log_set_priority(struct libinput *libinput, enum libinput_log_priority priority);
+          int libinput_resume(struct libinput *libinput);
+          void libinput_suspend(struct libinput *libinput);
+
+          // [추가] 장치 정보 획득 함수
+          void *libinput_device_get_user_data(struct libinput_device *device);
+          const char *libinput_device_get_name(struct libinput_device *device);
+          void libinput_device_unref(struct libinput_device *device);
+
+          // [추가] 하드웨어 스위치 이벤트 처리 함수
+          struct libinput_event_switch *libinput_event_get_switch_event(struct libinput_event *event);
+          int libinput_event_switch_get_switch(struct libinput_event_switch *event);
+          int libinput_event_switch_get_switch_state(struct libinput_event_switch *event);
+          unsigned long libinput_event_switch_get_time_usec(struct libinput_event_switch *event);
 
           #ifdef __cplusplus
           }
@@ -352,6 +383,20 @@ jobs:
           void *libinput_unref(void *l) { return NULL; }
           void *libinput_event_get_device(void *e) { return NULL; }
           void *libinput_get_user_data(void *l) { return NULL; }
+          
+          // [추가] 새로 확장된 함수들의 링커용 더미 구현체
+          int libinput_get_fd(void *l) { return -1; }
+          void libinput_log_set_handler(void *l, void *h) {}
+          void libinput_log_set_priority(void *l, int p) {}
+          int libinput_resume(void *l) { return 0; }
+          void libinput_suspend(void *l) {}
+          void *libinput_device_get_user_data(void *d) { return NULL; }
+          const char *libinput_device_get_name(void *d) { return ""; }
+          void libinput_device_unref(void *d) {}
+          void *libinput_event_get_switch_event(void *e) { return NULL; }
+          int libinput_event_switch_get_switch(void *s) { return 0; }
+          int libinput_event_switch_get_switch_state(void *s) { return 0; }
+          unsigned long libinput_event_switch_get_time_usec(void *s) { return 0; }
           EOF
 
           # NDK 컴파일러를 이용해 안드로이드 aarch64 전용 가짜 libinput.so 추출
@@ -371,7 +416,7 @@ jobs:
           Libs: -L\${libdir} -linput
           Cflags: -I\${includedir}
           EOF
-
+          
       - name: Create Dummy libseat Stub for Termux
         run: |
           TOOLCHAIN=$ANDROID_NDK/toolchains/llvm/prebuilt/linux-x86_64/bin
