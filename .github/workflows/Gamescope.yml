@@ -87,6 +87,53 @@ jobs:
           echo "TERMUX_SYSROOT=$HOME/termuxfs/aarch64" >> $GITHUB_ENV
           echo "RUNTIME_PATH=/data/data/com.termux/files/usr" >> $GITHUB_ENV
 
+      - name: Download and extract termuxfs for aarch64
+        run: |
+          mkdir -p $HOME/termuxfs/aarch64
+          cd $HOME/termuxfs/aarch64
+          wget -q https://github.com/ziad9267/termux-on-gha/releases/download/test/termuxfs.tar
+          tar -xf termuxfs.tar
+          
+          echo "TERMUX_PREFIX=$HOME/termuxfs/aarch64/data/data/com.termux/files/usr" >> $GITHUB_ENV
+          echo "TERMUX_SYSROOT=$HOME/termuxfs/aarch64" >> $GITHUB_ENV
+          echo "RUNTIME_PATH=/data/data/com.termux/files/usr" >> $GITHUB_ENV
+
+      # =======================================================================
+      # ⭐ [여기서부터 복사해서 붙여넣으세요!] 부족한 Termux 오피셜 패키지 강제 주입 단계
+      # =======================================================================
+      - name: Inject Missing Termux X11 Dependencies
+        run: |
+          REPO_URL="https://packages-cf.termux.dev/apt/termux-x11"
+          
+          echo "=== Termux X11 레포지토리 패키지 리스트 다운로드 ==="
+          wget -q $REPO_URL/dists/stable/main/binary-aarch64/Packages.gz
+          gunzip Packages.gz
+
+          # 💡 앞으로 xres 외에도 줄줄이 터질 수 있는 단골 누락 패키지들을 한 번에 리스트업했습니다.
+          MISSING_PKGS=("libxres" "libxcomposite" "libxdamage" "libxtst" "libxmu" "libxrender")
+
+          for PKG in "${MISSING_PKGS[@]}"; do
+            echo "--------------------------------------------------"
+            echo "▶️ Termux 공식 서버에서 $PKG 탐색 중..."
+            
+            # 버전이 수시로 바뀌므로 패키지 명세서에서 현재 진짜 파일 경로(Filename)를 동적으로 파싱합니다.
+            PKG_PATH=$(grep -A 15 "Package: $PKG$" Packages | grep "Filename:" | head -n 1 | awk '{print $2}')
+            
+            if [ -z "$PKG_PATH" ]; then
+              echo "❌ 에러: Termux 레포지토리에서 $PKG 패키지를 찾을 수 없습니다."
+              exit 1
+            fi
+
+            echo "📥 다운로드 중: $REPO_URL/$PKG_PATH"
+            wget -q "$REPO_URL/$PKG_PATH" -O "/tmp/$PKG.deb"
+            
+            echo "📦 가상 환경($TERMUX_SYSROOT)에 강제 추출 및 이식 중..."
+            dpkg-deb -x "/tmp/$PKG.deb" $TERMUX_SYSROOT
+            
+            echo "✅ $PKG 이식 완료!"
+          done
+      # =======================================================================
+
       - name: Create Android Cross File
         run: |
           NDK_ROOT=$ANDROID_NDK/toolchains/llvm/prebuilt/linux-x86_64
