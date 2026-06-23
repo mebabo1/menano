@@ -352,7 +352,6 @@ jobs:
           export CXX=$TOOLCHAIN/$TARGET-clang++
 
           export HOST_WAYLAND_SCANNER=$(which wayland-scanner)
-          export wayland-scanner = '$HOST_WAYLAND_SCANNER'
 
           cat > "$deps/lib/pkgconfig/wayland-client.pc" << EOF
           prefix=$deps
