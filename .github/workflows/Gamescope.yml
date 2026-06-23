@@ -87,39 +87,53 @@ jobs:
           echo "TERMUX_SYSROOT=$HOME/termuxfs/aarch64" >> $GITHUB_ENV
           echo "RUNTIME_PATH=/data/data/com.termux/files/usr" >> $GITHUB_ENV
 
-      - name: Inject Missing Termux X11 Dependencies
+      - name: Create Dummy XRes Stub for Termux
         run: |
-          REPO_URL="https://packages-cf.termux.dev/apt/termux-x11"
+          TOOLCHAIN=$ANDROID_NDK/toolchains/llvm/prebuilt/linux-x86_64/bin
           
-          echo "=== Termux X11 레포지토리 패키지 리스트 다운로드 ==="
-          wget -q $REPO_URL/dists/stable/main/binary-aarch64/Packages.gz
-          gunzip Packages.gz
+          echo "=== 1. Gamescope가 참조할 가짜 XRes.h 헤더 파일 생성 ==="
+          mkdir -p $TERMUX_PREFIX/include/X11/extensions
+          cat << 'EOF' > $TERMUX_PREFIX/include/X11/extensions/XRes.h
+          #pragma once
+          #include <X11/Xlib.h>
+          #include <X11/Xfuncproto.h>
+          
+          // Gamescope 소스 내부에서 에러가 나지 않도록 최소한의 구조체 선언
+          typedef struct { XID resource; unsigned long type; } XResClientIdSpec;
+          typedef struct { XResClientIdSpec spec; long length; void *value; } XResClientIdValue;
+          
+          _XFUNCPROTOBEGIN
+          Status XResQueryExtension(Display *dpy, int *event_basep, int *error_basep);
+          Status XResQueryClientIds(Display *dpy, long num_specs, XResClientIdSpec *specs, long *num_ids, XResClientIdValue **ids);
+          _XFUNCPROTOEND
+          EOF
 
-          # 💡 앞으로 xres 외에도 줄줄이 터질 수 있는 단골 누락 패키지들을 한 번에 리스트업했습니다.
-          MISSING_PKGS=("libxres" "libxcomposite" "libxdamage" "libxtst" "libxmu" "libxrender")
+          echo "=== 2. 링커(Linker)를 속이기 위한 알맹이 없는 가짜 64비트 .so 빌드 ==="
+          cat << 'EOF' > /tmp/dummy_xres.c
+          // 호출되어도 아무 일도 안 하고 0만 반환하는 가짜 함수들
+          int XResQueryExtension(void* dpy, int* ev, int* err) { return 0; }
+          int XResQueryClientIds(void* dpy, long num, void* specs, long* num_ids, void* ids) { return 0; }
+          EOF
 
-          for PKG in "${MISSING_PKGS[@]}"; do
-            echo "--------------------------------------------------"
-            echo "▶️ Termux 공식 서버에서 $PKG 탐색 중..."
-            
-            # 버전이 수시로 바뀌므로 패키지 명세서에서 현재 진짜 파일 경로(Filename)를 동적으로 파싱합니다.
-            PKG_PATH=$(grep -A 15 "Package: $PKG$" Packages | grep "Filename:" | head -n 1 | awk '{print $2}')
-            
-            if [ -z "$PKG_PATH" ]; then
-              echo "❌ 에러: Termux 레포지토리에서 $PKG 패키지를 찾을 수 없습니다."
-              exit 1
-            fi
+          # NDK 안드로이드 크로스 컴파일러를 사용해 가짜 aarch64용 libXres.so를 생성합니다.
+          $TOOLCHAIN/aarch64-linux-android${API_LEVEL}-clang -shared -fPIC /tmp/dummy_xres.c -o $TERMUX_PREFIX/lib/libXres.so
 
-            echo "📥 다운로드 중: $REPO_URL/$PKG_PATH"
-            wget -q "$REPO_URL/$PKG_PATH" -O "/tmp/$PKG.deb"
-            
-            echo "📦 가상 환경($TERMUX_SYSROOT)에 강제 추출 및 이식 중..."
-            dpkg-deb -x "/tmp/$PKG.deb" $TERMUX_SYSROOT
-            
-            echo "✅ $PKG 이식 완료!"
-          done
-      # =======================================================================
+          echo "=== 3. Meson 빌드 시스템을 속이기 위한 가짜 pkg-config (.pc) 파일 생성 ==="
+          mkdir -p $TERMUX_PREFIX/lib/pkgconfig
+          cat << EOF > $TERMUX_PREFIX/lib/pkgconfig/xres.pc
+          prefix=$TERMUX_PREFIX
+          exec_prefix=\${prefix}
+          libdir=\${exec_prefix}/lib
+          includedir=\${prefix}/include
 
+          Name: XRes
+          Description: Dummy X Resource Extension Library Stub for Termux Porting
+          Version: 1.2.2
+          Requires: x11
+          Libs: -L\${libdir} -lXres
+          Cflags: -I\${includedir}
+          EOF
+                
       - name: Create Android Cross File
         run: |
           NDK_ROOT=$ANDROID_NDK/toolchains/llvm/prebuilt/linux-x86_64
