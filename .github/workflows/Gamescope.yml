@@ -437,7 +437,7 @@ jobs:
           Libs: -L\${libdir} -lseat
           Cflags: -I\${includedir}
           EOF
-          
+
       - name: Create Dummy libgbm Stub for Termux
         run: |
           TOOLCHAIN=$ANDROID_NDK/toolchains/llvm/prebuilt/linux-x86_64/bin
@@ -472,6 +472,10 @@ jobs:
 
           struct gbm_device *gbm_create_device(int fd);
           void gbm_device_destroy(struct gbm_device *gbm);
+          
+          // ⭐️ 이번 에러를 해결하기 위해 추가된 명세
+          const char *gbm_device_get_backend_name(struct gbm_device *gbm);
+
           struct gbm_bo *gbm_bo_create(struct gbm_device *gbm, uint32_t width, uint32_t height, uint32_t format, uint32_t flags);
           struct gbm_bo *gbm_bo_create_with_modifiers(struct gbm_device *gbm, uint32_t width, uint32_t height, uint32_t format, const uint64_t *modifiers, const unsigned int count);
           void gbm_bo_destroy(struct gbm_bo *bo);
@@ -507,6 +511,10 @@ jobs:
 
           void *gbm_create_device(int fd) { return NULL; }
           void gbm_device_destroy(void *gbm) {}
+          
+          // ⭐️ 이번 에러를 해결하기 위해 추가된 가짜 깡통 함수
+          const char *gbm_device_get_backend_name(void *gbm) { return "dummy_android"; }
+
           void *gbm_bo_create(void *gbm, uint32_t w, uint32_t h, uint32_t f, uint32_t fl) { return NULL; }
           void *gbm_bo_create_with_modifiers(void *gbm, uint32_t w, uint32_t h, uint32_t f, const uint64_t *m, const unsigned int c) { return NULL; }
           void gbm_bo_destroy(void *bo) {}
