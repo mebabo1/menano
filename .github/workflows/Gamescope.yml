@@ -1,174 +1,173 @@
-name: Build Gamescope (Native arm64 Ubuntu with Termux glibc Linker)
+name: Build Android Gamescope (Legacy)
 
 on:
+  push:
+    branches: [ "main" ]
   workflow_dispatch:
 
-env:
-  DEBIAN_FRONTEND: noninteractive
-
 permissions:
-  contents: write
+  contents: read
 
 jobs:
-  build-arm64:
-    runs-on: ubuntu-24.04
-    timeout-minutes: 120
+  build-gamescope:
+    runs-on: ubuntu-22.04
+
+    env:
+      ANDROID_NDK_VERSION: r27
+      API_LEVEL: 30
 
     steps:
-      - name: Checkout Repository
+      - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Set up QEMU for arm64 emulation
-        uses: docker/setup-qemu-action@v3
+      - name: Clone Gamescope
+        run: |
+          git clone --depth 1 \
+            https://github.com/DadSchoorse/gamescope.git \
+            gamescope-src
+          
+      - name: Setup Python
+        uses: actions/setup-python@v5
         with:
-          platforms: arm64
+          python-version: "3.11"
 
-      # 1. 호스트 단에서 깔끔하게 출력용 폴더를 밀고 시작합니다.
-      - name: Pre-create output directory
+      - name: Install Dependencies
         run: |
-          rm -rf ${{ github.workspace }}/gamescope-dist
-          mkdir -p ${{ github.workspace }}/gamescope-dist
+          sudo apt update
 
-      # 2. 메손 크로스 파일 생성 (C++ 표준 라이브러리 경로 완벽 교정)
-      - name: Create Meson Cross File (Safe Host Side)
+          sudo apt install -y \
+            git \
+            wget \
+            unzip \
+            pkg-config \
+            ninja-build \
+            cmake \
+            bison \
+            flex \
+            python3-dev \
+            libx11-dev \
+            libxext-dev \
+            libxcb1-dev \
+            libxrandr-dev \
+            libxfixes-dev \
+            libxshmfence-dev \
+            libdrm-dev \
+            zlib1g-dev \
+            libzstd-dev \
+            glslang-tools \
+            libpixman-1-dev \
+            libxcomposite-dev \
+            libxcursor-dev \
+            libxdamage-dev \
+            libxi-dev \
+            libxmu-dev \
+            libxrender-dev \
+            libxres-dev \
+            libxtst-dev \
+            libvulkan-dev
+
+          python -m pip install --upgrade pip
+          python -m pip install meson mako pyyaml ninja
+
+      - name: Download Android NDK
         run: |
-          cat << 'EOF' > ${{ github.workspace }}/termux-glibc.ini
+          cd /tmp
+          wget -q https://dl.google.com/android/repository/android-ndk-${ANDROID_NDK_VERSION}-linux.zip
+          unzip -q android-ndk-${ANDROID_NDK_VERSION}-linux.zip
+          echo "ANDROID_NDK=/tmp/android-ndk-${ANDROID_NDK_VERSION}" >> $GITHUB_ENV
+
+      - name: Download and extract termuxfs for aarch64
+        run: |
+          mkdir -p $HOME/termuxfs/aarch64
+          cd $HOME/termuxfs/aarch64
+          wget -q https://github.com/ziad9267/termux-on-gha/releases/download/test/termuxfs.tar
+          tar -xf termuxfs.tar
+          
+          echo "TERMUX_PREFIX=$HOME/termuxfs/aarch64/data/data/com.termux/files/usr" >> $GITHUB_ENV
+          echo "TERMUX_SYSROOT=$HOME/termuxfs/aarch64" >> $GITHUB_ENV
+          echo "RUNTIME_PATH=/data/data/com.termux/files/usr" >> $GITHUB_ENV
+
+      - name: Create Android Cross File
+        run: |
+          NDK_ROOT=$ANDROID_NDK/toolchains/llvm/prebuilt/linux-x86_64
+          TOOLCHAIN=$NDK_ROOT/bin
+          SYSROOT=$NDK_ROOT/sysroot
+
+          cat > /tmp/android-cross.ini << EOF
+          [host_machine]
+          system = 'android'
+          cpu_family = 'aarch64'
+          cpu = 'aarch64'
+          endian = 'little'
+
           [binaries]
-          c = 'clang'
-          cpp = 'clang++'
+          c = ['$TOOLCHAIN/aarch64-linux-android${API_LEVEL}-clang', '-D__TERMUX__', '-D__USE_GNU', '-U__ANDROID__', '--target=aarch64-linux-android30']
+          cpp = ['$TOOLCHAIN/aarch64-linux-android${API_LEVEL}-clang++', '-D__TERMUX__', '-D__USE_GNU', '-U__ANDROID__', '--target=aarch64-linux-android30']
+          ar = '$TOOLCHAIN/llvm-ar'
+          strip = '$TOOLCHAIN/llvm-strip'
           pkgconfig = 'pkg-config'
-
-          [built-in options]
-          c_args = ['-O2', '-pipe', '--target=aarch64-linux-gnu']
-          # 🌟 맨 끝에 '-isystem', '/usr/include'를 추가하여 std::string 설계도 누락 에러를 완벽히 해결합니다.
-          cpp_args = ['-O2', '-pipe', '--target=aarch64-linux-gnu', '-stdlib=libstdc++', '-isystem', '/usr/include/c++/13', '-isystem', '/usr/include/aarch64-linux-gnu/c++/13', '-isystem', '/usr/include']
-          c_link_args = ['-s', '--target=aarch64-linux-gnu', '-L/usr/lib/aarch64-linux-gnu', '-Wl,--dynamic-linker=/data/data/com.termux/files/usr/glibc/lib/ld-linux-aarch64.so.1', '-Wl,-rpath=/data/data/com.termux/files/usr/glibc/lib', '-Wl,-O3,--sort-common,--as-needed', '-lpulse']
-          cpp_link_args = ['-s', '--target=aarch64-linux-gnu', '-stdlib=libstdc++', '-L/usr/lib/aarch64-linux-gnu', '-Wl,--dynamic-linker=/data/data/com.termux/files/usr/glibc/lib/ld-linux-aarch64.so.1', '-Wl,-rpath=/data/data/com.termux/files/usr/glibc/lib', '-Wl,-O3,--sort-common,--as-needed', '-lpulse']
 
           [properties]
           needs_exe_wrapper = true
-          pkg_config_libdir = '/usr/lib/pkgconfig:/usr/lib/aarch64-linux-gnu/pkgconfig:/usr/share/pkgconfig'
+          sysroot = '$SYSROOT'
 
-          [host_machine]
-          system = 'linux'
-          cpu_family = 'aarch64'
-          cpu = 'armv8-a'
-          endian = 'little'
-          EOF
-          echo "✔ Meson Cross File이 미니멀하게 정리 및 교정되었습니다."
-
-      - name: Build Gamescope inside Native arm64 Ubuntu Container
-        run: |
-          docker run --rm --privileged \
-            --platform linux/arm64 \
-            -v ${{ github.workspace }}:/workspace \
-            -w /workspace \
-            arm64v8/ubuntu:24.04 /bin/bash -c "
-              set -e
-              echo '🚀 arm64 네이티브 컨테이너 진입 (Architecture: '\$(uname -m)')'
-
-              # 1. 의존성 패키지 설치
-              apt-get update
-              apt-get install -y --no-install-recommends \
-                build-essential git cmake ninja-build python3 python3-pip python3-setuptools pkg-config \
-                meson libwayland-dev wayland-protocols libvulkan-dev libx11-dev \
-                libx11-xcb-dev libxcb-icccm4-dev libxcb-ewmh-dev xcb-proto \
-                libxcb-res0-dev libxcomposite-dev libxext-dev libxfixes-dev libxrender-dev \
-                libxrandr-dev libxinerama-dev libxkbcommon-dev libxxf86vm-dev \
-                libinput-dev libudev-dev libpixman-1-dev libdrm-dev libseat-dev \
-                libluajit-5.1-dev libgl-dev libegl-dev libgles-dev libepoxy-dev \
-                hwdata glslang-tools libcap-dev libbenchmark-dev libpulse-dev \
-                libpipewire-0.3-dev libavutil-dev libavcodec-dev libswscale-dev \
-                libdecor-0-dev libliftoff-dev \
-                libxdamage-dev libxmu-dev libxtst-dev libxshmfence-dev libxres-dev libxml2-dev \
-                autoconf automake libtool gettext flex bison nasm ca-certificates wget curl xz-utils file \
-                clang llvm lld libglib2.0-dev libfreetype6-dev libltdl-dev libxcb1-dev librsvg2-bin \
-                libunwind-dev libdbus-1-dev libxcursor-dev libxi-dev libmpg123-dev libopenal-dev \
-                libfontconfig1-dev libsdl2-dev libasound2-dev libgstreamer1.0-dev \
-                libgstreamer-plugins-base1.0-dev dpkg-dev fakeroot debhelper dh-make screen nano less \
-                xwayland libxcb-composite0-dev libxcb-render0-dev libxcb-util-dev
-
-              # 2. Wayland 코어 컴포넌트 수동 업그레이드
-              echo '📥 Upgrading Wayland Core to 1.24.0 for wlroots...'
-              cd /tmp
-              rm -rf wayland
-              git clone https://gitlab.freedesktop.org/wayland/wayland.git
-              cd wayland
-              git checkout 1.24.0 || git checkout main
-              meson setup build --prefix=/usr --buildtype=release -Ddocumentation=false
-              meson compile -C build
-              meson install -C build
-              cd /workspace
-
-              # 2-2. Pixman 라이브러리 수동 업그레이드
-              echo '📥 Upgrading Pixman to latest version for wlroots...'
-              cd /tmp
-              rm -rf pixman
-              git clone https://gitlab.freedesktop.org/pixman/pixman.git
-              cd pixman
-              git checkout pixman-0.44.0 || git checkout master
-              meson setup build --prefix=/usr --buildtype=release -Dtests=disabled
-              meson compile -C build
-              meson install -C build
-              cd /workspace
-
-              # 3. Gamescope 소스 다운로드 및 진입
-              if [ ! -d \"gamescope-src\" ]; then
-                git clone --recursive https://github.com/DadSchoorse/gamescope.git gamescope-src
-              fi
-              cd gamescope-src
-
-              # 4. Termux 고정 경로 선언
-              export deps=\"/data/data/com.termux/files/usr\"
-              export depsg=\"/data/data/com.termux/files/usr/glibc\"
-
-              echo '⚙️ Running Meson Setup with External Cross File...'
-              rm -rf build
-              
-              # 빌드 환경 구성 (호스트 패키지 인덱스 정상 탐색 유도 및 XWayland 빌드 강제)
-              PKG_CONFIG_SYSROOT_DIR=\"/\" \
-              PKG_CONFIG_LIBDIR=\"/usr/lib/pkgconfig:/usr/lib/aarch64-linux-gnu/pkgconfig:/usr/share/pkgconfig\" \
-              PKG_CONFIG_PATH=\"/usr/lib/pkgconfig:/usr/lib/aarch64-linux-gnu/pkgconfig\" \
-              meson setup build \
-                --cross-file /workspace/termux-glibc.ini \
-                --clearcache \
-                --prefix=/data/data/com.termux/files/usr/glibc
-
-              echo '🛠️ Gamescope 컴파일 시작...'
-              meson compile -C build
-
-              echo '📦 빌드 완료품 아티팩트 분리 수집...'
-              rm -rf /tmp/gamescope-stage
-              DESTDIR=/tmp/gamescope-stage meson install -C build
-
-              echo '🚚 안드로이드 디렉토리 하위에서 실제 바이너리 복사 중...'
-              if [ -d \"/tmp/gamescope-stage/data/data/com.termux/files/usr/glibc\" ]; then
-                cp -r /tmp/gamescope-stage/data/data/com.termux/files/usr/glibc/* /workspace/gamescope-dist/
-                echo \"✔ 아티팩트 구출 성공!\"
-              else
-                echo \"❌ 에러: 빌드된 바이너리 트리 구조가 올바르지 않습니다.\"
-                exit 1
-              fi
-              
-              chmod -R 777 /workspace/gamescope-dist
-            "
-            
-      - name: Package Native arm64 Artifacts
-        run: |
-          cd ${{ github.workspace }}/gamescope-dist
-          echo "=== 📦최종 압축 전 파일 목록 디버깅 ==="
-          ls -la
+          [built-in options]
+          c_args = ['-fPIC', '-idirafter$TERMUX_PREFIX/include', '-include', 'fcntl.h', '-include', 'unistd.h']
+          cpp_args = ['-fPIC', '-idirafter$TERMUX_PREFIX/include', '-include', 'fcntl.h', '-include', 'unistd.h']
           
-          if [ -n "$(ls -A .)" ]; then
-            tar -cJf ${{ github.workspace }}/gamescope-native-arm64.tar.xz .
-            echo "✔ Termux glibc용 완벽 패키징 완료!"
-          else
-            echo "❌ 에러: 여전히 압축 대상 폴더가 비어 있습니다."
-            exit 1
-          fi
+          c_link_args = ['--target=aarch64-linux-android30', '-L$TERMUX_PREFIX/lib', '-Wl,-rpath=/system/lib64:/vendor/lib64:/vendor/lib64/egl:/apex/com.android.i18n/lib64:$RUNTIME_PATH/lib', '-Wl,--no-as-needed', '-lEGL', '-landroid-shmem', '-ldrm', '-lwayland-client', '-lwayland-server']
+          cpp_link_args = ['--target=aarch64-linux-android30', '-L$TERMUX_PREFIX/lib', '-Wl,-rpath=/system/lib64:/vendor/lib64:/vendor/lib64/egl:/apex/com.android.i18n/lib64:$RUNTIME_PATH/lib', '-Wl,--no-as-needed', '-lEGL', '-landroid-shmem', '-static-libstdc++', '-ldrm', '-lwayland-client', '-lwayland-server']
 
-      - name: Upload Gamescope Artifact
+          [env]
+          PKG_CONFIG_PATH = '$TERMUX_PREFIX/lib/pkgconfig:$TERMUX_PREFIX/share/pkgconfig'
+          PKG_CONFIG_LIBDIR = '$TERMUX_PREFIX/lib/pkgconfig'
+          PKG_CONFIG_SYSROOT_DIR = '$TERMUX_SYSROOT'
+          EOF
+
+      # 💡 변경된 핵심 구간: 불필요한 최신 옵션을 모두 빼고 깔끔하게 정리했습니다.
+      - name: Configure Gamescope
+        run: |
+          cd gamescope-src
+
+          # 구버전 내부에 포함된 내장 라이브러리(subprojects) 소스를 안전하게 수집합니다.
+          meson subprojects download || true
+
+          export PKG_CONFIG_PATH="$TERMUX_PREFIX/lib/pkgconfig:$TERMUX_PREFIX/share/pkgconfig"
+          export PKG_CONFIG_LIBDIR="$TERMUX_PREFIX/lib/pkgconfig"
+          export PKG_CONFIG_SYSROOT_DIR="$TERMUX_ROOT"
+
+          export X_CFLAGS="-I$TERMUX_PREFIX/include"
+          export X_LIBS="-L$TERMUX_PREFIX/lib -landroid-shmem"
+          
+          export CFLAGS="-I$TERMUX_PREFIX/include -include fcntl.h -include unistd.h"
+          export CXXFLAGS="-I$TERMUX_PREFIX/include -include fcntl.h -include unistd.h"
+          export LDFLAGS="-L$TERMUX_PREFIX/lib -Wl,-rpath=$RUNTIME_PATH/lib -landroid-shmem -static-libstdc++"
+
+          # ⭐ 구버전 소스 사양에 맞춤: 오직 'pipewire'만 명시적으로 끄고 빌드를 시작합니다.
+          meson setup build \
+            --cross-file /tmp/android-cross.ini \
+            -Dpipewire=disabled \
+            --prefix=/data/data/com.termux/files/usr
+
+      - name: Build
+        run: |
+          cd gamescope-src
+          ninja -C build -v 2>&1 | tee build.log
+
+      - name: Install
+        run: |
+          cd gamescope-src
+          DESTDIR=$PWD/install ninja -C build install
+
+      - name: Show Files
+        run: |
+          echo "=== Installed Gamescope Files ==="
+          find gamescope-src/install -type f
+
+      - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: gamescope-native-arm64
-          path: ${{ github.workspace }}/gamescope-native-arm64.tar.xz
+          name: gamescope-android-legacy
+          path: |
+            gamescope-src/build.log
+            gamescope-src/install
