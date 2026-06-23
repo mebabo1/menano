@@ -590,6 +590,40 @@ jobs:
 
           # 혹시 share/pkgconfig 폴더 쪽에 원본 찌꺼기가 남아있을 수 있으므로 양쪽 모두 덮어씌웁니다.
           cp $TERMUX_PREFIX/lib/pkgconfig/wayland-scanner.pc $TERMUX_PREFIX/share/pkgconfig/wayland-scanner.pc
+          
+      - name: Force Disable libinput in wlroots Source
+        run: |
+          python3 -c "
+          import os
+          for root, dirs, files in os.walk('subprojects/wlroots'):
+              for file in files:
+                  if file == 'meson.build':
+                      path = os.path.join(root, file)
+                      with open(path, 'r') as f:
+                          content = f.read()
+                      
+                      # libinput 의존성 선언부 찾기 (공백 대응)
+                      idx = content.find('libinput = dependency')
+                      if idx != -1:
+                          start_paren = content.find('(', idx)
+                          paren_count = 1
+                          current_idx = start_paren + 1
+                          # 매칭되는 괄호가 끝나는 지점까지 추적 (멀티라인 대응)
+                          while paren_count > 0 and current_idx < len(content):
+                              if content[current_idx] == '(':
+                                  paren_count += 1
+                              elif content[current_idx] == ')':
+                                  paren_count -= 1
+                              current_idx += 1
+                          
+                          # 해당 구문을 통째로 아무것도 찾지 않는 깡통 디펜던시로 교체
+                          block_to_replace = content[idx:current_idx]
+                          content = content.replace(block_to_replace, \"libinput = dependency('', required: false)\")
+                          
+                          with open(path, 'w') as f:
+                              f.write(content)
+                          print(f'✅ 완벽히 차단됨: {path}')
+          "
                 
       - name: Create Android Cross File
         run: |
@@ -654,8 +688,6 @@ jobs:
           meson setup build \
             --cross-file /tmp/android-cross.ini \
             -Dpipewire=disabled \
-            -Dwlroots:libinput=disabled \
-            -Dwlroots:session=disabled \
             --prefix=/data/data/com.termux/files/usr
 
       - name: Build
