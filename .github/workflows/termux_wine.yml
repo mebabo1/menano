@@ -89,6 +89,29 @@ jobs:
           echo "TERMUX_SYSROOT=$HOME/termuxfs/aarch64" >> $GITHUB_ENV
           echo "RUNTIME_PATH=/data/data/com.termux/files/usr" >> $GITHUB_ENV
 
+      - name: Patch wayland-scanner.pc for wlroots Cross-Compilation
+        run: |
+          # 1. 우분투 호스트에 설치된 진짜 스캐너 경로를 알아냅니다. (예: /usr/bin/wayland-scanner)
+          HOST_SCANNER=$(which wayland-scanner)
+          echo "Real Host Scanner: $HOST_SCANNER"
+
+          # 2. Termux의 pkgconfig 디렉토리가 없다면 생성합니다.
+          mkdir -p $TERMUX_PREFIX/lib/pkgconfig
+          mkdir -p $TERMUX_PREFIX/share/pkgconfig
+
+          # 3. wlroots가 가짜 변수($SCANNER_PATH) 대신 호스트 스캐너를 강제로 바라보도록 .pc 파일을 새로 작성합니다.
+          cat << EOF > $TERMUX_PREFIX/lib/pkgconfig/wayland-scanner.pc
+          prefix=$TERMUX_PREFIX
+          exec_prefix=\${prefix}
+          bindir=\${exec_prefix}/bin
+          wayland_scanner=$HOST_SCANNER
+
+          Name: Wayland Scanner
+          Description: Wayland scanner stub redirecting to host for cross-compilation
+          Version: 1.22.0
+          EOF
+          cp $TERMUX_PREFIX/lib/pkgconfig/wayland-scanner.pc $TERMUX_PREFIX/share/pkgconfig/wayland-scanner.pc
+
       - name: Cache Android NDK
         id: cache-ndk
         uses: actions/cache@v4
