@@ -296,12 +296,12 @@ jobs:
           Cflags: -I\${includedir}
           EOF
 
-      - name: Create Dummy libinput Stub for Termux
+      - name: Create Dummy libinput, libseat, and libudev Stubs for Termux
         run: |
           TOOLCHAIN=$ANDROID_NDK/toolchains/llvm/prebuilt/linux-x86_64/bin
-
-          echo "=== 1. wlroots 입력 백엔드 전체를 속이는 무결점 libinput.h 생성 ==="
           mkdir -p $TERMUX_PREFIX/include
+
+          echo "=== 1. wlroots 입력 백엔드를 속이는 무결점 libinput.h 생성 ==="
           cat << 'EOF' > $TERMUX_PREFIX/include/libinput.h
           #pragma once
           #include <stdint.h>
@@ -309,7 +309,6 @@ jobs:
           extern "C" {
           #endif
 
-          // 구조체 선언
           struct libinput;
           struct libinput_event;
           struct libinput_device;
@@ -330,77 +329,38 @@ jobs:
               void (*close_restricted)(int fd, void *user_data);
           };
 
-          // [해결] events.c에서 사용하는 제스처 및 스위치 토글 이벤트 추가
           enum libinput_event_type {
-              LIBINPUT_EVENT_NONE = 0,
-              LIBINPUT_EVENT_DEVICE_ADDED,
-              LIBINPUT_EVENT_DEVICE_REMOVED,
-              LIBINPUT_EVENT_KEYBOARD_KEY,
-              LIBINPUT_EVENT_POINTER_MOTION,
-              LIBINPUT_EVENT_POINTER_MOTION_ABSOLUTE,
-              LIBINPUT_EVENT_POINTER_BUTTON,
-              LIBINPUT_EVENT_POINTER_AXIS,
-              LIBINPUT_EVENT_TOUCH_DOWN,
-              LIBINPUT_EVENT_TOUCH_UP,
-              LIBINPUT_EVENT_TOUCH_MOTION,
-              LIBINPUT_EVENT_TOUCH_CANCEL,
-              LIBINPUT_EVENT_TOUCH_FRAME,
-              LIBINPUT_EVENT_TABLET_TOOL_AXIS,
-              LIBINPUT_EVENT_TABLET_TOOL_PROXIMITY,
-              LIBINPUT_EVENT_TABLET_TOOL_TIP,
-              LIBINPUT_EVENT_TABLET_TOOL_BUTTON,
-              LIBINPUT_EVENT_TABLET_PAD_BUTTON,
-              LIBINPUT_EVENT_TABLET_PAD_RING,
-              LIBINPUT_EVENT_TABLET_PAD_STRIP,
-              LIBINPUT_EVENT_SWITCH_TOGGLE,
-              LIBINPUT_EVENT_GESTURE_SWIPE_BEGIN,
-              LIBINPUT_EVENT_GESTURE_SWIPE_UPDATE,
-              LIBINPUT_EVENT_GESTURE_SWIPE_END,
-              LIBINPUT_EVENT_GESTURE_PINCH_BEGIN,
-              LIBINPUT_EVENT_GESTURE_PINCH_UPDATE,
-              LIBINPUT_EVENT_GESTURE_PINCH_END,
-              LIBINPUT_EVENT_GESTURE_HOLD_BEGIN,
-              LIBINPUT_EVENT_GESTURE_HOLD_END
+              LIBINPUT_EVENT_NONE = 0, LIBINPUT_EVENT_DEVICE_ADDED, LIBINPUT_EVENT_DEVICE_REMOVED,
+              LIBINPUT_EVENT_KEYBOARD_KEY, LIBINPUT_EVENT_POINTER_MOTION, LIBINPUT_EVENT_POINTER_MOTION_ABSOLUTE,
+              LIBINPUT_EVENT_POINTER_BUTTON, LIBINPUT_EVENT_POINTER_AXIS, LIBINPUT_EVENT_TOUCH_DOWN,
+              LIBINPUT_EVENT_TOUCH_UP, LIBINPUT_EVENT_TOUCH_MOTION, LIBINPUT_EVENT_TOUCH_CANCEL,
+              LIBINPUT_EVENT_TOUCH_FRAME, LIBINPUT_EVENT_TABLET_TOOL_AXIS, LIBINPUT_EVENT_TABLET_TOOL_PROXIMITY,
+              LIBINPUT_EVENT_TABLET_TOOL_TIP, LIBINPUT_EVENT_TABLET_TOOL_BUTTON, LIBINPUT_EVENT_TABLET_PAD_BUTTON,
+              LIBINPUT_EVENT_TABLET_PAD_RING, LIBINPUT_EVENT_TABLET_PAD_STRIP, LIBINPUT_EVENT_SWITCH_TOGGLE,
+              LIBINPUT_EVENT_GESTURE_SWIPE_BEGIN, LIBINPUT_EVENT_GESTURE_SWIPE_UPDATE, LIBINPUT_EVENT_GESTURE_SWIPE_END,
+              LIBINPUT_EVENT_GESTURE_PINCH_BEGIN, LIBINPUT_EVENT_GESTURE_PINCH_UPDATE, LIBINPUT_EVENT_GESTURE_PINCH_END,
+              LIBINPUT_EVENT_GESTURE_HOLD_BEGIN, LIBINPUT_EVENT_GESTURE_HOLD_END
           };
 
-          // [해결] tablet_pad.c에서 누락된 패드 링 소스 정의 추가
-          enum libinput_tablet_pad_ring_source {
-              LIBINPUT_TABLET_PAD_RING_SOURCE_UNKNOWN = 0,
-              LIBINPUT_TABLET_PAD_RING_SOURCE_FINGER
-          };
+          enum libinput_tablet_pad_ring_source { LIBINPUT_TABLET_PAD_RING_SOURCE_UNKNOWN = 0, LIBINPUT_TABLET_PAD_RING_SOURCE_FINGER };
+          
+          // [해결] tablet_pad.c:173 에러 대응 누락된 스트립 소스 정의 추가
+          enum libinput_tablet_pad_strip_source { LIBINPUT_TABLET_PAD_STRIP_SOURCE_UNKNOWN = 0, LIBINPUT_TABLET_PAD_STRIP_SOURCE_FINGER };
 
-          enum libinput_tablet_tool_type {
-              LIBINPUT_TABLET_TOOL_TYPE_PEN = 1,
-              LIBINPUT_TABLET_TOOL_TYPE_ERASER,
-              LIBINPUT_TABLET_TOOL_TYPE_BRUSH,
-              LIBINPUT_TABLET_TOOL_TYPE_PENCIL,
-              LIBINPUT_TABLET_TOOL_TYPE_AIRBRUSH,
-              LIBINPUT_TABLET_TOOL_TYPE_MOUSE,
-              LIBINPUT_TABLET_TOOL_TYPE_LENS,
-              LIBINPUT_TABLET_TOOL_TYPE_TOTEM
-          };
-
+          enum libinput_tablet_tool_type { LIBINPUT_TABLET_TOOL_TYPE_PEN = 1, LIBINPUT_TABLET_TOOL_TYPE_ERASER, LIBINPUT_TABLET_TOOL_TYPE_BRUSH, LIBINPUT_TABLET_TOOL_TYPE_PENCIL, LIBINPUT_TABLET_TOOL_TYPE_AIRBRUSH, LIBINPUT_TABLET_TOOL_TYPE_MOUSE, LIBINPUT_TABLET_TOOL_TYPE_LENS, LIBINPUT_TABLET_TOOL_TYPE_TOTEM };
           enum libinput_log_priority { LIBINPUT_LOG_PRIORITY_ERROR = 0, LIBINPUT_LOG_PRIORITY_INFO = 1 };
           enum libinput_key_state { LIBINPUT_KEY_STATE_RELEASED = 0, LIBINPUT_KEY_STATE_PRESSED = 1 };
           enum libinput_button_state { LIBINPUT_BUTTON_STATE_RELEASED = 0, LIBINPUT_BUTTON_STATE_PRESSED = 1 };
           enum libinput_pointer_axis { LIBINPUT_POINTER_AXIS_SCROLL_VERTICAL = 0, LIBINPUT_POINTER_AXIS_SCROLL_HORIZONTAL = 1 };
           enum libinput_pointer_axis_source { LIBINPUT_POINTER_AXIS_SOURCE_WHEEL = 1, LIBINPUT_POINTER_AXIS_SOURCE_FINGER, LIBINPUT_POINTER_AXIS_SOURCE_CONTINUOUS, LIBINPUT_POINTER_AXIS_SOURCE_WHEEL_TILT };
-          enum libinput_device_capability {
-              LIBINPUT_DEVICE_CAP_KEYBOARD = 0, LIBINPUT_DEVICE_CAP_POINTER = 1, LIBINPUT_DEVICE_CAP_TOUCH = 2,
-              LIBINPUT_DEVICE_CAP_TABLET_TOOL = 3, LIBINPUT_DEVICE_CAP_TABLET_PAD = 4, LIBINPUT_DEVICE_CAP_GESTURE = 5, LIBINPUT_DEVICE_CAP_SWITCH = 6
-          };
-
-          enum libinput_tablet_pad_button_state {
-              LIBINPUT_TABLET_PAD_BUTTON_STATE_RELEASED = 0,
-              LIBINPUT_TABLET_PAD_BUTTON_STATE_PRESSED = 1
-          };
+          enum libinput_device_capability { LIBINPUT_DEVICE_CAP_KEYBOARD = 0, LIBINPUT_DEVICE_CAP_POINTER = 1, LIBINPUT_DEVICE_CAP_TOUCH = 2, LIBINPUT_DEVICE_CAP_TABLET_TOOL = 3, LIBINPUT_DEVICE_CAP_TABLET_PAD = 4, LIBINPUT_DEVICE_CAP_GESTURE = 5, LIBINPUT_DEVICE_CAP_SWITCH = 6 };
+          enum libinput_tablet_pad_button_state { LIBINPUT_TABLET_PAD_BUTTON_STATE_RELEASED = 0, LIBINPUT_TABLET_PAD_BUTTON_STATE_PRESSED = 1 };
 
           #define LIBINPUT_SWITCH_LID 1
           #define LIBINPUT_SWITCH_TABLET_MODE 2
           #define LIBINPUT_SWITCH_STATE_OFF 0
           #define LIBINPUT_SWITCH_STATE_ON 1
 
-          // 기본 함수 프로토타입
           struct libinput *libinput_udev_create_context(const struct libinput_interface *interface, void *user_data, struct udev *udev);
           struct libinput *libinput_path_create_context(const struct libinput_interface *interface, void *user_data);
           int libinput_udev_assign_seat(struct libinput *libinput, const char *seat_id);
@@ -415,7 +375,6 @@ jobs:
           void libinput_log_set_priority(struct libinput *libinput, enum libinput_log_priority priority);
           int libinput_resume(struct libinput *libinput);
           void libinput_suspend(struct libinput *libinput);
-
           struct libinput_device *libinput_event_get_device(struct libinput_event *event);
           void *libinput_device_get_user_data(struct libinput_device *device);
           void libinput_device_set_user_data(struct libinput_device *device, void *user_data);
@@ -430,7 +389,6 @@ jobs:
           void libinput_device_led_update(struct libinput_device *device, uint32_t leds);
           struct udev_device *libinput_device_get_udev_device(struct libinput_device *device);
 
-          // 키보드 & 스위치
           struct libinput_event_keyboard *libinput_event_get_keyboard_event(struct libinput_event *event);
           uint64_t libinput_event_keyboard_get_time_usec(struct libinput_event_keyboard *event);
           uint32_t libinput_event_keyboard_get_key(struct libinput_event_keyboard *event);
@@ -440,7 +398,6 @@ jobs:
           int libinput_event_switch_get_switch_state(struct libinput_event_switch *event);
           uint64_t libinput_event_switch_get_time_usec(struct libinput_event_switch *event);
 
-          // 마우스 포인터
           struct libinput_event_pointer *libinput_event_get_pointer_event(struct libinput_event *event);
           uint64_t libinput_event_pointer_get_time_usec(struct libinput_event_pointer *event);
           double libinput_event_pointer_get_dx(struct libinput_event_pointer *event);
@@ -456,7 +413,6 @@ jobs:
           double libinput_event_pointer_get_absolute_y_transformed(struct libinput_event_pointer *event, uint32_t height);
           double libinput_event_pointer_get_axis_value_discrete(struct libinput_event_pointer *event, enum libinput_pointer_axis axis);
 
-          // 터치
           struct libinput_event_touch *libinput_event_get_touch_event(struct libinput_event *event);
           uint64_t libinput_event_touch_get_time_usec(struct libinput_event_touch *event);
           int libinput_event_touch_get_slot(struct libinput_event_touch *event);
@@ -464,7 +420,6 @@ jobs:
           double libinput_event_touch_get_x_transformed(struct libinput_event_touch *event, uint32_t width);
           double libinput_event_touch_get_y_transformed(struct libinput_event_touch *event, uint32_t height);
 
-          // 제스처 세부 제어 API
           struct libinput_event_gesture *libinput_event_get_gesture_event(struct libinput_event *event);
           uint64_t libinput_event_gesture_get_time_usec(struct libinput_event_gesture *event);
           int libinput_event_gesture_get_finger_count(struct libinput_event_gesture *event);
@@ -474,14 +429,12 @@ jobs:
           double libinput_event_gesture_get_scale(struct libinput_event_gesture *event);
           double libinput_event_gesture_get_angle_delta(struct libinput_event_gesture *event);
 
-          // 태블릿 툴 제어 API
           struct libinput_event_tablet_tool *libinput_event_get_tablet_tool_event(struct libinput_event *event);
           struct libinput_tablet_tool *libinput_tablet_tool_ref(struct libinput_tablet_tool *tool);
           void libinput_tablet_tool_set_user_data(struct libinput_tablet_tool *tool, void *user_data);
           void *libinput_tablet_tool_get_user_data(struct libinput_tablet_tool *tool);
           int libinput_tablet_tool_has_pressure(struct libinput_tablet_tool *tool);
 
-          // [해결] tablet_pad.c 에러 대응 유실 API 프로토타입 추가
           struct libinput_event_tablet_pad *libinput_event_get_tablet_pad_event(struct libinput_event *event);
           struct libinput_tablet_pad_mode_group *libinput_device_tablet_pad_get_mode_group(struct libinput_device *device, unsigned int index);
           int libinput_tablet_pad_mode_group_has_ring(struct libinput_tablet_pad_mode_group *group, unsigned int ring);
@@ -503,16 +456,84 @@ jobs:
           enum libinput_tablet_pad_ring_source libinput_event_tablet_pad_get_ring_source(struct libinput_event_tablet_pad *event);
           unsigned int libinput_event_tablet_pad_get_strip_number(struct libinput_event_tablet_pad *event);
           double libinput_event_tablet_pad_get_strip_position(struct libinput_event_tablet_pad *event);
+          
+          // [해결] tablet_pad.c:173에서 새롭게 요구하는 스트립 소스 반환 함수 추가
+          enum libinput_tablet_pad_strip_source libinput_event_tablet_pad_get_strip_source(struct libinput_event_tablet_pad *event);
 
           #ifdef __cplusplus
           }
           #endif
           EOF
 
-          echo "=== 2. 알맹이 없는 가짜 C 코드 (dummy_input.c) 확장 생성 ==="
+          echo "=== 2. session.c 빌드 실패 대응을 위한 가짜 libseat.h 오버라이드 ==="
+          cat << 'EOF' > $TERMUX_PREFIX/include/libseat.h
+          #pragma once
+          #ifdef __cplusplus
+          extern "C" {
+          #endif
+
+          struct libseat;
+          
+          // [해결] incomplete type 에러 방지를 위한 구조체 정의 구체화
+          struct libseat_seat_listener {
+              void (*enable_seat)(struct libseat *seat, void *userdata);
+              void (*disable_seat)(struct libseat *seat, void *userdata);
+          };
+
+          // [해결] visibility 에러 방지를 위한 열거형 재정의
+          enum libseat_log_level {
+              LIBSEAT_LOG_LEVEL_SILENT = 0,
+              LIBSEAT_LOG_LEVEL_ERROR = 1,
+              LIBSEAT_LOG_LEVEL_INFO = 2,
+              LIBSEAT_LOG_LEVEL_DEBUG = 3
+          };
+
+          int libseat_close_seat(struct libseat *seat);
+          
+          // [해결] 미선언 함수 에러 우회용 프로토타입 추가
+          int libseat_disable_seat(struct libseat *seat);
+          void libseat_set_log_handler(void (*handler)(enum libseat_log_level level, const char *format, void *args));
+          void libseat_set_log_level(enum libseat_log_level level);
+
+          #ifdef __cplusplus
+          }
+          #endif
+          EOF
+
+          echo "=== 3. session.c 빌드 실패 대응을 위한 가짜 libudev.h 확장 ==="
+          // Termux 기존 libudev.h에 완벽히 오버레이하여 유실된 인터페이스 주입
+          cat << 'EOF' > $TERMUX_PREFIX/include/libudev.h
+          #pragma once
+          #include <sys/types.h>
+          #ifdef __cplusplus
+          extern "C" {
+          #endif
+
+          struct udev;
+          struct udev_device;
+          struct udev_monitor;
+
+          const char *udev_device_get_syspath(struct udev_device *udev_device);
+          const char *udev_device_get_devnode(struct udev_device *udev_device);
+          
+          // [해결] session.c에서 명시되지 않아 int 추론 및 오류 발생한 udev 함수 정의
+          const char *udev_device_get_sysname(struct udev_device *udev_device);
+          const char *udev_device_get_action(struct udev_device *udev_device);
+          dev_t udev_device_get_devnum(struct udev_device *udev_device);
+          void udev_monitor_unref(struct udev_monitor *udev_monitor);
+
+          #ifdef __cplusplus
+          }
+          #endif
+          EOF
+
+          echo "=== 4. 확장된 알맹이 없는 가짜 C 코드 (dummy_input.c) 생성 ==="
           cat << 'EOF' > /tmp/dummy_input.c
           #include <stdlib.h>
           #include <stdint.h>
+          #include <sys/types.h>
+          
+          // libinput 구현체
           void *libinput_udev_create_context(const void *i, void *u, void *ud) { return NULL; }
           void *libinput_path_create_context(const void *i, void *u) { return NULL; }
           int libinput_udev_assign_seat(void *l, const char *s) { return -1; }
@@ -581,8 +602,6 @@ jobs:
           void libinput_tablet_tool_set_user_data(void *t, void *u) {}
           void *libinput_tablet_tool_get_user_data(void *t) { return NULL; }
           int libinput_tablet_tool_has_pressure(void *t) { return 0; }
-          
-          // [해결] dummy_input.c 누락된 구현 함수들 전부 스텁(Stub) 처리
           void *libinput_event_get_tablet_pad_event(void *e) { return NULL; }
           void *libinput_device_tablet_pad_get_mode_group(void *d, unsigned int i) { return NULL; }
           int libinput_tablet_pad_mode_group_has_ring(void *g, unsigned int r) { return 0; }
@@ -604,11 +623,24 @@ jobs:
           int libinput_event_tablet_pad_get_ring_source(void *e) { return 0; }
           unsigned int libinput_event_tablet_pad_get_strip_number(void *e) { return 0; }
           double libinput_event_tablet_pad_get_strip_position(void *e) { return 0.0; }
+          int libinput_event_tablet_pad_get_strip_source(void *e) { return 0; }
+
+          // libseat 더미 구현 추가
+          int libseat_close_seat(void *s) { return 0; }
+          int libseat_disable_seat(void *s) { return 0; }
+          void libseat_set_log_handler(void *h) {}
+          void libseat_set_log_level(int l) {}
+
+          // libudev 더미 구현 추가
+          const char *udev_device_get_sysname(void *d) { return "dummy"; }
+          const char *udev_device_get_action(void *d) { return "add"; }
+          dev_t udev_device_get_devnum(void *d) { return 0; }
+          void udev_monitor_unref(void *m) {}
           EOF
 
           $TOOLCHAIN/aarch64-linux-android${API_LEVEL}-clang -shared -fPIC /tmp/dummy_input.c -o $TERMUX_PREFIX/lib/libinput.so
 
-          echo "=== 3. 가짜 pkg-config (.pc) 파일 갱신 ==="
+          echo "=== 5. 가짜 pkg-config (.pc) 파일 갱신 ==="
           mkdir -p $TERMUX_PREFIX/lib/pkgconfig
           cat << EOF > $TERMUX_PREFIX/lib/pkgconfig/libinput.pc
           prefix=$TERMUX_PREFIX
@@ -617,7 +649,7 @@ jobs:
           includedir=\${prefix}/include
 
           Name: libinput
-          Description: Comprehensive Dummy libinput Stub for Termux Porting
+          Description: Comprehensive Dummy libinput, libseat, and libudev Stub for Termux Porting
           Version: 1.23.0
           Libs: -L\${libdir} -linput
           Cflags: -I\${includedir}
