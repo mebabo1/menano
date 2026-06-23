@@ -296,6 +296,82 @@ jobs:
           Cflags: -I\${includedir}
           EOF
 
+      - name: Create Dummy libinput Stub for Termux
+        run: |
+          TOOLCHAIN=$ANDROID_NDK/toolchains/llvm/prebuilt/linux-x86_64/bin
+
+          echo "=== 1. wlroots 컴파일용 가짜 libinput.h 헤더 파일 생성 ==="
+          mkdir -p $TERMUX_PREFIX/include
+          cat << 'EOF' > $TERMUX_PREFIX/include/libinput.h
+          #pragma once
+          #ifdef __cplusplus
+          extern "C" {
+          #endif
+
+          // 빌드 통과를 위한 더미 구조체 선언
+          struct libinput;
+          struct libinput_event;
+          struct libinput_device;
+          struct libinput_interface;
+          struct udev;
+
+          // wlroots 내부 열거형 에러 방지용 기본값
+          enum libinput_event_type {
+              LIBINPUT_EVENT_NONE = 0
+          };
+
+          // wlroots가 요구하는 최소한의 핵심 함수 형태 선언
+          struct libinput *libinput_udev_create_context(const struct libinput_interface *interface, void *user_data, struct udev *udev);
+          struct libinput *libinput_path_create_context(const struct libinput_interface *interface, void *user_data);
+          int libinput_udev_assign_seat(struct libinput *libinput, const char *seat_id);
+          void libinput_dispatch(struct libinput *libinput);
+          struct libinput_event *libinput_get_event(struct libinput *libinput);
+          int libinput_event_get_type(struct libinput_event *event);
+          void libinput_event_destroy(struct libinput_event *event);
+          struct libinput *libinput_unref(struct libinput *libinput);
+          struct libinput_device *libinput_event_get_device(struct libinput_event *event);
+          void *libinput_get_user_data(struct libinput *libinput);
+
+          #ifdef __cplusplus
+          }
+          #endif
+          EOF
+
+          echo "=== 2. 링커를 속이기 위한 알맹이 없는 가짜 libinput.so 빌드 ==="
+          cat << 'EOF' > /tmp/dummy_input.c
+          #include <stdlib.h>
+          
+          // 호출되면 팅기지 않고 무조건 안전하게 NULL이나 0만 반환하는 깡통 함수들
+          void *libinput_udev_create_context(const void *i, void *u, void *ud) { return NULL; }
+          void *libinput_path_create_context(const void *i, void *u) { return NULL; }
+          int libinput_udev_assign_seat(void *l, const char *s) { return -1; }
+          void libinput_dispatch(void *l) {}
+          void *libinput_get_event(void *l) { return NULL; }
+          int libinput_event_get_type(void *e) { return 0; }
+          void libinput_event_destroy(void *e) {}
+          void *libinput_unref(void *l) { return NULL; }
+          void *libinput_event_get_device(void *e) { return NULL; }
+          void *libinput_get_user_data(void *l) { return NULL; }
+          EOF
+
+          # NDK 컴파일러를 이용해 안드로이드 aarch64 전용 가짜 libinput.so 추출
+          $TOOLCHAIN/aarch64-linux-android${API_LEVEL}-clang -shared -fPIC /tmp/dummy_input.c -o $TERMUX_PREFIX/lib/libinput.so
+
+          echo "=== 3. Meson을 속이기 위한 가짜 pkg-config (.pc) 파일 생성 ==="
+          mkdir -p $TERMUX_PREFIX/lib/pkgconfig
+          cat << EOF > $TERMUX_PREFIX/lib/pkgconfig/libinput.pc
+          prefix=$TERMUX_PREFIX
+          exec_prefix=\${prefix}
+          libdir=\${exec_prefix}/lib
+          includedir=\${prefix}/include
+
+          Name: libinput
+          Description: Dummy libinput Stub for Termux Porting
+          Version: 1.23.0
+          Libs: -L\${libdir} -linput
+          Cflags: -I\${includedir}
+          EOF
+
       - name: Install wayland-protocols into Termux Sysroot
         run: |
           git clone --depth 1 --branch 1.36 https://gitlab.freedesktop.org/wayland/wayland-protocols.git
