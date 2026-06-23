@@ -591,29 +591,12 @@ jobs:
           # 혹시 share/pkgconfig 폴더 쪽에 원본 찌꺼기가 남아있을 수 있으므로 양쪽 모두 덮어씌웁니다.
           cp $TERMUX_PREFIX/lib/pkgconfig/wayland-scanner.pc $TERMUX_PREFIX/share/pkgconfig/wayland-scanner.pc
 
-      - name: Wipe Out libinput Backend Source Files
+      - name: Hide Broken Libinput Header
         run: |
-          cat << 'EOF' > wipe_libinput.py
-          import os
-
-          # 에러를 유발하는 libinput 관련 C 소스 파일 목록
-          target_files = [
-              'subprojects/wlroots/backend/libinput/backend.c',
-              'subprojects/wlroots/backend/libinput/events.c',
-              'subprojects/wlroots/backend/libinput/switch.c',
-              'subprojects/wlroots/backend/libinput/tablet.c'
-          ]
-
-          # 파일들을 하나씩 찾아서 컴파일러가 무시할 수 있는 빈 껍데기로 교체
-          for file_path in target_files:
-              if os.path.exists(file_path):
-                  with open(file_path, 'w') as f:
-                      f.write('// Empty file for Termux build to prevent libinput errors\n')
-                  print(f"✅ 소스 파일 소멸 완료: {file_path}")
-              else:
-                  print(f"⚠️ 파일을 찾을 수 없음 (이미 없거나 경로 다름): {file_path}")
-          EOF
-          python3 wipe_libinput.py
+          if [ -f "/home/runner/termuxfs/aarch64/data/data/com.termux/files/usr/include/libinput.h" ]; then
+            mv /home/runner/termuxfs/aarch64/data/data/com.termux/files/usr/include/libinput.h /home/runner/termuxfs/aarch64/data/data/com.termux/files/usr/include/libinput.h.bak
+            echo "✅ libinput.h 헤더 파일을 백업 및 비활성화했습니다."
+          fi
                 
       - name: Create Android Cross File
         run: |
