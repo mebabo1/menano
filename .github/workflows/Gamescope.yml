@@ -590,11 +590,12 @@ jobs:
 
           # 혹시 share/pkgconfig 폴더 쪽에 원본 찌꺼기가 남아있을 수 있으므로 양쪽 모두 덮어씌웁니다.
           cp $TERMUX_PREFIX/lib/pkgconfig/wayland-scanner.pc $TERMUX_PREFIX/share/pkgconfig/wayland-scanner.pc
-          
+
       - name: Force Disable libinput in wlroots Source
         run: |
-          python3 -c "
+          cat << 'EOF' > disable_libinput.py
           import os
+
           for root, dirs, files in os.walk('subprojects/wlroots'):
               for file in files:
                   if file == 'meson.build':
@@ -602,28 +603,40 @@ jobs:
                       with open(path, 'r') as f:
                           content = f.read()
                       
-                      # libinput 의존성 선언부 찾기 (공백 대응)
-                      idx = content.find('libinput = dependency')
-                      if idx != -1:
-                          start_paren = content.find('(', idx)
-                          paren_count = 1
-                          current_idx = start_paren + 1
-                          # 매칭되는 괄호가 끝나는 지점까지 추적 (멀티라인 대응)
-                          while paren_count > 0 and current_idx < len(content):
-                              if content[current_idx] == '(':
-                                  paren_count += 1
-                              elif content[current_idx] == ')':
-                                  paren_count -= 1
-                              current_idx += 1
-                          
-                          # 해당 구문을 통째로 아무것도 찾지 않는 깡통 디펜던시로 교체
-                          block_to_replace = content[idx:current_idx]
-                          content = content.replace(block_to_replace, \"libinput = dependency('', required: false)\")
-                          
+                      original = content
+                      # 싱글/더블 쿼테이션 모두 대응
+                      for target in ["dependency('libinput'", 'dependency("libinput"']:
+                          start_idx = 0
+                          while True:
+                              idx = content.find(target, start_idx)
+                              if idx == -1:
+                                  break
+                              
+                              # dependency 호출의 시작 괄호 '(' 위치 확인
+                              open_paren = content.find('(', idx)
+                              if open_paren != -1:
+                                  paren_count = 1
+                                  current_idx = open_paren + 1
+                                  # 중첩된 괄호가 완전히 닫힐 때까지 추적 (멀티라인/함수 중첩 완벽 대응)
+                                  while paren_count > 0 and current_idx < len(content):
+                                      if content[current_idx] == '(':
+                                          paren_count += 1
+                                      elif content[current_idx] == ')':
+                                          paren_count -= 1
+                                      current_idx += 1
+                                  
+                                  # 찾아낸 dependency(...) 구문 전체를 깡통 의존성으로 변경
+                                  full_call = content[idx:current_idx]
+                                  content = content.replace(full_call, "dependency('', required: false)")
+                              
+                              start_idx = idx + 1
+                      
+                      if content != original:
                           with open(path, 'w') as f:
                               f.write(content)
-                          print(f'✅ 완벽히 차단됨: {path}')
-          "
+                          print(f"✅ 성공적으로 libinput 디텍션 차단됨: {path}")
+          EOF
+          python3 disable_libinput.py
                 
       - name: Create Android Cross File
         run: |
