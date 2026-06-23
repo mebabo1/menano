@@ -64,7 +64,8 @@ jobs:
             libxrender-dev \
             libxres-dev \
             libxtst-dev \
-            libvulkan-dev
+            libvulkan-dev \
+            libwayland-dev
 
           python -m pip install --upgrade pip
           python -m pip install meson mako pyyaml ninja
@@ -162,6 +163,8 @@ jobs:
           TOOLCHAIN=$NDK_ROOT/bin
           SYSROOT=$NDK_ROOT/sysroot
 
+          HOST_WAYLAND_SCANNER=$(which wayland-scanner)
+
           cat > /tmp/android-cross.ini << EOF
           [host_machine]
           system = 'android'
@@ -175,6 +178,8 @@ jobs:
           ar = '$TOOLCHAIN/llvm-ar'
           strip = '$TOOLCHAIN/llvm-strip'
           pkgconfig = 'pkg-config'
+
+          wayland-scanner = '$HOST_WAYLAND_SCANNER'
 
           [properties]
           needs_exe_wrapper = true
