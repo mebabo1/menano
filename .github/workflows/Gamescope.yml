@@ -639,17 +639,6 @@ jobs:
             echo "✅ libinput.h 헤더 파일을 백업 및 비활성화했습니다."
           fi
 
-      - name: Disable Libinput Feature in wlroots Config
-        run: |
-          # wlroots 메인 meson.build 파일 수정
-          sed -i "s/features.get_or_default('libinput-backend', true)/false/g" subprojects/wlroots/meson.build 2>/dev/null || true
-          sed -i "s/'libinput-backend': true/'libinput-backend': false/g" subprojects/wlroots/meson.build 2>/dev/null || true
-          
-          # 만약 meson_options.txt가 있다면 거기서도 플래그를 false로 수정
-          if [ -f "subprojects/wlroots/meson_options.txt" ]; then
-            sed -i "s/value: true/value: false/g" subprojects/wlroots/meson_options.txt
-          fi
-
       # 💡 변경된 핵심 구간: 불필요한 최신 옵션을 모두 빼고 깔끔하게 정리했습니다.
       - name: Configure Gamescope
         run: |
