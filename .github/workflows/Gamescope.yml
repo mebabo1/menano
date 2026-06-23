@@ -501,7 +501,7 @@ jobs:
           EOF
 
           echo "=== 3. session.c 빌드 실패 대응을 위한 가짜 libudev.h 확장 ==="
-          // Termux 기존 libudev.h에 완벽히 오버레이하여 유실된 인터페이스 주입
+          # Termux 기존 libudev.h에 완벽히 오버레이하여 유실된 인터페이스 주입
           cat << 'EOF' > $TERMUX_PREFIX/include/libudev.h
           #pragma once
           #include <sys/types.h>
