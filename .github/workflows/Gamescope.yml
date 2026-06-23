@@ -140,17 +140,74 @@ jobs:
           Cflags: -I\${includedir}
           EOF
 
+      - name: Create Dummy libcap Stub for Termux
+        run: |
+          TOOLCHAIN=$ANDROID_NDK/toolchains/llvm/prebuilt/linux-x86_64/bin
+
+          echo "=== 1. Gamescope가 참조할 가짜 sys/capability.h 헤더 파일 생성 ==="
+          mkdir -p $TERMUX_PREFIX/include/sys
+          cat << 'EOF' > $TERMUX_PREFIX/include/sys/capability.h
+          #pragma once
+          #ifdef __cplusplus
+          extern "C" {
+          #endif
+
+          // Gamescope 소스 컴파일에 필요한 최소한의 자료형 및 상수 정의
+          typedef struct _cap_struct *cap_t;
+          typedef int cap_value_t;
+          typedef enum { CAP_EFFECTIVE=0, CAP_PERMITTED=1, CAP_INHERITABLE=2 } cap_flag_t;
+          typedef enum { CAP_CLEAR=0, CAP_SET=1 } cap_flag_value_t;
+          
+          #define CAP_SYS_NICE 23
+
+          // 데스크톱 libcap의 필수 함수 형태 선언
+          cap_t cap_get_proc(void);
+          int cap_set_proc(cap_t cap_p);
+          cap_t cap_init(void);
+          int cap_set_flag(cap_t cap_p, cap_flag_t flag, int ncap, const cap_value_t *caps, cap_flag_value_t value);
+          int cap_free(void *obj_p);
+
+          #ifdef __cplusplus
+          }
+          #endif
+          EOF
+
+          echo "=== 2. 링커(Linker)를 속이기 위한 알맹이 없는 가짜 libcap.so 빌드 ==="
+          cat << 'EOF' > /tmp/dummy_cap.c
+          #include <stdlib.h>
+          typedef struct _cap_struct *cap_t;
+          
+          // 호출되면 에러 없이 정상 작동한 것처럼 0이나 더미 포인터를 반환
+          cap_t cap_get_proc(void) { return (cap_t)1; }
+          int cap_set_proc(cap_t cap_p) { return 0; }
+          cap_t cap_init(void) { return (cap_t)1; }
+          int cap_set_flag(cap_t cap_p, int flag, int ncap, const int *caps, int value) { return 0; }
+          int cap_free(void *obj_p) { return 0; }
+          EOF
+
+          # NDK 컴파일러로 가짜 안드로이드 aarch64용 libcap.so 생성
+          $TOOLCHAIN/aarch64-linux-android${API_LEVEL}-clang -shared -fPIC /tmp/dummy_cap.c -o $TERMUX_PREFIX/lib/libcap.so
+
+          echo "=== 3. Meson을 속이기 위한 가짜 pkg-config (.pc) 파일 생성 ==="
+          mkdir -p $TERMUX_PREFIX/lib/pkgconfig
+          cat << EOF > $TERMUX_PREFIX/lib/pkgconfig/libcap.pc
+          prefix=$TERMUX_PREFIX
+          exec_prefix=\${prefix}
+          libdir=\${exec_prefix}/lib
+          includedir=\${prefix}/include
+
+          Name: libcap
+          Description: Dummy libcap Stub for Termux Porting
+          Version: 2.66
+          Libs: -L\${libdir} -lcap
+          Cflags: -I\${includedir}
+          EOF
+
       - name: Install wayland-protocols into Termux Sysroot
         run: |
-          echo "=== 1. 공식 오피셜 wayland-protocols 소스 다운로드 ==="
-          # 구버전 Gamescope와 호환성이 좋은 버전으로 안전하게 가져옵니다.
           git clone --depth 1 --branch 1.36 https://gitlab.freedesktop.org/wayland/wayland-protocols.git
           
           cd wayland-protocols
-          
-          echo "=== 2. 호스트 Meson을 사용해 Termux 가상 경로에 텍스트 파일들 설치 ==="
-          # 기계어 컴파일이 없는 순수 데이터 패키지이므로, 크로스 파일 없이 호스트 환경에서 
-          # 경로만 $TERMUX_PREFIX로 지정하여 깡으로 설치하면 됩니다.
           meson setup build --prefix=$TERMUX_PREFIX
           ninja -C build install
           
