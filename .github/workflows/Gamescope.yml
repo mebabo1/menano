@@ -203,6 +203,99 @@ jobs:
           Cflags: -I\${includedir}
           EOF
 
+      - name: Create Dummy libudev Stub for Termux
+        run: |
+          TOOLCHAIN=$ANDROID_NDK/toolchains/llvm/prebuilt/linux-x86_64/bin
+
+          echo "=== 1. wlroots 컴파일용 가짜 libudev.h 헤더 파일 생성 ==="
+          mkdir -p $TERMUX_PREFIX/include
+          cat << 'EOF' > $TERMUX_PREFIX/include/libudev.h
+          #pragma once
+          #ifdef __cplusplus
+          extern "C" {
+          #endif
+
+          // wlroots가 내부적으로 사용하는 핵심 udev 구조체 선언
+          struct udev;
+          struct udev_monitor;
+          struct udev_device;
+          struct udev_enumerate;
+          struct udev_list_entry;
+
+          // wlroots 빌드 패스를 위해 필요한 최소한의 함수 형태 정의
+          struct udev *udev_new(void);
+          struct udev *udev_unref(struct udev *udev);
+          struct udev_monitor *udev_monitor_new_from_netlink(struct udev *udev, const char *name);
+          int udev_monitor_filter_add_match_subsystem_devtype(struct udev_monitor *udev_monitor, const char *subsystem, const char *devtype);
+          int udev_monitor_enable_receiving(struct udev_monitor *udev_monitor);
+          int udev_monitor_get_fd(struct udev_monitor *udev_monitor);
+          struct udev_device *udev_monitor_receive_device(struct udev_monitor *udev_monitor);
+          struct udev_device *udev_device_unref(struct udev_device *udev_device);
+          const char *udev_device_get_syspath(struct udev_device *udev_device);
+          const char *udev_device_get_devnode(struct udev_device *udev_device);
+          const char *udev_device_get_subsystem(struct udev_device *udev_device);
+          const char *udev_device_get_property_value(struct udev_device *udev_device, const char *key);
+          
+          struct udev_enumerate *udev_enumerate_new(struct udev *udev);
+          int udev_enumerate_add_match_subsystem(struct udev_enumerate *udev_enumerate, const char *subsystem);
+          int udev_enumerate_scan_devices(struct udev_enumerate *udev_enumerate);
+          struct udev_list_entry *udev_enumerate_get_list_entry(struct udev_enumerate *udev_enumerate);
+          struct udev_enumerate *udev_enumerate_unref(struct udev_enumerate *udev_enumerate);
+          struct udev_list_entry *udev_list_entry_get_next(struct udev_list_entry *list_entry);
+          const char *udev_list_entry_get_name(struct udev_list_entry *list_entry);
+          struct udev_device *udev_device_new_from_syspath(struct udev *udev, const char *syspath);
+
+          #ifdef __cplusplus
+          }
+          #endif
+          EOF
+
+          echo "=== 2. 링커를 속이기 위한 알맹이 없는 가짜 libudev.so 빌드 ==="
+          cat << 'EOF' > /tmp/dummy_udev.c
+          #include <stdlib.h>
+          
+          // 호출되면 크래시 없이 안전하게 NULL(0)이나 기본값만 반환하는 깡통 함수들
+          void *udev_new(void) { return (void*)1; }
+          void *udev_unref(void *udev) { return NULL; }
+          void *udev_monitor_new_from_netlink(void *udev, const char *name) { return (void*)1; }
+          int udev_monitor_filter_add_match_subsystem_devtype(void *m, const char *s, const char *d) { return 0; }
+          int udev_monitor_enable_receiving(void *m) { return 0; }
+          int udev_monitor_get_fd(void *m) { return -1; } // 유효하지 않은 파일 디스크립터 반환
+          void *udev_monitor_receive_device(void *m) { return NULL; }
+          void *udev_device_unref(void *d) { return NULL; }
+          const char *udev_device_get_syspath(void *d) { return ""; }
+          const char *udev_device_get_devnode(void *d) { return NULL; }
+          const char *udev_device_get_subsystem(void *d) { return ""; }
+          const char *udev_device_get_property_value(void *d, const char *k) { return NULL; }
+          
+          void *udev_enumerate_new(void *udev) { return (void*)1; }
+          int udev_enumerate_add_match_subsystem(void *e, const char *s) { return 0; }
+          int udev_enumerate_scan_devices(void *e) { return 0; }
+          void *udev_enumerate_get_list_entry(void *e) { return NULL; }
+          void *udev_enumerate_unref(void *e) { return NULL; }
+          void *udev_list_entry_get_next(void *l) { return NULL; }
+          const char *udev_list_entry_get_name(void *l) { return ""; }
+          void *udev_device_new_from_syspath(void *u, const char *s) { return NULL; }
+          EOF
+
+          # NDK 컴파일러를 이용해 안드로이드 aarch64 전용 가짜 libudev.so 추출
+          $TOOLCHAIN/aarch64-linux-android${API_LEVEL}-clang -shared -fPIC /tmp/dummy_udev.c -o $TERMUX_PREFIX/lib/libudev.so
+
+          echo "=== 3. Meson을 속이기 위한 가짜 pkg-config (.pc) 파일 생성 ==="
+          mkdir -p $TERMUX_PREFIX/lib/pkgconfig
+          cat << EOF > $TERMUX_PREFIX/lib/pkgconfig/libudev.pc
+          prefix=$TERMUX_PREFIX
+          exec_prefix=\${prefix}
+          libdir=\${exec_prefix}/lib
+          includedir=\${prefix}/include
+
+          Name: libudev
+          Description: Dummy libudev Stub for Termux Porting
+          Version: 251
+          Libs: -L\${libdir} -ludev
+          Cflags: -I\${includedir}
+          EOF
+
       - name: Install wayland-protocols into Termux Sysroot
         run: |
           git clone --depth 1 --branch 1.36 https://gitlab.freedesktop.org/wayland/wayland-protocols.git
