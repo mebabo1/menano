@@ -330,7 +330,7 @@ jobs:
               void (*close_restricted)(int fd, void *user_data);
           };
 
-          // [해결] events.c에서 사용하는 모든 이벤트 타입 정의
+          // [해결] events.c에서 사용하는 제스처 및 스위치 토글 이벤트 추가
           enum libinput_event_type {
               LIBINPUT_EVENT_NONE = 0,
               LIBINPUT_EVENT_DEVICE_ADDED,
@@ -351,10 +351,24 @@ jobs:
               LIBINPUT_EVENT_TABLET_TOOL_BUTTON,
               LIBINPUT_EVENT_TABLET_PAD_BUTTON,
               LIBINPUT_EVENT_TABLET_PAD_RING,
-              LIBINPUT_EVENT_TABLET_PAD_STRIP
+              LIBINPUT_EVENT_TABLET_PAD_STRIP,
+              LIBINPUT_EVENT_SWITCH_TOGGLE,
+              LIBINPUT_EVENT_GESTURE_SWIPE_BEGIN,
+              LIBINPUT_EVENT_GESTURE_SWIPE_UPDATE,
+              LIBINPUT_EVENT_GESTURE_SWIPE_END,
+              LIBINPUT_EVENT_GESTURE_PINCH_BEGIN,
+              LIBINPUT_EVENT_GESTURE_PINCH_UPDATE,
+              LIBINPUT_EVENT_GESTURE_PINCH_END,
+              LIBINPUT_EVENT_GESTURE_HOLD_BEGIN,
+              LIBINPUT_EVENT_GESTURE_HOLD_END
           };
 
-          // [해결] tablet_tool.c에서 사용하는 태블릿 툴 타입 정의
+          // [해결] tablet_pad.c에서 누락된 패드 링 소스 정의 추가
+          enum libinput_tablet_pad_ring_source {
+              LIBINPUT_TABLET_PAD_RING_SOURCE_UNKNOWN = 0,
+              LIBINPUT_TABLET_PAD_RING_SOURCE_FINGER
+          };
+
           enum libinput_tablet_tool_type {
               LIBINPUT_TABLET_TOOL_TYPE_PEN = 1,
               LIBINPUT_TABLET_TOOL_TYPE_ERASER,
@@ -374,6 +388,11 @@ jobs:
           enum libinput_device_capability {
               LIBINPUT_DEVICE_CAP_KEYBOARD = 0, LIBINPUT_DEVICE_CAP_POINTER = 1, LIBINPUT_DEVICE_CAP_TOUCH = 2,
               LIBINPUT_DEVICE_CAP_TABLET_TOOL = 3, LIBINPUT_DEVICE_CAP_TABLET_PAD = 4, LIBINPUT_DEVICE_CAP_GESTURE = 5, LIBINPUT_DEVICE_CAP_SWITCH = 6
+          };
+
+          enum libinput_tablet_pad_button_state {
+              LIBINPUT_TABLET_PAD_BUTTON_STATE_RELEASED = 0,
+              LIBINPUT_TABLET_PAD_BUTTON_STATE_PRESSED = 1
           };
 
           #define LIBINPUT_SWITCH_LID 1
@@ -421,7 +440,7 @@ jobs:
           int libinput_event_switch_get_switch_state(struct libinput_event_switch *event);
           uint64_t libinput_event_switch_get_time_usec(struct libinput_event_switch *event);
 
-          // [해결] 마우스 절대좌표 및 이산 축 변환 함수 추가
+          // 마우스 포인터
           struct libinput_event_pointer *libinput_event_get_pointer_event(struct libinput_event *event);
           uint64_t libinput_event_pointer_get_time_usec(struct libinput_event_pointer *event);
           double libinput_event_pointer_get_dx(struct libinput_event_pointer *event);
@@ -445,7 +464,7 @@ jobs:
           double libinput_event_touch_get_x_transformed(struct libinput_event_touch *event, uint32_t width);
           double libinput_event_touch_get_y_transformed(struct libinput_event_touch *event, uint32_t height);
 
-          // [해결] 제스처 세부 제어 API 추가
+          // 제스처 세부 제어 API
           struct libinput_event_gesture *libinput_event_get_gesture_event(struct libinput_event *event);
           uint64_t libinput_event_gesture_get_time_usec(struct libinput_event_gesture *event);
           int libinput_event_gesture_get_finger_count(struct libinput_event_gesture *event);
@@ -455,14 +474,14 @@ jobs:
           double libinput_event_gesture_get_scale(struct libinput_event_gesture *event);
           double libinput_event_gesture_get_angle_delta(struct libinput_event_gesture *event);
 
-          // [해결] 태블릿 툴 제어 API 추가
+          // 태블릿 툴 제어 API
           struct libinput_event_tablet_tool *libinput_event_get_tablet_tool_event(struct libinput_event *event);
           struct libinput_tablet_tool *libinput_tablet_tool_ref(struct libinput_tablet_tool *tool);
           void libinput_tablet_tool_set_user_data(struct libinput_tablet_tool *tool, void *user_data);
           void *libinput_tablet_tool_get_user_data(struct libinput_tablet_tool *tool);
           int libinput_tablet_tool_has_pressure(struct libinput_tablet_tool *tool);
 
-          // [해결] 태블릿 패드 및 모드 그룹 제어 API 추가
+          // [해결] tablet_pad.c 에러 대응 유실 API 프로토타입 추가
           struct libinput_event_tablet_pad *libinput_event_get_tablet_pad_event(struct libinput_event *event);
           struct libinput_tablet_pad_mode_group *libinput_device_tablet_pad_get_mode_group(struct libinput_device *device, unsigned int index);
           int libinput_tablet_pad_mode_group_has_ring(struct libinput_tablet_pad_mode_group *group, unsigned int ring);
@@ -471,6 +490,19 @@ jobs:
           int libinput_tablet_pad_mode_group_get_num_modes(struct libinput_tablet_pad_mode_group *group);
           int libinput_device_tablet_pad_get_num_buttons(struct libinput_device *device);
           int libinput_device_tablet_pad_get_num_rings(struct libinput_device *device);
+          int libinput_device_tablet_pad_get_num_strips(struct libinput_device *device);
+          int libinput_device_tablet_pad_get_num_mode_groups(struct libinput_device *device);
+          uint64_t libinput_event_tablet_pad_get_time_usec(struct libinput_event_tablet_pad *event);
+          unsigned int libinput_event_tablet_pad_get_button_number(struct libinput_event_tablet_pad *event);
+          unsigned int libinput_event_tablet_pad_get_mode(struct libinput_event_tablet_pad *event);
+          struct libinput_tablet_pad_mode_group *libinput_event_tablet_pad_get_mode_group(struct libinput_event_tablet_pad *event);
+          unsigned int libinput_tablet_pad_mode_group_get_index(struct libinput_tablet_pad_mode_group *group);
+          enum libinput_tablet_pad_button_state libinput_event_tablet_pad_get_button_state(struct libinput_event_tablet_pad *event);
+          unsigned int libinput_event_tablet_pad_get_ring_number(struct libinput_event_tablet_pad *event);
+          double libinput_event_tablet_pad_get_ring_position(struct libinput_event_tablet_pad *event);
+          enum libinput_tablet_pad_ring_source libinput_event_tablet_pad_get_ring_source(struct libinput_event_tablet_pad *event);
+          unsigned int libinput_event_tablet_pad_get_strip_number(struct libinput_event_tablet_pad *event);
+          double libinput_event_tablet_pad_get_strip_position(struct libinput_event_tablet_pad *event);
 
           #ifdef __cplusplus
           }
@@ -549,6 +581,8 @@ jobs:
           void libinput_tablet_tool_set_user_data(void *t, void *u) {}
           void *libinput_tablet_tool_get_user_data(void *t) { return NULL; }
           int libinput_tablet_tool_has_pressure(void *t) { return 0; }
+          
+          // [해결] dummy_input.c 누락된 구현 함수들 전부 스텁(Stub) 처리
           void *libinput_event_get_tablet_pad_event(void *e) { return NULL; }
           void *libinput_device_tablet_pad_get_mode_group(void *d, unsigned int i) { return NULL; }
           int libinput_tablet_pad_mode_group_has_ring(void *g, unsigned int r) { return 0; }
@@ -557,6 +591,19 @@ jobs:
           int libinput_tablet_pad_mode_group_get_num_modes(void *g) { return 0; }
           int libinput_device_tablet_pad_get_num_buttons(void *d) { return 0; }
           int libinput_device_tablet_pad_get_num_rings(void *d) { return 0; }
+          int libinput_device_tablet_pad_get_num_strips(void *d) { return 0; }
+          int libinput_device_tablet_pad_get_num_mode_groups(void *d) { return 0; }
+          uint64_t libinput_event_tablet_pad_get_time_usec(void *e) { return 0; }
+          unsigned int libinput_event_tablet_pad_get_button_number(void *e) { return 0; }
+          unsigned int libinput_event_tablet_pad_get_mode(void *e) { return 0; }
+          void *libinput_event_tablet_pad_get_mode_group(void *e) { return NULL; }
+          unsigned int libinput_tablet_pad_mode_group_get_index(void *g) { return 0; }
+          int libinput_event_tablet_pad_get_button_state(void *e) { return 0; }
+          unsigned int libinput_event_tablet_pad_get_ring_number(void *e) { return 0; }
+          double libinput_event_tablet_pad_get_ring_position(void *e) { return 0.0; }
+          int libinput_event_tablet_pad_get_ring_source(void *e) { return 0; }
+          unsigned int libinput_event_tablet_pad_get_strip_number(void *e) { return 0; }
+          double libinput_event_tablet_pad_get_strip_position(void *e) { return 0.0; }
           EOF
 
           $TOOLCHAIN/aarch64-linux-android${API_LEVEL}-clang -shared -fPIC /tmp/dummy_input.c -o $TERMUX_PREFIX/lib/libinput.so
