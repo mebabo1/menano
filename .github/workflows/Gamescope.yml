@@ -591,13 +591,6 @@ jobs:
           # 혹시 share/pkgconfig 폴더 쪽에 원본 찌꺼기가 남아있을 수 있으므로 양쪽 모두 덮어씌웁니다.
           cp $TERMUX_PREFIX/lib/pkgconfig/wayland-scanner.pc $TERMUX_PREFIX/share/pkgconfig/wayland-scanner.pc
 
-      - name: Hide Broken Libinput Header
-        run: |
-          if [ -f "/home/runner/termuxfs/aarch64/data/data/com.termux/files/usr/include/libinput.h" ]; then
-            mv /home/runner/termuxfs/aarch64/data/data/com.termux/files/usr/include/libinput.h /home/runner/termuxfs/aarch64/data/data/com.termux/files/usr/include/libinput.h.bak
-            echo "✅ libinput.h 헤더 파일을 백업 및 비활성화했습니다."
-          fi
-                
       - name: Create Android Cross File
         run: |
           NDK_ROOT=$ANDROID_NDK/toolchains/llvm/prebuilt/linux-x86_64
@@ -638,6 +631,24 @@ jobs:
           PKG_CONFIG_LIBDIR = '$TERMUX_PREFIX/lib/pkgconfig'
           PKG_CONFIG_SYSROOT_DIR = '$TERMUX_SYSROOT'
           EOF
+
+      - name: Hide Broken Libinput Header
+        run: |
+          if [ -f "/home/runner/termuxfs/aarch64/data/data/com.termux/files/usr/include/libinput.h" ]; then
+            mv /home/runner/termuxfs/aarch64/data/data/com.termux/files/usr/include/libinput.h /home/runner/termuxfs/aarch64/data/data/com.termux/files/usr/include/libinput.h.bak
+            echo "✅ libinput.h 헤더 파일을 백업 및 비활성화했습니다."
+          fi
+
+      - name: Disable Libinput Feature in wlroots Config
+        run: |
+          # wlroots 메인 meson.build 파일 수정
+          sed -i "s/features.get_or_default('libinput-backend', true)/false/g" subprojects/wlroots/meson.build 2>/dev/null || true
+          sed -i "s/'libinput-backend': true/'libinput-backend': false/g" subprojects/wlroots/meson.build 2>/dev/null || true
+          
+          # 만약 meson_options.txt가 있다면 거기서도 플래그를 false로 수정
+          if [ -f "subprojects/wlroots/meson_options.txt" ]; then
+            sed -i "s/value: true/value: false/g" subprojects/wlroots/meson_options.txt
+          fi
 
       # 💡 변경된 핵심 구간: 불필요한 최신 옵션을 모두 빼고 깔끔하게 정리했습니다.
       - name: Configure Gamescope
