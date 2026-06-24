@@ -616,9 +616,50 @@ jobs:
             sed -i "s/has_session = true/has_session = false/g" "$WL_BACKEND_MESON"
           fi
 
-          WL_SHM_C="subprojects/wlroots/util/shm.c"
-          if [ -f "$WL_SHM_C" ]; then
-            sed -i '1i #include <sys/types.h>\nint shm_open(const char *name, int oflag, mode_t mode);\nint shm_unlink(const char *name);' "$WL_SHM_C"
+          WL_SHM_DIR="subprojects/wlroots/util"
+          if [ -d "$WL_SHM_DIR" ]; then
+            cat << 'EOF' > "$WL_SHM_DIR/android_shm_def.h"
+          #ifndef __ANDROID_SHM_DEF_H
+          #define __ANDROID_SHM_DEF_H
+
+          #include <fcntl.h>
+          #include <stdio.h>
+          #include <stdlib.h>
+          #include <unistd.h>
+
+          static inline int shm_open(const char *name, int oflag, mode_t mode) {
+              char *tmpdir = getenv("TMPDIR");
+              char *fname;
+              if (!tmpdir) {
+                  tmpdir = "/data/data/com.termux/files/usr/tmp";
+              }
+              // wlroots가 전달하는 이름 앞의 슬래시(/) 처리 보정 (경로 깨짐 방지)
+              if (name[0] == '/') {
+                  name++;
+              }
+              asprintf(&fname, "%s/%s", tmpdir, name);
+              return open(fname, oflag, mode);
+          }
+
+          static inline int shm_unlink(const char *name) {
+              char *tmpdir = getenv("TMPDIR");
+              char *fname;
+              if (!tmpdir) {
+                  tmpdir = "/data/data/com.termux/files/usr/tmp";
+              }
+              if (name[0] == '/') {
+                  name++;
+              }
+              asprintf(&fname, "%s/%s", tmpdir, name);
+              return unlink(fname);
+          }
+
+          #endif /* __ANDROID_SHM_DEF_H */
+          EOF
+
+            # wlroots의 shm.c 맨 첫 줄에 방금 만든 커스텀 헤더를 포함시킵니다.
+            sed -i '1i #include "android_shm_def.h"' "$WL_SHM_DIR/shm.c"
+            echo "✅ 커스텀 SHM 헤더 주입 및 shm.c 연결 완료!"
           fi
 
           export PKG_CONFIG_PATH="$TERMUX_PREFIX/lib/pkgconfig:$TERMUX_PREFIX/share/pkgconfig"
