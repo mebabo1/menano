@@ -616,6 +616,11 @@ jobs:
             sed -i "s/has_session = true/has_session = false/g" "$WL_BACKEND_MESON"
           fi
 
+          WL_SHM_C="subprojects/wlroots/util/shm.c"
+          if [ -f "$WL_SHM_C" ]; then
+            sed -i '1i #include <sys/types.h>\nint shm_open(const char *name, int oflag, mode_t mode);\nint shm_unlink(const char *name);' "$WL_SHM_C"
+          fi
+
           export PKG_CONFIG_PATH="$TERMUX_PREFIX/lib/pkgconfig:$TERMUX_PREFIX/share/pkgconfig"
           export PKG_CONFIG_LIBDIR="$TERMUX_PREFIX/lib/pkgconfig"
           export PKG_CONFIG_SYSROOT_DIR="$TERMUX_ROOT"
