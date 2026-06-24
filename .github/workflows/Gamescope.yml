@@ -727,6 +727,12 @@ jobs:
           sed -i 's/XResClientIdsDestroy(num_ids, client_ids);/\/\/ XResClientIdsDestroy/g' src/steamcompmgr.cpp
           sed -i 's/if (!XResQueryVersion(ctx->dpy, \&xres_major, \&xres_minor))/if (false) \/\/ XResQueryVersion 스킵/g' src/steamcompmgr.cpp
 
+          echo "🛠️ wlserver.cpp libinput 생성 심볼 에러 우회 패치 중..."
+          sed -i 's/wlr_libinput_backend_create(.\+);/nullptr; \/\/ 안드로이드 libinput 미사용 우회/g' src/wlserver.cpp
+
+          echo "🛠️ rendervulkan.cpp Vulkan 타임라인 세마포어 심볼 링크 에러 패치 중..."
+          sed -i 's/vkGetSemaphoreCounterValue(/((PFN_vkGetSemaphoreCounterValue)vkGetDeviceProcAddr(vk.device, "vkGetSemaphoreCounterValue"))(/g' src/rendervulkan.cpp
+
           touch $TERMUX_PREFIX/include/libinput.h
 
           export PKG_CONFIG_PATH="$TERMUX_PREFIX/lib/pkgconfig:$TERMUX_PREFIX/share/pkgconfig"
