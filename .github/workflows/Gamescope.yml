@@ -559,6 +559,64 @@ jobs:
 
           HOST_WAYLAND_SCANNER=$(which wayland-scanner)
 
+          # 🔥 [강제 우회 해결책] 전역으로 주입할 Wine 스타일 SHM 에뮬레이션 헤더 파일 생성
+          mkdir -p $TERMUX_PREFIX/include
+          cat << 'EOF' > $TERMUX_PREFIX/include/android_shm_def.h
+          #ifndef __ANDROID_SHM_DEF_H
+          #define __ANDROID_SHM_DEF_H
+
+          #include <fcntl.h>
+          #include <stdio.h>
+          #include <stdlib.h>
+          #include <unistd.h>
+          #include <sys/types.h>
+
+          #ifdef __cplusplus
+          extern "C" {
+          #endif
+
+          static inline int shm_open(const char *name, int oflag, mode_t mode) {
+              char *tmpdir = getenv("TMPDIR");
+              char *fname;
+              if (!tmpdir) {
+                  tmpdir = "/data/data/com.termux/files/usr/tmp";
+              }
+              if (name[0] == '/') {
+                  name++;
+              }
+              if (asprintf(&fname, "%s/%s", tmpdir, name) == -1) {
+                  return -1;
+              }
+              int fd = open(fname, oflag, mode);
+              free(fname);
+              return fd;
+          }
+
+          static inline int shm_unlink(const char *name) {
+              char *tmpdir = getenv("TMPDIR");
+              char *fname;
+              if (!tmpdir) {
+                  tmpdir = "/data/data/com.termux/files/usr/tmp";
+              }
+              if (name[0] == '/') {
+                  name++;
+              }
+              if (asprintf(&fname, "%s/%s", tmpdir, name) == -1) {
+                  return -1;
+              }
+              int res = unlink(fname);
+              free(fname);
+              return res;
+          }
+
+          #ifdef __cplusplus
+          }
+          #endif
+
+          #endif /* __ANDROID_SHM_DEF_H */
+          EOF
+
+          # 🌟 c_args와 cpp_args 맨 뒤에 '-include', 'android_shm_def.h' 를 주입하여 컴파일러가 무조건 읽게 만듭니다.
           cat > /tmp/android-cross.ini << EOF
           [host_machine]
           system = 'android'
@@ -567,8 +625,8 @@ jobs:
           endian = 'little'
 
           [binaries]
-          c = ['$TOOLCHAIN/aarch64-linux-android${API_LEVEL}-clang', '-D__TERMUX__', '-D__USE_GNU', '-U__ANDROID__', '--target=aarch64-linux-android30']
-          cpp = ['$TOOLCHAIN/aarch64-linux-android${API_LEVEL}-clang++', '-D__TERMUX__', '-D__USE_GNU', '-U__ANDROID__', '--target=aarch64-linux-android30']
+          c = ['$TOOLCHAIN/aarch64-linux-android${API_LEVEL}-clang', '-D__TERMUX__', '-D__USE_GNU', '-D_GNU_SOURCE', '-U__ANDROID__', '--target=aarch64-linux-android30']
+          cpp = ['$TOOLCHAIN/aarch64-linux-android${API_LEVEL}-clang++', '-D__TERMUX__', '-D__USE_GNU', '-D_GNU_SOURCE', '-U__ANDROID__', '--target=aarch64-linux-android30']
           ar = '$TOOLCHAIN/llvm-ar'
           strip = '$TOOLCHAIN/llvm-strip'
           pkgconfig = 'pkg-config'
@@ -580,8 +638,8 @@ jobs:
           sysroot = '$SYSROOT'
 
           [built-in options]
-          c_args = ['-fPIC', '-idirafter$TERMUX_PREFIX/include', '-idirafter$TERMUX_PREFIX/include/libdrm', '-idirafter$TERMUX_PREFIX/include/pixman-1', '-include', 'fcntl.h', '-include', 'unistd.h']
-          cpp_args = ['-fPIC', '-idirafter$TERMUX_PREFIX/include', '-idirafter$TERMUX_PREFIX/include/libdrm', '-idirafter$TERMUX_PREFIX/include/pixman-1', '-include', 'fcntl.h', '-include', 'unistd.h']
+          c_args = ['-fPIC', '-idirafter$TERMUX_PREFIX/include', '-idirafter$TERMUX_PREFIX/include/libdrm', '-idirafter$TERMUX_PREFIX/include/pixman-1', '-include', 'fcntl.h', '-include', 'unistd.h', '-include', 'android_shm_def.h']
+          cpp_args = ['-fPIC', '-idirafter$TERMUX_PREFIX/include', '-idirafter$TERMUX_PREFIX/include/libdrm', '-idirafter$TERMUX_PREFIX/include/pixman-1', '-include', 'fcntl.h', '-include', 'unistd.h', '-include', 'android_shm_def.h']
           
           c_link_args = ['--target=aarch64-linux-android30', '-L$TERMUX_PREFIX/lib', '-Wl,-rpath=/system/lib64:/vendor/lib64:/vendor/lib64/egl:/apex/com.android.i18n/lib64:$RUNTIME_PATH/lib', '-Wl,--no-as-needed', '-lEGL', '-landroid-shmem', '-ldrm', '-lwayland-client', '-lwayland-server']
           cpp_link_args = ['--target=aarch64-linux-android30', '-L$TERMUX_PREFIX/lib', '-Wl,-rpath=/system/lib64:/vendor/lib64:/vendor/lib64/egl:/apex/com.android.i18n/lib64:$RUNTIME_PATH/lib', '-Wl,--no-as-needed', '-lEGL', '-landroid-shmem', '-static-libstdc++', '-ldrm', '-lwayland-client', '-lwayland-server']
@@ -591,8 +649,7 @@ jobs:
           PKG_CONFIG_LIBDIR = '$TERMUX_PREFIX/lib/pkgconfig'
           PKG_CONFIG_SYSROOT_DIR = '$TERMUX_SYSROOT'
           EOF
-
-      # 💡 변경된 핵심 구간: 불필요한 최신 옵션을 모두 빼고 깔끔하게 정리했습니다.
+          
       - name: Configure Gamescope
         run: |
           cd gamescope-src
@@ -614,52 +671,6 @@ jobs:
             # 🌟 [이번 추가 핵심] 문제의 session(libseat) 빌드 디렉토리 진입을 무력화
             sed -i "s/subdir('session')/# subdir('session')/g" "$WL_BACKEND_MESON"
             sed -i "s/has_session = true/has_session = false/g" "$WL_BACKEND_MESON"
-          fi
-
-          WL_SHM_DIR="subprojects/wlroots/util"
-          if [ -d "$WL_SHM_DIR" ]; then
-            cat << 'EOF' > "$WL_SHM_DIR/android_shm_def.h"
-          #ifndef __ANDROID_SHM_DEF_H
-          #define __ANDROID_SHM_DEF_H
-
-          #include <fcntl.h>
-          #include <stdio.h>
-          #include <stdlib.h>
-          #include <unistd.h>
-
-          static inline int shm_open(const char *name, int oflag, mode_t mode) {
-              char *tmpdir = getenv("TMPDIR");
-              char *fname;
-              if (!tmpdir) {
-                  tmpdir = "/data/data/com.termux/files/usr/tmp";
-              }
-              // wlroots가 전달하는 이름 앞의 슬래시(/) 처리 보정 (경로 깨짐 방지)
-              if (name[0] == '/') {
-                  name++;
-              }
-              asprintf(&fname, "%s/%s", tmpdir, name);
-              return open(fname, oflag, mode);
-          }
-
-          static inline int shm_unlink(const char *name) {
-              char *tmpdir = getenv("TMPDIR");
-              char *fname;
-              if (!tmpdir) {
-                  tmpdir = "/data/data/com.termux/files/usr/tmp";
-              }
-              if (name[0] == '/') {
-                  name++;
-              }
-              asprintf(&fname, "%s/%s", tmpdir, name);
-              return unlink(fname);
-          }
-
-          #endif /* __ANDROID_SHM_DEF_H */
-          EOF
-
-            # wlroots의 shm.c 맨 첫 줄에 방금 만든 커스텀 헤더를 포함시킵니다.
-            sed -i '1i #include "android_shm_def.h"' "$WL_SHM_DIR/shm.c"
-            echo "✅ 커스텀 SHM 헤더 주입 및 shm.c 연결 완료!"
           fi
 
           export PKG_CONFIG_PATH="$TERMUX_PREFIX/lib/pkgconfig:$TERMUX_PREFIX/share/pkgconfig"
