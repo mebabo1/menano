@@ -673,23 +673,14 @@ jobs:
 
           sed -i "s/'backends=libinput'/'backends=auto'/g" meson.build
           sed -i "s/'xwayland', 'libinput_backend'/'xwayland'/g" meson.build
+          sed -i "s/'default_library=static'/'default_library=static', 'tests=disabled'/g" meson.build
 
-          # 3. wlroots 내부 빌드 파일 패치 (libinput 및 libseat 세션 원천 차단)
-          echo "🛠️ wlroots 내부 필수 종속성 스킵 패치 적용 중..."
           WL_BACKEND_MESON="subprojects/wlroots/backend/meson.build"
           if [ -f "$WL_BACKEND_MESON" ]; then
-            # [기존 패치] libinput 진입 차단
             sed -i "s/subdir('libinput')/# subdir('libinput')/g" "$WL_BACKEND_MESON"
             sed -i "s/backends.contains('libinput')/false/g" "$WL_BACKEND_MESON"
-            
-            # 🌟 [이번 추가 핵심] 문제의 session(libseat) 빌드 디렉토리 진입을 무력화
             sed -i "s/subdir('session')/# subdir('session')/g" "$WL_BACKEND_MESON"
             sed -i "s/has_session = true/has_session = false/g" "$WL_BACKEND_MESON"
-          fi
-
-          LIFTOFF_MESON="subprojects/libliftoff/meson.build"
-          if [ -f "$LIFTOFF_MESON" ]; then
-            sed -i "s/subdir('test')/# subdir('test')/g" "$LIFTOFF_MESON"
           fi
 
           echo "🛠️ android_shm_def.h 내부에 EGL 및 makedev 정의 병합 중..."
