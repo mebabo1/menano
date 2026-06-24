@@ -698,6 +698,21 @@ jobs:
           #endif
           EOF
 
+          echo "🛠️ wlroots session 미지원 함수 링크 에러 우회 패치 중..."
+          cat << 'EOF' >> src/main.cpp
+
+          #include <stddef.h>
+          extern "C" {
+              void* wlr_session_create(void* disp) { return nullptr; }
+              void wlr_session_destroy(void* session) {}
+              void* wlr_session_open_file(void* session, const char* path) { return nullptr; }
+              void wlr_session_close_file(void* session, void* dev) {}
+              bool wlr_session_change_vt(void* session, unsigned int vt) { return false; }
+              int wlr_session_find_gpus(void* session, size_t ret_len, void** ret) { return 0; }
+              int session_open_if_kms(void* session, const char* path) { return -1; }
+          }
+          EOF
+
           sed -i 's/cap_t caps = cap_get_proc();/void* caps = nullptr; \/\/ 안드로이드 우회/g' src/main.cpp
           sed -i 's/cap_flag_value_t nicecapvalue = CAP_CLEAR;/int nicecapvalue = 0;/g' src/main.cpp
           sed -i 's/cap_get_flag( caps, CAP_SYS_NICE, CAP_EFFECTIVE, \&nicecapvalue );/nicecapvalue = 1; \/\/ 항상 권한 있음으로 속임/g' src/main.cpp
