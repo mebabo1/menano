@@ -698,18 +698,22 @@ jobs:
           #endif
           EOF
 
-          echo "🛠️ 링커 에러 방지용 더미 세션 함수를 src/main.cpp에 주입 중..."
+          echo "🛠️ 타입 일치된 더미 세션 함수를 src/main.cpp에 주입 중..."
           cat << 'EOF' >> src/main.cpp
 
-          // 안드로이드 우회용 wlroots 세션 더미 심볼 (Linker Error 우회용)
+          // 안드로이드 우회용 wlroots 세션 타입 매칭 더미 심볼
+          struct wlr_session;
+          struct wl_display;
+          struct wlr_device;
+
           extern "C" {
-              void* wlr_session_create(void* disp) { return nullptr; }
-              void wlr_session_destroy(void* session) {}
-              void* wlr_session_open_file(void* session, const char* path) { return nullptr; }
-              void wlr_session_close_file(void* session, void* dev) {}
-              bool wlr_session_change_vt(void* session, unsigned int vt) { return false; }
-              long wlr_session_find_gpus(void* session, unsigned long ret_len, void* ret) { return 0; }
-              int session_open_if_kms(void* session, const char* path) { return -1; }
+              struct wlr_session *wlr_session_create(struct wl_display *disp) { return nullptr; }
+              void wlr_session_destroy(struct wlr_session *session) {}
+              struct wlr_device *wlr_session_open_file(struct wlr_session *session, const char *path) { return nullptr; }
+              void wlr_session_close_file(struct wlr_session *session, struct wlr_device *dev) {}
+              bool wlr_session_change_vt(struct wlr_session *session, unsigned int vt) { return false; }
+              long wlr_session_find_gpus(struct wlr_session *session, unsigned long ret_len, void *ret) { return 0; }
+              int session_open_if_kms(void *session, const char *path) { return -1; }
           }
           EOF
           
