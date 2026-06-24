@@ -730,6 +730,7 @@ jobs:
           meson setup build \
             --cross-file /tmp/android-cross.ini \
             -Dpipewire=disabled \
+            -Dtests=disabled \
             --prefix=/data/data/com.termux/files/usr
 
       - name: Build
