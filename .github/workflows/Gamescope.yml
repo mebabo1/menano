@@ -213,18 +213,17 @@ jobs:
           mkdir -p $TERMUX_PREFIX/include
           cat << 'EOF' > $TERMUX_PREFIX/include/libudev.h
           #pragma once
+          #include <sys/types.h>
           #ifdef __cplusplus
           extern "C" {
           #endif
 
-          // wlroots가 내부적으로 사용하는 핵심 udev 구조체 선언
           struct udev;
           struct udev_monitor;
           struct udev_device;
           struct udev_enumerate;
           struct udev_list_entry;
 
-          // wlroots 빌드 패스를 위해 필요한 최소한의 함수 형태 정의
           struct udev *udev_new(void);
           struct udev *udev_unref(struct udev *udev);
           struct udev_monitor *udev_monitor_new_from_netlink(struct udev *udev, const char *name);
@@ -247,6 +246,12 @@ jobs:
           const char *udev_list_entry_get_name(struct udev_list_entry *list_entry);
           struct udev_device *udev_device_new_from_syspath(struct udev *udev, const char *syspath);
 
+          // 🌟 이번 에러를 유발한 누락된 필수 udev 함수들 명세 주입
+          const char *udev_device_get_sysname(struct udev_device *udev_device);
+          const char *udev_device_get_action(struct udev_device *udev_device);
+          dev_t udev_device_get_devnum(struct udev_device *udev_device);
+          struct udev_monitor *udev_monitor_unref(struct udev_monitor *udev_monitor);
+
           #ifdef __cplusplus
           }
           #endif
@@ -255,21 +260,19 @@ jobs:
           echo "=== 2. 링커를 속이기 위한 알맹이 없는 가짜 libudev.so 빌드 ==="
           cat << 'EOF' > /tmp/dummy_udev.c
           #include <stdlib.h>
-          
-          // 호출되면 크래시 없이 안전하게 NULL(0)이나 기본값만 반환하는 깡통 함수들
+          #include <sys/types.h>
           void *udev_new(void) { return (void*)1; }
           void *udev_unref(void *udev) { return NULL; }
           void *udev_monitor_new_from_netlink(void *udev, const char *name) { return (void*)1; }
           int udev_monitor_filter_add_match_subsystem_devtype(void *m, const char *s, const char *d) { return 0; }
           int udev_monitor_enable_receiving(void *m) { return 0; }
-          int udev_monitor_get_fd(void *m) { return -1; } // 유효하지 않은 파일 디스크립터 반환
+          int udev_monitor_get_fd(void *m) { return -1; }
           void *udev_monitor_receive_device(void *m) { return NULL; }
           void *udev_device_unref(void *d) { return NULL; }
           const char *udev_device_get_syspath(void *d) { return ""; }
           const char *udev_device_get_devnode(void *d) { return NULL; }
           const char *udev_device_get_subsystem(void *d) { return ""; }
           const char *udev_device_get_property_value(void *d, const char *k) { return NULL; }
-          
           void *udev_enumerate_new(void *udev) { return (void*)1; }
           int udev_enumerate_add_match_subsystem(void *e, const char *s) { return 0; }
           int udev_enumerate_scan_devices(void *e) { return 0; }
@@ -278,12 +281,16 @@ jobs:
           void *udev_list_entry_get_next(void *l) { return NULL; }
           const char *udev_list_entry_get_name(void *l) { return ""; }
           void *udev_device_new_from_syspath(void *u, const char *s) { return NULL; }
+
+          // 🌟 가짜 바보 함수 실체 구현
+          const char *udev_device_get_sysname(void *d) { return ""; }
+          const char *udev_device_get_action(void *d) { return ""; }
+          dev_t udev_device_get_devnum(void *d) { return 0; }
+          void *udev_monitor_unref(void *m) { return NULL; }
           EOF
 
-          # NDK 컴파일러를 이용해 안드로이드 aarch64 전용 가짜 libudev.so 추출
           $TOOLCHAIN/aarch64-linux-android${API_LEVEL}-clang -shared -fPIC /tmp/dummy_udev.c -o $TERMUX_PREFIX/lib/libudev.so
 
-          echo "=== 3. Meson을 속이기 위한 가짜 pkg-config (.pc) 파일 생성 ==="
           mkdir -p $TERMUX_PREFIX/lib/pkgconfig
           cat << EOF > $TERMUX_PREFIX/lib/pkgconfig/libudev.pc
           prefix=$TERMUX_PREFIX
@@ -427,15 +434,33 @@ jobs:
           extern "C" {
           #endif
 
-          // wlroots 빌드를 만족시키기 위한 최소한의 더미 구조체 및 함수 선언
           struct libseat;
-          struct libseat_seat_listener;
+
+          // 🌟 에러가 났던 리스너 구조체의 진짜 모양새 정의
+          struct libseat_seat_listener {
+              void (*enable_seat)(struct libseat *seat, void *data);
+              void (*disable_seat)(struct libseat *seat, void *data);
+          };
+
+          // 🌟 에러가 났던 로그 레벨 열거형 상수 주입
+          enum libseat_log_level {
+              LIBSEAT_LOG_LEVEL_ERROR = 0,
+              LIBSEAT_LOG_LEVEL_INFO,
+              LIBSEAT_LOG_LEVEL_SILENT
+          };
+
+          typedef void (*libseat_log_func)(enum libseat_log_level level, const char *format, ...);
 
           inline struct libseat *libseat_open_seat(struct libseat_seat_listener *listener, void *data) { return (struct libseat*)1; }
           inline int libseat_close_seat(struct libseat *seat) { return 0; }
-          inline int libseat_dispatch_pending(struct libseat *seat, int timeout) { return 0; }
           inline int libseat_get_fd(struct libseat *seat) { return -1; }
           inline const char *libseat_seat_name(struct libseat *seat) { return "dummy_android"; }
+
+          // 🌟 부족하다고 뿜었던 핵심 함수 명세들 긴급 보충
+          inline int libseat_disable_seat(struct libseat *seat) { return 0; }
+          inline int libseat_dispatch(struct libseat *seat, int timeout) { return 0; }
+          inline void libseat_set_log_handler(libseat_log_func handler) {}
+          inline void libseat_set_log_level(enum libseat_log_level level) {}
 
           #ifdef __cplusplus
           }
@@ -447,15 +472,16 @@ jobs:
           #include <stdlib.h>
           void *libseat_open_seat(void *l, void *d) { return (void*)1; }
           int libseat_close_seat(void *s) { return 0; }
-          int libseat_dispatch_pending(void *s, int t) { return 0; }
           int libseat_get_fd(void *s) { return -1; }
           const char *libseat_seat_name(void *s) { return "dummy_android"; }
+          int libseat_disable_seat(void *s) { return 0; }
+          int libseat_dispatch(void *s, int t) { return 0; }
+          void libseat_set_log_handler(void *h) {}
+          void libseat_set_log_level(int l) {}
           EOF
 
-          # NDK 크로스 컴파일러로 안드로이드용 가짜 libseat.so 추출
           $TOOLCHAIN/aarch64-linux-android${API_LEVEL}-clang -shared -fPIC /tmp/dummy_seat.c -o $TERMUX_PREFIX/lib/libseat.so
 
-          echo "=== 3. Meson을 완벽히 속이기 위한 가짜 pkg-config (.pc) 파일 생성 ==="
           mkdir -p $TERMUX_PREFIX/lib/pkgconfig
           cat << EOF > $TERMUX_PREFIX/lib/pkgconfig/libseat.pc
           prefix=$TERMUX_PREFIX
