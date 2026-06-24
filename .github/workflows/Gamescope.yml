@@ -687,12 +687,19 @@ jobs:
             sed -i "s/has_session = true/has_session = false/g" "$WL_BACKEND_MESON"
           fi
 
-          echo "🛠️ EGL Wayland 확장 정의 헤더 별도 생성 중..."
-          cat << 'EOF' > $TERMUX_PREFIX/include/android_egl_fix.h
-          #ifndef ANDROID_EGL_FIX_H
-          #define ANDROID_EGL_FIX_H
+          echo "🛠️ android_shm_def.h 내부에 EGL Wayland 정의 강제 병합 중..."
+          cat << 'EOF' >> $TERMUX_PREFIX/include/android_shm_def.h
+
+          #ifndef PFNEGLQUERYWAYLANDBUFFERWL
+          #ifdef __cplusplus
+          extern "C" {
+          #endif
           struct wl_resource;
           typedef int ( *PFNEGLQUERYWAYLANDBUFFERWL) (void *dpy, struct wl_resource *buffer, int attribute, int *value);
+          #ifdef __cplusplus
+          }
+          #endif
+          #define PFNEGLQUERYWAYLANDBUFFERWL PFNEGLQUERYWAYLANDBUFFERWL
           #endif
           EOF
 
