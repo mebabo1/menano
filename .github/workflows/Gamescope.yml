@@ -673,7 +673,7 @@ jobs:
 
           sed -i "s/'backends=libinput'/'backends=auto'/g" meson.build
           sed -i "s/'xwayland', 'libinput_backend'/'xwayland'/g" meson.build
-          sed -i "s/'default_library=static'/'default_library=static', 'tests=disabled'/g" meson.build
+          sed -i "s/'default_library=static'/'default_library=static'/g" meson.build
 
           WL_BACKEND_MESON="subprojects/wlroots/backend/meson.build"
           if [ -f "$WL_BACKEND_MESON" ]; then
