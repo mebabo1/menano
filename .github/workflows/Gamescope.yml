@@ -673,8 +673,7 @@ jobs:
 
           sed -i "s/'backends=libinput'/'backends=auto'/g" meson.build
           sed -i "s/'xwayland', 'libinput_backend'/'xwayland'/g" meson.build
-          sed -i "s/'default_library=static'/'default_library=static'/g" meson.build
-
+          
           WL_BACKEND_MESON="subprojects/wlroots/backend/meson.build"
           if [ -f "$WL_BACKEND_MESON" ]; then
             sed -i "s/subdir('libinput')/# subdir('libinput')/g" "$WL_BACKEND_MESON"
@@ -741,6 +740,21 @@ jobs:
             --cross-file /tmp/android-cross.ini \
             -Dpipewire=disabled \
             --prefix=/data/data/com.termux/files/usr
+
+            WL_BACKEND_MESON="subprojects/wlroots/backend/meson.build"
+          if [ -f "$WL_BACKEND_MESON" ]; then
+            sed -i "s/subdir('libinput')/# subdir('libinput')/g" "$WL_BACKEND_MESON"
+            sed -i "s/backends.contains('libinput')/false/g" "$WL_BACKEND_MESON"
+            sed -i "s/subdir('session')/# subdir('session')/g" "$WL_BACKEND_MESON"
+            sed -i "s/has_session = true/has_session = false/g" "$WL_BACKEND_MESON"
+          fi
+
+          # 🛠️ 여기에 아래 코드를 새로 추가합니다.
+          LIFTOFF_MESON="subprojects/libliftoff/meson.build"
+          if [ -f "$LIFTOFF_MESON" ]; then
+            echo "🛠️ libliftoff 테스트 빌드 제외 패치 중..."
+            sed -i "s/subdir('test')/# subdir('test')/g" "$LIFTOFF_MESON"
+          fi
 
       - name: Build
         run: |
