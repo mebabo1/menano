@@ -501,16 +501,19 @@ jobs:
           meson subprojects download || true
 
           sed -i "s/'backends=libinput'/'backends=auto'/g" meson.build
-          # 검증 배열에서 libinput_backend 제거
           sed -i "s/'xwayland', 'libinput_backend'/'xwayland'/g" meson.build
 
-          # 3. 🌟 [이번 핵심] wlroots 내부 빌드 파일 서브디렉토리 진입 강제 주석 처리
-          echo "🛠️ wlroots 서브프로젝트 내부 libinput 로드맵 강제 차단 중..."
+          # 3. wlroots 내부 빌드 파일 패치 (libinput 및 libseat 세션 원천 차단)
+          echo "🛠️ wlroots 내부 필수 종속성 스킵 패치 적용 중..."
           WL_BACKEND_MESON="subprojects/wlroots/backend/meson.build"
           if [ -f "$WL_BACKEND_MESON" ]; then
-            # libinput 폴더로 진입하는 메손 명령어 자체를 주석(#) 처리하여 존재감을 지웁니다.
+            # [기존 패치] libinput 진입 차단
             sed -i "s/subdir('libinput')/# subdir('libinput')/g" "$WL_BACKEND_MESON"
             sed -i "s/backends.contains('libinput')/false/g" "$WL_BACKEND_MESON"
+            
+            # 🌟 [이번 추가 핵심] 문제의 session(libseat) 빌드 디렉토리 진입을 무력화
+            sed -i "s/subdir('session')/# subdir('session')/g" "$WL_BACKEND_MESON"
+            sed -i "s/has_session = true/has_session = false/g" "$WL_BACKEND_MESON"
           fi
 
           export PKG_CONFIG_PATH="$TERMUX_PREFIX/lib/pkgconfig:$TERMUX_PREFIX/share/pkgconfig"
