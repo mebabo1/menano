@@ -551,6 +551,20 @@ jobs:
           # 혹시 share/pkgconfig 폴더 쪽에 원본 찌꺼기가 남아있을 수 있으므로 양쪽 모두 덮어씌웁니다.
           cp $TERMUX_PREFIX/lib/pkgconfig/wayland-scanner.pc $TERMUX_PREFIX/share/pkgconfig/wayland-scanner.pc
 
+      - name: Inject Missing SDL2 Headers into Termux Sysroot
+        run: |
+          mkdir -p $TERMUX_PREFIX/include/SDL2
+          cd /tmp
+
+          echo "🛠️ 공식 SDL2 저장소에서 헤더 파일 추출 중..."
+          git clone --depth 1 -b SDL2 https://github.com/libsdl-org/SDL.git sdl2-src
+          
+          # 1. SDL2 표준 헤더들을 include/SDL2 폴더에 복사
+          cp sdl2-src/include/*.h $TERMUX_PREFIX/include/SDL2/
+          
+          # 2. Gamescope가 <SDL.h> 로 바로 호출할 수 있도록 상위 include 폴더에도 복사
+          cp sdl2-src/include/*.h $TERMUX_PREFIX/include/
+
       - name: Create Android Cross File
         run: |
           NDK_ROOT=$ANDROID_NDK/toolchains/llvm/prebuilt/linux-x86_64
