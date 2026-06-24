@@ -224,6 +224,10 @@ jobs:
           struct udev_enumerate;
           struct udev_list_entry;
 
+          // 🌟 [최종 패치 핵심] 문법 폭파를 막기 위한 진짜 우회용 포문 매크로 선언
+          #define udev_list_entry_foreach(list_entry, first_entry) \
+              for (list_entry = first_entry; list_entry != NULL; list_entry = NULL)
+
           struct udev *udev_new(void);
           struct udev *udev_unref(struct udev *udev);
           struct udev_monitor *udev_monitor_new_from_netlink(struct udev *udev, const char *name);
@@ -246,11 +250,15 @@ jobs:
           const char *udev_list_entry_get_name(struct udev_list_entry *list_entry);
           struct udev_device *udev_device_new_from_syspath(struct udev *udev, const char *syspath);
 
-          // 🌟 이번 에러를 유발한 누락된 필수 udev 함수들 명세 주입
           const char *udev_device_get_sysname(struct udev_device *udev_device);
           const char *udev_device_get_action(struct udev_device *udev_device);
           dev_t udev_device_get_devnum(struct udev_device *udev_device);
           struct udev_monitor *udev_monitor_unref(struct udev_monitor *udev_monitor);
+
+          // 🌟 이번에 추가로 요구된 udev 함수 군집령 주입
+          int udev_enumerate_add_match_sysname(struct udev_enumerate *udev_enumerate, const char *sysname);
+          struct udev_device *udev_device_get_parent_with_subsystem_devtype(struct udev_device *udev_device, const char *subsystem, const char *devtype);
+          const char *udev_device_get_sysattr_value(struct udev_device *udev_device, const char *sysattr);
 
           #ifdef __cplusplus
           }
@@ -281,12 +289,15 @@ jobs:
           void *udev_list_entry_get_next(void *l) { return NULL; }
           const char *udev_list_entry_get_name(void *l) { return ""; }
           void *udev_device_new_from_syspath(void *u, const char *s) { return NULL; }
-
-          // 🌟 가짜 바보 함수 실체 구현
           const char *udev_device_get_sysname(void *d) { return ""; }
           const char *udev_device_get_action(void *d) { return ""; }
           dev_t udev_device_get_devnum(void *d) { return 0; }
           void *udev_monitor_unref(void *m) { return NULL; }
+
+          // 🌟 가짜 보충 함수 실체 구현 완료
+          int udev_enumerate_add_match_sysname(void *e, const char *s) { return 0; }
+          void *udev_device_get_parent_with_subsystem_devtype(void *d, const char *s, const char *dt) { return NULL; }
+          const char *udev_device_get_sysattr_value(void *d, const char *sa) { return NULL; }
           EOF
 
           $TOOLCHAIN/aarch64-linux-android${API_LEVEL}-clang -shared -fPIC /tmp/dummy_udev.c -o $TERMUX_PREFIX/lib/libudev.so
@@ -430,37 +441,40 @@ jobs:
           mkdir -p $TERMUX_PREFIX/include
           cat << 'EOF' > $TERMUX_PREFIX/include/libseat.h
           #pragma once
+          #include <stdarg.h>
           #ifdef __cplusplus
           extern "C" {
           #endif
 
           struct libseat;
 
-          // 🌟 에러가 났던 리스너 구조체의 진짜 모양새 정의
           struct libseat_seat_listener {
               void (*enable_seat)(struct libseat *seat, void *data);
               void (*disable_seat)(struct libseat *seat, void *data);
           };
 
-          // 🌟 에러가 났던 로그 레벨 열거형 상수 주입
           enum libseat_log_level {
               LIBSEAT_LOG_LEVEL_ERROR = 0,
               LIBSEAT_LOG_LEVEL_INFO,
               LIBSEAT_LOG_LEVEL_SILENT
           };
 
-          typedef void (*libseat_log_func)(enum libseat_log_level level, const char *format, ...);
+          // 🌟 [포인터 타입 에러 해결] va_list를 정교하게 수용하도록 타입 명세 변경
+          typedef void (*libseat_log_func)(enum libseat_log_level level, const char *format, va_list args);
 
           inline struct libseat *libseat_open_seat(struct libseat_seat_listener *listener, void *data) { return (struct libseat*)1; }
           inline int libseat_close_seat(struct libseat *seat) { return 0; }
           inline int libseat_get_fd(struct libseat *seat) { return -1; }
           inline const char *libseat_seat_name(struct libseat *seat) { return "dummy_android"; }
-
-          // 🌟 부족하다고 뿜었던 핵심 함수 명세들 긴급 보충
           inline int libseat_disable_seat(struct libseat *seat) { return 0; }
           inline int libseat_dispatch(struct libseat *seat, int timeout) { return 0; }
           inline void libseat_set_log_handler(libseat_log_func handler) {}
           inline void libseat_set_log_level(enum libseat_log_level level) {}
+
+          // 🌟 추가로 징징대던 디바이스 오픈/스위칭 가짜 스텁 선언 완료
+          inline int libseat_open_device(struct libseat *seat, const char *path, int *fd) { return 1; }
+          inline int libseat_close_device(struct libseat *seat, int device_id) { return 0; }
+          inline int libseat_switch_session(struct libseat *seat, int vt) { return 0; }
 
           #ifdef __cplusplus
           }
@@ -478,6 +492,11 @@ jobs:
           int libseat_dispatch(void *s, int t) { return 0; }
           void libseat_set_log_handler(void *h) {}
           void libseat_set_log_level(int l) {}
+
+          // 🌟 가짜 함수 바디 구현 완료
+          int libseat_open_device(void *s, const char *p, int *f) { return 1; }
+          int libseat_close_device(void *s, int id) { return 0; }
+          int libseat_switch_session(void *s, int v) { return 0; }
           EOF
 
           $TOOLCHAIN/aarch64-linux-android${API_LEVEL}-clang -shared -fPIC /tmp/dummy_seat.c -o $TERMUX_PREFIX/lib/libseat.so
