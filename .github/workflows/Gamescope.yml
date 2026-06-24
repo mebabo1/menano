@@ -677,7 +677,6 @@ jobs:
           echo "🛠️ android_shm_def.h 내부에 EGL 및 makedev 정의 병합 중..."
           cat << 'EOF' >> $TERMUX_PREFIX/include/android_shm_def.h
 
-          // 안드로이드 NDK EGL 구조적 보정을 위한 주입 코드
           #ifndef PFNEGLQUERYWAYLANDBUFFERWL
           #ifdef __cplusplus
           extern "C" {
@@ -712,10 +711,6 @@ jobs:
           ssize_t wlr_session_find_gpus(void* session, size_t ret_len, void* ret) { return 0; }
           int session_open_if_kms(void* session, const char* path) { return -1; }
           EOF
-
-          git checkout meson.build 2>/dev/null || true
-          sed -i "s/gamescope_srcs = files(/gamescope_srcs = files('dummy_session.c',/g" meson.build
-          sed -i "s/srcs = files(/srcs = files('dummy_session.c',/g" meson.build
           
           sed -i 's/cap_t caps = cap_get_proc();/void* caps = nullptr; \/\/ 안드로이드 우회/g' src/main.cpp
           sed -i 's/cap_flag_value_t nicecapvalue = CAP_CLEAR;/int nicecapvalue = 0;/g' src/main.cpp
