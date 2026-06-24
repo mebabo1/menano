@@ -551,36 +551,6 @@ jobs:
           # 혹시 share/pkgconfig 폴더 쪽에 원본 찌꺼기가 남아있을 수 있으므로 양쪽 모두 덮어씌웁니다.
           cp $TERMUX_PREFIX/lib/pkgconfig/wayland-scanner.pc $TERMUX_PREFIX/share/pkgconfig/wayland-scanner.pc
 
-      - name: Inject Missing XCB Utility Headers into Termux Sysroot
-        run: |
-          mkdir -p $TERMUX_PREFIX/include/xcb
-          cd /tmp
-
-          echo "🛠️ 1. libxcb-wm (icccm, ewmh) 헤더 다운로드 중..."
-          git clone --depth 1 https://gitlab.freedesktop.org/xorg/lib/libxcb-wm.git xcb-wm
-          cp xcb-wm/icccm/xcb_icccm.h $TERMUX_PREFIX/include/xcb/
-          cp xcb-wm/ewmh/xcb_ewmh.h $TERMUX_PREFIX/include/xcb/
-
-          echo "🛠️ 2. libxcb-keysyms 헤더 다운로드 중..."
-          git clone --depth 1 https://gitlab.freedesktop.org/xorg/lib/libxcb-keysyms.git xcb-keysyms
-          cp xcb-keysyms/keysyms/xcb_keysyms.h $TERMUX_PREFIX/include/xcb/
-
-          echo "🛠️ 3. libxcb-image 헤더 다운로드 중..."
-          git clone --depth 1 https://gitlab.freedesktop.org/xorg/lib/libxcb-image.git xcb-image
-          cp xcb-image/image/xcb_image.h $TERMUX_PREFIX/include/xcb/
-
-          echo "🛠️ 4. libxcb-renderutil 헤더 다운로드 중..."
-          git clone --depth 1 https://gitlab.freedesktop.org/xorg/lib/libxcb-renderutil.git xcb-renderutil
-          cp xcb-renderutil/renderutil/xcb_renderutil.h $TERMUX_PREFIX/include/xcb/
-
-          echo "🛠️ 5. libxcb-errors 헤더 다운로드 중..."
-          git clone --depth 1 https://gitlab.freedesktop.org/xorg/lib/libxcb-errors.git xcb-errors || true
-          if [ -d "xcb-errors" ]; then
-            cp xcb-errors/src/xcb_errors.h $TERMUX_PREFIX/include/xcb/ || true
-          fi
-
-          echo "✅ 누락된 모든 XCB 유틸리티 헤더 주입 완료!"
-
       - name: Create Android Cross File
         run: |
           NDK_ROOT=$ANDROID_NDK/toolchains/llvm/prebuilt/linux-x86_64
