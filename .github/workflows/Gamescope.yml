@@ -497,13 +497,21 @@ jobs:
         run: |
           cd gamescope-src
 
-          sed -i "s/'backends=libinput'/'backends=headless'/g" meson.build
-          
-          # wlroots 빌드 후 'libinput_backend'를 가지고 검증하는 배열 요소를 통째로 삭제
-          sed -i "s/'xwayland', 'libinput_backend'/'xwayland'/g" meson.build
-
           # 구버전 내부에 포함된 내장 라이브러리(subprojects) 소스를 안전하게 수집합니다.
           meson subprojects download || true
+
+          sed -i "s/'backends=libinput'/'backends=auto'/g" meson.build
+          # 검증 배열에서 libinput_backend 제거
+          sed -i "s/'xwayland', 'libinput_backend'/'xwayland'/g" meson.build
+
+          # 3. 🌟 [이번 핵심] wlroots 내부 빌드 파일 서브디렉토리 진입 강제 주석 처리
+          echo "🛠️ wlroots 서브프로젝트 내부 libinput 로드맵 강제 차단 중..."
+          WL_BACKEND_MESON="subprojects/wlroots/backend/meson.build"
+          if [ -f "$WL_BACKEND_MESON" ]; then
+            # libinput 폴더로 진입하는 메손 명령어 자체를 주석(#) 처리하여 존재감을 지웁니다.
+            sed -i "s/subdir('libinput')/# subdir('libinput')/g" "$WL_BACKEND_MESON"
+            sed -i "s/backends.contains('libinput')/false/g" "$WL_BACKEND_MESON"
+          fi
 
           export PKG_CONFIG_PATH="$TERMUX_PREFIX/lib/pkgconfig:$TERMUX_PREFIX/share/pkgconfig"
           export PKG_CONFIG_LIBDIR="$TERMUX_PREFIX/lib/pkgconfig"
