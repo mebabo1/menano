@@ -697,6 +697,8 @@ jobs:
           sed -i 's/XResClientIdsDestroy(num_ids, client_ids);/\/\/ XResClientIdsDestroy/g' src/steamcompmgr.cpp
           sed -i 's/if (!XResQueryVersion(ctx->dpy, \&xres_major, \&xres_minor))/if (false) \/\/ XResQueryVersion 스킵/g' src/steamcompmgr.cpp
 
+          touch $TERMUX_PREFIX/include/libinput.h
+
           export PKG_CONFIG_PATH="$TERMUX_PREFIX/lib/pkgconfig:$TERMUX_PREFIX/share/pkgconfig"
           export PKG_CONFIG_LIBDIR="$TERMUX_PREFIX/lib/pkgconfig"
           export PKG_CONFIG_SYSROOT_DIR="$TERMUX_ROOT"
