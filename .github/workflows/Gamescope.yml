@@ -745,7 +745,7 @@ jobs:
           find subprojects/wlroots/backend/ -type f \( -name "*.c" -o -name "*.h" \) -exec sed -i "/#include <libinput.h>/d" {} +
           find subprojects/wlroots/include/ -type f \( -name "*.c" -o -name "*.h" \) -exec sed -i "/#include <libinput.h>/d" {} +
           rm -f "subprojects/wlroots/include/backend/libinput.h"
-          rm -f "subprojects/wlroots/backend/libinput"
+          rm -f "subprojects/wlroots/backend/libinput/keyboard.c"
           find subprojects/wlroots/backend/ -type f \( -name "*.c" -o -name "*.h" \) -exec sed -i "/backend\/libinput\.h/d" {} +
           find subprojects/wlroots/include/ -type f \( -name "*.c" -o -name "*.h" \) -exec sed -i "/backend\/libinput\.h/d" {} +
 
