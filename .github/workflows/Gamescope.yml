@@ -731,7 +731,7 @@ jobs:
             -Dpipewire=disabled \
             --prefix=/data/data/com.termux/files/usr
 
-            WL_BACKEND_MESON="subprojects/wlroots/backend/meson.build"
+          WL_BACKEND_MESON="subprojects/wlroots/backend/meson.build"
           if [ -f "$WL_BACKEND_MESON" ]; then
             echo "✅ subprojects/wlroots 발견! libinput 백엔드 제거 패치를 적용합니다."
             sed -i "s/subdir('libinput')/# subdir('libinput')/g" "$WL_BACKEND_MESON"
@@ -743,7 +743,7 @@ jobs:
           find subprojects/wlroots/backend/ -type f \( -name "*.c" -o -name "*.h" \) -exec sed -i "/#include <libinput.h>/d" {} +
           find subprojects/wlroots/include/ -type f \( -name "*.c" -o -name "*.h" \) -exec sed -i "/#include <libinput.h>/d" {} +
 
-            WL_BACKEND_MESON="subprojects/wlroots/backend/meson.build"
+          WL_BACKEND_MESON="subprojects/wlroots/backend/meson.build"
           if [ -f "$WL_BACKEND_MESON" ]; then
             sed -i "s/subdir('libinput')/# subdir('libinput')/g" "$WL_BACKEND_MESON"
             sed -i "s/backends.contains('libinput')/false/g" "$WL_BACKEND_MESON"
