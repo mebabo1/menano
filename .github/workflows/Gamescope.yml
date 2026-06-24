@@ -740,6 +740,9 @@ jobs:
             sed -i "s/has_session = true/has_session = false/g" "$WL_BACKEND_MESON"
           fi
 
+          find subprojects/wlroots/backend/ -type f \( -name "*.c" -o -name "*.h" \) -exec sed -i "/#include <libinput.h>/d" {} +
+          find subprojects/wlroots/include/ -type f \( -name "*.c" -o -name "*.h" \) -exec sed -i "/#include <libinput.h>/d" {} +
+
             WL_BACKEND_MESON="subprojects/wlroots/backend/meson.build"
           if [ -f "$WL_BACKEND_MESON" ]; then
             sed -i "s/subdir('libinput')/# subdir('libinput')/g" "$WL_BACKEND_MESON"
