@@ -698,23 +698,21 @@ jobs:
           #endif
           EOF
 
-          echo "🛠️ 링커 에러 우회용 dummy_session.c 소스 생성 중..."
-          cat << 'EOF' > src/dummy_session.c
-          #include <sys/types.h>
-          #include <stdbool.h>
+          echo "🛠️ 링커 에러 방지용 더미 세션 함수를 src/main.cpp에 주입 중..."
+          cat << 'EOF' >> src/main.cpp
 
-          void* wlr_session_create(void* disp) { return 0; }
-          void wlr_session_destroy(void* session) {}
-          void* wlr_session_open_file(void* session, const char* path) { return 0; }
-          void wlr_session_close_file(void* session, void* dev) {}
-          bool wlr_session_change_vt(void* session, unsigned int vt) { return false; }
-          ssize_t wlr_session_find_gpus(void* session, size_t ret_len, void* ret) { return 0; }
-          int session_open_if_kms(void* session, const char* path) { return -1; }
+          // 안드로이드 우회용 wlroots 세션 더미 심볼 (Linker Error 우회용)
+          extern "C" {
+              void* wlr_session_create(void* disp) { return nullptr; }
+              void wlr_session_destroy(void* session) {}
+              void* wlr_session_open_file(void* session, const char* path) { return nullptr; }
+              void wlr_session_close_file(void* session, void* dev) {}
+              bool wlr_session_change_vt(void* session, unsigned int vt) { return false; }
+              long wlr_session_find_gpus(void* session, unsigned long ret_len, void* ret) { return 0; }
+              int session_open_if_kms(void* session, const char* path) { return -1; }
+          }
           EOF
-
-          echo "🛠️ src/meson.build 파일에 dummy_session.c 빌드 대상 추가 중..."
-          sed -i "s/'main.cpp'/'main.cpp', 'dummy_session.c'/g" meson.build
-
+          
           sed -i 's/cap_t caps = cap_get_proc();/void* caps = nullptr; \/\/ 안드로이드 우회/g' src/main.cpp
           sed -i 's/cap_flag_value_t nicecapvalue = CAP_CLEAR;/int nicecapvalue = 0;/g' src/main.cpp
           sed -i 's/cap_get_flag( caps, CAP_SYS_NICE, CAP_EFFECTIVE, \&nicecapvalue );/nicecapvalue = 1; \/\/ 항상 권한 있음으로 속임/g' src/main.cpp
