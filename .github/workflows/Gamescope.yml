@@ -730,12 +730,7 @@ jobs:
             --cross-file /tmp/android-cross.ini \
             -Dpipewire=disabled \
             --prefix=/data/data/com.termux/files/usr
-
-          if [ -f "subprojects/wlroots/backend/libinput/meson.build" ]; then
-            echo "🔥 libinput 빌드 대상 빌드 스크립트 강제 비우기 완료"
-            echo "# libinput disabled for termux" > "subprojects/wlroots/backend/libinput/meson.build"
-          fi
-
+            
           WL_BACKEND_MESON="subprojects/wlroots/backend/meson.build"
           if [ -f "$WL_BACKEND_MESON" ]; then
             echo "✅ subprojects/wlroots/backend/meson.build 강제 무력화 패치 중..."
@@ -766,6 +761,11 @@ jobs:
           if [ -f "$LIFTOFF_MESON" ]; then
             echo "🛠️ libliftoff 테스트 빌드 제외 패치 중..."
             sed -i "s/subdir('test')/# subdir('test')/g" "$LIFTOFF_MESON"
+          fi
+
+          if [ -f "subprojects/wlroots/backend/libinput/meson.build" ]; then
+            echo "🔥 libinput 빌드 대상 빌드 스크립트 강제 비우기 완료"
+            echo "# libinput disabled for termux" > "subprojects/wlroots/backend/libinput/meson.build"
           fi
 
       - name: Build
