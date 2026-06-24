@@ -687,6 +687,11 @@ jobs:
             sed -i "s/has_session = true/has_session = false/g" "$WL_BACKEND_MESON"
           fi
 
+          LIFTOFF_MESON="subprojects/libliftoff/meson.build"
+          if [ -f "$LIFTOFF_MESON" ]; then
+            sed -i "s/subdir('test')/# subdir('test')/g" "$LIFTOFF_MESON"
+          fi
+
           echo "🛠️ android_shm_def.h 내부에 EGL Wayland 정의 강제 병합 중..."
           cat << 'EOF' >> $TERMUX_PREFIX/include/android_shm_def.h
 
@@ -730,7 +735,6 @@ jobs:
           meson setup build \
             --cross-file /tmp/android-cross.ini \
             -Dpipewire=disabled \
-            -Dtests=disabled \
             --prefix=/data/data/com.termux/files/usr
 
       - name: Build
