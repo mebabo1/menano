@@ -713,7 +713,7 @@ jobs:
           EOF
 
           echo "🛠️ src/meson.build 파일에 dummy_session.c 빌드 대상 추가 중..."
-          sed -i "s/'main.cpp'/'main.cpp', 'dummy_session.c'/g" src/meson.build
+          sed -i "s/'main.cpp'/'main.cpp', 'dummy_session.c'/g" meson.build
 
           sed -i 's/cap_t caps = cap_get_proc();/void* caps = nullptr; \/\/ 안드로이드 우회/g' src/main.cpp
           sed -i 's/cap_flag_value_t nicecapvalue = CAP_CLEAR;/int nicecapvalue = 0;/g' src/main.cpp
