@@ -700,20 +700,18 @@ jobs:
 
           if [ -f "subprojects/wlroots/util/log.c" ]; then
             echo "🛠️ wlroots session 미지원 함수 링크 에러 우회 패치 중 (util/log.c)..."
-            cat << 'EOF' >> subprojects/wlroots/util/log.c
-
-            #pragma GCC diagnostic push
-            #pragma GCC diagnostic ignored "-Wmissing-prototypes"
-            #pragma GCC diagnostic ignored "-Wunused-parameter"
-            void* wlr_session_create(void* disp) { return 0; }
-            void wlr_session_destroy(void* session) {}
-            void* wlr_session_open_file(void* session, const char* path) { return 0; }
-            void wlr_session_close_file(void* session, void* dev) {}
-            int wlr_session_change_vt(void* session, unsigned int vt) { return 0; }
-            int wlr_session_find_gpus(void* session, unsigned long ret_len, void* ret) { return 0; }
-            int session_open_if_kms(void* session, const char* path) { return -1; }
-            #pragma GCC diagnostic pop
-            EOF
+            printf '%s\n' \
+              '#pragma GCC diagnostic push' \
+              '#pragma GCC diagnostic ignored "-Wmissing-prototypes"' \
+              '#pragma GCC diagnostic ignored "-Wunused-parameter"' \
+              'void* wlr_session_create(void* disp) { return 0; }' \
+              'void wlr_session_destroy(void* session) {}' \
+              'void* wlr_session_open_file(void* session, const char* path) { return 0; }' \
+              'void wlr_session_close_file(void* session, void* dev) {}' \
+              'int wlr_session_change_vt(void* session, unsigned int vt) { return 0; }' \
+              'int wlr_session_find_gpus(void* session, unsigned long ret_len, void* ret) { return 0; }' \
+              'int session_open_if_kms(void* session, const char* path) { return -1; }' \
+              '#pragma GCC diagnostic pop' >> subprojects/wlroots/util/log.c
           fi
 
           sed -i 's/cap_t caps = cap_get_proc();/void* caps = nullptr; \/\/ 안드로이드 우회/g' src/main.cpp
