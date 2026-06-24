@@ -611,8 +611,8 @@ jobs:
           sysroot = '$SYSROOT'
 
           [built-in options]
-          c_args = ['-fPIC', '-I$TERMUX_PREFIX/include', '-I$TERMUX_PREFIX/include/xcb', '-I$TERMUX_PREFIX/include/libdrm', '-I$TERMUX_PREFIX/include/pixman-1', '-include', 'sys/shm_android_wrapper.h', '-include', 'fcntl.h', '-include', 'unistd.h']
-          cpp_args = ['-fPIC', '-I$TERMUX_PREFIX/include', '-I$TERMUX_PREFIX/include/xcb', '-I$TERMUX_PREFIX/include/libdrm', '-I$TERMUX_PREFIX/include/pixman-1', '-include', 'sys/shm_android_wrapper.h', '-include', 'fcntl.h', '-include', 'unistd.h']
+          c_args = ['-fPIC', '-isystem$TERMUX_PREFIX/include', '-isystem$TERMUX_PREFIX/include/xcb', '-isystem$TERMUX_PREFIX/include/libdrm', '-isystem$TERMUX_PREFIX/include/pixman-1', '-include', 'sys/shm_android_wrapper.h', '-include', 'fcntl.h', '-include', 'unistd.h']
+          cpp_args = ['-fPIC', '-isystem$TERMUX_PREFIX/include', '-isystem$TERMUX_PREFIX/include/xcb', '-isystem$TERMUX_PREFIX/include/libdrm', '-isystem$TERMUX_PREFIX/include/pixman-1', '-include', 'sys/shm_android_wrapper.h', '-include', 'fcntl.h', '-include', 'unistd.h']
           
           c_link_args = ['--target=aarch64-linux-android30', '-L$TERMUX_PREFIX/lib', '-Wl,-rpath=/system/lib64:/vendor/lib64:/vendor/lib64/egl:/apex/com.android.i18n/lib64:$RUNTIME_PATH/lib', '-Wl,--no-as-needed', '-lEGL', '-landroid-shmem', '-ldrm', '-lwayland-client', '-lwayland-server']
           cpp_link_args = ['--target=aarch64-linux-android30', '-L$TERMUX_PREFIX/lib', '-Wl,-rpath=/system/lib64:/vendor/lib64:/vendor/lib64/egl:/apex/com.android.i18n/lib64:$RUNTIME_PATH/lib', '-Wl,--no-as-needed', '-lEGL', '-landroid-shmem', '-static-libstdc++', '-ldrm', '-lwayland-client', '-lwayland-server']
