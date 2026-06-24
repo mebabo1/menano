@@ -515,6 +515,37 @@ jobs:
           Cflags: -I\${includedir}
           EOF
 
+      - name: Create Dummy SHM Wrapper for Android
+        run: |
+          echo "=== 1. sys/mman.h를 확장하는 가짜 shm_open 매핑 헤더 생성 ==="
+          mkdir -p $TERMUX_PREFIX/include/sys
+          cat << 'EOF' > $TERMUX_PREFIX/include/sys/shm_android_wrapper.h
+          #pragma once
+          #include <fcntl.h>
+          #include <unistd.h>
+          #include <stdlib.h>
+          #include <stdio.h>
+          #include <sys/mman.h>
+
+          // 안드로이드에 없는 shm_open을 mkstemp 방식으로 모방합니다.
+          static inline int shm_open(const char *name, int oflag, mode_t mode) {
+              char template_path[256];
+              // Termux의 임시 디렉토리 혹은 안드로이드 기본 임시 디렉토리 활용
+              snprintf(template_path, sizeof(template_path), "/data/data/com.termux/files/usr/tmp/shm_XXXXXX");
+              
+              int fd = mkstemp(template_path);
+              if (fd >= 0) {
+                  // 파일 이름 링크를 끊어 이름은 없지만 fd로 접근 가능한 공유 메모리처럼 작동하게 만듦
+                  unlink(template_path);
+              }
+              return fd;
+          }
+
+          static inline int shm_unlink(const char *name) {
+              return 0; // mkstemp 직후 unlink를 이미 수행하므로 0 반환
+          }
+          EOF
+
       - name: Install wayland-protocols into Termux Sysroot
         run: |
           git clone --depth 1 --branch 1.36 https://gitlab.freedesktop.org/wayland/wayland-protocols.git
@@ -580,8 +611,8 @@ jobs:
           sysroot = '$SYSROOT'
 
           [built-in options]
-          c_args = ['-fPIC', '-idirafter$TERMUX_PREFIX/include', '-idirafter$TERMUX_PREFIX/include/libdrm', '-idirafter$TERMUX_PREFIX/include/pixman-1', '-include', 'fcntl.h', '-include', 'unistd.h']
-          cpp_args = ['-fPIC', '-idirafter$TERMUX_PREFIX/include', '-idirafter$TERMUX_PREFIX/include/libdrm', '-idirafter$TERMUX_PREFIX/include/pixman-1', '-include', 'fcntl.h', '-include', 'unistd.h']
+          c_args = ['-fPIC', '-idirafter$TERMUX_PREFIX/include', '-idirafter$TERMUX_PREFIX/include/libdrm', '-idirafter$TERMUX_PREFIX/include/pixman-1', '-include', 'fcntl.h', '-include', 'unistd.h', '-include', 'sys/shm_android_wrapper.h']
+          cpp_args = ['-fPIC', '-idirafter$TERMUX_PREFIX/include', '-idirafter$TERMUX_PREFIX/include/libdrm', '-idirafter$TERMUX_PREFIX/include/pixman-1', '-include', 'fcntl.h', '-include', 'unistd.h', '-include', 'sys/shm_android_wrapper.h']
           
           c_link_args = ['--target=aarch64-linux-android30', '-L$TERMUX_PREFIX/lib', '-Wl,-rpath=/system/lib64:/vendor/lib64:/vendor/lib64/egl:/apex/com.android.i18n/lib64:$RUNTIME_PATH/lib', '-Wl,--no-as-needed', '-lEGL', '-landroid-shmem', '-ldrm', '-lwayland-client', '-lwayland-server']
           cpp_link_args = ['--target=aarch64-linux-android30', '-L$TERMUX_PREFIX/lib', '-Wl,-rpath=/system/lib64:/vendor/lib64:/vendor/lib64/egl:/apex/com.android.i18n/lib64:$RUNTIME_PATH/lib', '-Wl,--no-as-needed', '-lEGL', '-landroid-shmem', '-static-libstdc++', '-ldrm', '-lwayland-client', '-lwayland-server']
