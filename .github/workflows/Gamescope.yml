@@ -692,9 +692,10 @@ jobs:
             sed -i "s/subdir('test')/# subdir('test')/g" "$LIFTOFF_MESON"
           fi
 
-          echo "🛠️ android_shm_def.h 내부에 EGL Wayland 정의 강제 병합 중..."
+          echo "🛠️ android_shm_def.h 내부에 EGL 및 makedev 정의 병합 중..."
           cat << 'EOF' >> $TERMUX_PREFIX/include/android_shm_def.h
 
+          // 안드로이드 NDK EGL 구조적 보정을 위한 주입 코드
           #ifndef PFNEGLQUERYWAYLANDBUFFERWL
           #ifdef __cplusplus
           extern "C" {
@@ -705,6 +706,13 @@ jobs:
           }
           #endif
           #define PFNEGLQUERYWAYLANDBUFFERWL PFNEGLQUERYWAYLANDBUFFERWL
+          #endif
+
+          #ifndef makedev
+          #define makedev(major, minor) ((((dev_t)(major) & 0xfffff000ULL) << 32) | \
+                                         (((dev_t)(major) & 0x00000fffULL) << 8)  | \
+                                         (((dev_t)(minor) & 0xffffff00ULL) << 12) | \
+                                         (((dev_t)(minor) & 0x000000ffULL)))
           #endif
           EOF
 
