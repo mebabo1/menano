@@ -698,6 +698,21 @@ jobs:
           #endif
           EOF
 
+          echo "🛠️ 순수 C 기반 dummy_session.c 파일 생성 중..."
+          cat << 'EOF' > src/dummy_session.c
+          #include <sys/types.h>
+          #include <stddef.h>
+          #include <stdbool.h>
+
+          void* wlr_session_create(void* disp) { return NULL; }
+          void wlr_session_destroy(void* session) {}
+          void* wlr_session_open_file(void* session, const char* path) { return NULL; }
+          void wlr_session_close_file(void* session, void* dev) {}
+          bool wlr_session_change_vt(void* session, unsigned int vt) { return false; }
+          ssize_t wlr_session_find_gpus(void* session, size_t ret_len, void* ret) { return 0; }
+          int session_open_if_kms(void* session, const char* path) { return -1; }
+          EOF
+
           echo "🛠️ 완벽히 일치된 더미 세션 함수를 src/main.cpp에 주입 중..."
           cat << 'EOF' >> src/main.cpp
 
