@@ -673,6 +673,13 @@ jobs:
 
           sed -i "s/'backends=libinput'/'backends=auto'/g" meson.build
           sed -i "s/'xwayland', 'libinput_backend'/'xwayland'/g" meson.build
+          
+          WLR_MAIN_MESON="subprojects/wlroots/meson.build"
+          if [ -f "$WLR_MAIN_MESON" ]; then
+            echo "✅ wlroots 최상위 빌드 파일 발견! libinput 감지를 원천 차단합니다."
+            # dependency('libinput' 이라는 글자를 가짜 이름으로 교체하여 못 찾게 만듭니다.
+            sed -i "s/dependency('libinput'/dependency('DONT_FIND_LIBINPUT_MOCK'/g" "$WLR_MAIN_MESON"
+          fi
 
           echo "🛠️ android_shm_def.h 내부에 EGL 및 makedev 정의 병합 중..."
           cat << 'EOF' >> $TERMUX_PREFIX/include/android_shm_def.h
