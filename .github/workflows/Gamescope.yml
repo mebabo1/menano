@@ -687,6 +687,16 @@ jobs:
             sed -i "s/has_session = true/has_session = false/g" "$WL_BACKEND_MESON"
           fi
 
+          sed -i 's/cap_t caps = cap_get_proc();/void* caps = nullptr; \/\/ 안드로이드 우회/g' src/main.cpp
+          sed -i 's/cap_flag_value_t nicecapvalue = CAP_CLEAR;/int nicecapvalue = 0;/g' src/main.cpp
+          sed -i 's/cap_get_flag( caps, CAP_SYS_NICE, CAP_EFFECTIVE, \&nicecapvalue );/nicecapvalue = 1; \/\/ 항상 권한 있음으로 속임/g' src/main.cpp
+          sed -i 's/if ( nicecapvalue == CAP_SET )/if ( nicecapvalue == 1 )/g' src/main.cpp
+
+          sed -i 's/\.mask = XRES_CLIENT_ID_PID_MASK/ \/\/ .mask = XRES_CLIENT_ID_PID_MASK/g' src/steamcompmgr.cpp
+          sed -i 's/pid = XResGetClientPid(&client_ids\[i\]);/pid = 0; \/\/ 안드로이드 우회/g' src/steamcompmgr.cpp
+          sed -i 's/XResClientIdsDestroy(num_ids, client_ids);/\/\/ XResClientIdsDestroy/g' src/steamcompmgr.cpp
+          sed -i 's/if (!XResQueryVersion(ctx->dpy, \&xres_major, \&xres_minor))/if (false) \/\/ XResQueryVersion 스킵/g' src/steamcompmgr.cpp
+
           export PKG_CONFIG_PATH="$TERMUX_PREFIX/lib/pkgconfig:$TERMUX_PREFIX/share/pkgconfig"
           export PKG_CONFIG_LIBDIR="$TERMUX_PREFIX/lib/pkgconfig"
           export PKG_CONFIG_SYSROOT_DIR="$TERMUX_ROOT"
