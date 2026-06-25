@@ -561,14 +561,14 @@ jobs:
           #include <stddef.h>
           #include <sys/types.h>
 
-          // 1. 메인 소스코드와 충돌하지 않는 유연한 drm_t 전방 선언
+          // 1. 전방 선언
           struct drm_t;
           struct wlr_buffer;
           struct wlr_dmabuf_attributes;
           struct Composite_t;
           struct VulkanPipeline_t;
 
-          // 2. 전역 변수 정의 (main.cpp 등 C++ 소스 매칭용)
+          // 2. 전역 변수 정의 (C++ 링킹 대응)
           void* g_DRM = NULL;
           bool g_bRotated = false;
           uint32_t g_nDRMFormat = 0;
@@ -577,12 +577,12 @@ jobs:
           bool g_bDebugLayers = false;
           int g_drmModeGeneration = 0;
 
-          // 3. 함수 정의 (extern "C"와 일반 C++ 양쪽 링커 모두 잡히도록 선언)
+          // 3. 함수 정의 (원래 헤더의 스펙에 맞춰 extern "C"와 struct 포인터 서명 일치)
           extern "C" {
               bool init_drm(struct drm_t* d, int w, int h, int r) { return true; }
               uint32_t drm_fbid_from_dmabuf(struct drm_t* d, struct wlr_buffer* b, struct wlr_dmabuf_attributes* a) { return 0; }
               void drm_drop_fbid(struct drm_t* d, unsigned int f) {}
-              int find_drm_node_by_devid(unsigned long id) { return -1; } // ◄ 중복 함수 완전히 제거됨!
+              int find_drm_node_by_devid(unsigned long id) { return -1; } // ◄ uint64_t 중복 정의는 제거되었습니다!
               void drm_lock_fbid(struct drm_t* d, unsigned int f) {}
               void drm_poll_state(struct drm_t* d) {}
               int drm_get_default_refresh(struct drm_t* d) { return 60; }
@@ -595,6 +595,7 @@ jobs:
               void drm_set_color_gains(struct drm_t* d, float* f) {}
               void drm_set_color_gain_blend(struct drm_t* d, float f) {}
               void drm_set_color_matrix(struct drm_t* d, float* f) {}
+              void drm_unlock_fbid(struct drm_t* d, unsigned int f) {}
           }
           EOF
 
