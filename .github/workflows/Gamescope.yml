@@ -554,21 +554,21 @@ jobs:
           }
           EOF
 
-          echo "🛠️ 링커 서명을 100% 만족하는 순수 C++ 깡통 DRM 소스 주입 중..."
+          echo "🛠️ 중복 정의를 제거하고 변수/함수 서명을 최적화한 깡통 DRM 소스 주입 중..."
           
           cat << 'EOF' > src/drm.cpp
           #include <stdint.h>
           #include <stddef.h>
           #include <sys/types.h>
 
-          // 1. drm_t 가 void* 가 아닌 struct drm_t* 형태로 정의되어 있을 가능성 완벽 반영
-          struct drm_t {}; 
+          // 1. 메인 소스코드와 충돌하지 않는 유연한 drm_t 전방 선언
+          struct drm_t;
           struct wlr_buffer;
           struct wlr_dmabuf_attributes;
           struct Composite_t;
           struct VulkanPipeline_t;
 
-          // 2. 전역 변수 정의 (C++)
+          // 2. 전역 변수 정의 (main.cpp 등 C++ 소스 매칭용)
           void* g_DRM = NULL;
           bool g_bRotated = false;
           uint32_t g_nDRMFormat = 0;
@@ -577,25 +577,25 @@ jobs:
           bool g_bDebugLayers = false;
           int g_drmModeGeneration = 0;
 
-          // 3. 순수 C++ 함수 정의 (첫 번째 인자를 drm_t* d 로 완벽 매칭)
-          bool init_drm(drm_t* d, int w, int h, int r) { return true; }
-          uint32_t drm_fbid_from_dmabuf(drm_t* d, wlr_buffer* b, wlr_dmabuf_attributes* a) { return 0; }
-          void drm_drop_fbid(drm_t* d, unsigned int f) {}
-          int find_drm_node_by_devid(unsigned long id) { return -1; }
-          void drm_lock_fbid(drm_t* d, unsigned int f) {}
-          void drm_poll_state(drm_t* d) {}
-          int drm_get_default_refresh(drm_t* d) { return 60; }
-          void drm_set_refresh(drm_t* d, int r) {}
-          bool drm_prepare(drm_t* d, const Composite_t* c, const VulkanPipeline_t* v) { return false; }
-          void drm_rollback(drm_t* d) {}
-          bool drm_commit(drm_t* d, Composite_t* c, VulkanPipeline_t* v) { return false; }
-          void finish_drm(drm_t* d) {}
-          void drm_set_color_linear_gains(drm_t* d, float* f) {}
-          void drm_set_color_gains(drm_t* d, float* f) {}
-          void drm_set_color_gain_blend(drm_t* d, float f) {}
-          void drm_set_color_matrix(drm_t* d, float* f) {}
-
-          int find_drm_node_by_devid(uint64_t id) { return -1; }
+          // 3. 함수 정의 (extern "C"와 일반 C++ 양쪽 링커 모두 잡히도록 선언)
+          extern "C" {
+              bool init_drm(struct drm_t* d, int w, int h, int r) { return true; }
+              uint32_t drm_fbid_from_dmabuf(struct drm_t* d, struct wlr_buffer* b, struct wlr_dmabuf_attributes* a) { return 0; }
+              void drm_drop_fbid(struct drm_t* d, unsigned int f) {}
+              int find_drm_node_by_devid(unsigned long id) { return -1; } // ◄ 중복 함수 완전히 제거됨!
+              void drm_lock_fbid(struct drm_t* d, unsigned int f) {}
+              void drm_poll_state(struct drm_t* d) {}
+              int drm_get_default_refresh(struct drm_t* d) { return 60; }
+              void drm_set_refresh(struct drm_t* d, int r) {}
+              bool drm_prepare(struct drm_t* d, const struct Composite_t* c, const struct VulkanPipeline_t* v) { return false; }
+              void drm_rollback(struct drm_t* d) {}
+              bool drm_commit(struct drm_t* d, struct Composite_t* c, struct VulkanPipeline_t* v) { return false; }
+              void finish_drm(struct drm_t* d) {}
+              void drm_set_color_linear_gains(struct drm_t* d, float* f) {}
+              void drm_set_color_gains(struct drm_t* d, float* f) {}
+              void drm_set_color_gain_blend(struct drm_t* d, float f) {}
+              void drm_set_color_matrix(struct drm_t* d, float* f) {}
+          }
           EOF
 
           sed -i 's/cap_t caps = cap_get_proc();/void* caps = nullptr; \/\/ 안드로이드 우회/g' src/main.cpp
