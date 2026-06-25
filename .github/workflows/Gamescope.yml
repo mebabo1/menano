@@ -554,21 +554,21 @@ jobs:
           }
           EOF
 
-          echo "🛠️ 링커 서명과 완벽히 일치하는 순수 C++ 깡통 DRM 소스 주입 중..."
+          echo "🛠️ 링커 서명을 100% 만족하는 순수 C++ 깡통 DRM 소스 주입 중..."
           
           cat << 'EOF' > src/drm.cpp
           #include <stdint.h>
           #include <stddef.h>
           #include <sys/types.h>
 
-          // 타 객체 전방 선언
-          typedef void* drm_t;
+          // 1. drm_t 가 void* 가 아닌 struct drm_t* 형태로 정의되어 있을 가능성 완벽 반영
+          struct drm_t {}; 
           struct wlr_buffer;
           struct wlr_dmabuf_attributes;
           struct Composite_t;
           struct VulkanPipeline_t;
 
-          // 1. 전역 변수 정의 (C++)
+          // 2. 전역 변수 정의 (C++)
           void* g_DRM = NULL;
           bool g_bRotated = false;
           uint32_t g_nDRMFormat = 0;
@@ -577,8 +577,7 @@ jobs:
           bool g_bDebugLayers = false;
           int g_drmModeGeneration = 0;
 
-          // 2. 함수 정의 (extern "C"를 완전히 제거하여 순수 C++ 심볼로 매칭)
-          // 첫 번째 인자는 로그에 찍힌 스펙 그대로 포인터(drm_t*) 형태로 맞춰줍니다.
+          // 3. 순수 C++ 함수 정의 (첫 번째 인자를 drm_t* d 로 완벽 매칭)
           bool init_drm(drm_t* d, int w, int h, int r) { return true; }
           uint32_t drm_fbid_from_dmabuf(drm_t* d, wlr_buffer* b, wlr_dmabuf_attributes* a) { return 0; }
           void drm_drop_fbid(drm_t* d, unsigned int f) {}
@@ -595,6 +594,8 @@ jobs:
           void drm_set_color_gains(drm_t* d, float* f) {}
           void drm_set_color_gain_blend(drm_t* d, float f) {}
           void drm_set_color_matrix(drm_t* d, float* f) {}
+
+          int find_drm_node_by_devid(uint64_t id) { return -1; }
           EOF
 
           sed -i 's/cap_t caps = cap_get_proc();/void* caps = nullptr; \/\/ 안드로이드 우회/g' src/main.cpp
