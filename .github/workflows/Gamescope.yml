@@ -508,6 +508,8 @@ jobs:
           sed -i "s/'src\/modegen.cpp',/# 'src\/modegen.cpp',/g" meson.build
           sed -i "s/drm_dep,//g" meson.build
           sed -i "s/liftoff_dep,//g" meson.build
+          find src/ -type f \( -name "*.cpp" -o -name "*.hpp" -o -name "*.h" \) -exec sed -i "/#include <libliftoff.h>/d" {} +
+          find src/ -type f \( -name "*.cpp" -o -name "*.hpp" -o -name "*.h" \) -exec sed -i "/#include \"libliftoff.h\"/d" {} +
 
           echo "🛠️ android_shm_def.h 내부에 EGL 및 makedev 정의 병합 중..."
           cat << 'EOF' >> $TERMUX_PREFIX/include/android_shm_def.h
@@ -603,9 +605,6 @@ jobs:
           rm -f "subprojects/wlroots/include/backend/libinput.h"
           find subprojects/wlroots/backend/ -type f \( -name "*.c" -o -name "*.h" \) -exec sed -i "/backend\/libinput\.h/d" {} +
           find subprojects/wlroots/include/ -type f \( -name "*.c" -o -name "*.h" \) -exec sed -i "/backend\/libinput\.h/d" {} +
-          find subprojects/wlroots/backend/ -type f \( -name "*.c" -o -name "*.h" \) -exec sed -i "/#include <libliftoff.h>/d" {} +
-          find subprojects/wlroots/include/ -type f \( -name "*.c" -o -name "*.h" \) -exec sed -i "/#include <libliftoff.h>/d" {} +
-
 
           WL_BACKEND_MESON="subprojects/wlroots/backend/meson.build"
           if [ -f "$WL_BACKEND_MESON" ]; then
