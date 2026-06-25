@@ -704,14 +704,18 @@ jobs:
           #include <stddef.h>
           #include <stdbool.h>
 
+          struct wl_display;
+          struct wlr_session;
+          struct wlr_device;
+
           extern "C" {
-              void* wlr_session_create(void* disp) { return NULL; }
-              void wlr_session_destroy(void* session) {}
-              void* wlr_session_open_file(void* session, const char* path) { return NULL; }
-              void wlr_session_close_file(void* session, void* dev) {}
-              bool wlr_session_change_vt(void* session, unsigned int vt) { return false; }
-              ssize_t wlr_session_find_gpus(void* session, size_t ret_len, void* ret) { return 0; }
-              int session_open_if_kms(void* session, const char* path) { return -1; }
+              struct wlr_session *wlr_session_create(struct wl_display *disp) { return NULL; }
+              void wlr_session_destroy(struct wlr_session *session) {}
+              struct wlr_device *wlr_session_open_file(struct wlr_session *session, const char *path) { return NULL; }
+              void wlr_session_close_file(struct wlr_session *session, struct wlr_device *dev) {}
+              bool wlr_session_change_vt(struct wlr_session *session, unsigned int vt) { return false; }
+              ssize_t wlr_session_find_gpus(struct wlr_session *session, size_t ret_len, struct wlr_device **ret) { return 0; }
+              int session_open_if_kms(struct wlr_session *session, const char *path) { return -1; }
           }
           EOF
 
