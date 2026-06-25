@@ -26,7 +26,8 @@ jobs:
       - name: Install Host Dependencies
         run: |
           sudo apt update
-          sudo apt install -y git wget unzip pkg-config make autOCONF automake libtool gperf
+          # autOCONF를 소문자 autoconf로 수정했습니다.
+          sudo apt install -y git wget unzip pkg-config make autoconf automake libtool gperf
 
       - name: Download Android NDK
         run: |
