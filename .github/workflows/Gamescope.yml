@@ -505,7 +505,7 @@ jobs:
           
           sed -i "s/dependency('libdrm', version: '>= 2.4.105')/disabler()/g" meson.build
           sed -i "s/drm_dep,//g" meson.build
-          sed -i "s/liftoff_dep,//g" meson.buil
+          sed -i "s/liftoff_dep,//g" meson.build
           find src/ -type f \( -name "*.cpp" -o -name "*.hpp" -o -name "*.h" \) -exec sed -i "/#include <libliftoff.h>/d" {} +
           find src/ -type f \( -name "*.cpp" -o -name "*.hpp" -o -name "*.h" \) -exec sed -i "/#include \"libliftoff.h\"/d" {} +
 
