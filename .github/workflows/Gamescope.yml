@@ -503,9 +503,9 @@ jobs:
           sed -i "s/'backends=libinput'/'backends=auto'/g" meson.build
           sed -i "s/'xwayland', 'libinput_backend'/'xwayland'/g" meson.build
           
-          sed -i "s/dependency('libdrm', version: '>= 2.4.105')/dependency('threads') \/\/ libdrm 대체/g" meson.build
-          sed -i "s/drm_dep,/thread_dep,/g" meson.build
-          sed -i "s/liftoff_dep,//g" meson.build
+          sed -i "s/dependency('libdrm', version: '>= 2.4.105')/disabler()/g" meson.build
+          sed -i "s/drm_dep,//g" meson.build
+          sed -i "s/liftoff_dep,//g" meson.buil
           find src/ -type f \( -name "*.cpp" -o -name "*.hpp" -o -name "*.h" \) -exec sed -i "/#include <libliftoff.h>/d" {} +
           find src/ -type f \( -name "*.cpp" -o -name "*.hpp" -o -name "*.h" \) -exec sed -i "/#include \"libliftoff.h\"/d" {} +
 
@@ -554,21 +554,20 @@ jobs:
           }
           EOF
 
-          echo "🛠️ steamcompmgr, main, rendervulkan 등을 속이기 위한 완벽한 C++ 깡통 DRM 소스 주입 중..."
+          echo "🛠️ 링커를 속이기 위한 완벽한 깡통 DRM 소스 주입 중..."
           
           cat << 'EOF' > src/drm.cpp
           #include <stdint.h>
           #include <stddef.h>
           #include <sys/types.h>
 
-          // 필요한 타 객체 전방 선언
           typedef void* drm_t;
           struct wlr_buffer;
           struct wlr_dmabuf_attributes;
           struct Composite_t;
           struct VulkanPipeline_t;
 
-          // 1. C++ 컴파일러가 올바르게 매핑할 수 있도록 extern "C"를 빼고 순수 C++ 전역 변수로 선언
+          // 모든 컴포넌트가 참조하는 전역 변수들 정의
           void* g_DRM = NULL;
           bool g_bRotated = false;
           uint32_t g_nDRMFormat = 0;
@@ -577,23 +576,24 @@ jobs:
           bool g_bDebugLayers = false;
           int g_drmModeGeneration = 0;
 
-          // 2. C++ 명명 규칙(Mangling)을 따르도록 순수 C++ 함수들로 정의
-          bool init_drm(drm_t d, int w, int h, int r) { return true; }
-          uint32_t drm_fbid_from_dmabuf(drm_t d, wlr_buffer* b, wlr_dmabuf_attributes* a) { return 0; }
-          void drm_drop_fbid(drm_t d, unsigned int f) {}
-          int find_drm_node_by_devid(unsigned long id) { return -1; }
-          void drm_lock_fbid(drm_t d, unsigned int f) {}
-          void drm_poll_state(drm_t d) {}
-          int drm_get_default_refresh(drm_t d) { return 60; }
-          void drm_set_refresh(drm_t d, int r) {}
-          bool drm_prepare(drm_t d, const Composite_t* c, const VulkanPipeline_t* v) { return false; }
-          void drm_rollback(drm_t d) {}
-          bool drm_commit(drm_t d, Composite_t* c, VulkanPipeline_t* v) { return false; }
-          void finish_drm(drm_t d) {}
-          void drm_set_color_linear_gains(drm_t d, float* f) {}
-          void drm_set_color_gains(drm_t d, float* f) {}
-          void drm_set_color_gain_blend(drm_t d, float f) {}
-          void drm_set_color_matrix(drm_t d, float* f) {}
+          extern "C" {
+              bool init_drm(drm_t d, int w, int h, int r) { return true; }
+              uint32_t drm_fbid_from_dmabuf(drm_t d, wlr_buffer* b, wlr_dmabuf_attributes* a) { return 0; }
+              void drm_drop_fbid(drm_t d, unsigned int f) {}
+              int find_drm_node_by_devid(unsigned long id) { return -1; }
+              void drm_lock_fbid(drm_t d, unsigned int f) {}
+              void drm_poll_state(drm_t d) {}
+              int drm_get_default_refresh(drm_t d) { return 60; }
+              void drm_set_refresh(drm_t d, int r) {}
+              bool drm_prepare(drm_t d, const Composite_t* c, const VulkanPipeline_t* v) { return false; }
+              void drm_rollback(drm_t d) {}
+              bool drm_commit(drm_t d, Composite_t* c, VulkanPipeline_t* v) { return false; }
+              void finish_drm(drm_t d) {}
+              void drm_set_color_linear_gains(drm_t d, float* f) {}
+              void drm_set_color_gains(drm_t d, float* f) {}
+              void drm_set_color_gain_blend(drm_t d, float f) {}
+              void drm_set_color_matrix(drm_t d, float* f) {}
+          }
           EOF
 
           sed -i 's/cap_t caps = cap_get_proc();/void* caps = nullptr; \/\/ 안드로이드 우회/g' src/main.cpp
