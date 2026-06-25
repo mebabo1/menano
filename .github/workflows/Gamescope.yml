@@ -157,117 +157,6 @@ jobs:
           Libs: -L\${libdir} -lcap
           Cflags: -I\${includedir}
           EOF
-
-      - name: Create Dummy libudev Stub for Termux
-        run: |
-          TOOLCHAIN=$ANDROID_NDK/toolchains/llvm/prebuilt/linux-x86_64/bin
-
-          echo "=== 1. wlroots 컴파일용 가짜 libudev.h 헤더 파일 생성 ==="
-          mkdir -p $TERMUX_PREFIX/include
-          cat << 'EOF' > $TERMUX_PREFIX/include/libudev.h
-          #pragma once
-          #include <sys/types.h>
-          #ifdef __cplusplus
-          extern "C" {
-          #endif
-
-          struct udev;
-          struct udev_monitor;
-          struct udev_device;
-          struct udev_enumerate;
-          struct udev_list_entry;
-
-          // 🌟 [최종 패치 핵심] 문법 폭파를 막기 위한 진짜 우회용 포문 매크로 선언
-          #define udev_list_entry_foreach(list_entry, first_entry) \
-              for (list_entry = first_entry; list_entry != NULL; list_entry = NULL)
-
-          struct udev *udev_new(void);
-          struct udev *udev_unref(struct udev *udev);
-          struct udev_monitor *udev_monitor_new_from_netlink(struct udev *udev, const char *name);
-          int udev_monitor_filter_add_match_subsystem_devtype(struct udev_monitor *udev_monitor, const char *subsystem, const char *devtype);
-          int udev_monitor_enable_receiving(struct udev_monitor *udev_monitor);
-          int udev_monitor_get_fd(struct udev_monitor *udev_monitor);
-          struct udev_device *udev_monitor_receive_device(struct udev_monitor *udev_monitor);
-          struct udev_device *udev_device_unref(struct udev_device *udev_device);
-          const char *udev_device_get_syspath(struct udev_device *udev_device);
-          const char *udev_device_get_devnode(struct udev_device *udev_device);
-          const char *udev_device_get_subsystem(struct udev_device *udev_device);
-          const char *udev_device_get_property_value(struct udev_device *udev_device, const char *key);
-          
-          struct udev_enumerate *udev_enumerate_new(struct udev *udev);
-          int udev_enumerate_add_match_subsystem(struct udev_enumerate *udev_enumerate, const char *subsystem);
-          int udev_enumerate_scan_devices(struct udev_enumerate *udev_enumerate);
-          struct udev_list_entry *udev_enumerate_get_list_entry(struct udev_enumerate *udev_enumerate);
-          struct udev_enumerate *udev_enumerate_unref(struct udev_enumerate *udev_enumerate);
-          struct udev_list_entry *udev_list_entry_get_next(struct udev_list_entry *list_entry);
-          const char *udev_list_entry_get_name(struct udev_list_entry *list_entry);
-          struct udev_device *udev_device_new_from_syspath(struct udev *udev, const char *syspath);
-
-          const char *udev_device_get_sysname(struct udev_device *udev_device);
-          const char *udev_device_get_action(struct udev_device *udev_device);
-          dev_t udev_device_get_devnum(struct udev_device *udev_device);
-          struct udev_monitor *udev_monitor_unref(struct udev_monitor *udev_monitor);
-
-          // 🌟 이번에 추가로 요구된 udev 함수 군집령 주입
-          int udev_enumerate_add_match_sysname(struct udev_enumerate *udev_enumerate, const char *sysname);
-          struct udev_device *udev_device_get_parent_with_subsystem_devtype(struct udev_device *udev_device, const char *subsystem, const char *devtype);
-          const char *udev_device_get_sysattr_value(struct udev_device *udev_device, const char *sysattr);
-
-          #ifdef __cplusplus
-          }
-          #endif
-          EOF
-
-          echo "=== 2. 링커를 속이기 위한 알맹이 없는 가짜 libudev.so 빌드 ==="
-          cat << 'EOF' > /tmp/dummy_udev.c
-          #include <stdlib.h>
-          #include <sys/types.h>
-          void *udev_new(void) { return (void*)1; }
-          void *udev_unref(void *udev) { return NULL; }
-          void *udev_monitor_new_from_netlink(void *udev, const char *name) { return (void*)1; }
-          int udev_monitor_filter_add_match_subsystem_devtype(void *m, const char *s, const char *d) { return 0; }
-          int udev_monitor_enable_receiving(void *m) { return 0; }
-          int udev_monitor_get_fd(void *m) { return -1; }
-          void *udev_monitor_receive_device(void *m) { return NULL; }
-          void *udev_device_unref(void *d) { return NULL; }
-          const char *udev_device_get_syspath(void *d) { return ""; }
-          const char *udev_device_get_devnode(void *d) { return NULL; }
-          const char *udev_device_get_subsystem(void *d) { return ""; }
-          const char *udev_device_get_property_value(void *d, const char *k) { return NULL; }
-          void *udev_enumerate_new(void *udev) { return (void*)1; }
-          int udev_enumerate_add_match_subsystem(void *e, const char *s) { return 0; }
-          int udev_enumerate_scan_devices(void *e) { return 0; }
-          void *udev_enumerate_get_list_entry(void *e) { return NULL; }
-          void *udev_enumerate_unref(void *e) { return NULL; }
-          void *udev_list_entry_get_next(void *l) { return NULL; }
-          const char *udev_list_entry_get_name(void *l) { return ""; }
-          void *udev_device_new_from_syspath(void *u, const char *s) { return NULL; }
-          const char *udev_device_get_sysname(void *d) { return ""; }
-          const char *udev_device_get_action(void *d) { return ""; }
-          dev_t udev_device_get_devnum(void *d) { return 0; }
-          void *udev_monitor_unref(void *m) { return NULL; }
-
-          // 🌟 가짜 보충 함수 실체 구현 완료
-          int udev_enumerate_add_match_sysname(void *e, const char *s) { return 0; }
-          void *udev_device_get_parent_with_subsystem_devtype(void *d, const char *s, const char *dt) { return NULL; }
-          const char *udev_device_get_sysattr_value(void *d, const char *sa) { return NULL; }
-          EOF
-
-          $TOOLCHAIN/aarch64-linux-android${API_LEVEL}-clang -shared -fPIC /tmp/dummy_udev.c -o $TERMUX_PREFIX/lib/libudev.so
-
-          mkdir -p $TERMUX_PREFIX/lib/pkgconfig
-          cat << EOF > $TERMUX_PREFIX/lib/pkgconfig/libudev.pc
-          prefix=$RUNTIME_PATH
-          exec_prefix=\${prefix}
-          libdir=\${exec_prefix}/lib
-          includedir=\${prefix}/include
-
-          Name: libudev
-          Description: Dummy libudev Stub for Termux Porting
-          Version: 251
-          Libs: -L\${libdir} -ludev
-          Cflags: -I\${includedir}
-          EOF
           
       - name: Create Dummy libgbm Stub for Termux
         run: |
@@ -715,6 +604,8 @@ jobs:
             sed -i "s/has_session = true/has_session = false/g" "$WL_BACKEND_MESON"
             sed -i "s/.*libinput_events.c.*/# /g" "$WL_BACKEND_MESON"
             sed -i "s/.*backend\/libinput.*/# /g" "$WL_BACKEND_MESON"
+            sed -i "s/features.contains('libudev')/false/g" "$WL_BACKEND_MESON"
+            sed -i "s/dependencies: \[udev\]/dependencies: []/g" "$WL_BACKEND_MESON"
           fi
 
           find subprojects/wlroots/backend/ -type f \( -name "*.c" -o -name "*.h" \) -exec sed -i "/#include <libinput.h>/d" {} +
