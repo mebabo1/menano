@@ -594,6 +594,19 @@ jobs:
             --cross-file /tmp/android-cross.ini \
             -Dpipewire=disabled \
             --prefix=/data/data/com.termux/files/usr
+
+          find . -name "meson.build" -exec sed -i "s/dependency('libudev')/dependency('log')/g" {} +
+          find . -name "meson.build" -exec sed -i "s/dependency('libudev',/dependency('log',/g" {} +
+          WL_ROOTS_MESON="subprojects/wlroots/meson.build"
+          if [ -f "$WL_ROOTS_MESON" ]; then
+            sed -i "s/has_libudev = true/has_libudev = false/g" "$WL_ROOTS_MESON"
+            sed -i "s/has_libudev = .*/has_libudev = false/g" "$WL_ROOTS_MESON"
+          fi
+          WL_BACKEND_MESON="subprojects/wlroots/backend/meson.build"
+          if [ -f "$WL_BACKEND_MESON" ]; then
+            sed -i "s/features.contains('libudev')/false/g" "$WL_BACKEND_MESON"
+            sed -i "s/udev = .*/udev = dependency('log')/g" "$WL_BACKEND_MESON"
+          fi
             
           WL_BACKEND_MESON="subprojects/wlroots/backend/meson.build"
           if [ -f "$WL_BACKEND_MESON" ]; then
