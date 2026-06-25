@@ -47,6 +47,16 @@ jobs:
       - name: generate configure script
         run: |
           cd eudev-src
+          # 🛠️ 중요: man 디렉터리로 진입해 컴파일하는 단계를 빌드 스크립트(Makefile.am)에서 제거합니다.
+          if [ -f "Makefile.am" ]; then
+            sed -i "s/SUBDIRS = .*/SUBDIRS = src/g" Makefile.am
+          fi
+          
+          # man 폴더 내부의 빌드 스크립트를 무력화하여 xsltproc 호출을 차단합니다.
+          if [ -f "man/make.sh" ]; then
+            echo "exit 0" > man/make.sh
+          fi
+
           ./autogen.sh
 
       - name: configure for android crosse-compile
