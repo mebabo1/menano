@@ -503,10 +503,8 @@ jobs:
           sed -i "s/'backends=libinput'/'backends=auto'/g" meson.build
           sed -i "s/'xwayland', 'libinput_backend'/'xwayland'/g" meson.build
           
-          sed -i "s/dependency('libdrm', version: '>= 2.4.105')/dependency('libdrm', required: false)/g" meson.build
-          sed -i "s/'src\/drm.cpp',/# 'src\/drm.cpp',/g" meson.build
-          sed -i "s/'src\/modegen.cpp',/# 'src\/modegen.cpp',/g" meson.build
-          sed -i "s/drm_dep,//g" meson.build
+          sed -i "s/dependency('libdrm', version: '>= 2.4.105')/dependency('threads') \/\/ libdrm 대체/g" meson.build
+          sed -i "s/drm_dep,/thread_dep,/g" meson.build
           sed -i "s/liftoff_dep,//g" meson.build
           find src/ -type f \( -name "*.cpp" -o -name "*.hpp" -o -name "*.h" \) -exec sed -i "/#include <libliftoff.h>/d" {} +
           find src/ -type f \( -name "*.cpp" -o -name "*.hpp" -o -name "*.h" \) -exec sed -i "/#include \"libliftoff.h\"/d" {} +
