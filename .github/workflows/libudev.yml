@@ -45,7 +45,6 @@ jobs:
           path: eudev-src
 
       - name: generate configure script
-      - name: generate configure script
         run: |
           cd eudev-src
           
