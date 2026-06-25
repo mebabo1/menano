@@ -578,6 +578,19 @@ jobs:
           echo "🛠️ rendervulkan.cpp Vulkan 타임라인 세마포어 심볼 링크 에러 패치 중..."
           sed -i 's/vkGetSemaphoreCounterValue(/((PFN_vkGetSemaphoreCounterValue)vkGetDeviceProcAddr(device, "vkGetSemaphoreCounterValue"))(/g' src/rendervulkan.cpp
 
+          find . -name "meson.build" -exec sed -i "s/dependency('libudev')/dependency('log')/g" {} +
+          find . -name "meson.build" -exec sed -i "s/dependency('libudev',/dependency('log',/g" {} +
+          WL_ROOTS_MESON="subprojects/wlroots/meson.build"
+          if [ -f "$WL_ROOTS_MESON" ]; then
+            sed -i "s/has_libudev = true/has_libudev = false/g" "$WL_ROOTS_MESON"
+            sed -i "s/has_libudev = .*/has_libudev = false/g" "$WL_ROOTS_MESON"
+          fi
+          WL_BACKEND_MESON="subprojects/wlroots/backend/meson.build"
+          if [ -f "$WL_BACKEND_MESON" ]; then
+            sed -i "s/features.contains('libudev')/false/g" "$WL_BACKEND_MESON"
+            sed -i "s/udev = .*/udev = dependency('log')/g" "$WL_BACKEND_MESON"
+          fi
+
           export PKG_CONFIG_PATH="$TERMUX_PREFIX/lib/pkgconfig:$TERMUX_PREFIX/share/pkgconfig"
           export PKG_CONFIG_LIBDIR="$TERMUX_PREFIX/lib/pkgconfig"
           export PKG_CONFIG_SYSROOT_DIR="$TERMUX_ROOT"
@@ -595,19 +608,6 @@ jobs:
             -Dpipewire=disabled \
             --prefix=/data/data/com.termux/files/usr
 
-          find . -name "meson.build" -exec sed -i "s/dependency('libudev')/dependency('log')/g" {} +
-          find . -name "meson.build" -exec sed -i "s/dependency('libudev',/dependency('log',/g" {} +
-          WL_ROOTS_MESON="subprojects/wlroots/meson.build"
-          if [ -f "$WL_ROOTS_MESON" ]; then
-            sed -i "s/has_libudev = true/has_libudev = false/g" "$WL_ROOTS_MESON"
-            sed -i "s/has_libudev = .*/has_libudev = false/g" "$WL_ROOTS_MESON"
-          fi
-          WL_BACKEND_MESON="subprojects/wlroots/backend/meson.build"
-          if [ -f "$WL_BACKEND_MESON" ]; then
-            sed -i "s/features.contains('libudev')/false/g" "$WL_BACKEND_MESON"
-            sed -i "s/udev = .*/udev = dependency('log')/g" "$WL_BACKEND_MESON"
-          fi
-            
           WL_BACKEND_MESON="subprojects/wlroots/backend/meson.build"
           if [ -f "$WL_BACKEND_MESON" ]; then
             echo "✅ subprojects/wlroots/backend/meson.build 강제 무력화 패치 중..."
