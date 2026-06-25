@@ -578,14 +578,6 @@ jobs:
           echo "🛠️ rendervulkan.cpp Vulkan 타임라인 세마포어 심볼 링크 에러 패치 중..."
           sed -i 's/vkGetSemaphoreCounterValue(/((PFN_vkGetSemaphoreCounterValue)vkGetDeviceProcAddr(device, "vkGetSemaphoreCounterValue"))(/g' src/rendervulkan.cpp
 
-          WL_DRM_MESON="subprojects/wlroots/backend/drm/meson.build"
-          if [ -f "$WL_DRM_MESON" ]; then
-            sed -i "s/error('The drm backend requires libudev')/# error('The drm backend requires libudev')/g" "$WL_DRM_MESON"
-            sed -i "s/files('udev.c')/files()/g" "$WL_DRM_MESON"
-            sed -i "s/backend_files += files('udev.c')/# backend_files += files('udev.c')/g" "$WL_DRM_MESON"
-            sed -i "s/backend_deps += udev/# backend_deps += udev/g" "$WL_DRM_MESON"
-          fi
-
           export PKG_CONFIG_PATH="$TERMUX_PREFIX/lib/pkgconfig:$TERMUX_PREFIX/share/pkgconfig"
           export PKG_CONFIG_LIBDIR="$TERMUX_PREFIX/lib/pkgconfig"
           export PKG_CONFIG_SYSROOT_DIR="$TERMUX_ROOT"
@@ -602,6 +594,13 @@ jobs:
             --cross-file /tmp/android-cross.ini \
             -Dpipewire=disabled \
             --prefix=/data/data/com.termux/files/usr
+
+          WL_ROOTS_MESON="subprojects/wlroots/meson.build"
+          if [ -f "$WL_ROOTS_MESON" ]; then
+            # dependency('libudev', ...) 구문을 찾아서 안드로이드 시스템 라이브러리인 'log'로 강제 치환
+            sed -i "s/dependency('libudev'/dependency('log'/g" "$WL_ROOTS_MESON"
+            sed -i "s/has_libudev = .*/has_libudev = false/g" "$WL_ROOTS_MESON"
+          fi
 
           WL_BACKEND_MESON="subprojects/wlroots/backend/meson.build"
           if [ -f "$WL_BACKEND_MESON" ]; then
