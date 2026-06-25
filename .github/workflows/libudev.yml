@@ -83,19 +83,23 @@ jobs:
         run: |
           cd eudev-src
           
+          # 🛠️ [핵심 보완] 유실될 수 있는 경로 변수를 이 단계 내부에서 명시적으로 다시 선언합니다.
+          export TERMUX_PREFIX="$HOME/termuxfs/aarch64/data/data/com.termux/files/usr"
+          export RUNTIME_PATH="/data/data/com.termux/files/usr"
+          
           NDK_ROOT=$ANDROID_NDK/toolchains/llvm/prebuilt/linux-x86_64
           TOOLCHAIN=$NDK_ROOT/bin
           
           export CC="$TOOLCHAIN/aarch64-linux-android30-clang"
           export CXX="$TOOLCHAIN/aarch64-linux-android30-clang++"
           
-          # 🛠️ 깨끗한 순정 CFLAGS 상태로 되돌립니다. (Dprogram_invocation_short_name 제거)
+          # 🛠️ 수정한 변수들을 기반으로 헤더 경로($TERMUX_PREFIX)와 라이브러리 경로 및 rpath를 정확히 주입합니다.
           export CFLAGS="-O2 -fPIE -fPIC --target=aarch64-linux-android30 -D__TERMUX__ -D__USE_GNU -U__ANDROID__ -isystem $TERMUX_PREFIX/include"
-          export LDFLAGS="--target=aarch64-linux-android30 -L$TERMUX_PREFIX/lib -landroid-shmem"
+          export LDFLAGS="-target=aarch64-linux-android30 -L$TERMUX_PREFIX/lib -Wl,-rpath=$RUNTIME_PATH/lib -landroid-shmem"
 
           ./configure \
             --host=aarch64-linux-android \
-            --prefix=/data/data/com.termux/files/usr \
+            --prefix=$RUNTIME_PATH \
             --disable-introspection \
             --disable-hwdb \
             --disable-manpages \
