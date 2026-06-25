@@ -89,8 +89,10 @@ jobs:
           
           export CC="$TOOLCHAIN/aarch64-linux-android30-clang"
           export CXX="$TOOLCHAIN/aarch64-linux-android30-clang++"
-
-          export CFLAGS="-O2 -fPIE -fPIC --target=aarch64-linux-android30 -D__TERMUX__ -D__USE_GNU -U__ANDROID__ -isystem $TERMUX_PREFIX/include -Dprogram_invocation_short_name=getprogname()"
+          
+          # 🛠️ [교정] 괄호 '()'를 제거하고, 매크로 전개 시 함수 호출이 되도록 트릭을 씁니다.
+          # -Dprogram_invocation_short_name=getprogname 대신 아래 형식을 사용하면 셸 에러를 완벽히 회피합니다.
+          export CFLAGS="-O2 -fPIE -fPIC --target=aarch64-linux-android30 -D__TERMUX__ -D__USE_GNU -U__ANDROID__ -isystem $TERMUX_PREFIX/include -Dprogram_invocation_short_name=getprogname"
           export LDFLAGS="--target=aarch64-linux-android30 -L$TERMUX_PREFIX/lib -landroid-shmem"
 
           ./configure \
@@ -101,6 +103,8 @@ jobs:
             --disable-manpages \
             --disable-selinux \
             --disable-blkid
+
+          echo "#define getprogname getprogname()" >> config.h
 
       - name: make
         run: |
