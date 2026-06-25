@@ -502,11 +502,14 @@ jobs:
 
           sed -i "s/'backends=libinput'/'backends=auto'/g" meson.build
           sed -i "s/'xwayland', 'libinput_backend'/'xwayland'/g" meson.build
+          
           sed -i "s/dependency('libdrm', version: '>= 2.4.105')/dependency('libdrm', required: false)/g" meson.build
           sed -i "s/'src\/drm.cpp',/# 'src\/drm.cpp',/g" meson.build
           sed -i "s/'src\/modegen.cpp',/# 'src\/modegen.cpp',/g" meson.build
           sed -i "s/drm_dep,//g" meson.build
           sed -i "s/liftoff_dep,//g" meson.build
+          find subprojects/wlroots/backend/ -type f \( -name "*.c" -o -name "*.h" \) -exec sed -i "/#include <libliftoff.h>/d" {} +
+          find subprojects/wlroots/include/ -type f \( -name "*.c" -o -name "*.h" \) -exec sed -i "/#include <libliftoff.h>/d" {} +
 
           echo "🛠️ android_shm_def.h 내부에 EGL 및 makedev 정의 병합 중..."
           cat << 'EOF' >> $TERMUX_PREFIX/include/android_shm_def.h
@@ -557,7 +560,6 @@ jobs:
           sed -i 's/cap_flag_value_t nicecapvalue = CAP_CLEAR;/int nicecapvalue = 0;/g' src/main.cpp
           sed -i 's/cap_get_flag( caps, CAP_SYS_NICE, CAP_EFFECTIVE, \&nicecapvalue );/nicecapvalue = 1; \/\/ 항상 권한 있음으로 속임/g' src/main.cpp
           sed -i 's/if ( nicecapvalue == CAP_SET )/if ( nicecapvalue == 1 )/g' src/main.cpp
-
           sed -i 's/\.mask = XRES_CLIENT_ID_PID_MASK/ \/\/ .mask = XRES_CLIENT_ID_PID_MASK/g' src/steamcompmgr.cpp
           sed -i 's/\.client = id,/ \/\/ .client = id,/g' src/steamcompmgr.cpp
           sed -i 's/pid = XResGetClientPid(&client_ids\[i\]);/pid = 0; \/\/ 안드로이드 우회/g' src/steamcompmgr.cpp
