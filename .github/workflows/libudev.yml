@@ -89,7 +89,8 @@ jobs:
           
           export CC="$TOOLCHAIN/aarch64-linux-android30-clang"
           export CXX="$TOOLCHAIN/aarch64-linux-android30-clang++"
-          export CFLAGS="-O2 -fPIE -fPIC --target=aarch64-linux-android30 -D__TERMUX__ -D__USE_GNU -U__ANDROID__ -isystem $TERMUX_PREFIX/include"
+
+          export CFLAGS="-O2 -fPIE -fPIC --target=aarch64-linux-android30 -D__TERMUX__ -D__USE_GNU -U__ANDROID__ -isystem $TERMUX_PREFIX/include -Dprogram_invocation_short_name=getprogname()"
           export LDFLAGS="--target=aarch64-linux-android30 -L$TERMUX_PREFIX/lib -landroid-shmem"
 
           ./configure \
