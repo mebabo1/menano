@@ -500,10 +500,8 @@ jobs:
           meson subprojects download || true
           meson subprojects update || true
 
-          sed -i "s/g_vulkanSupportsModifiers = false;/g_vulkanSupportsModifiers = true;/g" src/rendervulkan.cpp
-          sed -i "s/if ( hasDrmProps ) {/g_vulkanSupportsModifiers = true; g_drmRenderFd = 0; if ( false ) {/g" src/rendervulkan.cpp
-          sed -i "s/vk_log.errorf( \"physical device doesn't support VK_EXT_physical_device_drm nor VK_EXT_pci_bus_info\" );/vk_log.infof(\"Termux Bypass: Skipping DRM hardware checks.\");/g" src/rendervulkan.cpp
-          sed -i "s/return false;/return true;\n\t\/\/ Bypass/g" src/rendervulkan.cpp
+          sed -i 's/vk_log.errorf( "physical device doesn"t support VK_EXT_physical_device_drm nor VK_EXT_pci_bus_info" );/vk_log.infof("Termux Bypass: Device match fallback.");/g' src/rendervulkan.cpp
+          sed -i 's/return false;/\n\t\treturn true; \/\/ Bypass Fallback/g' src/rendervulkan.cpp
           sed -i 's/return g_bIsNested;/return true;/g' src/main.cpp
           sed -i 's/if ( BIsNested() )/if ( false )/g' src/main.cpp
 
