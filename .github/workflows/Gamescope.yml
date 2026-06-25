@@ -559,7 +559,7 @@ jobs:
           }
           EOF
 
-          echo "🛠️ 중복 정의를 제거하고 순수 C++ 심볼로 통일한 깡통 DRM 소스 주입 중..."
+          echo "🛠️ DISPLAY=:0 및 가상 모니터 연동 기능을 내장한 깡통 DRM 주입 중..."
           
           cat << 'EOF' > src/drm.cpp
           #include <stdint.h>
@@ -573,23 +573,31 @@ jobs:
           struct Composite_t;
           struct VulkanPipeline_t;
 
-          // 2. 전역 변수 정의
-          void* g_DRM = NULL;
+          // 2. 전역 변수 정의 (가상 모니터 이름 및 상태 강제 지정)
+          void* g_DRM = NULL;                 // 하드웨어 DRM은 쓰지 않으므로 NULL 고정
           bool g_bRotated = false;
           uint32_t g_nDRMFormat = 0;
-          const char* g_sOutputName = "Termux-X11";
-          bool g_bUseLayers = false;
+          const char* g_sOutputName = "Termux-X11-Virtual"; // Gamescope 내부 가상 모니터 식별자 명시
+          bool g_bUseLayers = false;          // 하드웨어 오버레이 레이어 비활성화 (창 모드 전용)
           bool g_bDebugLayers = false;
           int g_drmModeGeneration = 0;
 
-          // 3. 순수 C++ 함수 정의 (extern "C"를 완벽히 제거하여 링커 요구 조건 충족)
-          bool init_drm(struct drm_t* d, int w, int h, int r) { return true; }
+          // 3. [★핵심 연결 고리] 환경 변수(DISPLAY)와 가상 모니터 창을 이어주는 마스터 스위치
+          // Gamescope 엔진이 내부적으로 "지금 창 모드로 돌아가는 중인가?" 물어볼 때 
+          // 무조건 true를 반환하여 DISPLAY=:0 통로로 화면을 던지게 만듭니다.
+          bool BIsNested(void) {
+              return true;
+          }
+
+          // 4. 순수 C++ 함수 정의 (링커 요구 조건을 충족하는 안전한 깡통들)
+          // 이제 하드웨어 DRM 초기화는 안전하게 거부(false)하여 오직 가상 모니터 스왑체인만 타게 합니다.
+          bool init_drm(struct drm_t* d, int w, int h, int r) { return false; } 
           uint32_t drm_fbid_from_dmabuf(struct drm_t* d, struct wlr_buffer* b, struct wlr_dmabuf_attributes* a) { return 0; }
           void drm_drop_fbid(struct drm_t* d, unsigned int f) {}
-          int find_drm_node_by_devid(unsigned long id) { return -1; } // ◄ 중복 정의 오류 원인 제거 완료!
+          int find_drm_node_by_devid(unsigned long id) { return -1; } 
           void drm_lock_fbid(struct drm_t* d, unsigned int f) {}
           void drm_poll_state(struct drm_t* d) {}
-          int drm_get_default_refresh(struct drm_t* d) { return 60; }
+          int drm_get_default_refresh(struct drm_t* d) { return 60; } // 가상 모니터 주사율 기준점 제공
           void drm_set_refresh(struct drm_t* d, int r) {}
           bool drm_prepare(struct drm_t* d, const struct Composite_t* c, const struct VulkanPipeline_t* v) { return false; }
           void drm_rollback(struct drm_t* d) {}
