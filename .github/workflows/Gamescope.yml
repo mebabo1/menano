@@ -393,20 +393,6 @@ jobs:
           # 혹시 share/pkgconfig 폴더 쪽에 원본 찌꺼기가 남아있을 수 있으므로 양쪽 모두 덮어씌웁니다.
           cp $TERMUX_PREFIX/lib/pkgconfig/wayland-scanner.pc $TERMUX_PREFIX/share/pkgconfig/wayland-scanner.pc
 
-      - name: Inject Missing SDL2 Headers into Termux Sysroot
-        run: |
-          mkdir -p $TERMUX_PREFIX/include/SDL2
-          cd /tmp
-
-          echo "🛠️ 공식 SDL2 저장소에서 헤더 파일 추출 중..."
-          git clone --depth 1 -b SDL2 https://github.com/libsdl-org/SDL.git sdl2-src
-          
-          # 1. SDL2 표준 헤더들을 include/SDL2 폴더에 복사
-          cp sdl2-src/include/*.h $TERMUX_PREFIX/include/SDL2/
-          
-          # 2. Gamescope가 <SDL.h> 로 바로 호출할 수 있도록 상위 include 폴더에도 복사
-          cp sdl2-src/include/*.h $TERMUX_PREFIX/include/
-
       - name: Create Android Cross File
         run: |
           NDK_ROOT=$ANDROID_NDK/toolchains/llvm/prebuilt/linux-x86_64
@@ -578,16 +564,6 @@ jobs:
 
           echo "🛠️ rendervulkan.cpp Vulkan 타임라인 세마포어 심볼 링크 에러 패치 중..."
           sed -i 's/vkGetSemaphoreCounterValue(/((PFN_vkGetSemaphoreCounterValue)vkGetDeviceProcAddr(device, "vkGetSemaphoreCounterValue"))(/g' src/rendervulkan.cpp
-
-          find . -name "meson.build" -exec sed -i "s/dependency('libudev')/dependency('log', required: false)/g" {} +
-          find . -name "meson.build" -exec sed -i "s/dependency('libudev',/dependency('log', required: false,/g" {} +
-          WL_ROOTS_MESON="subprojects/wlroots/meson.build"
-          if [ -f "$WL_ROOTS_MESON" ]; then
-            # 130번째 줄 근처의 dependency('libudev') 구문을 강제로 required: false 처리하거나 무력화합니다.
-            sed -i "s/dependency('libudev')/dependency('log', required: false)/g" "$WL_ROOTS_MESON"
-            sed -i "s/dependency('libudev',/dependency('log', required: false,/g" "$WL_ROOTS_MESON"
-            sed -i "s/has_libudev = .*/has_libudev = false/g" "$WL_ROOTS_MESON"
-          fi
 
           export PKG_CONFIG_PATH="$TERMUX_PREFIX/lib/pkgconfig:$TERMUX_PREFIX/share/pkgconfig"
           export PKG_CONFIG_LIBDIR="$TERMUX_PREFIX/lib/pkgconfig"
