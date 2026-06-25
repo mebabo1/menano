@@ -45,14 +45,20 @@ jobs:
           path: eudev-src
 
       - name: generate configure script
+      - name: generate configure script
         run: |
           cd eudev-src
-          # 🛠️ 중요: man 디렉터리로 진입해 컴파일하는 단계를 빌드 스크립트(Makefile.am)에서 제거합니다.
+          
+          # 1. 안드로이드(Bionic libc)에 없는 GNU 전용 변수를 getprogname() 함수로 대체하는 매크로 주입
+          if [ -f "src/shared/log.c" ]; then
+            echo "🛠️ log.c 안드로이드 호환성 패치 중..."
+            sed -i '1s/^/#define program_invocation_short_name getprogname()\n/' src/shared/log.c
+          fi
+          
+          # 2. 기존의 man 페이지 빌드 제외 로직 유지
           if [ -f "Makefile.am" ]; then
             sed -i "s/SUBDIRS = .*/SUBDIRS = src/g" Makefile.am
           fi
-          
-          # man 폴더 내부의 빌드 스크립트를 무력화하여 xsltproc 호출을 차단합니다.
           if [ -f "man/make.sh" ]; then
             echo "exit 0" > man/make.sh
           fi
