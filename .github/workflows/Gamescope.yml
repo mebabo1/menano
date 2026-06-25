@@ -580,8 +580,9 @@ jobs:
 
           WL_ROOTS_MESON="subprojects/wlroots/meson.build"
           if [ -f "$WL_ROOTS_MESON" ]; then
-            # dependency('libudev', ...) 구문을 찾아서 안드로이드 시스템 라이브러리인 'log'로 강제 치환
-            sed -i "s/dependency('libudev'/dependency('log'/g" "$WL_ROOTS_MESON"
+            # 130번째 줄 근처의 dependency('libudev') 구문을 강제로 required: false 처리하거나 무력화합니다.
+            sed -i "s/dependency('libudev')/dependency('log', required: false)/g" "$WL_ROOTS_MESON"
+            sed -i "s/dependency('libudev',/dependency('log', required: false,/g" "$WL_ROOTS_MESON"
             sed -i "s/has_libudev = .*/has_libudev = false/g" "$WL_ROOTS_MESON"
           fi
 
