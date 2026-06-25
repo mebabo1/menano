@@ -578,13 +578,12 @@ jobs:
           echo "🛠️ rendervulkan.cpp Vulkan 타임라인 세마포어 심볼 링크 에러 패치 중..."
           sed -i 's/vkGetSemaphoreCounterValue(/((PFN_vkGetSemaphoreCounterValue)vkGetDeviceProcAddr(device, "vkGetSemaphoreCounterValue"))(/g' src/rendervulkan.cpp
 
-          find . -type f \( -name "meson.build" -o -name "*.txt" -o -name "*.ini" \) -exec sed -i "s/-ludev/-llog/g" {} +
-          find . -name "meson.build" -exec sed -i "s/dependency('libudev')/dependency('log')/g" {} +
-          find . -name "meson.build" -exec sed -i "s/dependency('libudev',/dependency('log',/g" {} +
-          WL_ROOTS_MESON="subprojects/wlroots/meson.build"
-          if [ -f "$WL_ROOTS_MESON" ]; then
-            sed -i "s/conf.set10('HAVE_LIBUDEV', true)/conf.set10('HAVE_LIBUDEV', false)/g" "$WL_ROOTS_MESON"
-            sed -i "s/has_libudev = .*/has_libudev = false/g" "$WL_ROOTS_MESON"
+          WL_DRM_MESON="subprojects/wlroots/backend/drm/meson.build"
+          if [ -f "$WL_DRM_MESON" ]; then
+            sed -i "s/error('The drm backend requires libudev')/# error('The drm backend requires libudev')/g" "$WL_DRM_MESON"
+            sed -i "s/files('udev.c')/files()/g" "$WL_DRM_MESON"
+            sed -i "s/backend_files += files('udev.c')/# backend_files += files('udev.c')/g" "$WL_DRM_MESON"
+            sed -i "s/backend_deps += udev/# backend_deps += udev/g" "$WL_DRM_MESON"
           fi
 
           export PKG_CONFIG_PATH="$TERMUX_PREFIX/lib/pkgconfig:$TERMUX_PREFIX/share/pkgconfig"
