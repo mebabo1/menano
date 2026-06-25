@@ -48,13 +48,17 @@ jobs:
         run: |
           cd eudev-src
           
-          # 1. 안드로이드(Bionic libc)에 없는 GNU 전용 변수를 getprogname() 함수로 대체하는 매크로 주입
+          # 1. 안드로이드에 없는 get_current_dir_name() 함수를 표준 getcwd(NULL, 0)으로 전역 치환
+          echo "🛠️ get_current_dir_name() -> getcwd(NULL, 0) 안드로이드 호환성 치환 중..."
+          find src/ -type f \( -name "*.c" -o -name "*.h" \) -exec sed -i 's/get_current_dir_name()/getcwd(NULL, 0)/g' {} +
+
+          # 2. log.c 안드로이드 호환성 패치 (기존 로직 유지)
           if [ -f "src/shared/log.c" ]; then
             echo "🛠️ log.c 안드로이드 호환성 패치 중..."
             sed -i '1s/^/#define program_invocation_short_name getprogname()\n/' src/shared/log.c
           fi
           
-          # 2. 기존의 man 페이지 빌드 제외 로직 유지
+          # 3. man 페이지 빌드 제외 로직 (기존 로직 유지)
           if [ -f "Makefile.am" ]; then
             sed -i "s/SUBDIRS = .*/SUBDIRS = src/g" Makefile.am
           fi
