@@ -48,17 +48,24 @@ jobs:
         run: |
           cd eudev-src
           
-          # 1. 안드로이드에 없는 get_current_dir_name() 함수를 표준 getcwd(NULL, 0)으로 전역 치환
+          # 1. 안드로이드 NDK에 없는 필수 시스템 매크로 강제 주입 (RLIMIT, IPTOS)
+          # missing.h 헤더 상단에 안드로이드 환경을 위한 가짜 디파인을 주입합니다.
+          if [ -f "src/shared/missing.h" ]; then
+            echo "🛠️ missing.h 안드로이드 시스템 매크로 보완 패치 중..."
+            sed -i '1s/^/#ifndef RLIMIT_NLIMITS\n#define RLIMIT_NLIMITS 16\n#endif\n#ifndef IPTOS_LOWCOST\n#define IPTOS_LOWCOST 0x02\n#endif\n/' src/shared/missing.h
+          fi
+
+          # 2. 안드로이드에 없는 get_current_dir_name() 함수를 표준 getcwd(NULL, 0)으로 전역 치환 (기존 유지)
           echo "🛠️ get_current_dir_name() -> getcwd(NULL, 0) 안드로이드 호환성 치환 중..."
           find src/ -type f \( -name "*.c" -o -name "*.h" \) -exec sed -i 's/get_current_dir_name()/getcwd(NULL, 0)/g' {} +
 
-          # 2. log.c 안드로이드 호환성 패치 (기존 로직 유지)
+          # 3. log.c 안드로이드 호환성 패치 (기존 유지)
           if [ -f "src/shared/log.c" ]; then
             echo "🛠️ log.c 안드로이드 호환성 패치 중..."
             sed -i '1s/^/#define program_invocation_short_name getprogname()\n/' src/shared/log.c
           fi
           
-          # 3. man 페이지 빌드 제외 로직 (기존 로직 유지)
+          # 4. man 페이지 빌드 제외 로직 (기존 유지)
           if [ -f "Makefile.am" ]; then
             sed -i "s/SUBDIRS = .*/SUBDIRS = src/g" Makefile.am
           fi
