@@ -556,30 +556,32 @@ jobs:
           }
           EOF
 
-          echo "🛠️ 링커 에러 방지를 위한 가짜 DRM 심볼(Stub) 주입 중..."        
-
+          echo "🛠️ steamcompmgr, main, rendervulkan 등을 속이기 위한 완벽한 깡통 DRM 소스 주입 중..."
+          
+          # 1. drm.cpp 파일은 무조건 존재하므로 깡통 코드로 덮어씌웁니다.
           cat << 'EOF' > src/drm.cpp
           #include <stdint.h>
           #include <stddef.h>
           #include <sys/types.h>
 
-          // 가짜 구조체 및 타입 정의
           typedef void* drm_t;
           struct wlr_buffer;
           struct wlr_dmabuf_attributes;
           struct Composite_t;
           struct VulkanPipeline_t;
 
-          // 링커가 찾던 누락된 전역 변수들 위조
+          // 링커가 각 소스파일에서 애타게 찾던 전역 변수들 선언
           void* g_DRM = NULL;
           bool g_bRotated = false;
           uint32_t g_nDRMFormat = 0;
           const char* g_sOutputName = "Termux-X11";
           bool g_bUseLayers = false;
           bool g_bDebugLayers = false;
+          int g_drmModeGeneration = 0;
 
-          // 링커가 요구하는 누락된 함수들 깡통(Stub)으로 구현
+          // 모든 컴포넌트가 참조하는 DRM 함수들을 에러 없이 즉시 리턴하는 깡통으로 정의
           extern "C" {
+              bool init_drm(drm_t* d, int w, int h, int r) { return true; }
               uint32_t drm_fbid_from_dmabuf(drm_t* d, wlr_buffer* b, wlr_dmabuf_attributes* a) { return 0; }
               void drm_drop_fbid(drm_t* d, unsigned int f) {}
               int find_drm_node_by_devid(unsigned long id) { return -1; }
@@ -594,6 +596,7 @@ jobs:
               void drm_set_color_linear_gains(drm_t* d, float* f) {}
               void drm_set_color_gains(drm_t* d, float* f) {}
               void drm_set_color_gain_blend(drm_t* d, float f) {}
+              void drm_set_color_matrix(drm_t* d, float* f) {}
           }
           EOF
 
