@@ -95,53 +95,6 @@ jobs:
           echo "TERMUX_SYSROOT=$HOME/termuxfs/aarch64" >> $GITHUB_ENV
           echo "RUNTIME_PATH=/data/data/com.termux/files/usr" >> $GITHUB_ENV
 
-      - name: Create Dummy XRes Stub for Termux
-        run: |
-          TOOLCHAIN=$ANDROID_NDK/toolchains/llvm/prebuilt/linux-x86_64/bin
-          
-          echo "=== 1. Gamescope가 참조할 가짜 XRes.h 헤더 파일 생성 ==="
-          mkdir -p $TERMUX_PREFIX/include/X11/extensions
-          cat << 'EOF' > $TERMUX_PREFIX/include/X11/extensions/XRes.h
-          #pragma once
-          #include <X11/Xlib.h>
-          #include <X11/Xfuncproto.h>
-          
-          // Gamescope 소스 내부에서 에러가 나지 않도록 최소한의 구조체 선언
-          typedef struct { XID resource; unsigned long type; } XResClientIdSpec;
-          typedef struct { XResClientIdSpec spec; long length; void *value; } XResClientIdValue;
-          
-          _XFUNCPROTOBEGIN
-          Status XResQueryExtension(Display *dpy, int *event_basep, int *error_basep);
-          Status XResQueryClientIds(Display *dpy, long num_specs, XResClientIdSpec *specs, long *num_ids, XResClientIdValue **ids);
-          _XFUNCPROTOEND
-          EOF
-
-          echo "=== 2. 링커(Linker)를 속이기 위한 알맹이 없는 가짜 64비트 .so 빌드 ==="
-          cat << 'EOF' > /tmp/dummy_xres.c
-          // 호출되어도 아무 일도 안 하고 0만 반환하는 가짜 함수들
-          int XResQueryExtension(void* dpy, int* ev, int* err) { return 0; }
-          int XResQueryClientIds(void* dpy, long num, void* specs, long* num_ids, void* ids) { return 0; }
-          EOF
-
-          # NDK 안드로이드 크로스 컴파일러를 사용해 가짜 aarch64용 libXres.so를 생성합니다.
-          $TOOLCHAIN/aarch64-linux-android${API_LEVEL}-clang -shared -fPIC /tmp/dummy_xres.c -o $TERMUX_PREFIX/lib/libXres.so
-
-          echo "=== 3. Meson 빌드 시스템을 속이기 위한 가짜 pkg-config (.pc) 파일 생성 ==="
-          mkdir -p $TERMUX_PREFIX/lib/pkgconfig
-          cat << EOF > $TERMUX_PREFIX/lib/pkgconfig/xres.pc
-          prefix=$TERMUX_PREFIX
-          exec_prefix=\${prefix}
-          libdir=\${exec_prefix}/lib
-          includedir=\${prefix}/include
-
-          Name: XRes
-          Description: Dummy X Resource Extension Library Stub for Termux Porting
-          Version: 1.2.2
-          Requires: x11
-          Libs: -L\${libdir} -lXres
-          Cflags: -I\${includedir}
-          EOF
-
       - name: Create Dummy libcap Stub for Termux
         run: |
           TOOLCHAIN=$ANDROID_NDK/toolchains/llvm/prebuilt/linux-x86_64/bin
@@ -193,7 +146,7 @@ jobs:
           echo "=== 3. Meson을 속이기 위한 가짜 pkg-config (.pc) 파일 생성 ==="
           mkdir -p $TERMUX_PREFIX/lib/pkgconfig
           cat << EOF > $TERMUX_PREFIX/lib/pkgconfig/libcap.pc
-          prefix=$TERMUX_PREFIX
+          prefix=$RUNTIME_PATH
           exec_prefix=\${prefix}
           libdir=\${exec_prefix}/lib
           includedir=\${prefix}/include
@@ -304,7 +257,7 @@ jobs:
 
           mkdir -p $TERMUX_PREFIX/lib/pkgconfig
           cat << EOF > $TERMUX_PREFIX/lib/pkgconfig/libudev.pc
-          prefix=$TERMUX_PREFIX
+          prefix=$RUNTIME_PATH
           exec_prefix=\${prefix}
           libdir=\${exec_prefix}/lib
           includedir=\${prefix}/include
@@ -421,7 +374,7 @@ jobs:
           echo "=== 3. Meson을 속이기 위한 가짜 pkg-config (.pc) 파일 생성 ==="
           mkdir -p $TERMUX_PREFIX/lib/pkgconfig
           cat << EOF > $TERMUX_PREFIX/lib/pkgconfig/gbm.pc
-          prefix=$TERMUX_PREFIX
+          prefix=$RUNTIME_PATH
           exec_prefix=\${prefix}
           libdir=\${exec_prefix}/lib
           includedir=\${prefix}/include
@@ -503,7 +456,7 @@ jobs:
 
           mkdir -p $TERMUX_PREFIX/lib/pkgconfig
           cat << EOF > $TERMUX_PREFIX/lib/pkgconfig/libseat.pc
-          prefix=$TERMUX_PREFIX
+          prefix=$RUNTIME_PATH
           exec_prefix=\${prefix}
           libdir=\${exec_prefix}/lib
           includedir=\${prefix}/include
@@ -538,7 +491,7 @@ jobs:
 
           # 3. wlroots가 가짜 변수($SCANNER_PATH) 대신 호스트 스캐너를 강제로 바라보도록 .pc 파일을 새로 작성합니다.
           cat << EOF > $TERMUX_PREFIX/lib/pkgconfig/wayland-scanner.pc
-          prefix=$TERMUX_PREFIX
+          prefix=$RUNTIME_PATH
           exec_prefix=\${prefix}
           bindir=\${exec_prefix}/bin
           wayland_scanner=$HOST_SCANNER
