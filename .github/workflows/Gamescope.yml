@@ -500,8 +500,9 @@ jobs:
           meson subprojects download || true
           meson subprojects update || true
 
-          sed -i 's/vk_log.errorf( "physical device doesn"t support VK_EXT_physical_device_drm nor VK_EXT_pci_bus_info" );/vk_log.infof("Termux Bypass: Device match fallback.");/g' src/rendervulkan.cpp
-          sed -i 's/return false;/\n\t\treturn true; \/\/ Bypass Fallback/g' src/rendervulkan.cpp
+          sed -i '/vkEnumeratePhysicalDevices(instance, &physicalDeviceCount, deviceHandles);/a \ \ \ \ physicalDevice = deviceHandles[0];' src/rendervulkan.cpp
+          sed -i 's/else {/else {\n\t\tvk_log.infof("Termux Bypass: Skipping hardware DRM node assignment.");\n\t\tg_drmRenderFd = -1; \/\/ 가짜 디스크립터 주입\n\t\thasDrmProps = false;\n\t\thasPciBusProps = false;\n\t\t\/\/ 원래라면 return false로 터져야 할 자리를 아래 코드로 세탁/g' src/rendervulkan.cpp
+          sed -i 's/vk_log.errorf( "physical device doesn"t support VK_EXT_physical_device_drm nor VK_EXT_pci_bus_info" );\n\t\treturn false;/vk_log.infof("Termux Bypass: Device match success.");/g' src/rendervulkan.cpp
           sed -i 's/return g_bIsNested;/return true;/g' src/main.cpp
           sed -i 's/if ( BIsNested() )/if ( false )/g' src/main.cpp
 
