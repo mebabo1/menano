@@ -506,7 +506,7 @@ index def1234..5678901 100644
      pthread_mutex_lock(&parser->mutex);
  
      if (parser->connected)
-@@ -2345,3 +2376,72 @@ NTSTATUS wg_parser_get_duration(void *args)
+@@ -2345,3 +2376,93 @@ NTSTATUS wg_parser_get_duration(void *args)
  
      return S_OK;
  }
@@ -537,6 +537,15 @@ index def1234..5678901 100644
 +                "stream-format", G_TYPE_STRING, "raw",
 +                NULL);
 +        }
++        /* [수정 추가] 구형 MPG 비디오 내부의 MPEG Layer 1/2/3 오디오 대응 */
++        else if (IsEqualGUID(type->subtype, &MFAudioFormat_MP3) ||
++                 IsEqualGUID(type->subtype, &MFAudioFormat_MPEG))
++        {
++            caps = gst_caps_new_simple("audio/mpeg",
++                "mpegversion", G_TYPE_INT, 1,
++                "layer", G_TYPE_INT, 3,
++                NULL);
++        }
 +    }
 +    else if (IsEqualGUID(type->majortype, &MFMediaType_Video))
 +    {
@@ -554,7 +563,7 @@ index def1234..5678901 100644
 +                "alignment", G_TYPE_STRING, "au",
 +                NULL);
 +        }
-+        /* [수정 추가] MPEG-1 (mpg) 비디오 정지 해결 */
++        /* MPEG-1 (mpg) 비디오 정지 해결 */
 +        else if (IsEqualGUID(type->subtype, &MFVideoFormat_MPG1))
 +        {
 +            caps = gst_caps_new_simple("video/mpeg",
@@ -562,12 +571,23 @@ index def1234..5678901 100644
 +                "systemstream", G_TYPE_BOOLEAN, FALSE,
 +                NULL);
 +        }
-+        /* [수정 추가] MPEG-2 (mpg/vob) 비디오 정지 해결 */
++        /* MPEG-2 (mpg/vob) 비디오 정지 해결 */
 +        else if (IsEqualGUID(type->subtype, &MFVideoFormat_MPEG2))
 +        {
 +            caps = gst_caps_new_simple("video/mpeg",
 +                "mpegversion", G_TYPE_INT, 2,
 +                "systemstream", G_TYPE_BOOLEAN, FALSE,
++                NULL);
++        }
++    }
++    /* [수정 추가] MPG 복합 컨테이너 파싱 분기 (MPEG-PS / MPEG-TS Demuxer 작동 유도) */
++    else if (IsEqualGUID(type->majortype, &MFMediaType_Stream))
++    {
++        if (IsEqualGUID(type->subtype, &MFStreamFormat_MPEG2_TRANSPORT) || 
++            IsEqualGUID(type->subtype, &MFStreamFormat_MPEG2_PROGRAM))
++        {
++            caps = gst_caps_new_simple("video/mpeg",
++                "systemstream", G_TYPE_BOOLEAN, TRUE,
 +                NULL);
 +        }
 +    }
