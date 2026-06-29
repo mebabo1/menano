@@ -496,7 +496,7 @@ index def1234..5678901 100644
      if (!(parser = calloc(1, sizeof(*parser))))
          return E_OUTOFMEMORY;
  
-@@ -1255,6 +1283,9 @@ NTSTATUS wg_parser_connect(void *args)
+@@ -1255,6 +1283,39 @@ NTSTATUS wg_parser_connect(void *args)
      struct wg_parser *parser = params->parser;
      HRESULT hr = S_OK;
  
@@ -506,7 +506,7 @@ index def1234..5678901 100644
      pthread_mutex_lock(&parser->mutex);
  
      if (parser->connected)
-@@ -2345,3 +2376,58 @@ NTSTATUS wg_parser_get_duration(void *args)
+@@ -2345,3 +2376,72 @@ NTSTATUS wg_parser_get_duration(void *args)
  
      return S_OK;
  }
@@ -552,6 +552,22 @@ index def1234..5678901 100644
 +            caps = gst_caps_new_simple("video/x-h265",
 +                "stream-format", G_TYPE_STRING, "byte-stream",
 +                "alignment", G_TYPE_STRING, "au",
++                NULL);
++        }
++        /* [수정 추가] MPEG-1 (mpg) 비디오 정지 해결 */
++        else if (IsEqualGUID(type->subtype, &MFVideoFormat_MPG1))
++        {
++            caps = gst_caps_new_simple("video/mpeg",
++                "mpegversion", G_TYPE_INT, 1,
++                "systemstream", G_TYPE_BOOLEAN, FALSE,
++                NULL);
++        }
++        /* [수정 추가] MPEG-2 (mpg/vob) 비디오 정지 해결 */
++        else if (IsEqualGUID(type->subtype, &MFVideoFormat_MPEG2))
++        {
++            caps = gst_caps_new_simple("video/mpeg",
++                "mpegversion", G_TYPE_INT, 2,
++                "systemstream", G_TYPE_BOOLEAN, FALSE,
 +                NULL);
 +        }
 +    }
