@@ -281,6 +281,8 @@ jobs:
           find . -name "loader.c" -exec sed -i 's|"/tmp"|"/data/data/com.termux/files/usr/tmp"|g' {} + 2>/dev/null || true
           find . -name "server.c" -exec sed -i 's|"/tmp"|"/data/data/com.termux/files/usr/tmp"|g' {} + 2>/dev/null || true
 
+          sed -i '/#include "config.h"/a #include "esync.h"' dlls/ntdll/unix/server.c
+
           FILE_LOADER="dlls/ntdll/unix/loader.c"
           if [ -f "$FILE_LOADER" ]; then
             echo "Removing M_PERTURB calls from $FILE_LOADER..."
