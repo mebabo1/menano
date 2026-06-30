@@ -274,8 +274,8 @@ jobs:
           curl -L https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/dlls/ntdll/unix/env_pro11.c -o dlls/ntdll/unix/env.c
           curl -L https://raw.githubusercontent.com/ziad9267/wine/refs/heads/bleeding-edge/server/esync.c -o server/esync.c
           curl -L https://raw.githubusercontent.com/ziad9267/wine/refs/heads/bleeding-edge/dlls/ntdll/unix/esync.c -o dlls/ntdll/unix/esync.c
-          curl -L https://raw.githubusercontent.com/ValveSoftware/wine/refs/heads/proton_11.0/server/fsync.c -o server/fsync.c
-          curl -L https://raw.githubusercontent.com/ValveSoftware/wine/refs/heads/proton_11.0/dlls/ntdll/unix/fsync.c -o dlls/ntdll/unix/fsync.c
+          curl -L https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/server/fsync.c -o server/fsync.c
+          curl -L https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/dlls/ntdll/unix/fsync.c -o dlls/ntdll/unix/fsync.c
 
       - name: Termux
         run: |
