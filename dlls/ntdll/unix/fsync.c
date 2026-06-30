@@ -2,6 +2,7 @@
  * futex-based synchronization objects
  *
  * Copyright (C) 2018 Zebediah Figura
+ * Copyright (C) 2025 Paul Gofman for CodeWeavers
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -59,6 +60,7 @@ WINE_DEFAULT_DEBUG_CHANNEL(fsync);
 #include "pshpack4.h"
 #include "poppack.h"
 
+int fsync_enabled;
 static int current_pid;
 
 /* futex_waitv interface */
@@ -91,7 +93,7 @@ static int shm_open(const char *name, int oflag, mode_t mode) {
 	
 	tmpdir = getenv("TMPDIR");
 	if (!tmpdir) {
-		tmpdir = "/data/data/com.termux/files/usr/tmp";
+		tmpdir = "/tmp";
 	}
 	asprintf(&fname, "%s/%s", tmpdir, name);
 	return open(fname, oflag, mode);
@@ -133,19 +135,6 @@ static void get_wait_end_time( const LARGE_INTEGER **timeout, struct timespec64 
     end->tv_nsec = (nt_end % TICKSPERSEC) * 100;
 }
 
-static LONGLONG update_timeout( const struct timespec64 *end, clockid_t clock_id )
-{
-    struct timespec end_ts, ts;
-    LONGLONG timeleft;
-
-    clock_gettime( clock_id, &ts );
-    end_ts.tv_sec = end->tv_sec;
-    end_ts.tv_nsec = end->tv_nsec;
-    timeleft = nt_time_from_ts( &end_ts ) - nt_time_from_ts( &ts );
-    if (timeleft < 0) timeleft = 0;
-    return timeleft;
-}
-
 static inline void futex_vector_set( struct futex_waitv *waitv, int *addr, int val )
 {
     waitv->uaddr = (uintptr_t) addr;
@@ -175,26 +164,6 @@ static inline int futex_wait_multiple( const struct futex_waitv *futexes,
 static inline int futex_wake( int *addr, int val )
 {
     return syscall( __NR_futex, addr, 1, val, NULL, 0, 0 );
-}
-
-int do_fsync(void)
-{
-#ifdef __linux__
-    static int do_fsync_cached = -1;
-
-    if (do_fsync_cached == -1)
-    {
-        syscall( __NR_futex_waitv, NULL, 0, 0, NULL, 0 );
-        do_fsync_cached = getenv("WINEFSYNC") && atoi(getenv("WINEFSYNC")) && errno != ENOSYS && errno != EPERM;
-    }
-
-    return do_fsync_cached;
-#else
-    static int once;
-    if (!once++)
-        FIXME("futexes not supported on this platform.\n");
-    return 0;
-#endif
 }
 
 struct fsync
@@ -269,7 +238,7 @@ static void *get_shm( unsigned int idx )
 #define FSYNC_LIST_BLOCK_SIZE  (65536 / sizeof(struct fsync))
 #define FSYNC_LIST_ENTRIES     256
 
-struct fsync_cache
+struct DECLSPEC_ALIGN(8) fsync_cache
 {
     enum fsync_type type;
     unsigned int shm_idx;
@@ -287,10 +256,17 @@ static inline UINT_PTR handle_to_index( HANDLE handle, UINT_PTR *entry )
     return idx % FSYNC_LIST_BLOCK_SIZE;
 }
 
+static BOOL is_pseudo_handle( HANDLE handle )
+{
+    return ((ULONG)(ULONG_PTR)handle >= 0xfffffffa);
+}
+
 static void add_to_list( HANDLE handle, enum fsync_type type, unsigned int shm_idx )
 {
     UINT_PTR entry, idx = handle_to_index( handle, &entry );
     struct fsync_cache cache;
+
+    if (is_pseudo_handle( handle )) return;
 
     if (entry >= FSYNC_LIST_ENTRIES)
     {
@@ -353,6 +329,7 @@ static void put_object( struct fsync *obj )
             wine_server_call( req );
         }
         SERVER_END_REQ;
+        shm_index_from_shm( obj->shm );
     }
     else
     {
@@ -397,23 +374,17 @@ again:
 }
 
 /* Gets an object. This is either a proper fsync object (i.e. an event,
- * semaphore, etc. created using create_fsync) or a generic synchronizable
+ * semaphore, etc.) or a generic synchronizable
  * server-side object which the server will signal (e.g. a process, thread,
  * message queue, etc.) */
 static NTSTATUS get_object( HANDLE handle, struct fsync *obj )
 {
     NTSTATUS ret = STATUS_SUCCESS;
     unsigned int shm_idx = 0;
-    enum fsync_type type;
+    enum fsync_type type = -1;
     sigset_t sigset;
 
     if (get_cached_object( handle, obj )) return STATUS_SUCCESS;
-
-    if ((INT_PTR)handle < 0)
-    {
-        /* We can deal with pseudo-handles, but it's just easier this way */
-        return STATUS_NOT_IMPLEMENTED;
-    }
 
     if (!handle) return STATUS_INVALID_HANDLE;
 
@@ -427,16 +398,18 @@ static NTSTATUS get_object( HANDLE handle, struct fsync *obj )
         server_leave_uninterrupted_section( &fd_cache_mutex, &sigset );
         return STATUS_SUCCESS;
     }
-    SERVER_START_REQ( get_fsync_idx )
+
+    SERVER_START_REQ( get_inproc_sync_fd )
     {
         req->handle = wine_server_obj_handle( handle );
         if (!(ret = wine_server_call( req )))
         {
-            shm_idx = reply->shm_idx;
-            type    = reply->type;
+            shm_idx = reply->fsync_shm_idx;
+            type = reply->type;
         }
     }
     SERVER_END_REQ;
+
     if (!ret) add_to_list( handle, type, shm_idx );
     server_leave_uninterrupted_section( &fd_cache_mutex, &sigset );
 
@@ -475,7 +448,7 @@ NTSTATUS fsync_close( HANDLE handle )
 {
     UINT_PTR entry, idx = handle_to_index( handle, &entry );
 
-    TRACE("%p.\n", handle);
+    TRACE( "%p.\n", handle );
 
     if (entry < FSYNC_LIST_ENTRIES && fsync_list[entry])
     {
@@ -491,93 +464,17 @@ NTSTATUS fsync_close( HANDLE handle )
     return STATUS_INVALID_HANDLE;
 }
 
-static NTSTATUS create_fsync( enum fsync_type type, HANDLE *handle,
-    ACCESS_MASK access, const OBJECT_ATTRIBUTES *attr, int low, int high )
-{
-    NTSTATUS ret;
-    data_size_t len;
-    struct object_attributes *objattr;
-    unsigned int shm_idx;
-
-    if ((ret = alloc_object_attributes( attr, &objattr, &len ))) return ret;
-
-    SERVER_START_REQ( create_fsync )
-    {
-        req->access = access;
-        req->low    = low;
-        req->high   = high;
-        req->type   = type;
-        wine_server_add_data( req, objattr, len );
-        ret = wine_server_call( req );
-        if (!ret || ret == STATUS_OBJECT_NAME_EXISTS)
-        {
-            *handle = wine_server_ptr_handle( reply->handle );
-            shm_idx = reply->shm_idx;
-            type    = reply->type;
-        }
-    }
-    SERVER_END_REQ;
-
-    if (!ret || ret == STATUS_OBJECT_NAME_EXISTS)
-    {
-        add_to_list( *handle, type, shm_idx );
-        TRACE("-> handle %p, shm index %d.\n", *handle, shm_idx);
-    }
-
-    free( objattr );
-    return ret;
-}
-
-static NTSTATUS open_fsync( enum fsync_type type, HANDLE *handle,
-    ACCESS_MASK access, const OBJECT_ATTRIBUTES *attr )
-{
-    NTSTATUS ret;
-    unsigned int shm_idx;
-
-    SERVER_START_REQ( open_fsync )
-    {
-        req->access     = access;
-        req->attributes = attr->Attributes;
-        req->rootdir    = wine_server_obj_handle( attr->RootDirectory );
-        req->type       = type;
-        if (attr->ObjectName)
-            wine_server_add_data( req, attr->ObjectName->Buffer, attr->ObjectName->Length );
-        if (!(ret = wine_server_call( req )))
-        {
-            *handle = wine_server_ptr_handle( reply->handle );
-            type = reply->type;
-            shm_idx = reply->shm_idx;
-        }
-    }
-    SERVER_END_REQ;
-
-    if (!ret)
-    {
-        add_to_list( *handle, type, shm_idx );
-
-        TRACE("-> handle %p, shm index %u.\n", *handle, shm_idx);
-    }
-    return ret;
-}
-
-void fsync_init(void)
+void fsync_init( DWORD pid )
 {
     struct stat st;
 
-    if (!do_fsync())
+
+    fsync_enabled = 1;
+    syscall( __NR_futex_waitv, NULL, 0, 0, NULL, 0 );
+    if (errno == ENOSYS || errno == EPERM)
     {
-        /* make sure the server isn't running with WINEFSYNC */
-        HANDLE handle;
-        NTSTATUS ret;
-
-        ret = create_fsync( 0, &handle, 0, NULL, 0, 0 );
-        if (ret != STATUS_NOT_IMPLEMENTED)
-        {
-            ERR("Server is running with WINEFSYNC but this process is not, please enable WINEFSYNC or restart wineserver.\n");
-            exit(1);
-        }
-
-        return;
+        ERR("Server is running with WINEFSYNC but this process can't use __NR_futex_waitv.\n");
+        exit(1);
     }
 
     if (stat( config_dir, &st ) == -1)
@@ -598,25 +495,8 @@ void fsync_init(void)
         exit(1);
     }
 
-    current_pid = GetCurrentProcessId();
-    assert(current_pid);
-}
-
-NTSTATUS fsync_create_semaphore( HANDLE *handle, ACCESS_MASK access,
-    const OBJECT_ATTRIBUTES *attr, LONG initial, LONG max )
-{
-    TRACE("name %s, initial %d, max %d.\n",
-        attr ? debugstr_us(attr->ObjectName) : "<no name>", (int)initial, (int)max);
-
-    return create_fsync( FSYNC_SEMAPHORE, handle, access, attr, initial, max );
-}
-
-NTSTATUS fsync_open_semaphore( HANDLE *handle, ACCESS_MASK access,
-    const OBJECT_ATTRIBUTES *attr )
-{
-    TRACE("name %s.\n", debugstr_us(attr->ObjectName));
-
-    return open_fsync( FSYNC_SEMAPHORE, handle, access, attr );
+    current_pid = pid;
+    assert( current_pid );
 }
 
 NTSTATUS fsync_release_semaphore( HANDLE handle, ULONG count, ULONG *prev )
@@ -625,8 +505,6 @@ NTSTATUS fsync_release_semaphore( HANDLE handle, ULONG count, ULONG *prev )
     struct semaphore *semaphore;
     ULONG current;
     NTSTATUS ret;
-
-    TRACE("%p, %d, %p.\n", handle, (int)count, prev);
 
     if ((ret = get_object( handle, &obj ))) return ret;
     semaphore = obj.shm;
@@ -649,44 +527,21 @@ NTSTATUS fsync_release_semaphore( HANDLE handle, ULONG count, ULONG *prev )
     return STATUS_SUCCESS;
 }
 
-NTSTATUS fsync_query_semaphore( HANDLE handle, void *info, ULONG *ret_len )
+NTSTATUS fsync_query_semaphore( HANDLE handle, void *info )
 {
     struct fsync obj;
     struct semaphore *semaphore;
     SEMAPHORE_BASIC_INFORMATION *out = info;
     NTSTATUS ret;
 
-    TRACE("handle %p, info %p, ret_len %p.\n", handle, info, ret_len);
-
     if ((ret = get_object( handle, &obj ))) return ret;
     semaphore = obj.shm;
 
     out->CurrentCount = semaphore->count;
     out->MaximumCount = semaphore->max;
-    if (ret_len) *ret_len = sizeof(*out);
 
     put_object( &obj );
     return STATUS_SUCCESS;
-}
-
-NTSTATUS fsync_create_event( HANDLE *handle, ACCESS_MASK access,
-    const OBJECT_ATTRIBUTES *attr, EVENT_TYPE event_type, BOOLEAN initial )
-{
-    enum fsync_type type = (event_type == SynchronizationEvent ? FSYNC_AUTO_EVENT : FSYNC_MANUAL_EVENT);
-
-    TRACE("name %s, %s-reset, initial %d.\n",
-        attr ? debugstr_us(attr->ObjectName) : "<no name>",
-        event_type == NotificationEvent ? "manual" : "auto", initial);
-
-    return create_fsync( type, handle, access, attr, initial, 0xdeadbeef );
-}
-
-NTSTATUS fsync_open_event( HANDLE *handle, ACCESS_MASK access,
-    const OBJECT_ATTRIBUTES *attr )
-{
-    TRACE("name %s.\n", debugstr_us(attr->ObjectName));
-
-    return open_fsync( FSYNC_AUTO_EVENT, handle, access, attr );
 }
 
 NTSTATUS fsync_set_event( HANDLE handle, LONG *prev )
@@ -695,8 +550,6 @@ NTSTATUS fsync_set_event( HANDLE handle, LONG *prev )
     struct fsync obj;
     LONG current;
     NTSTATUS ret;
-
-    TRACE("%p.\n", handle);
 
     if ((ret = get_object( handle, &obj ))) return ret;
     event = obj.shm;
@@ -722,8 +575,6 @@ NTSTATUS fsync_reset_event( HANDLE handle, LONG *prev )
     struct fsync obj;
     LONG current;
     NTSTATUS ret;
-
-    TRACE("%p.\n", handle);
 
     if ((ret = get_object( handle, &obj ))) return ret;
     event = obj.shm;
@@ -756,8 +607,6 @@ NTSTATUS fsync_pulse_event( HANDLE handle, LONG *prev )
     LONG current;
     NTSTATUS ret;
 
-    TRACE("%p.\n", handle);
-
     if ((ret = get_object( handle, &obj ))) return ret;
     event = obj.shm;
 
@@ -785,42 +634,21 @@ NTSTATUS fsync_pulse_event( HANDLE handle, LONG *prev )
     return STATUS_SUCCESS;
 }
 
-NTSTATUS fsync_query_event( HANDLE handle, void *info, ULONG *ret_len )
+NTSTATUS fsync_query_event( HANDLE handle, void *info )
 {
     struct event *event;
     struct fsync obj;
     EVENT_BASIC_INFORMATION *out = info;
     NTSTATUS ret;
 
-    TRACE("handle %p, info %p, ret_len %p.\n", handle, info, ret_len);
-
     if ((ret = get_object( handle, &obj ))) return ret;
     event = obj.shm;
 
     out->EventState = event->signaled;
     out->EventType = (obj.type == FSYNC_AUTO_EVENT ? SynchronizationEvent : NotificationEvent);
-    if (ret_len) *ret_len = sizeof(*out);
 
     put_object( &obj );
     return STATUS_SUCCESS;
-}
-
-NTSTATUS fsync_create_mutex( HANDLE *handle, ACCESS_MASK access,
-    const OBJECT_ATTRIBUTES *attr, BOOLEAN initial )
-{
-    TRACE("name %s, initial %d.\n",
-        attr ? debugstr_us(attr->ObjectName) : "<no name>", initial);
-
-    return create_fsync( FSYNC_MUTEX, handle, access, attr,
-        initial ? GetCurrentThreadId() : 0, initial ? 1 : 0 );
-}
-
-NTSTATUS fsync_open_mutex( HANDLE *handle, ACCESS_MASK access,
-    const OBJECT_ATTRIBUTES *attr )
-{
-    TRACE("name %s.\n", debugstr_us(attr->ObjectName));
-
-    return open_fsync( FSYNC_MUTEX, handle, access, attr );
 }
 
 NTSTATUS fsync_release_mutex( HANDLE handle, LONG *prev )
@@ -828,8 +656,6 @@ NTSTATUS fsync_release_mutex( HANDLE handle, LONG *prev )
     struct mutex *mutex;
     struct fsync obj;
     NTSTATUS ret;
-
-    TRACE("%p, %p.\n", handle, prev);
 
     if ((ret = get_object( handle, &obj ))) return ret;
     mutex = obj.shm;
@@ -852,14 +678,12 @@ NTSTATUS fsync_release_mutex( HANDLE handle, LONG *prev )
     return STATUS_SUCCESS;
 }
 
-NTSTATUS fsync_query_mutex( HANDLE handle, void *info, ULONG *ret_len )
+NTSTATUS fsync_query_mutex( HANDLE handle, void *info )
 {
     struct fsync obj;
     struct mutex *mutex;
     MUTANT_BASIC_INFORMATION *out = info;
     NTSTATUS ret;
-
-    TRACE("handle %p, info %p, ret_len %p.\n", handle, info, ret_len);
 
     if ((ret = get_object( handle, &obj ))) return ret;
     mutex = obj.shm;
@@ -867,7 +691,6 @@ NTSTATUS fsync_query_mutex( HANDLE handle, void *info, ULONG *ret_len )
     out->CurrentCount = 1 - mutex->count;
     out->OwnedByCaller = (mutex->tid == GetCurrentThreadId());
     out->AbandonedState = (mutex->tid == ~0);
-    if (ret_len) *ret_len = sizeof(*out);
 
     put_object( &obj );
     return STATUS_SUCCESS;
@@ -934,7 +757,7 @@ static void put_objects( struct fsync *objs, unsigned int count )
         if (objs[i].type) put_object_from_wait( &objs[i] );
 }
 
-static NTSTATUS __fsync_wait_objects( DWORD count, const HANDLE *handles,
+NTSTATUS fsync_wait_objects( DWORD count, const HANDLE *handles,
     BOOLEAN wait_any, BOOLEAN alertable, const LARGE_INTEGER *timeout )
 {
     static const LARGE_INTEGER zero = {0};
@@ -944,27 +767,21 @@ static NTSTATUS __fsync_wait_objects( DWORD count, const HANDLE *handles,
 
     struct futex_waitv futexes[MAXIMUM_WAIT_OBJECTS + 1];
     struct fsync objs[MAXIMUM_WAIT_OBJECTS];
-    BOOL msgwait = FALSE, waited = FALSE;
     int prev_pids[MAXIMUM_WAIT_OBJECTS];
     int has_fsync = 0, has_server = 0;
     clockid_t clock_id = 0;
     struct timespec64 end;
     int dummy_futex = 0;
-    LONGLONG timeleft;
+    BOOL waited = FALSE;
     DWORD waitcount;
     int i, ret;
 
     /* Grab the APC futex if we don't already have it. */
     if (alertable && !ntdll_get_thread_data()->fsync_apc_futex)
     {
-        unsigned int idx = 0;
-        SERVER_START_REQ( get_fsync_apc_idx )
-        {
-            if (!(ret = wine_server_call( req )))
-                idx = reply->shm_idx;
-        }
-        SERVER_END_REQ;
+        unsigned int idx = get_inproc_alert_fd();
 
+        TRACE( "get_inproc_alert_fd() %d.\n", idx );
         if (idx)
         {
             struct event *apc_event = get_shm( idx );
@@ -995,36 +812,13 @@ static NTSTATUS __fsync_wait_objects( DWORD count, const HANDLE *handles,
         }
     }
 
-    if (count && objs[count - 1].type == FSYNC_QUEUE)
-        msgwait = TRUE;
-
     if (has_fsync && has_server)
         FIXME("Can't wait on fsync and server objects at the same time!\n");
     else if (has_server)
     {
         put_objects( objs, count );
+        WARN( "has unimplemented objects.\n" );
         return STATUS_NOT_IMPLEMENTED;
-    }
-
-    if (TRACE_ON(fsync))
-    {
-        TRACE("Waiting for %s of %d handles:", wait_any ? "any" : "all", (int)count);
-        for (i = 0; i < count; i++)
-            TRACE(" %p", handles[i]);
-
-        if (msgwait)
-            TRACE(" or driver events");
-        if (alertable)
-            TRACE(", alertable");
-
-        if (!timeout)
-            TRACE(", timeout = INFINITE.\n");
-        else
-        {
-            timeleft = update_timeout( &end, clock_id );
-            TRACE(", timeout = %ld.%07ld sec.\n",
-                (long) (timeleft / TICKSPERSEC), (long) (timeleft % TICKSPERSEC));
-        }
     }
 
     if (wait_any || count <= 1)
@@ -1104,6 +898,11 @@ static NTSTATUS __fsync_wait_objects( DWORD count, const HANDLE *handles,
                             return STATUS_ABANDONED_WAIT_0 + i;
                         }
 
+                        if (fsync_yield_to_waiters && waited && !mutex->last_pid)
+                        {
+                            /* Someone else grabbed the mutex while we are waiting, re-register us as waiter. */
+                            __sync_val_compare_and_swap( &mutex->last_pid, 0, current_pid );
+                        }
                         futex_vector_set( &futexes[i], &mutex->tid, tid );
                         break;
                     }
@@ -1420,52 +1219,6 @@ userapc:
     if (ret == STATUS_TIMEOUT) ret = STATUS_USER_APC;
     return ret;
 #undef CURRENT_TID
-}
-
-/* Like esync, we need to let the server know when we are doing a message wait,
- * and when we are done with one, so that all of the code surrounding hung
- * queues works, and we also need this for WaitForInputIdle().
- *
- * Unlike esync, we can't wait on the queue fd itself locally. Instead we let
- * the server do that for us, the way it normally does. This could actually
- * work for esync too, and that might be better. */
-static void server_set_msgwait( int in_msgwait )
-{
-    SERVER_START_REQ( fsync_msgwait )
-    {
-        req->in_msgwait = in_msgwait;
-        wine_server_call( req );
-    }
-    SERVER_END_REQ;
-}
-
-/* This is a very thin wrapper around the proper implementation above. The
- * purpose is to make sure the server knows when we are doing a message wait.
- * This is separated into a wrapper function since there are at least a dozen
- * exit paths from fsync_wait_objects(). */
-NTSTATUS fsync_wait_objects( DWORD count, const HANDLE *handles, BOOLEAN wait_any,
-                             BOOLEAN alertable, const LARGE_INTEGER *timeout )
-{
-    BOOL msgwait = FALSE;
-    struct fsync obj;
-    NTSTATUS ret;
-
-    if (count && !get_object( handles[count - 1], &obj ))
-    {
-        if (obj.type == FSYNC_QUEUE)
-        {
-            msgwait = TRUE;
-            server_set_msgwait( 1 );
-        }
-        put_object( &obj );
-    }
-
-    ret = __fsync_wait_objects( count, handles, wait_any, alertable, timeout );
-
-    if (msgwait)
-        server_set_msgwait( 0 );
-
-    return ret;
 }
 
 NTSTATUS fsync_signal_and_wait( HANDLE signal, HANDLE wait, BOOLEAN alertable,
