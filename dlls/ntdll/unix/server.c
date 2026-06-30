@@ -1402,7 +1402,9 @@ static int server_connect(void)
 
         /* try to connect to it */
         addr.sun_family = AF_UNIX;
-        strcpy( addr.sun_path, SOCKETNAME );
+        if (strlen(SOCKETNAME) >= sizeof(addr.sun_path))
+            fatal_error( "'%s/%s' socket path is too long\n", server_dir, SOCKETNAME );
+        snprintf( addr.sun_path, sizeof(addr.sun_path), "%s", SOCKETNAME );
         slen = sizeof(addr) - sizeof(addr.sun_path) + strlen(addr.sun_path) + 1;
 #ifdef HAVE_STRUCT_SOCKADDR_UN_SUN_LEN
         addr.sun_len = slen;
