@@ -1,79 +1,95 @@
-name: Build and Release vulkan-wsi-layer
+name: Build Android Vulkan WSI Layer (Bionic Wrapper Style)
 
 on:
   push:
-    branches:
-      - master
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
-  build_and_release:
-    name: Build Debian Package for vulkan-wsi-layer
-    # ARM64(aarch64) 환경에서 실행되도록 설정
-    runs-on: ubuntu-24.04-arm
-    permissions:
-      contents: write
+  build-wsi-layer:
+    runs-on: ubuntu-22.04
+
+    env:
+      ANDROID_NDK_VERSION: r27
+      API_LEVEL: 30
 
     steps:
-      - name: Fix Git Permissions
-        run: |
-          mkdir -p ~/.config/git
-          chmod -R 700 ~/.config
+      - name: Checkout
+        uses: actions/checkout@v4
 
-      - name: Install dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y software-properties-common
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends \
-            build-essential \
-            debhelper \
-            devscripts \
-            cmake \
-            pkg-config \
-            libdrm-dev \
-            libx11-dev \
-            libx11-xcb-dev \
-            libxcb1-dev \
-            libxcb-dri3-dev \
-            libxcb-randr0-dev \
-            libxcb-shm0-dev \
-            libxcb-sync-dev \
-            libxrandr-dev \
-            libvulkan-dev \
-            libwayland-bin \
-            libwayland-client0 \
-            libwayland-dev \
-            wayland-protocols
-          sudo apt-get clean autoclean --yes
-          sudo apt-get autoremove --yes
-          sudo rm -rf /var/cache/apt/archives* /var/lib/apt/lists/*
-
-      # 1. 퀄컴/Mali용 vulkan-wsi-layer 소스코드 가져오기
+      # 1. 대상 소스코드 클론
       - name: Clone vulkan-wsi-layer
         run: |
-          git clone --depth 1 https://github.com/fish4terrisa-MSDSM/vulkan-wsi-layer.git .
+          git clone --depth 1 https://github.com/fish4terrisa-MSDSM/vulkan-wsi-layer.git wsi-src
 
-      # 2. 데비안 패키지 빌드 진행
-      - name: Build Debian package
-        run: |
-          debuild -us -uc -b && cp -a ../*.deb ./
-
-      - name: Get version
-        id: get_version
-        run: |
-          echo "version=$(dpkg-parsechangelog --show-field Version)" >> $GITHUB_OUTPUT
-
-      - name: Get commit hash
-        id: get_commit_hash
-        uses: prompt/actions-commit-hash@v3
-
-      # 3. 빌드된 .deb 파일을 GitHub Release에 업로드
-      - name: Release
-        uses: softprops/action-gh-release@v1
+      - name: Setup Python
+        uses: actions/setup-python@v5
         with:
-          name: v${{ steps.get_version.outputs.version }}-${{ steps.get_commit_hash.outputs.short }}
-          tag_name: v${{ steps.get_version.outputs.version }}-${{ steps.get_commit_hash.outputs.short }}
-          generate_release_notes: true
-          files: |
-            ./*.deb
+          python-version: "3.11"
+
+      - name: Install Dependencies
+        run: |
+          sudo apt update
+          sudo apt install -y git wget unzip pkg-config ninja-build cmake glslang-tools
+
+      # 2. Android NDK 설정 (Mesa 래퍼 코드와 동일)
+      - name: Download Android NDK
+        run: |
+          cd /tmp
+          wget -q https://dl.google.com/android/repository/android-ndk-${ANDROID_NDK_VERSION}-linux.zip
+          unzip -q android-ndk-${ANDROID_NDK_VERSION}-linux.zip
+          echo "ANDROID_NDK=/tmp/android-ndk-${ANDROID_NDK_VERSION}" >> $GITHUB_ENV
+
+      # 3. Termux 파일시스템 헤더/라이브러리 확보
+      - name: Download and extract termuxfs for aarch64
+        run: |
+          mkdir -p $HOME/termuxfs/aarch64
+          cd $HOME/termuxfs/aarch64
+          wget -q https://github.com/ziad9267/termux-on-gha/releases/download/test/termuxfs.tar
+          tar -xf termuxfs.tar
+          
+          echo "TERMUX_PREFIX=$HOME/termuxfs/aarch64/data/data/com.termux/files/usr" >> $GITHUB_ENV
+          echo "RUNTIME_PATH=/data/data/com.termux/files/usr" >> $GITHUB_ENV
+
+      # 4. CMake 구성 및 질문자님의 Bionic 링커 인수 적용
+      - name: Configure and Build
+        run: |
+          cd wsi-src
+          mkdir build && cd build
+
+          NDK_ROOT=$ANDROID_NDK/toolchains/llvm/prebuilt/linux-x86_64
+          TOOLCHAIN=$NDK_ROOT/bin
+
+          # 보여주신 코드의 핵심 링커 인수(rpath 교정 및 추가 라이브러리)를 그대로 주입합니다.
+          export SYSTEM_LDFLAGS="--target=aarch64-linux-android30 -L$TERMUX_PREFIX/lib -Wl,-rpath=/system/lib64:/vendor/lib64:/vendor/lib64/egl:/apex/com.android.i18n/lib64:$RUNTIME_PATH/lib -Wl,--no-as-needed -lEGL -landroid-shmem -ldrm -lwayland-client"
+
+          cmake .. \
+            -DCMAKE_TOOLCHAIN_FILE=$ANDROID_NDK/build/cmake/android.toolchain.cmake \
+            -DANDROID_ABI=arm64-v8a \
+            -DANDROID_PLATFORM=android-${API_LEVEL} \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_C_COMPILER=$TOOLCHAIN/aarch64-linux-android${API_LEVEL}-clang \
+            -DCMAKE_CXX_COMPILER=$TOOLCHAIN/aarch64-linux-android${API_LEVEL}-clang++ \
+            -DCMAKE_C_FLAGS="-fPIC -D__TERMUX__ -D__USE_GNU -U__ANDROID__ -I$TERMUX_PREFIX/include -idirafter$TERMUX_PREFIX/include -include fcntl.h -include unistd.h" \
+            -DCMAKE_CXX_FLAGS="-fPIC -D__TERMUX__ -D__USE_GNU -U__ANDROID__ -I$TERMUX_PREFIX/include -idirafter$TERMUX_PREFIX/include -include fcntl.h -include unistd.h" \
+            -DCMAKE_SHARED_LINKER_FLAGS="$SYSTEM_LDFLAGS" \
+            -DBUILD_WSI_X11=ON \
+            -DBUILD_WSI_WAYLAND=OFF \
+            -DCMAKE_INSTALL_PREFIX=$RUNTIME_PATH
+
+          make -j$(nproc)
+          make DESTDIR=$PWD/install install
+
+      - name: Show Files
+        run: |
+          echo "=== Installed Files ==="
+          find wsi-src/build/install -type f
+
+      # 5. 아티팩트 업로드
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: vulkan-wsi-layer-bionic
+          path: wsi-src/build/install/
