@@ -1,0 +1,79 @@
+name: Build and Release vulkan-wsi-layer
+
+on:
+  push:
+    branches:
+      - master
+  workflow_dispatch:
+
+jobs:
+  build_and_release:
+    name: Build Debian Package for vulkan-wsi-layer
+    # ARM64(aarch64) 환경에서 실행되도록 설정
+    runs-on: ubuntu-24.04-arm
+    permissions:
+      contents: write
+
+    steps:
+      - name: Fix Git Permissions
+        run: |
+          mkdir -p ~/.config/git
+          chmod -R 700 ~/.config
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y software-properties-common
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential \
+            debhelper \
+            devscripts \
+            cmake \
+            pkg-config \
+            libdrm-dev \
+            libx11-dev \
+            libx11-xcb-dev \
+            libxcb1-dev \
+            libxcb-dri3-dev \
+            libxcb-randr0-dev \
+            libxcb-shm0-dev \
+            libxcb-sync-dev \
+            libxrandr-dev \
+            libvulkan-dev \
+            libwayland-bin \
+            libwayland-client0 \
+            libwayland-dev \
+            wayland-protocols
+          sudo apt-get clean autoclean --yes
+          sudo apt-get autoremove --yes
+          sudo rm -rf /var/cache/apt/archives* /var/lib/apt/lists/*
+
+      # 1. 퀄컴/Mali용 vulkan-wsi-layer 소스코드 가져오기
+      - name: Clone vulkan-wsi-layer
+        run: |
+          git clone --depth 1 https://github.com/fish4terrisa-MSDSM/vulkan-wsi-layer.git .
+
+      # 2. 데비안 패키지 빌드 진행
+      - name: Build Debian package
+        run: |
+          debuild -us -uc -b && cp -a ../*.deb ./
+
+      - name: Get version
+        id: get_version
+        run: |
+          echo "version=$(dpkg-parsechangelog --show-field Version)" >> $GITHUB_OUTPUT
+
+      - name: Get commit hash
+        id: get_commit_hash
+        uses: prompt/actions-commit-hash@v3
+
+      # 3. 빌드된 .deb 파일을 GitHub Release에 업로드
+      - name: Release
+        uses: softprops/action-gh-release@v1
+        with:
+          name: v${{ steps.get_version.outputs.version }}-${{ steps.get_commit_hash.outputs.short }}
+          tag_name: v${{ steps.get_version.outputs.version }}-${{ steps.get_commit_hash.outputs.short }}
+          generate_release_notes: true
+          files: |
+            ./*.deb
