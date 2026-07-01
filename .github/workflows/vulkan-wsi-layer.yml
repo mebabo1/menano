@@ -66,6 +66,7 @@ jobs:
           export NDK_VULKAN_INCLUDE="$ANDROID_NDK/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/include"
 
           # 💡 pkg-config가 termuxfs 내부의 libdrm 등을 찾을 수 있도록 경로 강제 주입
+          export CPPFLAGS="-I$TERMUX_PREFIX/include --sysroot=$TOOLCHAIN/../sysroot"
           export PKG_CONFIG_PATH="$TERMUX_PREFIX/lib/pkgconfig:$TERMUX_PREFIX/share/pkgconfig"
           export PKG_CONFIG_LIBDIR="$TERMUX_PREFIX/lib/pkgconfig"
           export PKG_CONFIG_SYSROOT_DIR="$TERMUX_SYSROOT"
