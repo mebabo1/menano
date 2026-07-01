@@ -53,7 +53,7 @@ jobs:
           echo "TERMUX_PREFIX=$HOME/termuxfs/aarch64/data/data/com.termux/files/usr" >> $GITHUB_ENV
           echo "RUNTIME_PATH=/data/data/com.termux/files/usr" >> $GITHUB_ENV
 
-      # 4. CMake 구성 및 질문자님의 Bionic 링커 인수 적용 (Vulkan 및 PKG_CONFIG 경로 보강)
+      # 4. CMake 구성 및 질문자님의 Bionic 링커 인수 적용 (헤더 검색 경로 보강)
       - name: Configure and Build
         run: |
           cd wsi-src
@@ -65,11 +65,13 @@ jobs:
           # NDK 내부에 포함된 Vulkan 헤더 절대 경로 지정
           export NDK_VULKAN_INCLUDE="$ANDROID_NDK/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/include"
 
-          # 💡 pkg-config가 termuxfs 내부의 libdrm 등을 찾을 수 있도록 경로 강제 주입
-          export CPPFLAGS="-I$TERMUX_PREFIX/include --sysroot=$TOOLCHAIN/../sysroot"
+          # pkg-config 경로 설정
           export PKG_CONFIG_PATH="$TERMUX_PREFIX/lib/pkgconfig:$TERMUX_PREFIX/share/pkgconfig"
           export PKG_CONFIG_LIBDIR="$TERMUX_PREFIX/lib/pkgconfig"
           export PKG_CONFIG_SYSROOT_DIR="$TERMUX_SYSROOT"
+
+          # 💡 drm_fourcc.h를 정상적으로 찾을 수 있도록 libdrm 헤더 경로를 명시적으로 추가
+          export DRIVER_INCLUDES="-I$TERMUX_PREFIX/include -I$TERMUX_PREFIX/include/libdrm -idirafter$TERMUX_PREFIX/include"
 
           export SYSTEM_LDFLAGS="--target=aarch64-linux-android30 -L$TERMUX_PREFIX/lib -Wl,-rpath=/system/lib64:/vendor/lib64:/vendor/lib64/egl:/apex/com.android.i18n/lib64:$RUNTIME_PATH/lib -Wl,--no-as-needed -lEGL -landroid-shmem -ldrm -lwayland-client -lvulkan"
 
@@ -80,8 +82,9 @@ jobs:
             -DCMAKE_BUILD_TYPE=Release \
             -DCMAKE_C_COMPILER=$TOOLCHAIN/aarch64-linux-android${API_LEVEL}-clang \
             -DCMAKE_CXX_COMPILER=$TOOLCHAIN/aarch64-linux-android${API_LEVEL}-clang++ \
-            -DCMAKE_C_FLAGS="-fPIC -D__TERMUX__ -D__USE_GNU -U__ANDROID__ -I$TERMUX_PREFIX/include -idirafter$TERMUX_PREFIX/include -include fcntl.h -include unistd.h" \
-            -DCMAKE_CXX_FLAGS="-fPIC -D__TERMUX__ -D__USE_GNU -U__ANDROID__ -I$TERMUX_PREFIX/include -idirafter$TERMUX_PREFIX/include -include fcntl.h -include unistd.h" \
+            -DCMAKE_C_FLAGS="-fPIC -D__TERMUX__ -D__USE_GNU -U__ANDROID__ $DRIVER_INCLUDES -include fcntl.h -include unistd.h" \
+            -DCMAKE_CXX_FLAGS="-fPIC -D__TERMUX__ -D__USE_GNU -U__ANDROID__ $DRIVER_INCLUDES -include fcntl.h -include unistd.h" \
+            -DCMAKE_INCLUDE_PATH="$TERMUX_PREFIX/include;$TERMUX_PREFIX/include/libdrm" \
             -DCMAKE_SHARED_LINKER_FLAGS="$SYSTEM_LDFLAGS" \
             -DVULKAN_CXX_INCLUDE="$NDK_VULKAN_INCLUDE" \
             -DBUILD_WSI_X11=ON \
