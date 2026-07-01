@@ -53,7 +53,7 @@ jobs:
           echo "TERMUX_PREFIX=$HOME/termuxfs/aarch64/data/data/com.termux/files/usr" >> $GITHUB_ENV
           echo "RUNTIME_PATH=/data/data/com.termux/files/usr" >> $GITHUB_ENV
 
-      # 4. CMake 구성 및 질문자님의 Bionic 링커 인수 적용 (Vulkan 경로 보강)
+      # 4. CMake 구성 및 질문자님의 Bionic 링커 인수 적용 (Vulkan 및 PKG_CONFIG 경로 보강)
       - name: Configure and Build
         run: |
           cd wsi-src
@@ -62,8 +62,13 @@ jobs:
           NDK_ROOT=$ANDROID_NDK/toolchains/llvm/prebuilt/linux-x86_64
           TOOLCHAIN=$NDK_ROOT/bin
           
-          # NDK 내부에 포함된 Vulkan 헤더 절대 경로 강제 지정
+          # NDK 내부에 포함된 Vulkan 헤더 절대 경로 지정
           export NDK_VULKAN_INCLUDE="$ANDROID_NDK/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/include"
+
+          # 💡 pkg-config가 termuxfs 내부의 libdrm 등을 찾을 수 있도록 경로 강제 주입
+          export PKG_CONFIG_PATH="$TERMUX_PREFIX/lib/pkgconfig:$TERMUX_PREFIX/share/pkgconfig"
+          export PKG_CONFIG_LIBDIR="$TERMUX_PREFIX/lib/pkgconfig"
+          export PKG_CONFIG_SYSROOT_DIR="$TERMUX_SYSROOT"
 
           export SYSTEM_LDFLAGS="--target=aarch64-linux-android30 -L$TERMUX_PREFIX/lib -Wl,-rpath=/system/lib64:/vendor/lib64:/vendor/lib64/egl:/apex/com.android.i18n/lib64:$RUNTIME_PATH/lib -Wl,--no-as-needed -lEGL -landroid-shmem -ldrm -lwayland-client -lvulkan"
 
