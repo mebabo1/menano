@@ -53,7 +53,7 @@ jobs:
           echo "TERMUX_PREFIX=$HOME/termuxfs/aarch64/data/data/com.termux/files/usr" >> $GITHUB_ENV
           echo "RUNTIME_PATH=/data/data/com.termux/files/usr" >> $GITHUB_ENV
 
-      # 4. CMake 구성 및 질문자님의 Bionic 링커 인수 적용
+      # 4. CMake 구성 및 질문자님의 Bionic 링커 인수 적용 (Vulkan 경로 보강)
       - name: Configure and Build
         run: |
           cd wsi-src
@@ -61,9 +61,11 @@ jobs:
 
           NDK_ROOT=$ANDROID_NDK/toolchains/llvm/prebuilt/linux-x86_64
           TOOLCHAIN=$NDK_ROOT/bin
+          
+          # NDK 내부에 포함된 Vulkan 헤더 절대 경로 강제 지정
+          export NDK_VULKAN_INCLUDE="$ANDROID_NDK/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/include"
 
-          # 보여주신 코드의 핵심 링커 인수(rpath 교정 및 추가 라이브러리)를 그대로 주입합니다.
-          export SYSTEM_LDFLAGS="--target=aarch64-linux-android30 -L$TERMUX_PREFIX/lib -Wl,-rpath=/system/lib64:/vendor/lib64:/vendor/lib64/egl:/apex/com.android.i18n/lib64:$RUNTIME_PATH/lib -Wl,--no-as-needed -lEGL -landroid-shmem -ldrm -lwayland-client"
+          export SYSTEM_LDFLAGS="--target=aarch64-linux-android30 -L$TERMUX_PREFIX/lib -Wl,-rpath=/system/lib64:/vendor/lib64:/vendor/lib64/egl:/apex/com.android.i18n/lib64:$RUNTIME_PATH/lib -Wl,--no-as-needed -lEGL -landroid-shmem -ldrm -lwayland-client -lvulkan"
 
           cmake .. \
             -DCMAKE_TOOLCHAIN_FILE=$ANDROID_NDK/build/cmake/android.toolchain.cmake \
@@ -75,6 +77,7 @@ jobs:
             -DCMAKE_C_FLAGS="-fPIC -D__TERMUX__ -D__USE_GNU -U__ANDROID__ -I$TERMUX_PREFIX/include -idirafter$TERMUX_PREFIX/include -include fcntl.h -include unistd.h" \
             -DCMAKE_CXX_FLAGS="-fPIC -D__TERMUX__ -D__USE_GNU -U__ANDROID__ -I$TERMUX_PREFIX/include -idirafter$TERMUX_PREFIX/include -include fcntl.h -include unistd.h" \
             -DCMAKE_SHARED_LINKER_FLAGS="$SYSTEM_LDFLAGS" \
+            -DVULKAN_CXX_INCLUDE="$NDK_VULKAN_INCLUDE" \
             -DBUILD_WSI_X11=ON \
             -DBUILD_WSI_WAYLAND=OFF \
             -DCMAKE_INSTALL_PREFIX=$RUNTIME_PATH
