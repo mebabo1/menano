@@ -6,6 +6,10 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    
+    # Actions가 내 레포지토리에 Releases를 쓸 수 있도록 명시적 권한 부여
+    permissions:
+      contents: write
 
     steps:
     - name: Install Dependencies
@@ -132,3 +136,24 @@ jobs:
       with:
         name: fexcore-nightly
         path: '*.tar.gz'
+
+    - name: Create GitHub Release
+      uses: softprops/action-gh-release@v2
+      with:
+        tag_name: ${{ env.VERSION_NAME }}
+        name: FEXCore Nightly (${{ env.VERSION_NAME }})
+        body: |
+          ### FEXCore Nightly Build
+          Automated nightly build package for FEXCore.
+          
+          - **Version:** `${{ env.VERSION_NAME }}`
+          - **Build Number:** `${{ github.run_number }}`
+          - **Date:** ${{ github.event.repository.updated_at }}
+          
+          *This is an automated pre-release build. Use with caution.*
+        draft: false
+        prerelease: true
+        files: |
+          *.tar.gz
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
