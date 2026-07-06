@@ -1,0 +1,55 @@
+name: Build Vortek ARM64 (Termux glibc)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    steps:
+    - name: Checkout Vortek repository
+      uses: actions/checkout@v4
+      with:
+        repository: brunodev85/vortek
+        ref: main # 기본 브랜치가 main 또는 master인지 확인 필요 (일반적으로 main)
+        fetch-depth: 0
+        submodules: recursive
+
+    - name: Install Build Tools & ARM64 Cross-Compiler
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y cmake ninja-build gcc-aarch64-linux-gnu g++-aarch64-linux-gnu libvulkan-dev
+
+    - name: Termux glibc path patches
+      run: |
+        # 소스코드 내에 /tmp 경로가 있다면 Termux glibc 환경에 맞게 일치화
+        find . -type f \( -name "*.c" -o -name "*.h" -o -name "*.in" \) -exec grep -l "/tmp" {} \; 2>/dev/null | xargs sed -i 's|/tmp/|/data/data/com.termux/files/usr/tmp/|g' 2>/dev/null || true
+  
+    - name: Configure Vortek for Termux glibc
+      run: |
+        cmake -B build -G Ninja \
+          -DCMAKE_SYSTEM_NAME=Linux \
+          -DCMAKE_SYSTEM_PROCESSOR=aarch64 \
+          -DCMAKE_C_COMPILER=aarch64-linux-gnu-gcc \
+          -DCMAKE_CXX_COMPILER=aarch64-linux-gnu-g++ \
+          -DCMAKE_BUILD_TYPE=Release \
+          -DCMAKE_INSTALL_PREFIX=./target \
+          -DCMAKE_STRIP="" \
+          -DCMAKE_C_FLAGS="-fvisibility=default -O2 -Wall -Wno-discarded-qualifiers -DVK_USE_PLATFORM_XLIB_KHR" \
+          -DCMAKE_SHARED_LINKER_FLAGS="-Wl,--export-dynamic -Wl,--allow-shlib-undefined -Wl,-rpath,/data/data/com.termux/files/usr/glibc/lib -Wl,--dynamic-linker=/data/data/com.termux/files/usr/glibc/lib/ld-linux-aarch64.so.1"
+
+    - name: Build
+      run: cmake --build build --parallel $(nproc)
+
+    - name: Install
+      run: |
+        # Vortek의 오리지널 CMakeLists.txt에 'install' 규칙이 없을 수도 있으므로 
+        # 안전하게 build 폴더 내의 결과물을 target 폴더로 직접 복사하도록 스크립트화합니다.
+        mkdir -p target/lib
+        cp -f build/*.so target/lib/ 2>/dev/null || cp -f build/libvulkan_vortek.so target/lib/
+
+    - name: Upload Artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: vortek-termux-glibc
+        path: target/*
