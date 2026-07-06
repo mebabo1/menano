@@ -79,8 +79,9 @@ jobs:
           -DCMAKE_INSTALL_PREFIX=./target \
           -DCMAKE_STRIP="" \
           -DCMAKE_C_FLAGS="-fvisibility=default -O2 -Wall -Wno-discarded-qualifiers -DVK_USE_PLATFORM_XLIB_KHR" \
-          -DCMAKE_SHARED_LINKER_FLAGS="-Wl,--export-dynamic -Wl,--allow-shlib-undefined -Wl,-rpath,/data/data/com.termux/files/usr/glibc/lib -Wl,--dynamic-linker=/data/data/com.termux/files/usr/glibc/lib/ld-linux-aarch64.so.1"
-
+          -DCMAKE_CXX_FLAGS="-fvisibility=default -O2 -Wall -DVK_USE_PLATFORM_XLIB_KHR" \
+          -DCMAKE_SHARED_LINKER_FLAGS="-Wl,--export-dynamic -Wl,--no-as-needed -Wl,--allow-shlib-undefined -Wl,-rpath,/data/data/com.termux/files/usr/glibc/lib -Wl,--dynamic-linker=/data/data/com.termux/files/usr/glibc/lib/ld-linux-aarch64.so.1"
+          
     - name: Build
       run: cmake --build build --parallel $(nproc)
 
