@@ -15,24 +15,30 @@ jobs:
         fetch-depth: 0
         submodules: recursive
 
-    - name: Install Build Tools & ARM64 Cross-Compiler
+    - name: Install Correct Ports & Build Tools
       run: |
-        # 1. ARM64 아키텍처 추가
+        # 1. 디스크 공간 확보 (선택 사항, 안전하게 유지)
+        echo "🧹 Freeing disk space..."
+        sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/share/boost
+
+        # 2. ARM64 아키텍처 추가
         sudo dpkg --add-architecture arm64
 
-        # 2. 기존 메인 리포지토리는 [arch=amd64]로 고정하여 arm64 탐색을 방지
+        # 3. 기존 우분투 24.04(noble) 메인 주소는 x86_64(amd64)용으로 선언
         sudo sed -i 's/deb http/deb [arch=amd64] http/g' /etc/apt/sources.list
         sudo sed -i 's/deb https/deb [arch=amd64] https/g' /etc/apt/sources.list
 
-        # 3. ARM64 패키지용 포트(ports.ubuntu.com) 리포지토리를 별도로 추가
-        # (GitHub Actions 호스트가 Ubuntu 24.04 noble 버전이므로 noble에 맞게 작성)
+        # 4. ARM64 전용 공식 우분투 포트(ports) 주소를 깨끗하게 추가
         echo "deb [arch=arm64] http://ports.ubuntu.com/ubuntu-ports/ noble main restricted universe multiverse" | sudo tee -a /etc/apt/sources.list
         echo "deb [arch=arm64] http://ports.ubuntu.com/ubuntu-ports/ noble-updates main restricted universe multiverse" | sudo tee -a /etc/apt/sources.list
         echo "deb [arch=arm64] http://ports.ubuntu.com/ubuntu-ports/ noble-security main restricted universe multiverse" | sudo tee -a /etc/apt/sources.list
 
-        # 4. 이제 업데이트 및 설치 진행
+        # 5. 업데이트 후 오직 'Vortek'에 필요한 필수 패키지만 정밀 타격 설치
         sudo apt-get update
-        sudo apt-get install -y cmake ninja-build gcc-aarch64-linux-gnu g++-aarch64-linux-gnu libvulkan-dev libx11-dev libx11-dev:arm64
+        sudo apt-get install -y --no-install-recommends \
+          cmake ninja-build gcc-aarch64-linux-gnu g++-aarch64-linux-gnu \
+          libvulkan-dev libvulkan-dev:arm64 \
+          libx11-dev libx11-dev:arm64
         
     - name: Termux glibc path patches
       run: |
