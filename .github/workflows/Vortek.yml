@@ -17,9 +17,10 @@ jobs:
 
     - name: Install Build Tools & ARM64 Cross-Compiler
       run: |
+        sudo dpkg --add-architecture arm64
         sudo apt-get update
-        sudo apt-get install -y cmake ninja-build gcc-aarch64-linux-gnu g++-aarch64-linux-gnu libvulkan-dev
-
+        sudo apt-get install -y cmake ninja-build gcc-aarch64-linux-gnu g++-aarch64-linux-gnu libvulkan-dev libx11-dev libx11-dev:arm64
+        
     - name: Termux glibc path patches
       run: |
         # 소스코드 내에 /tmp 경로가 있다면 Termux glibc 환경에 맞게 일치화
