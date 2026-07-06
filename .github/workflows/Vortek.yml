@@ -17,7 +17,20 @@ jobs:
 
     - name: Install Build Tools & ARM64 Cross-Compiler
       run: |
+        # 1. ARM64 아키텍처 추가
         sudo dpkg --add-architecture arm64
+
+        # 2. 기존 메인 리포지토리는 [arch=amd64]로 고정하여 arm64 탐색을 방지
+        sudo sed -i 's/deb http/deb [arch=amd64] http/g' /etc/apt/sources.list
+        sudo sed -i 's/deb https/deb [arch=amd64] https/g' /etc/apt/sources.list
+
+        # 3. ARM64 패키지용 포트(ports.ubuntu.com) 리포지토리를 별도로 추가
+        # (GitHub Actions 호스트가 Ubuntu 24.04 noble 버전이므로 noble에 맞게 작성)
+        echo "deb [arch=arm64] http://ports.ubuntu.com/ubuntu-ports/ noble main restricted universe multiverse" | sudo tee -a /etc/apt/sources.list
+        echo "deb [arch=arm64] http://ports.ubuntu.com/ubuntu-ports/ noble-updates main restricted universe multiverse" | sudo tee -a /etc/apt/sources.list
+        echo "deb [arch=arm64] http://ports.ubuntu.com/ubuntu-ports/ noble-security main restricted universe multiverse" | sudo tee -a /etc/apt/sources.list
+
+        # 4. 이제 업데이트 및 설치 진행
         sudo apt-get update
         sudo apt-get install -y cmake ninja-build gcc-aarch64-linux-gnu g++-aarch64-linux-gnu libvulkan-dev libx11-dev libx11-dev:arm64
         
