@@ -16,7 +16,6 @@ jobs:
         submodules: recursive
 
     - name: Install Correct Ports & Build Tools
-    - name: Install Correct Ports & Build Tools
       run: |
         # 1. 디스크 공간 확보
         echo "🧹 Freeing disk space..."
