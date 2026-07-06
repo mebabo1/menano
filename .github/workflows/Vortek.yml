@@ -46,15 +46,23 @@ jobs:
           libvulkan-dev libvulkan-dev:arm64 \
           libx11-dev libx11-dev:arm64
 
-    - name: Upgrade Vulkan Headers to Latest
+    - name: Upgrade Vulkan Headers to Latest (Including vk_video)
       run: |
         echo "🔄 Downloading latest Vulkan headers from Khronos..."
         git clone https://github.com/KhronosGroup/Vulkan-Headers.git
-
-        sudo cp -r Vulkan-Headers/include/vulkan /usr/include/
-        sudo cp -r Vulkan-Headers/include/vulkan /usr/aarch64-linux-gnu/include/ || true
         
-        echo "✅ Vulkan headers updated successfully."
+        # 1. 메인 시스템 경로(/usr/include) 업데이트
+        sudo cp -r Vulkan-Headers/include/vulkan /usr/include/
+        sudo cp -r Vulkan-Headers/include/vk_video /usr/include/
+
+        # 2. ARM64 교차 컴파일러 전용 경로 업데이트 (오류 발생 지점)
+        sudo mkdir -p /usr/aarch64-linux-gnu/include/vulkan
+        sudo mkdir -p /usr/aarch64-linux-gnu/include/vk_video
+        
+        sudo cp -r Vulkan-Headers/include/vulkan/* /usr/aarch64-linux-gnu/include/vulkan/
+        sudo cp -r Vulkan-Headers/include/vk_video/* /usr/aarch64-linux-gnu/include/vk_video/
+        
+        echo "✅ All Vulkan and Video Codec headers updated successfully."
         
     - name: Termux glibc path patches
       run: |
