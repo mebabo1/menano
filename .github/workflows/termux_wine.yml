@@ -267,7 +267,7 @@ jobs:
           cd ${{ env.WINE_SOURCE_DIR }}/source
           # curl -L https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/dlls/ntdll/unix/env.c -o dlls/ntdll/unix/env.c
           # curl -L https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/dlls/ntdll/unix/virtual20.c -o dlls/ntdll/unix/virtual.c
-          curl -L https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/dlls/ntdll/unix/0env.c.c -o dlls/ntdll/unix/env.c
+          curl -L https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/dlls/ntdll/unix/0env.c -o dlls/ntdll/unix/env.c
           # curl -L https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/dlls/ntdll/unix/09env.c -o dlls/ntdll/unix/env.c
           # curl -L https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/dlls/ntdll/unix/virtual.c -o dlls/ntdll/unix/virtual.c
           # curl -L https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/dlls/ntdll/unix/env_pro10.c -o dlls/ntdll/unix/env.c
