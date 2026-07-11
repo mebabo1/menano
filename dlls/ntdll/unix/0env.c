@@ -805,7 +805,7 @@ static void init_locale(void)
     const NLS_LOCALE_DATA *locale;
     char *p;
 
-#ifdef __ANDROID__
+  #ifdef __ANDROID__
     {
         const char *all; // 👈 'all' 변수가 없다고 하니 내부 블록에서 직접 선언합니다.
 
@@ -846,6 +846,11 @@ static void init_locale(void)
     if (!unix_to_win_locale( messages, user_locale )) user_locale[0] = 0;
     TRACE_(nls)( "Unix LC_MESSAGES is %s, user system locale to %s\n", debugstr_a(messages), debugstr_a(user_locale) );
 #endif
+
+    setlocale( LC_ALL, "" );
+    if (!unix_to_win_locale( setlocale( LC_CTYPE, NULL ), system_locale )) system_locale[0] = 0;
+    if (!unix_to_win_locale( setlocale( LC_MESSAGES, NULL ), user_locale )) user_locale[0] = 0;
+
 #ifdef __APPLE__
     if (!system_locale[0])
     {
