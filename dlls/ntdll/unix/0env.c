@@ -847,10 +847,6 @@ static void init_locale(void)
     TRACE_(nls)( "Unix LC_MESSAGES is %s, user system locale to %s\n", debugstr_a(messages), debugstr_a(user_locale) );
 #endif
 
-    setlocale( LC_ALL, "" );
-    if (!unix_to_win_locale( setlocale( LC_CTYPE, NULL ), system_locale )) system_locale[0] = 0;
-    if (!unix_to_win_locale( setlocale( LC_MESSAGES, NULL ), user_locale )) user_locale[0] = 0;
-
 #ifdef __APPLE__
     if (!system_locale[0])
     {
