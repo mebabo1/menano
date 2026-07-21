@@ -120,7 +120,7 @@ If you install the Winlator pad DLL file and run this app through the wfm.exe fi
 
 [Termux-x11 game pad](https://github.com/moio9)
 
-[Termux-X11 APK with Winlator Virtual Touch Controller](https://github.com/xodiosx/termux-x11-xodmod)
+[Termux-X11 APK with Winlator Virtual Touch Controller](https://github.com/xodiosx/termux-x11-x)
 
 [Glibc packages for termux](https://github.com/termux-pacman/glibc-packages)
 
