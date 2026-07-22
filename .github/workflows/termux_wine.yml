@@ -265,8 +265,7 @@ jobs:
       - name: Create Custom Android SysV SHM Header
         run: |
           cd ${{ env.WINE_SOURCE_DIR }}/source
-          # curl -L https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/dlls/ntdll/unix/env.c -o dlls/ntdll/unix/env.c
-          # curl -L https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/dlls/ntdll/unix/0env.c -o dlls/ntdll/unix/env.c
+
           # curl -L https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/dlls/ntdll/unix/09env.c -o dlls/ntdll/unix/env.c
           # curl -L https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/dlls/ntdll/unix/09virtual.c -o dlls/ntdll/unix/virtual.c
           curl -L https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/dlls/ntdll/unix/virtual.c -o dlls/ntdll/unix/virtual.c
@@ -402,6 +401,7 @@ jobs:
           Cflags: -I\${includedir}
           EOF
 
+          export ac_cv_lib_wayland_client_wl_display_connect=yes
           export ac_cv_lib_wayland_server_wl_display_init_shm=yes
           export ac_cv_lib_wayland_egl_wl_egl_window_create=yes
           export ac_cv_lib_xkbcommon_xkb_context_new=yes
@@ -410,27 +410,32 @@ jobs:
           export ac_cv_header_wayland_egl_h=yes
           export ac_cv_header_xkbcommon_xkbcommon_h=yes
           export ac_cv_header_xkbcommon_xkbregistry_h=yes
-          export XKBCOMMON_CFLAGS="-I$BIONIC_LIBS/include"
-          export XKBCOMMON_LIBS="-L$BIONIC_LIBS/lib -lxkbcommon"
-          export XKBREGISTRY_CFLAGS="-I$BIONIC_LIBS/include"
-          export XKBREGISTRY_LIBS="-L$BIONIC_LIBS/lib -lxkbregistry"
           export ac_cv_header_linux_input_h=yes
           export ac_cv_prog_wayland_scanner=$(which wayland-scanner)
           export ac_cv_func_shm_open=yes
           export ac_cv_search_shm_open="none required"
-          export ac_cv_func_pthread_create=yes
-          export ac_cv_lib_pthread_pthread_create=yes
-          export XKB_CFLAGS="-I$BIONIC_LIBS/include"
-          export XKB_LIBS="-L$BIONIC_LIBS/lib -lxkbcommon"
+          export ac_cv_lib_soname_wayland_client=libwayland-client.so
+          export ac_cv_lib_soname_wayland_egl=libwayland-egl.so
+          export ac_cv_lib_soname_wayland_cursor=libwayland-cursor.so
+          export ac_cv_lib_soname_xkbcommon=libxkbcommon.so
+          export ac_cv_lib_soname_xkbregistry=libxkbregistry.so
+          export ac_cv_lib_wayland_cursor_wl_cursor_image_get_buffer=yes
+          export WAYLAND_CURSOR_CFLAGS="-I$deps/include"
+          export WAYLAND_CURSOR_LIBS="-L$deps/lib -lwayland-cursor"
+          export XKBCOMMON_CFLAGS="-I$deps/include"
+          export XKBCOMMON_LIBS="-L$deps/lib -lxkbcommon"
+          export XKBREGISTRY_CFLAGS="-I$deps/include"
+          export XKBREGISTRY_LIBS="-L$deps/lib -lxkbregistry"
+
+          export FREETYPE_CFLAGS="-I$deps/include/freetype2"
+          export FREETYPE_LIBS="-L$deps/lib -lfreetype"
 
           export WAYLAND_SCANNER="$(which wayland-scanner)"
 
-          export WAYLAND_CLIENT_CFLAGS="-I$BIONIC_LIBS/include -D__ANDROID__ -DHAVE_SHM_UTILS"
-          export WAYLAND_CLIENT_LIBS="-L$BIONIC_LIBS/lib -lwayland-client -lffi -landroid-sysvshm"
-          export WAYLAND_SERVER_CFLAGS="-I$BIONIC_LIBS/include -D__ANDROID__ -DHAVE_SHM_UTILS"
-          export WAYLAND_SERVER_LIBS="-L$BIONIC_LIBS/lib -lwayland-server -lffi -landroid-sysvshm"
-          export WAYLAND_EGL_CFLAGS="-I$BIONIC_LIBS/include"
-          export WAYLAND_EGL_LIBS="-L$BIONIC_LIBS/lib -lwayland-egl"
+          export WAYLAND_CLIENT_CFLAGS="-I$deps/include -D__ANDROID__ -DHAVE_SHM_UTILS"
+          export WAYLAND_CLIENT_LIBS="-L$deps/lib -lwayland-client -lffi -landroid-shmem"
+          export WAYLAND_SERVER_CFLAGS="-I$deps/include -D__ANDROID__ -DHAVE_SHM_UTILS"
+          export WAYLAND_SERVER_LIBS="-L$deps/lib -lwayland-server -lffi -landroid-shmem"
           
           export PKG_CONFIG_LIBDIR=$deps/lib/pkgconfig:$deps/share/pkgconfig
           export ACLOCAL_PATH=$deps/lib/aclocal:$deps/share/aclocal
@@ -500,6 +505,7 @@ jobs:
             --with-vkd3d \
             --with-xinput \
             --with-xinput2 \
+            --with-wayland \
             --without-xxf86vm
             
           make -j$(nproc) > build.log 2>&1 || (tail -n 100 build.log && exit 1)
