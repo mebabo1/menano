@@ -433,9 +433,11 @@ jobs:
           export WAYLAND_SCANNER="$(which wayland-scanner)"
 
           export WAYLAND_CLIENT_CFLAGS="-I$deps/include -D__ANDROID__ -DHAVE_SHM_UTILS"
-          export WAYLAND_CLIENT_LIBS="-L$deps/lib -lwayland-client -lffi -landroid-shmem"
+          export WAYLAND_CLIENT_LIBS="-L$deps/lib -lwayland-client -lwayland-egl -lffi -landroid-shmem"
           export WAYLAND_SERVER_CFLAGS="-I$deps/include -D__ANDROID__ -DHAVE_SHM_UTILS"
           export WAYLAND_SERVER_LIBS="-L$deps/lib -lwayland-server -lffi -landroid-shmem"
+          export WAYLAND_EGL_CFLAGS="-I$deps/include"
+          export WAYLAND_EGL_LIBS="-L$deps/lib -lwayland-egl"
           
           export PKG_CONFIG_LIBDIR=$deps/lib/pkgconfig:$deps/share/pkgconfig
           export ACLOCAL_PATH=$deps/lib/aclocal:$deps/share/aclocal
