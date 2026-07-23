@@ -314,6 +314,18 @@ jobs:
             sed -i '/static void kernel_writewatch_init(void)/{n;s/^{/{\n    return;/}' "$FILE_VIRTUAL"
           fi
 
+          FILE_FSYNC="dlls/ntdll/unix/fsync.c"
+          if [ -f "$FILE_FSYNC" ]; then
+            echo "Patching $FILE_FSYNC: Neutralizing fsync_init to prevent SIGSYS..."
+            sed -i '/void fsync_init(void)/{n;s/^{/{\n    return;/}' "$FILE_FSYNC"
+          fi
+
+          FILE_SYNC="dlls/ntdll/unix/sync.c"
+          if [ -f "$FILE_SYNC" ]; then
+            echo "Patching $FILE_SYNC: Force disabling do_fsync..."
+            sed -i 's/do_fsync = 1;/do_fsync = 0;/g' "$FILE_SYNC" 2>/dev/null || true
+          fi
+
           FILE_PULSE_MK="dlls/winepulse.drv/Makefile.in"
           if [ -f "$FILE_PULSE_MK" ]; then
             echo "Adding -lpulse to $FILE_PULSE_MK..."
