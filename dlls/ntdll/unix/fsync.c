@@ -57,6 +57,34 @@
 
 WINE_DEFAULT_DEBUG_CHANNEL(fsync);
 
+#ifdef __ANDROID__
+static int shm_open(const char *name, int oflag, mode_t mode) {
+    char *tmpdir;
+    char *fname;
+
+    tmpdir = getenv("TMPDIR");
+
+    if (!tmpdir) {
+        tmpdir = "/tmp";
+    }
+    asprintf(&fname, "%s/%s", tmpdir, name);
+    return open(fname, oflag, mode);
+}
+
+static int shm_unlink(const char *name) {
+    char *tmpdir;
+    char *fname;
+
+    tmpdir = getenv("TMPDIR");
+
+    if (!tmpdir) {
+        tmpdir = "/tmp";
+    }
+    asprintf(&fname, "%s/%s", tmpdir, name);
+    return unlink(fname);
+}
+#endif
+
 #include "pshpack4.h"
 #include "poppack.h"
 
@@ -85,20 +113,6 @@ struct timespec64
     long long tv_sec;
     long long tv_nsec;
 };
-
-#ifdef __ANDROID__
-static int shm_open(const char *name, int oflag, mode_t mode) {
-	char *tmpdir;
-	char *fname;
-	
-	tmpdir = getenv("TMPDIR");
-	if (!tmpdir) {
-		tmpdir = "/tmp";
-	}
-	asprintf(&fname, "%s/%s", tmpdir, name);
-	return open(fname, oflag, mode);
-}
-#endif
 
 static LONGLONG nt_time_from_ts( struct timespec *ts )
 {
