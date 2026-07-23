@@ -317,7 +317,7 @@ jobs:
           FILE_FSYNC="dlls/ntdll/unix/fsync.c"
           if [ -f "$FILE_FSYNC" ]; then
             echo "Patching $FILE_FSYNC: Neutralizing fsync_init to prevent SIGSYS..."
-            sed -i '/void fsync_init(void)/{n;s/^{/{\n    return;/}' "$FILE_FSYNC"
+            sed -i 's/void fsync_init/static void __disabled_fsync_init/g' "$FILE_FSYNC"
           fi
 
           FILE_SYNC="dlls/ntdll/unix/sync.c"
@@ -325,6 +325,7 @@ jobs:
             echo "Patching $FILE_SYNC: Force disabling do_fsync..."
             sed -i 's/do_fsync = 1;/do_fsync = 0;/g' "$FILE_SYNC" 2>/dev/null || true
           fi
+          find dlls/ntdll/unix/ -type f -name "*.c" -exec sed -i 's/syscall( *__NR_futex_waitv.*/-1; \/* futex_waitv disabled *\/ /g' {} +
 
           FILE_PULSE_MK="dlls/winepulse.drv/Makefile.in"
           if [ -f "$FILE_PULSE_MK" ]; then
