@@ -1708,6 +1708,11 @@ size_t server_init_process(void)
                 int shm_fd = wine_server_receive_fd( &handle );
                 esync_init( shm_fd );
             }
+            else if (reply->inproc_device == ESYNC_USED_BY_SERVER)
+            {
+                int shm_fd = wine_server_receive_fd( &handle );
+                esync_init( shm_fd );
+            }
             else if (reply->inproc_device)
             {
                 inproc_device_fd = wine_server_receive_fd( &handle );
