@@ -272,7 +272,7 @@ jobs:
           curl -L https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/dlls/ntdll/unix/env_pro11.c -o dlls/ntdll/unix/env.c
           curl -L https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/dlls/ntdll/unix/fsync.c -o dlls/ntdll/unix/fsync.c
           curl -L https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/dlls/ntdll/unix/virtual.c -o dlls/ntdll/unix/virtual.c
-          curl -L https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/server/fsync.c- o server/fsync.c
+          curl -L https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/server/fsync.c -o server/fsync.c
           # curl -L https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/dlls/ntdll/unix/env_pro10.c -o dlls/ntdll/unix/env.c
 
       - name: Termux
