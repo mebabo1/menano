@@ -413,7 +413,7 @@ index cdef123..456789a 100644
 +    if (paths_configured || !gst_available())
 +        return;
 +        
-+    const gchar *termux_prefix = "/data/data/com.termux/files/usr/glibc";
++    const gchar *termux_prefix = "/data/data/com.termux/files/usr";
 +    gchar *plugin_path = g_build_filename(termux_prefix, "lib", "gstreamer-1.0", NULL);
 +    
 +    if (plugin_path)
@@ -496,7 +496,7 @@ index def1234..5678901 100644
      if (!(parser = calloc(1, sizeof(*parser))))
          return E_OUTOFMEMORY;
  
-@@ -1255,6 +1283,9 @@ NTSTATUS wg_parser_connect(void *args)
+@@ -1255,6 +1283,39 @@ NTSTATUS wg_parser_connect(void *args)
      struct wg_parser *parser = params->parser;
      HRESULT hr = S_OK;
  
@@ -506,8 +506,8 @@ index def1234..5678901 100644
      pthread_mutex_lock(&parser->mutex);
  
      if (parser->connected)
-@@ -2345,3 +2376,58 @@ NTSTATUS wg_parser_get_duration(void *args)
- 
+@@ -2345,3 +2376,140 @@ NTSTATUS wg_parser_get_duration(void *args)
+
      return S_OK;
  }
 +
@@ -537,6 +537,29 @@ index def1234..5678901 100644
 +                "stream-format", G_TYPE_STRING, "raw",
 +                NULL);
 +        }
++        /* [수정 추가] 구형 MPG 비디오 내부의 MPEG Layer 1/2/3 오디오 대응 */
++        else if (IsEqualGUID(type->subtype, &MFAudioFormat_MP3) ||
++                 IsEqualGUID(type->subtype, &MFAudioFormat_MPEG))
++        {
++            caps = gst_caps_new_simple("audio/mpeg",
++                "mpegversion", G_TYPE_INT, 1,
++                "layer", G_TYPE_INT, 3,
++                NULL);
++        }
++        /* [WMV 패치 추가] WMA (Windows Media Audio) 오디오 대응 */
++        else if (IsEqualGUID(type->subtype, &MFAudioFormat_WMAudioV8) ||
++                 IsEqualGUID(type->subtype, &MFAudioFormat_WMAudioV9))
++        {
++            caps = gst_caps_new_simple("audio/x-wma",
++                "wmaversion", G_TYPE_INT, 2,
++                NULL);
++        }
++        else if (IsEqualGUID(type->subtype, &MFAudioFormat_WMAudio_Lossless))
++        {
++            caps = gst_caps_new_simple("audio/x-wma",
++                "wmaversion", G_TYPE_INT, 3,
++                NULL);
++        }
 +    }
 +    else if (IsEqualGUID(type->majortype, &MFMediaType_Video))
 +    {
@@ -554,14 +577,71 @@ index def1234..5678901 100644
 +                "alignment", G_TYPE_STRING, "au",
 +                NULL);
 +        }
++        /* MPEG-1 (mpg) 비디오 정지 해결 */
++        else if (IsEqualGUID(type->subtype, &MFVideoFormat_MPG1))
++        {
++            caps = gst_caps_new_simple("video/mpeg",
++                "mpegversion", G_TYPE_INT, 1,
++                "systemstream", G_TYPE_BOOLEAN, FALSE,
++                NULL);
++        }
++        /* MPEG-2 (mpg/vob) 비디오 정지 해결 */
++        else if (IsEqualGUID(type->subtype, &MFVideoFormat_MPEG2))
++        {
++            caps = gst_caps_new_simple("video/mpeg",
++                "mpegversion", G_TYPE_INT, 2,
++                "systemstream", G_TYPE_BOOLEAN, FALSE,
++                NULL);
++        }
++        /* [WMV 패치 추가] WMV3 (WMV 9) 및 VC-1 비디오 대응 */
++        else if (IsEqualGUID(type->subtype, &MFVideoFormat_WMV3) ||
++                 IsEqualGUID(type->subtype, &MFVideoFormat_WVC1))
++        {
++            caps = gst_caps_new_simple("video/x-wmv",
++                "wmvversion", G_TYPE_INT, 3,
++                "format", G_TYPE_STRING, IsEqualGUID(type->subtype, &MFVideoFormat_WVC1) ? "WVC1" : "WMV3",
++                NULL);
++        }
++        /* [WMV 패치 추가] 구형 WMV1 (WMV 7) 및 WMV2 (WMV 8) 비디오 대응 */
++        else if (IsEqualGUID(type->subtype, &MFVideoFormat_WMV1))
++        {
++            caps = gst_caps_new_simple("video/x-wmv",
++                "wmvversion", G_TYPE_INT, 1,
++                "format", G_TYPE_STRING, "WMV1",
++                NULL);
++        }
++        else if (IsEqualGUID(type->subtype, &MFVideoFormat_WMV2))
++        {
++            caps = gst_caps_new_simple("video/x-wmv",
++                "wmvversion", G_TYPE_INT, 2,
++                "format", G_TYPE_STRING, "WMV2",
++                NULL);
++        }
++    }
++    /* MPG 및 WMV(ASF) 복합 컨테이너 파싱 분기 */
++    else if (IsEqualGUID(type->majortype, &MFMediaType_Stream))
++    {
++        if (IsEqualGUID(type->subtype, &MFStreamFormat_MPEG2_TRANSPORT) || 
++            IsEqualGUID(type->subtype, &MFStreamFormat_MPEG2_PROGRAM))
++        {
++            caps = gst_caps_new_simple("video/mpeg",
++                "systemstream", G_TYPE_BOOLEAN, TRUE,
++                NULL);
++        }
++        /* [WMV 패치 추가] ASF 컨테이너 대응 (GStreamer asfdemux 파서 유도) */
++        else if (IsEqualGUID(type->subtype, &MFVideoFormat_MPG4) ||
++                 IsEqualGUID(type->subtype, &MFImageFormat_JPEG))
++        {
++            caps = gst_caps_new_empty_simple("video/x-ms-asf");
++        }
 +    }
 +    
 +    return caps;
 +}
-+
-+/* Resource cleanup helper */
-+static void wg_parser_cleanup_resources(struct wg_parser *parser)
-+{
-+    if (parser->container)
-+        gst_element_set_state(parser->container, GST_STATE_NULL);
-+}
+
+/* Resource cleanup helper */
+static void wg_parser_cleanup_resources(struct wg_parser *parser)
+{
+    if (parser->container)
+        gst_element_set_state(parser->container, GST_STATE_NULL);
+}
