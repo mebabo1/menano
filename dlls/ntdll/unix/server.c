@@ -82,6 +82,7 @@
 #include "ddk/wdm.h"
 
 #include "fsync.h"
+#include "esync.h"
 
 WINE_DEFAULT_DEBUG_CHANNEL(server);
 WINE_DECLARE_DEBUG_CHANNEL(syscall);
@@ -1330,7 +1331,6 @@ static const char *init_server_dir( dev_t dev, ino_t ino )
  *
  * Setup the wine configuration dir.
  */
-
 static int setup_config_dir(void)
 {
     char *p;
@@ -1371,6 +1371,7 @@ static int setup_config_dir(void)
     fcntl( fd_cwd, F_SETFD, FD_CLOEXEC );
     return fd_cwd;
 }
+
 
 /***********************************************************************
  *           server_connect_error
@@ -1702,11 +1703,6 @@ size_t server_init_process(void)
             {
                 inproc_device_fd = FSYNC_USED_BY_SERVER;
                 fsync_init( pid );
-            }
-            else if (reply->inproc_device == ESYNC_USED_BY_SERVER)
-            {
-                int shm_fd = wine_server_receive_fd( &handle );
-                esync_init( shm_fd );
             }
             else if (reply->inproc_device == ESYNC_USED_BY_SERVER)
             {
