@@ -159,7 +159,7 @@ jobs:
             winearm64ec)
               echo "Processing protonarm64ec branch"
 
-              git clone -b "proton_11.0" https://github.com/ValveSoftware/wine.git source
+              git clone -b "proton_11.0" https://github.com/WinNative-Emu/proton-wine.git source
               cd source
               git config advice.detachedHead false
               if [ "$WINE_VERSION" != "latest" ]; then
@@ -202,6 +202,11 @@ jobs:
           mkdir -p ${{ env.WINE64_DIR }}
           cp -r ${{ env.WINE_SOURCE_DIR }}/source ${{ env.WINE64_DIR }}/source
           cd ${{ env.WINE64_DIR }}/source
+
+          FILE_SERVER="dlls/ntdll/unix/server.c"
+          if [ -f "$FILE_SERVER" ]; then
+            sed -i '1s/^/extern void esync_init(int);\n/' "$FILE_SERVER"
+          fi
           
           if [ ! -f "configure" ]; then
             ./autogen.sh
@@ -270,9 +275,7 @@ jobs:
           # curl -L https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/dlls/ntdll/unix/09env.c -o dlls/ntdll/unix/env.c
           # curl -L https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/dlls/ntdll/unix/09virtual.c -o dlls/ntdll/unix/virtual.c
           curl -L https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/dlls/ntdll/unix/env_pro11.c -o dlls/ntdll/unix/env.c
-          curl -L https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/dlls/ntdll/unix/fsync.c -o dlls/ntdll/unix/fsync.c
-          curl -L https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/dlls/ntdll/unix/virtual.c -o dlls/ntdll/unix/virtual.c
-          curl -L https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/server/fsync.c -o server/fsync.c
+          curl -L https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/dlls/ntdll/unix/server.c -o dlls/ntdll/unix/server.c
           # curl -L https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/dlls/ntdll/unix/env_pro10.c -o dlls/ntdll/unix/env.c
 
       - name: Termux
@@ -314,18 +317,10 @@ jobs:
             sed -i '/static void kernel_writewatch_init(void)/{n;s/^{/{\n    return;/}' "$FILE_VIRTUAL"
           fi
 
-          FILE_FSYNC="dlls/ntdll/unix/fsync.c"
-          if [ -f "$FILE_FSYNC" ]; then
-            echo "Patching $FILE_FSYNC: Neutralizing fsync_init to prevent SIGSYS..."
-            sed -i 's/void fsync_init/static void __disabled_fsync_init/g' "$FILE_FSYNC"
+          FILE_SERVER="dlls/ntdll/unix/server.c"
+          if [ -f "$FILE_SERVER" ]; then
+            sed -i '1s/^/extern void esync_init(int);\n/' "$FILE_SERVER"
           fi
-
-          FILE_SYNC="dlls/ntdll/unix/sync.c"
-          if [ -f "$FILE_SYNC" ]; then
-            echo "Patching $FILE_SYNC: Force disabling do_fsync..."
-            sed -i 's/do_fsync = 1;/do_fsync = 0;/g' "$FILE_SYNC" 2>/dev/null || true
-          fi
-          find dlls/ntdll/unix/ -type f -name "*.c" -exec sed -i 's/syscall( *__NR_futex_waitv.*/-1; \/* futex_waitv disabled *\/ /g' {} +
 
           FILE_PULSE_MK="dlls/winepulse.drv/Makefile.in"
           if [ -f "$FILE_PULSE_MK" ]; then
@@ -350,7 +345,7 @@ jobs:
 
           export PATCH_BASE="https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/path"
 
-          PATCH_FILES="1.patch gstreamer.patch"
+          PATCH_FILES="1.patch gstreamer01.patch"
           echo "Applying external patches from $PATCH_BASE..."
           for FILE in $PATCH_FILES; do
             URL="${PATCH_BASE}/${FILE}"
