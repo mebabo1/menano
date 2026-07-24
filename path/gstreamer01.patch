@@ -638,10 +638,10 @@ index def1234..5678901 100644
 +    
 +    return caps;
 +}
-
-/* Resource cleanup helper */
-static void wg_parser_cleanup_resources(struct wg_parser *parser)
-{
-    if (parser->container)
-        gst_element_set_state(parser->container, GST_STATE_NULL);
-}
++
++/* Resource cleanup helper */
++static void wg_parser_cleanup_resources(struct wg_parser *parser)
++{
++    if (parser->container)
++        gst_element_set_state(parser->container, GST_STATE_NULL);
++}
