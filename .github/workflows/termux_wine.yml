@@ -202,11 +202,6 @@ jobs:
           mkdir -p ${{ env.WINE64_DIR }}
           cp -r ${{ env.WINE_SOURCE_DIR }}/source ${{ env.WINE64_DIR }}/source
           cd ${{ env.WINE64_DIR }}/source
-
-          FILE_SERVER="dlls/ntdll/unix/server.c"
-          if [ -f "$FILE_SERVER" ]; then
-            sed -i '1s/^/extern void esync_init(int);\n/' "$FILE_SERVER"
-          fi
           
           if [ ! -f "configure" ]; then
             ./autogen.sh
@@ -315,11 +310,6 @@ jobs:
             echo "Patching $FILE_VIRTUAL: Completely neutralizing userfaultfd..."
             sed -i 's/uffd_fd = syscall( __NR_userfaultfd/uffd_fd = -1; \/\/ syscall( __NR_userfaultfd/g' "$FILE_VIRTUAL"
             sed -i '/static void kernel_writewatch_init(void)/{n;s/^{/{\n    return;/}' "$FILE_VIRTUAL"
-          fi
-
-          FILE_SERVER="dlls/ntdll/unix/server.c"
-          if [ -f "$FILE_SERVER" ]; then
-            sed -i '1s/^/extern void esync_init(int);\n/' "$FILE_SERVER"
           fi
 
           FILE_PULSE_MK="dlls/winepulse.drv/Makefile.in"
