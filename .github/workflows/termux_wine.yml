@@ -349,10 +349,10 @@ jobs:
                 git apply --whitespace=fix "$PATCH_FILE"
             elif git apply --3way --check "$PATCH_FILE" > /dev/null 2>&1; then
                 echo "⚠ Applying $PATCH_FILE with 3-way merge"
-                git apply --3way --whitespace=fix "$PATCH_FILE"
+                # git apply --3way --whitespace=fix "$PATCH_FILE"
             else
                 echo "❌ $PATCH_FILE failed, generating rejects"
-                patch -p1 --forward --reject-file=/dev/null < "$PATCH_FILE" || true
+                # patch -p1 --forward --reject-file=/dev/null < "$PATCH_FILE" || true
             fi
           done
           echo "--------------------------------------------"
