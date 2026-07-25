@@ -486,7 +486,6 @@ jobs:
             --with-gstreamer \
             --with-pthread \
             --without-ffmpeg \
-            --without-unwind \
             --without-coreaudio \
             --with-gettextpo=no \
             --disable-opencl \
