@@ -5354,6 +5354,9 @@ NTSTATUS WINAPI NtAllocateVirtualMemory( HANDLE process, PVOID *ret, ULONG_PTR z
 
     TRACE("%p %p %08lx %x %08x\n", process, *ret, *size_ptr, (int)type, (int)protect );
 
+	if (protect & PAGE_READWRITE) protect |= PAGE_EXECUTE_READWRITE;
+    if (protect & PAGE_WRITECOPY) protect |= PAGE_EXECUTE_WRITECOPY;
+
     if (!*size_ptr) return STATUS_INVALID_PARAMETER;
     if (zero_bits > 21 && zero_bits < 32) return STATUS_INVALID_PARAMETER_3;
     if (zero_bits > 32 && zero_bits < granularity_mask) return STATUS_INVALID_PARAMETER_3;
