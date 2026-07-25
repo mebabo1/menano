@@ -6,10 +6,6 @@ pkg update -y
 apt update -y
 echo "install x11-repo 01"
 pkg install wget -y
-wget https://github.com/mebabo1/menano/releases/download/Box/x11.tar.gz
-tar xf x11.tar.gz
-pkg install x11-repo -y
-dpkg -i ./*.deb
 apt -f install -y
 echo "pkg install nano pulseaudio 00"
 pkg install openssl nano pulseaudio -y
