@@ -12,6 +12,7 @@ pkg install openssl nano pulseaudio -y
 rm -rf x11.tar.gz termux-x11-nightly-1.03.01-0-all.deb termux-x11-nightly-1.03.01-0-any.pkg.tar.xz
 termux-setup-storage
 termux-change-repo
+pkg upgrade
 pkg install termux-am x11-repo -y
 pkg install xorg-xrandr xwayland fzf libandroid-spawn -y
 pkg install feh tint2 xcompmgr xfce4-taskmanager caja pv -y
