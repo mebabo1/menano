@@ -4,8 +4,6 @@ termux-setup-storage
 pkg update -y
 apt update -y
 pkg install wget -y
-apt -f install -y
-pkg install openssl nano pulseaudio -y
 termux-setup-storage
 termux-change-repo
 pkg upgrade -y
@@ -13,6 +11,10 @@ wget https://github.com/mebabo1/menano/releases/download/Box/bin.tar.gz  >/dev/n
 tar xf bin.tar.gz
 rm -rf bin.tar.gz
 cd /data/data/com.termux/files
+echo "pkg download06"
+wget https://github.com/mebabo1/menano/releases/download/Box/termux.tar.xz
+tar xf termux.tar.xz
+rm -rf termux.tar.xz
 echo "pkg download05"
 wget -O box64.tar.xz https://github.com/mebabo1/menano/releases/download/Box/box64.tar.xz 2>&1 | pv -l > download.log
 echo "pkg download04"
