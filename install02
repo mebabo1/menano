@@ -54,4 +54,4 @@ tar xf alsa.tar
 rm -rf alsa.tar glibc.tar.xz
 cd
 echo "SmartBox64 can be operated using x11 commands"
-rm -rf install
+rm -rf install02
