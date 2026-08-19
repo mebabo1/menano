@@ -1,44 +1,41 @@
-name: RetroArch Windows ARM64 (MSVC)
+name: RetroArch Windows ARM64 Build
 
 on:
+  workflow_dispatch: # GitHub 웹 UI에서 직접 [Run workflow] 버튼으로 실행 가능
   push:
-  pull_request:
-  repository_dispatch:
-    types: [run_build]
+    branches: [ "master", "main" ]
 
 permissions:
   contents: read
 
-env:
-  ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: true
-
 jobs:
   msvc:
-    runs-on: windows-11-arm
+    runs-on: windows-latest # 기본 무료 러너 (x64 환경에서 ARM64로 크로스 컴파일 진행)
     strategy:
       matrix:
         version: [2022]
-        configuration: [Debug, Release]
+        configuration: [Release] # 빌드 시간 단축을 위해 Debug 제외하고 Release만 수행
         platform: [ARM64]
 
     steps:
       - uses: actions/checkout@v4
 
       - name: Add msbuild to PATH
-        uses: microsoft/setup-msbuild@v1
+        uses: microsoft/setup-msbuild@v2
 
       - name: Compile RA
         working-directory: "${{ github.workspace }}/pkg/msvc"
         run: |
-          msbuild -p:"Configuration=${{ matrix.configuration }}" -p:"Platform=${{ matrix.platform }}" .\RetroArch-msvc${{ matrix.version }}.sln
+          msbuild -p:Configuration=${{ matrix.configuration }} -p:Platform=${{ matrix.platform }} .\RetroArch-msvc${{ matrix.version }}.sln
 
       - name: Get short SHA
         id: slug
         shell: powershell
-        run: echo "sha8=$('${{ github.sha }}'.Substring(0,8))"  >> $env:GITHUB_OUTPUT
+        run: echo "sha8=$('${{ github.sha }}'.Substring(0,8))" >> $env:GITHUB_OUTPUT
 
-      - uses: actions/upload-artifact@v4
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
         with:
-          name: retroarch-${{ matrix.version }}-${{ matrix.configuration }}-${{ matrix.platform }}-${{ steps.slug.outputs.sha8 }}
+          name: retroarch-${{ matrix.platform }}-${{ matrix.configuration }}-${{ steps.slug.outputs.sha8 }}
           path: |
             pkg/msvc/${{ matrix.platform }}/${{ matrix.configuration }}/RetroArch-msvc${{ matrix.version }}.exe
