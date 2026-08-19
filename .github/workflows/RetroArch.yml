@@ -1,7 +1,7 @@
 name: RetroArch Windows ARM64 Build
 
 on:
-  workflow_dispatch: # GitHub 웹 UI에서 직접 [Run workflow] 버튼으로 실행 가능
+  workflow_dispatch:
   push:
     branches: [ "master", "main" ]
 
@@ -10,15 +10,20 @@ permissions:
 
 jobs:
   msvc:
-    runs-on: windows-latest # 기본 무료 러너 (x64 환경에서 ARM64로 크로스 컴파일 진행)
+    runs-on: windows-latest
     strategy:
       matrix:
         version: [2022]
-        configuration: [Release] # 빌드 시간 단축을 위해 Debug 제외하고 Release만 수행
+        configuration: [Release]
         platform: [ARM64]
 
     steps:
+      # RetroArch 공식 저장소 및 서브모듈 직접 체크아웃
       - uses: actions/checkout@v4
+        with:
+          repository: libretro/RetroArch
+          submodules: recursive
+          fetch-depth: 0
 
       - name: Add msbuild to PATH
         uses: microsoft/setup-msbuild@v2
