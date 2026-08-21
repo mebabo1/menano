@@ -18,7 +18,6 @@ jobs:
         platform: [ARM64]
 
     steps:
-      # RetroArch 공식 저장소 및 서브모듈 직접 체크아웃
       - uses: actions/checkout@v4
         with:
           repository: libretro/RetroArch
@@ -31,16 +30,40 @@ jobs:
       - name: Compile RA
         working-directory: "${{ github.workspace }}/pkg/msvc"
         run: |
-          msbuild -p:Configuration=${{ matrix.configuration }} -p:Platform=${{ matrix.platform }} .\RetroArch-msvc${{ matrix.version }}.sln
+          msbuild -p:Configuration=${{ matrix.configuration }} -p:Platform=${{ matrix.platform }} -p:PreferredToolArchitecture=x64 .\RetroArch-msvc${{ matrix.version }}.sln
 
       - name: Get short SHA
         id: slug
         shell: powershell
         run: echo "sha8=$('${{ github.sha }}'.Substring(0,8))" >> $env:GITHUB_OUTPUT
 
+      # 1. 패키징 단계: exe 파일 및 관련 모듈과 필수 폴더 구조 생성
+      - name: Prepare RetroArch Package
+        shell: powershell
+        run: |
+          $buildOut = "pkg/msvc/${{ matrix.platform }}/${{ matrix.configuration }}"
+          $distDir = "dist"
+          
+          # dist 배포 폴더 생성
+          New-Item -ItemType Directory -Force -Path $distDir
+
+          # 빌드 결과물 전체 복사 (exe 및 생성된 DLL/동적 라이브러리 포함)
+          Copy-Item -Path "$buildOut\*" -Destination $distDir -Recurse -Force
+
+          # RetroArch 실행에 필요한 기본 구조 폴더 자동 생성
+          $subDirs = @("cores", "assets", "system", "overlays", "shaders", "database", "info", "autoconfig")
+          foreach ($dir in $subDirs) {
+              New-Item -ItemType Directory -Force -Path "$distDir\$dir"
+          }
+
+          # 저장소 내 기본 retroarch.cfg 파일이 있다면 복사
+          if (Test-Path "retroarch.cfg") {
+              Copy-Item -Path "retroarch.cfg" -Destination $distDir
+          }
+
+      # 2. 단일 파일 대신 준비된 dist 폴더 전체 업로드
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
           name: retroarch-${{ matrix.platform }}-${{ matrix.configuration }}-${{ steps.slug.outputs.sha8 }}
-          path: |
-            pkg/msvc/${{ matrix.platform }}/${{ matrix.configuration }}/RetroArch-msvc${{ matrix.version }}.exe
+          path: dist/
