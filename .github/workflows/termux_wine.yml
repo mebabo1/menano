@@ -217,6 +217,7 @@ jobs:
             --disable-tests \
             --without-x \
             --without-vulkan \
+            --without-vosk \
             --without-wayland
           make __tooldeps__ -j$(nproc) > /dev/null
           echo "构建 NLS 目录..."
@@ -504,6 +505,7 @@ jobs:
             --without-usb \
             --without-v4l2 \
             --without-inotify \
+            --without-vosk \
             --with-xshm \
             --with-vkd3d \
             --with-xinput \
