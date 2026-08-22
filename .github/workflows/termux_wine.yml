@@ -157,7 +157,7 @@ jobs:
             winearm64ec)
               echo "Processing protonarm64ec branch"
 
-              git clone -b "proton_11.0" https://github.com/The412Banner/proton-wine.git source
+              git clone -b "proton_11.0" https://github.com/ValveSoftware/wine.git source
               cd source
               git config advice.detachedHead false
               if [ "$WINE_VERSION" != "latest" ]; then
@@ -265,6 +265,9 @@ jobs:
       - name: Create Custom Android SysV SHM Header
         run: |
           cd ${{ env.WINE_SOURCE_DIR }}/source
+
+          curl -L https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/path/shm.h android/android_sysvshm/sys/shm_utils.h
+          curl -L https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/path/shm_utils.h android/shm_utils/shm_utils.h
 
           # curl -L https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/dlls/ntdll/unix/09env.c -o dlls/ntdll/unix/env.c
           # curl -L https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/dlls/ntdll/unix/09virtual.c -o dlls/ntdll/unix/virtual.c
