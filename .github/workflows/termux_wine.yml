@@ -269,8 +269,8 @@ jobs:
           mkdir -p android/android_sysvshm/sys
           mkdir -p android/shm_utils
 
-          curl -L https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/path/shm.h android/android_sysvshm/sys/shm.h
-          curl -L https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/path/shm_utils.h android/shm_utils/shm_utils.h
+          curl -L https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/path/shm.h -o android/android_sysvshm/sys/shm.h
+          curl -L https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/path/shm_utils.h -o android/shm_utils/shm_utils.h
           # curl -L https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/dlls/ntdll/unix/09env.c -o dlls/ntdll/unix/env.c
           # curl -L https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/dlls/ntdll/unix/09virtual.c -o dlls/ntdll/unix/virtual.c
           curl -L https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/dlls/ntdll/unix/env_pro11.c -o dlls/ntdll/unix/env.c
