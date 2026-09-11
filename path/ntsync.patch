@@ -1,0 +1,1067 @@
+NTSYNC + userspace ntsync support for Wine 11.17 (Termux/Hangover).
+
+Ported from GameNative/proton-wine (android/patches/common/*ntsync* and
+related commits d67ac1e, 0971187, 962a379) to upstream Wine 11.17, which
+removed esync entirely in favour of the ntsync-based in-process sync.
+
+What this patch does:
+- vendors the ntsync-android C API headers (android/ntsync_android/):
+  ntsync_kernel_abi.h mirrors the frozen /dev/ntsync ioctl ABI and
+  ntsync_user.h declares the userspace (libntsync_android) API, so both
+  backends compile on Android without the kernel uapi header.
+- wineserver (server/inproc_sync.c): runtime backend detection - it opens
+  /dev/ntsync and probes it with a real NTSYNC_IOC_CREATE_EVENT ioctl
+  (catches SELinux/seccomp-blocked nodes), falls back to the userspace
+  ntsync-android shm region, and honours PROTON_NO_NTSYNC (disable both)
+  and PROTON_NO_KERNEL_NTSYNC (force userspace) env switches.
+- protocol (protocol.def + regenerated request_handlers.h /
+  request_trace.h / server_protocol.h, version 962): the
+  get_inproc_sync_fd / get_inproc_alert_fd replies gain an ntsync_handle
+  field used to pass userspace object handles instead of SCM_RIGHTS fds.
+- ntdll (unix/sync.c, unix/server.c): attaches to the shared region when
+  the server reports NTSYNC_ANDROID_USED_BY_SERVER, dispatches every
+  semaphore/event/mutex operation and wait to the userspace backend,
+  and supports alertable waits through the per-thread alert event.
+- server/process.c: reclaims objects of dead processes
+  (ntsync_sweep_dead) - userspace ntsync has no fd-close-on-death hook.
+- ntdll + wineserver link the static libntsync_android.a (-lntsync_android);
+  it is built from https://github.com/GameNative/ntsync-android by
+  build.sh (termux_setup_rust + cargo build --release, staticlib).
+
+Differences from the GameNative original: upstream 11.17 has no fsync, so
+all do_fsync()/fsync_shm_idx code paths are dropped; the new reply field
+is named ntsync_handle instead of reusing Proton's fsync_shm_idx; the
+GameNative container dosdevices mapping is not ported (termux-fix-paths
+handles dosdevices for Termux).
+
+Co-developed with the GameNative/proton-wine patches by Joshua Tam
+(ntsync-android library is LGPL-3.0-only, headers keep their license).
+diff --git a/android/ntsync_android/ntsync_kernel_abi.h b/android/ntsync_android/ntsync_kernel_abi.h
+new file mode 100644
+index 0000000..13a5828
+--- /dev/null
++++ b/android/ntsync_android/ntsync_kernel_abi.h
+@@ -0,0 +1,52 @@
++/*
++ * Kernel /dev/ntsync ioctl ABI, for runtime kernel-vs-userspace detection.
++ *
++ * Copyright (C) 2026 Joshua Tam <297250+joshuatam@users.noreply.github.com>
++ *
++ * This library is free software: you can redistribute it and/or modify
++ * it under the terms of the GNU Lesser General Public License as
++ * published by the Free Software Foundation, version 3 only.
++ *
++ * This library is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
++ * Lesser General Public License for more details.
++ *
++ * You should have received a copy of the GNU Lesser General Public
++ * License along with this library. If not, see <https://www.gnu.org/licenses/>.
++ *
++ * Mirrors the ioctl request numbers from the Linux uapi header
++ * (include/uapi/linux/ntsync.h); those numbers are frozen kernel ABI.
++ * The struct layouts come from ntsync_user.h, which mirrors the same uapi
++ * structs, so this header only adds the ioctl numbers. uint32_t stands in
++ * for the uapi __u32 (identical size, hence identical ioctl numbers).
++ *
++ * Used on Android, where /dev/ntsync may or may not exist and be usable:
++ * wineserver/ntdll compile in both the kernel-ioctl and the userspace
++ * implementation and pick one at runtime.
++ *
++ * SPDX-License-Identifier: LGPL-3.0-only
++ */
++#ifndef NTSYNC_KERNEL_ABI_H
++#define NTSYNC_KERNEL_ABI_H
++
++#include <sys/ioctl.h>
++
++#include "ntsync_user.h"
++
++#define NTSYNC_IOC_CREATE_SEM       _IOW ('N', 0x80, struct ntsync_sem_args)
++#define NTSYNC_IOC_SEM_RELEASE      _IOWR('N', 0x81, uint32_t)
++#define NTSYNC_IOC_WAIT_ANY         _IOWR('N', 0x82, struct ntsync_wait_args)
++#define NTSYNC_IOC_WAIT_ALL         _IOWR('N', 0x83, struct ntsync_wait_args)
++#define NTSYNC_IOC_CREATE_MUTEX     _IOW ('N', 0x84, struct ntsync_mutex_args)
++#define NTSYNC_IOC_MUTEX_UNLOCK     _IOWR('N', 0x85, struct ntsync_mutex_args)
++#define NTSYNC_IOC_MUTEX_KILL       _IOW ('N', 0x86, uint32_t)
++#define NTSYNC_IOC_CREATE_EVENT     _IOW ('N', 0x87, struct ntsync_event_args)
++#define NTSYNC_IOC_EVENT_SET        _IOR ('N', 0x88, uint32_t)
++#define NTSYNC_IOC_EVENT_RESET      _IOR ('N', 0x89, uint32_t)
++#define NTSYNC_IOC_EVENT_PULSE      _IOR ('N', 0x8a, uint32_t)
++#define NTSYNC_IOC_SEM_READ         _IOR ('N', 0x8b, struct ntsync_sem_args)
++#define NTSYNC_IOC_MUTEX_READ       _IOR ('N', 0x8c, struct ntsync_mutex_args)
++#define NTSYNC_IOC_EVENT_READ       _IOR ('N', 0x8d, struct ntsync_event_args)
++
++#endif /* NTSYNC_KERNEL_ABI_H */
+diff --git a/android/ntsync_android/ntsync_user.h b/android/ntsync_android/ntsync_user.h
+new file mode 100644
+index 0000000..a1c16b4
+--- /dev/null
++++ b/android/ntsync_android/ntsync_user.h
+@@ -0,0 +1,137 @@
++/*
++ * Userspace ntsync library for Android - C API.
++ *
++ * Copyright (C) 2026 Joshua Tam <297250+joshuatam@users.noreply.github.com>
++ *
++ * This library is free software: you can redistribute it and/or modify
++ * it under the terms of the GNU Lesser General Public License as
++ * published by the Free Software Foundation, version 3 only.
++ *
++ * This library is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
++ * Lesser General Public License for more details.
++ *
++ * You should have received a copy of the GNU Lesser General Public
++ * License along with this library. If not, see <https://www.gnu.org/licenses/>.
++ *
++ * Mirrors the Linux /dev/ntsync ioctl interface (include/uapi/linux/ntsync.h)
++ * with u32 handles in place of kernel fds. All functions return 0 on success
++ * or a negative errno, exactly like the kernel ioctls.
++ *
++ * Objects live in a file-backed shared mapping and are cross-process: any
++ * process that opens the same region path sees the same handles. Waits use
++ * futexes on the shared pages.
++ *
++ * Alertable waits are supported: if ntsync_wait_args.alert is nonzero it
++ * names an event object that aborts the wait; the wait returns success with
++ * index == count, exactly like the kernel ioctls.
++ * Divergence from the kernel: closing an object other threads are waiting on
++ * fails those waits with -EINVAL; objects leaked by a crashed process must
++ * be reclaimed with ntsync_sweep_dead().
++ *
++ * SPDX-License-Identifier: LGPL-3.0-only
++ */
++#ifndef NTSYNC_USER_H
++#define NTSYNC_USER_H
++
++#include <stdint.h>
++
++#ifdef __cplusplus
++extern "C" {
++#endif
++
++struct ntsync_sem_args {
++    uint32_t count;
++    uint32_t max;
++};
++
++struct ntsync_mutex_args {
++    uint32_t owner;
++    uint32_t count;
++};
++
++struct ntsync_event_args {
++    uint32_t manual;
++    uint32_t signaled;
++};
++
++#define NTSYNC_WAIT_REALTIME 0x1
++
++struct ntsync_wait_args {
++    /* Absolute timeout in ns; CLOCK_MONOTONIC, or CLOCK_REALTIME if
++     * NTSYNC_WAIT_REALTIME is set. UINT64_MAX = infinite. */
++    uint64_t timeout;
++    /* Pointer to an array of `count` uint32_t handles. */
++    uint64_t objs;
++    uint32_t count;
++    /* Out: index of the object that satisfied the wait. */
++    uint32_t index;
++    uint32_t flags;
++    /* In: owner tid used to acquire mutexes. */
++    uint32_t owner;
++    /* In: optional alert event handle (0 = none); aborts the wait, which
++     * then returns success with index == count. */
++    uint32_t alert;
++    uint32_t pad;
++};
++
++#define NTSYNC_MAX_WAIT_COUNT 64
++
++/* Wine integration: wineserver reports userspace ntsync to clients by
++ * putting this sentinel in the inproc_device field of the init_first_thread
++ * reply, and passes object handles in the fsync_shm_idx reply field instead
++ * of SCM_RIGHTS fd passing. */
++#define NTSYNC_ANDROID_USED_BY_SERVER 0x7eadfe01
++
++/* Initialize the shared region. `path` may be NULL to use
++ * $TMPDIR/ntsync_userspace.shm (the caller must export TMPDIR); a layout
++ * version is inserted before the ".shm" extension (ntsync_userspace.vN.shm).
++ * Idempotent; all other functions auto-initialize on first use. */
++int32_t ntsync_init(const char *path);
++
++/* Free all objects whose creator process no longer exists. Userspace has no
++ * fd-close-on-death hook, so a launcher/server should call this after a
++ * process exits. Returns the number of freed objects or a negative errno. */
++int32_t ntsync_sweep_dead(void);
++
++/* Create objects. Return 0 and store the handle, or a negative errno.
++ * Handles are never 0: slot 0 is permanently reserved because 0 is the
++ * "no alert" sentinel in ntsync_wait_args.alert. */
++int32_t ntsync_create_sem(uint32_t *out_handle, const struct ntsync_sem_args *args);
++int32_t ntsync_create_mutex(uint32_t *out_handle, const struct ntsync_mutex_args *args);
++int32_t ntsync_create_event(uint32_t *out_handle, const struct ntsync_event_args *args);
++
++/* Destroy an object. Returns -EINVAL for a bad handle. */
++int32_t ntsync_close(uint32_t handle);
++
++/* Semaphores. On success, sem_release overwrites *count with the previous
++ * count; returns -EOVERFLOW (state unchanged) if count would exceed max. */
++int32_t ntsync_sem_release(uint32_t handle, uint32_t *count);
++int32_t ntsync_sem_read(uint32_t handle, struct ntsync_sem_args *args);
++
++/* Mutexes. args->owner is input; on success args->count is overwritten with
++ * the previous recursion count. Returns -EPERM if not the owner.
++ * mutex_read returns -EOWNERDEAD if the mutex is abandoned. */
++int32_t ntsync_mutex_unlock(uint32_t handle, struct ntsync_mutex_args *args);
++int32_t ntsync_mutex_kill(uint32_t handle, uint32_t owner);
++int32_t ntsync_mutex_read(uint32_t handle, struct ntsync_mutex_args *args);
++
++/* Events. On success, set/reset/pulse store the previous signaled state in
++ * *prev (if non-NULL), like the kernel ioctls. */
++int32_t ntsync_event_set(uint32_t handle, uint32_t *prev);
++int32_t ntsync_event_reset(uint32_t handle, uint32_t *prev);
++int32_t ntsync_event_pulse(uint32_t handle, uint32_t *prev);
++int32_t ntsync_event_read(uint32_t handle, struct ntsync_event_args *args);
++
++/* Waits. Return 0 and set args->index on success, -EOWNERDEAD (and set
++ * args->index) when an abandoned mutex was acquired, -ETIMEDOUT on timeout,
++ * -EINVAL on bad arguments. */
++int32_t ntsync_wait_any(struct ntsync_wait_args *args);
++int32_t ntsync_wait_all(struct ntsync_wait_args *args);
++
++#ifdef __cplusplus
++}
++#endif
++
++#endif /* NTSYNC_USER_H */
+diff --git a/dlls/ntdll/Makefile.in b/dlls/ntdll/Makefile.in
+index 9a15bc3..4026170 100644
+--- a/dlls/ntdll/Makefile.in
++++ b/dlls/ntdll/Makefile.in
+@@ -5,7 +5,7 @@ IMPORTLIB = ntdll
+ IMPORTS   = $(SYMCRYPT_PE_LIBS) $(ZLIB_PE_LIBS) $(MUSL_PE_LIBS)
+ EXTRAINCL = $(SYMCRYPT_PE_CFLAGS) $(ZLIB_PE_CFLAGS)
+ UNIX_CFLAGS  = $(HWLOC_CFLAGS)
+-UNIX_LIBS    = $(IOKIT_LIBS) $(COREFOUNDATION_LIBS) $(CORESERVICES_LIBS) $(RT_LIBS) $(PTHREAD_LIBS) $(I386_LIBS) $(PROCSTAT_LIBS) $(HWLOC_LIBS)
++UNIX_LIBS    = $(IOKIT_LIBS) $(COREFOUNDATION_LIBS) $(CORESERVICES_LIBS) $(RT_LIBS) $(PTHREAD_LIBS) $(I386_LIBS) $(PROCSTAT_LIBS) $(HWLOC_LIBS) -lntsync_android
+ 
+ EXTRADLLFLAGS = -nodefaultlibs
+ i386_EXTRADLLFLAGS = -Wl,--image-base,0x7bc00000
+diff --git a/dlls/ntdll/unix/server.c b/dlls/ntdll/unix/server.c
+index 04af8b9..ea37dd7 100644
+--- a/dlls/ntdll/unix/server.c
++++ b/dlls/ntdll/unix/server.c
+@@ -78,6 +78,9 @@
+ #include "wine/server.h"
+ #include "wine/debug.h"
+ #include "unix_private.h"
++#ifdef __ANDROID__
++#include "../../../android/ntsync_android/ntsync_user.h"
++#endif
+ #include "ddk/wdm.h"
+ 
+ WINE_DEFAULT_DEBUG_CHANNEL(server);
+@@ -1704,8 +1707,22 @@ size_t server_init_process(void)
+             supported_machines_count = wine_server_reply_size( reply ) / sizeof(*supported_machines);
+             if (reply->inproc_device)
+             {
+-                inproc_device_fd = wine_server_receive_fd( &handle );
+-                assert( handle == reply->inproc_device );
++#ifdef __ANDROID__
++                /* userspace ntsync: no device fd; attach to the shared region */
++                if (reply->inproc_device == NTSYNC_ANDROID_USED_BY_SERVER)
++                {
++                    if (!ntsync_init( NULL ))
++                    {
++                        inproc_device_fd = 0;
++                        ntsync_userspace = 1;
++                    }
++                }
++                else
++#endif
++                {
++                    inproc_device_fd = wine_server_receive_fd( &handle );
++                    assert( handle == reply->inproc_device );
++                }
+             }
+         }
+     }
+diff --git a/dlls/ntdll/unix/sync.c b/dlls/ntdll/unix/sync.c
+index 0127a05..c6a4a6c 100644
+--- a/dlls/ntdll/unix/sync.c
++++ b/dlls/ntdll/unix/sync.c
+@@ -60,7 +60,12 @@
+ #ifdef HAVE_KQUEUE
+ # include <sys/event.h>
+ #endif
+-#ifdef HAVE_LINUX_NTSYNC_H
++#ifdef __ANDROID__
++/* Kernel /dev/ntsync ioctl ABI + userspace ntsync API: both are compiled
++ * in and selected at runtime (kernel ntsync if the server passed us a real
++ * device fd, userspace if it reported NTSYNC_ANDROID_USED_BY_SERVER). */
++# include "../../../android/ntsync_android/ntsync_kernel_abi.h"
++#elif defined(HAVE_LINUX_NTSYNC_H)
+ # include <linux/ntsync.h>
+ #endif
+ 
+@@ -76,6 +81,11 @@ WINE_DEFAULT_DEBUG_CHANNEL(sync);
+ 
+ HANDLE keyed_event = 0;
+ int inproc_device_fd = -1;
++#ifdef __ANDROID__
++/* 1 when the server reported userspace ntsync (NTSYNC_ANDROID_USED_BY_SERVER);
++ * inproc_device_fd is a dummy 0 then, not a /dev/ntsync fd */
++int ntsync_userspace = 0;
++#endif
+ 
+ static const char *debugstr_timeout( const LARGE_INTEGER *timeout )
+ {
+@@ -310,8 +320,151 @@ static unsigned int validate_open_object_attributes( const OBJECT_ATTRIBUTES *at
+ 
+ #ifdef NTSYNC_IOC_EVENT_READ
+ 
++#ifdef __ANDROID__
++/* Userspace ntsync (libntsync_android): same semantics as the kernel ioctls,
++ * but objects are uint32 handles in a shared-memory region instead of fds. */
++
++static NTSTATUS userspace_release_semaphore_obj( int obj, ULONG count, ULONG *prev_count )
++{
++    uint32_t prev = count;
++    int ret = ntsync_sem_release( obj, &prev );
++    if (ret == -EOVERFLOW) return STATUS_SEMAPHORE_LIMIT_EXCEEDED;
++    if (ret) return errno_to_status( -ret );
++    if (prev_count) *prev_count = prev;
++    return STATUS_SUCCESS;
++}
++
++static NTSTATUS userspace_query_semaphore_obj( int obj, SEMAPHORE_BASIC_INFORMATION *info )
++{
++    struct ntsync_sem_args args = {0};
++    int ret = ntsync_sem_read( obj, &args );
++    if (ret) return errno_to_status( -ret );
++    info->CurrentCount = args.count;
++    info->MaximumCount = args.max;
++    return STATUS_SUCCESS;
++}
++
++static NTSTATUS userspace_set_event_obj( int obj, LONG *prev_state )
++{
++    uint32_t prev;
++    int ret = ntsync_event_set( obj, &prev );
++    if (ret) return errno_to_status( -ret );
++    if (prev_state) *prev_state = prev;
++    return STATUS_SUCCESS;
++}
++
++static NTSTATUS userspace_reset_event_obj( int obj, LONG *prev_state )
++{
++    uint32_t prev;
++    int ret = ntsync_event_reset( obj, &prev );
++    if (ret) return errno_to_status( -ret );
++    if (prev_state) *prev_state = prev;
++    return STATUS_SUCCESS;
++}
++
++static NTSTATUS userspace_pulse_event_obj( int obj, LONG *prev_state )
++{
++    uint32_t prev;
++    int ret = ntsync_event_pulse( obj, &prev );
++    if (ret) return errno_to_status( -ret );
++    if (prev_state) *prev_state = prev;
++    return STATUS_SUCCESS;
++}
++
++static NTSTATUS userspace_query_event_obj( int obj, EVENT_BASIC_INFORMATION *info )
++{
++    struct ntsync_event_args args = {0};
++    int ret = ntsync_event_read( obj, &args );
++    if (ret) return errno_to_status( -ret );
++    info->EventType = args.manual ? NotificationEvent : SynchronizationEvent;
++    info->EventState = args.signaled;
++    return STATUS_SUCCESS;
++}
++
++static NTSTATUS userspace_release_mutex_obj( int obj, LONG *prev_count )
++{
++    struct ntsync_mutex_args args = {.owner = GetCurrentThreadId()};
++    int ret = ntsync_mutex_unlock( obj, &args );
++    if (ret == -EOVERFLOW) return STATUS_MUTANT_LIMIT_EXCEEDED;
++    if (ret == -EPERM) return STATUS_MUTANT_NOT_OWNED;
++    if (ret) return errno_to_status( -ret );
++    if (prev_count) *prev_count = 1 - args.count;
++    return STATUS_SUCCESS;
++}
++
++static NTSTATUS userspace_query_mutex_obj( int obj, MUTANT_BASIC_INFORMATION *info )
++{
++    struct ntsync_mutex_args args = {0};
++    int ret = ntsync_mutex_read( obj, &args );
++    if (ret == -EOWNERDEAD)
++    {
++        info->AbandonedState = TRUE;
++        info->OwnedByCaller = FALSE;
++        info->CurrentCount = 1;
++        return STATUS_SUCCESS;
++    }
++    if (ret) return errno_to_status( -ret );
++    info->AbandonedState = FALSE;
++    info->OwnedByCaller = (args.owner == GetCurrentThreadId());
++    info->CurrentCount = 1 - args.count;
++    return STATUS_SUCCESS;
++}
++
++static NTSTATUS userspace_wait_objs( DWORD count, const int *objs, WAIT_TYPE type,
++                                     int alert_fd, const LARGE_INTEGER *timeout )
++{
++    struct ntsync_wait_args args = {0};
++    struct timespec now;
++    int ret;
++
++    if (!timeout || timeout->QuadPart == TIMEOUT_INFINITE)
++    {
++        args.timeout = ~(uint64_t)0;
++    }
++    else if (timeout->QuadPart <= 0)
++    {
++        clock_gettime( CLOCK_MONOTONIC, &now );
++        args.timeout = ((ULONGLONG)now.tv_sec * NSECPERSEC) + now.tv_nsec + (-timeout->QuadPart * 100);
++    }
++    else
++    {
++        args.timeout = (timeout->QuadPart * 100) - (SECS_1601_TO_1970 * NSECPERSEC);
++        args.flags |= NTSYNC_WAIT_REALTIME;
++    }
++
++    args.objs = (uintptr_t)objs;
++    args.count = count;
++    args.owner = GetCurrentThreadId();
++    args.index = ~0u;
++    args.alert = alert_fd;
++
++    if (type != WaitAll || count == 1) ret = ntsync_wait_any( &args );
++    else ret = ntsync_wait_all( &args );
++
++    if (!ret)
++    {
++        if (args.index == count)
++        {
++            static const LARGE_INTEGER zero_timeout;
++
++            ret = server_wait( NULL, 0, SELECT_INTERRUPTIBLE | SELECT_ALERTABLE, &zero_timeout );
++            assert( ret == STATUS_USER_APC );
++            return ret;
++        }
++
++        return type != WaitAll ? args.index : 0;
++    }
++    if (ret == -EOWNERDEAD) return STATUS_ABANDONED + (type != WaitAll ? args.index : 0);
++    if (ret == -ETIMEDOUT) return STATUS_TIMEOUT;
++    return errno_to_status( -ret );
++}
++#endif  /* __ANDROID__ */
++
+ static NTSTATUS linux_release_semaphore_obj( int obj, ULONG count, ULONG *prev_count )
+ {
++#ifdef __ANDROID__
++    if (ntsync_userspace) return userspace_release_semaphore_obj( obj, count, prev_count );
++#endif
+     if (ioctl( obj, NTSYNC_IOC_SEM_RELEASE, &count ) < 0)
+     {
+         if (errno == EOVERFLOW) return STATUS_SEMAPHORE_LIMIT_EXCEEDED;
+@@ -324,6 +477,9 @@ static NTSTATUS linux_release_semaphore_obj( int obj, ULONG count, ULONG *prev_c
+ static NTSTATUS linux_query_semaphore_obj( int obj, SEMAPHORE_BASIC_INFORMATION *info )
+ {
+     struct ntsync_sem_args args = {0};
++#ifdef __ANDROID__
++    if (ntsync_userspace) return userspace_query_semaphore_obj( obj, info );
++#endif
+     if (ioctl( obj, NTSYNC_IOC_SEM_READ, &args ) < 0) return errno_to_status( errno );
+     info->CurrentCount = args.count;
+     info->MaximumCount = args.max;
+@@ -332,7 +488,10 @@ static NTSTATUS linux_query_semaphore_obj( int obj, SEMAPHORE_BASIC_INFORMATION
+ 
+ static NTSTATUS linux_set_event_obj( int obj, LONG *prev_state )
+ {
+-    __u32 prev;
++    uint32_t prev;
++#ifdef __ANDROID__
++    if (ntsync_userspace) return userspace_set_event_obj( obj, prev_state );
++#endif
+     if (ioctl( obj, NTSYNC_IOC_EVENT_SET, &prev ) < 0) return errno_to_status( errno );
+     if (prev_state) *prev_state = prev;
+     return STATUS_SUCCESS;
+@@ -340,7 +499,10 @@ static NTSTATUS linux_set_event_obj( int obj, LONG *prev_state )
+ 
+ static NTSTATUS linux_reset_event_obj( int obj, LONG *prev_state )
+ {
+-    __u32 prev;
++    uint32_t prev;
++#ifdef __ANDROID__
++    if (ntsync_userspace) return userspace_reset_event_obj( obj, prev_state );
++#endif
+     if (ioctl( obj, NTSYNC_IOC_EVENT_RESET, &prev ) < 0) return errno_to_status( errno );
+     if (prev_state) *prev_state = prev;
+     return STATUS_SUCCESS;
+@@ -348,7 +510,10 @@ static NTSTATUS linux_reset_event_obj( int obj, LONG *prev_state )
+ 
+ static NTSTATUS linux_pulse_event_obj( int obj, LONG *prev_state )
+ {
+-    __u32 prev;
++    uint32_t prev;
++#ifdef __ANDROID__
++    if (ntsync_userspace) return userspace_pulse_event_obj( obj, prev_state );
++#endif
+     if (ioctl( obj, NTSYNC_IOC_EVENT_PULSE, &prev ) < 0) return errno_to_status( errno );
+     if (prev_state) *prev_state = prev;
+     return STATUS_SUCCESS;
+@@ -357,6 +522,9 @@ static NTSTATUS linux_pulse_event_obj( int obj, LONG *prev_state )
+ static NTSTATUS linux_query_event_obj( int obj, EVENT_BASIC_INFORMATION *info )
+ {
+     struct ntsync_event_args args = {0};
++#ifdef __ANDROID__
++    if (ntsync_userspace) return userspace_query_event_obj( obj, info );
++#endif
+     if (ioctl( obj, NTSYNC_IOC_EVENT_READ, &args ) < 0) return errno_to_status( errno );
+     info->EventType = args.manual ? NotificationEvent : SynchronizationEvent;
+     info->EventState = args.signaled;
+@@ -366,6 +534,9 @@ static NTSTATUS linux_query_event_obj( int obj, EVENT_BASIC_INFORMATION *info )
+ static NTSTATUS linux_release_mutex_obj( int obj, LONG *prev_count )
+ {
+     struct ntsync_mutex_args args = {.owner = GetCurrentThreadId()};
++#ifdef __ANDROID__
++    if (ntsync_userspace) return userspace_release_mutex_obj( obj, prev_count );
++#endif
+     if (ioctl( obj, NTSYNC_IOC_MUTEX_UNLOCK, &args ) < 0)
+     {
+         if (errno == EOVERFLOW) return STATUS_MUTANT_LIMIT_EXCEEDED;
+@@ -379,6 +550,9 @@ static NTSTATUS linux_release_mutex_obj( int obj, LONG *prev_count )
+ static NTSTATUS linux_query_mutex_obj( int obj, MUTANT_BASIC_INFORMATION *info )
+ {
+     struct ntsync_mutex_args args = {0};
++#ifdef __ANDROID__
++    if (ntsync_userspace) return userspace_query_mutex_obj( obj, info );
++#endif
+     if (ioctl( obj, NTSYNC_IOC_MUTEX_READ, &args ) < 0)
+     {
+         if (errno == EOWNERDEAD)
+@@ -403,10 +577,13 @@ static NTSTATUS linux_wait_objs( int device, DWORD count, const int *objs, WAIT_
+     unsigned long request;
+     struct timespec now;
+     int ret;
++#ifdef __ANDROID__
++    if (ntsync_userspace) return userspace_wait_objs( count, objs, type, alert_fd, timeout );
++#endif
+ 
+     if (!timeout || timeout->QuadPart == TIMEOUT_INFINITE)
+     {
+-        args.timeout = ~(__u64)0;
++        args.timeout = ~(uint64_t)0;
+     }
+     else if (timeout->QuadPart <= 0)
+     {
+@@ -634,7 +811,12 @@ static void release_inproc_sync( struct inproc_sync *sync )
+     LONG ref = InterlockedDecrement( &sync->refcount );
+ 
+     assert( ref >= 0 );
++#ifdef __ANDROID__
++    /* userspace ntsync objects are owned by the server; nothing to close */
++    if (!ref && !ntsync_userspace) close( fd );
++#else
+     if (!ref) close( fd );
++#endif
+ }
+ 
+ static struct inproc_sync *get_cached_inproc_sync( HANDLE handle )
+@@ -675,8 +857,18 @@ static NTSTATUS get_server_inproc_sync( HANDLE handle, struct inproc_sync *sync
+         {
+             obj_handle_t fd_handle;
+             sync->refcount = 1;
++#ifdef __ANDROID__
++            /* userspace ntsync object handle is passed in ntsync_handle */
++            if (ntsync_userspace) sync->fd = reply->ntsync_handle;
++            else
++            {
++                sync->fd = wine_server_receive_fd( &fd_handle );
++                assert( wine_server_ptr_handle(fd_handle) == handle );
++            }
++#else
+             sync->fd = wine_server_receive_fd( &fd_handle );
+             assert( wine_server_ptr_handle(fd_handle) == handle );
++#endif
+             sync->access = reply->access;
+             sync->type = reply->type;
+             sync->closed = 0;
+@@ -884,8 +1076,18 @@ static int get_inproc_alert_fd(void)
+         {
+             if (!server_call_unlocked( req ))
+             {
++#ifdef __ANDROID__
++                /* userspace ntsync alert event handle; valid in every process */
++                if (ntsync_userspace) data->alert_fd = fd = reply->ntsync_handle;
++                else
++                {
++                    data->alert_fd = fd = wine_server_receive_fd( &token );
++                    assert( token == reply->handle );
++                }
++#else
+                 data->alert_fd = fd = wine_server_receive_fd( &token );
+                 assert( token == reply->handle );
++#endif
+             }
+         }
+         SERVER_END_REQ;
+@@ -2394,19 +2596,34 @@ NTSTATUS WINAPI NtSignalAndWaitForSingleObject( HANDLE signal, HANDLE wait,
+  */
+ NTSTATUS WINAPI NtYieldExecution(void)
+ {
++    static int fast_yield = -1;
++
++    if (fast_yield < 0)
++    {
++        const char *e = getenv( "WINE_FAST_YIELD" );
++        fast_yield = e && atoi( e );
++    }
++    if (fast_yield)
++    {
++        usleep( 0 );
++        return STATUS_SUCCESS;
++    }
++
+ #ifdef HAVE_SCHED_YIELD
++    {
+ #ifdef RUSAGE_THREAD
+-    struct rusage u1, u2;
+-    int ret;
++        struct rusage u1, u2;
++        int ret;
+ 
+-    ret = getrusage( RUSAGE_THREAD, &u1 );
++        ret = getrusage( RUSAGE_THREAD, &u1 );
+ #endif
+-    sched_yield();
++        sched_yield();
+ #ifdef RUSAGE_THREAD
+-    if (!ret) ret = getrusage( RUSAGE_THREAD, &u2 );
+-    if (!ret && u1.ru_nvcsw == u2.ru_nvcsw && u1.ru_nivcsw == u2.ru_nivcsw) return STATUS_NO_YIELD_PERFORMED;
++        if (!ret) ret = getrusage( RUSAGE_THREAD, &u2 );
++        if (!ret && u1.ru_nvcsw == u2.ru_nvcsw && u1.ru_nivcsw == u2.ru_nivcsw) return STATUS_NO_YIELD_PERFORMED;
+ #endif
+-    return STATUS_SUCCESS;
++        return STATUS_SUCCESS;
++    }
+ #else
+     return STATUS_NO_YIELD_PERFORMED;
+ #endif
+diff --git a/dlls/ntdll/unix/unix_private.h b/dlls/ntdll/unix/unix_private.h
+index 9a4db8e..bce9f14 100644
+--- a/dlls/ntdll/unix/unix_private.h
++++ b/dlls/ntdll/unix/unix_private.h
+@@ -217,6 +217,10 @@ extern USHORT supported_machines[8];
+ extern BOOL process_exiting;
+ extern HANDLE keyed_event;
+ extern int inproc_device_fd;
++#ifdef __ANDROID__
++/* 1 when the server reported userspace ntsync instead of a /dev/ntsync fd */
++extern int ntsync_userspace;
++#endif
+ extern timeout_t server_start_time;
+ extern sigset_t server_block_set;
+ extern pthread_mutex_t fd_cache_mutex;
+diff --git a/include/wine/server_protocol.h b/include/wine/server_protocol.h
+index 6f30cf0..ba1e145 100644
+--- a/include/wine/server_protocol.h
++++ b/include/wine/server_protocol.h
+@@ -6067,6 +6067,8 @@ struct get_inproc_sync_fd_reply
+     struct reply_header __header;
+     int           type;
+     unsigned int access;
++    unsigned int ntsync_handle;
++    char __pad_20[4];
+ };
+ 
+ 
+@@ -6080,7 +6082,7 @@ struct get_inproc_alert_fd_reply
+ {
+     struct reply_header __header;
+     obj_handle_t handle;
+-    char __pad_12[4];
++    unsigned int ntsync_handle;
+ };
+ 
+ 
+@@ -7183,6 +7185,6 @@ union generic_reply
+     struct alpc_create_port_reply alpc_create_port_reply;
+ };
+ 
+-#define SERVER_PROTOCOL_VERSION 961
++#define SERVER_PROTOCOL_VERSION 962
+ 
+ #endif /* __WINE_WINE_SERVER_PROTOCOL_H */
+diff --git a/server/Makefile.in b/server/Makefile.in
+index 0dd5395..e0b1af1 100644
+--- a/server/Makefile.in
++++ b/server/Makefile.in
+@@ -52,6 +52,6 @@ SOURCES = \
+ 	winstation.c
+ 
+ UNIX_CFLAGS = $(INOTIFY_CFLAGS)
+-UNIX_LIBS   = $(LDEXECFLAGS) $(RT_LIBS) $(INOTIFY_LIBS) $(PROCSTAT_LIBS)
++UNIX_LIBS   = $(LDEXECFLAGS) $(RT_LIBS) $(INOTIFY_LIBS) $(PROCSTAT_LIBS) -lntsync_android
+ 
+ unicode_EXTRADEFS = -DBINDIR="\"${bindir}\"" -DDATADIR="\"${datadir}\""
+diff --git a/server/inproc_sync.c b/server/inproc_sync.c
+index 522d9a4..7b28ee1 100644
+--- a/server/inproc_sync.c
++++ b/server/inproc_sync.c
+@@ -33,7 +33,9 @@
+ #include "thread.h"
+ #include "user.h"
+ 
+-#ifdef HAVE_LINUX_NTSYNC_H
++#ifdef __ANDROID__
++# include "../android/ntsync_android/ntsync_kernel_abi.h"
++#elif defined(HAVE_LINUX_NTSYNC_H)
+ # include <linux/ntsync.h>
+ #endif
+ 
+@@ -44,10 +46,95 @@
+ #include <sys/stat.h>
+ #include <unistd.h>
+ 
++#ifdef __ANDROID__
++#include <stdlib.h>
++/* Kernel /dev/ntsync ioctl ABI + userspace ntsync API: both are compiled
++ * in and selected at runtime (kernel ntsync if usable, userspace else). */
++
++static int ntsync_userspace;  /* 1 when using libntsync_android instead of /dev/ntsync */
++
++int ntsync_userspace_active(void)
++{
++    return ntsync_userspace;
++}
++
++static int create_ntsync_event( const struct ntsync_event_args *args )
++{
++    uint32_t handle;
++    if (ntsync_create_event( &handle, args )) return -1;
++    return (int)handle;
++}
++
++static int create_ntsync_mutex( const struct ntsync_mutex_args *args )
++{
++    uint32_t handle;
++    if (ntsync_create_mutex( &handle, args )) return -1;
++    return (int)handle;
++}
++
++static int create_ntsync_sem( const struct ntsync_sem_args *args )
++{
++    uint32_t handle;
++    if (ntsync_create_sem( &handle, args )) return -1;
++    return (int)handle;
++}
++#endif  /* __ANDROID__ */
++
+ int get_inproc_device_fd(void)
+ {
+     static int fd = -2;
+-    if (fd == -2) fd = open( "/dev/ntsync", O_CLOEXEC | O_RDONLY );
++    if (fd == -2)
++    {
++#ifdef __ANDROID__
++        /* escape hatch for A/B testing: PROTON_NO_KERNEL_NTSYNC=1 ignores a
++         * working kernel driver and forces the userspace backend */
++        int force_userspace = getenv( "PROTON_NO_KERNEL_NTSYNC" ) && atoi(getenv( "PROTON_NO_KERNEL_NTSYNC" ));
++#endif
++        if (getenv( "PROTON_NO_NTSYNC" ) && atoi(getenv( "PROTON_NO_NTSYNC" )))
++            fd = -1;
++        else
++        {
++            fd = open( "/dev/ntsync", O_CLOEXEC | O_RDONLY );
++#ifdef __ANDROID__
++            if (force_userspace && fd >= 0)
++            {
++                close( fd );
++                fd = -1;
++            }
++            if (fd >= 0)
++            {
++                /* the device node can exist but be unusable (SELinux policy,
++                 * seccomp); probe it with a real object creation */
++                struct ntsync_event_args args = {0};
++                int probe = ioctl( fd, NTSYNC_IOC_CREATE_EVENT, &args );
++                if (probe < 0)
++                {
++                    close( fd );
++                    fd = -1;
++                }
++                else close( probe );
++            }
++            if (fd < 0 && !ntsync_init( NULL ))
++            {
++                /* userspace ntsync needs no device fd; objects live in a
++                 * shared-memory region every process attaches to */
++                fd = 0;
++                ntsync_userspace = 1;
++            }
++#endif
++        }
++        if (fd >= 0)
++        {
++#ifdef __ANDROID__
++            if (ntsync_userspace)
++                fprintf( stderr, force_userspace
++                                 ? "ntsync: PROTON_NO_KERNEL_NTSYNC set, using userspace ntsync.\n"
++                                 : "ntsync: no usable /dev/ntsync, using userspace ntsync.\n" );
++            else
++#endif
++            fprintf( stderr, "ntsync: up and running.\n" );
++        }
++    }
+     return fd;
+ }
+ 
+@@ -87,6 +174,10 @@ struct inproc_sync *create_inproc_internal_sync( int manual, int signaled )
+ 
+     if (!(event = alloc_object( &inproc_sync_ops ))) return NULL;
+     event->type = INPROC_SYNC_INTERNAL;
++#ifdef __ANDROID__
++    if (ntsync_userspace) event->fd = create_ntsync_event( &args );
++    else
++#endif
+     event->fd   = ioctl( get_inproc_device_fd(), NTSYNC_IOC_CREATE_EVENT, &args );
+     list_init( &event->entry );
+ 
+@@ -106,6 +197,10 @@ struct inproc_sync *create_inproc_event_sync( int manual, int signaled )
+ 
+     if (!(event = alloc_object( &inproc_sync_ops ))) return NULL;
+     event->type = INPROC_SYNC_EVENT;
++#ifdef __ANDROID__
++    if (ntsync_userspace) event->fd = create_ntsync_event( &args );
++    else
++#endif
+     event->fd   = ioctl( get_inproc_device_fd(), NTSYNC_IOC_CREATE_EVENT, &args );
+     list_init( &event->entry );
+ 
+@@ -125,6 +220,10 @@ struct inproc_sync *create_inproc_mutex_sync( thread_id_t owner, unsigned int co
+ 
+     if (!(mutex = alloc_object( &inproc_sync_ops ))) return NULL;
+     mutex->type = INPROC_SYNC_MUTEX;
++#ifdef __ANDROID__
++    if (ntsync_userspace) mutex->fd = create_ntsync_mutex( &args );
++    else
++#endif
+     mutex->fd   = ioctl( get_inproc_device_fd(), NTSYNC_IOC_CREATE_MUTEX, &args );
+     list_add_tail( &inproc_mutexes, &mutex->entry );
+ 
+@@ -144,6 +243,10 @@ struct inproc_sync *create_inproc_semaphore_sync( unsigned int initial, unsigned
+ 
+     if (!(sem = alloc_object( &inproc_sync_ops ))) return NULL;
+     sem->type = INPROC_SYNC_SEMAPHORE;
++#ifdef __ANDROID__
++    if (ntsync_userspace) sem->fd = create_ntsync_sem( &args );
++    else
++#endif
+     sem->fd   = ioctl( get_inproc_device_fd(), NTSYNC_IOC_CREATE_SEM, &args );
+     list_init( &sem->entry );
+ 
+@@ -165,15 +268,23 @@ static void inproc_sync_dump( struct object *obj, int verbose )
+ 
+ void signal_inproc_sync( struct inproc_sync *sync )
+ {
+-    __u32 count;
++    uint32_t count;
+     if (debug_level) fprintf( stderr, "set_inproc_event %d\n", sync->fd );
++#ifdef __ANDROID__
++    if (ntsync_userspace) ntsync_event_set( sync->fd, &count );
++    else
++#endif
+     ioctl( sync->fd, NTSYNC_IOC_EVENT_SET, &count );
+ }
+ 
+ void reset_inproc_sync( struct inproc_sync *sync )
+ {
+-    __u32 count;
++    uint32_t count;
+     if (debug_level) fprintf( stderr, "reset_inproc_event %d\n", sync->fd );
++#ifdef __ANDROID__
++    if (ntsync_userspace) ntsync_event_reset( sync->fd, &count );
++    else
++#endif
+     ioctl( sync->fd, NTSYNC_IOC_EVENT_RESET, &count );
+ }
+ 
+@@ -195,6 +306,10 @@ static void inproc_sync_destroy( struct object *obj )
+     struct inproc_sync *sync = (struct inproc_sync *)obj;
+     assert( obj->ops == &inproc_sync_ops );
+     list_remove( &sync->entry );
++#ifdef __ANDROID__
++    if (ntsync_userspace) ntsync_close( sync->fd );
++    else
++#endif
+     close( sync->fd );
+ }
+ 
+@@ -203,7 +318,13 @@ void abandon_inproc_mutexes( thread_id_t tid )
+     struct inproc_sync *mutex;
+ 
+     LIST_FOR_EACH_ENTRY( mutex, &inproc_mutexes, struct inproc_sync, entry )
++    {
++#ifdef __ANDROID__
++        if (ntsync_userspace) ntsync_mutex_kill( mutex->fd, tid );
++        else
++#endif
+         ioctl( mutex->fd, NTSYNC_IOC_MUTEX_KILL, &tid );
++    }
+ }
+ 
+ static int get_obj_inproc_sync( struct object *obj, int *type )
+@@ -284,6 +405,10 @@ DECL_HANDLER(get_inproc_sync_fd)
+     reply->access = get_handle_access( current->process, req->handle );
+ 
+     if ((fd = get_obj_inproc_sync( obj, &reply->type )) < 0) set_error( STATUS_NOT_IMPLEMENTED );
++#ifdef __ANDROID__
++    /* userspace ntsync object handle; valid in every process */
++    else if (ntsync_userspace) reply->ntsync_handle = fd;
++#endif
+     else send_client_fd( current->process, fd, req->handle );
+ 
+     release_object( obj );
+diff --git a/server/process.c b/server/process.c
+index 94adb19..22ad67e 100644
+--- a/server/process.c
++++ b/server/process.c
+@@ -64,6 +64,12 @@
+ #include "user.h"
+ #include "security.h"
+ 
++#ifdef __ANDROID__
++#include "../android/ntsync_android/ntsync_user.h"
++/* from inproc_sync.c: 1 when using userspace ntsync instead of /dev/ntsync */
++extern int ntsync_userspace_active(void);
++#endif
++
+ /* process object */
+ 
+ static struct list process_list = LIST_INIT(process_list);
+@@ -738,6 +744,12 @@ static void process_destroy( struct object *obj )
+     if (process->id) free_ptid( process->id );
+     if (process->token) release_object( process->token );
+     if (process->sync) release_object( process->sync );
++#ifdef __ANDROID__
++    /* userspace ntsync has no fd-close-on-death hook; reclaim objects whose
++     * creator process is gone (only when userspace ntsync is actually in use,
++     * otherwise ntsync_sweep_dead would pointlessly auto-init the shm region) */
++    if (ntsync_userspace_active()) ntsync_sweep_dead();
++#endif
+     list_remove( &process->rawinput_entry );
+     free( process->rawinput_devices );
+     free( process->dir_cache );
+diff --git a/server/protocol.def b/server/protocol.def
+index a9be0a1..9fb419f 100644
+--- a/server/protocol.def
++++ b/server/protocol.def
+@@ -4228,6 +4228,7 @@ enum inproc_sync_type
+ @REPLY
+     int           type;         /* inproc sync type */
+     unsigned int access;        /* handle access rights */
++    unsigned int ntsync_handle; /* userspace ntsync object handle (Android) */
+ @END
+ 
+ 
+@@ -4235,6 +4236,7 @@ enum inproc_sync_type
+ @REQ(get_inproc_alert_fd)
+ @REPLY
+     obj_handle_t handle;        /* alert fd is in flight with this handle */
++    unsigned int ntsync_handle; /* userspace ntsync alert event handle (Android) */
+ @END
+ 
+ 
+diff --git a/server/request_handlers.h b/server/request_handlers.h
+index e73242d..ccc2c04 100644
+--- a/server/request_handlers.h
++++ b/server/request_handlers.h
+@@ -2330,9 +2330,11 @@ C_ASSERT( offsetof(struct get_inproc_sync_fd_request, handle) == 12 );
+ C_ASSERT( sizeof(struct get_inproc_sync_fd_request) == 16 );
+ C_ASSERT( offsetof(struct get_inproc_sync_fd_reply, type) == 8 );
+ C_ASSERT( offsetof(struct get_inproc_sync_fd_reply, access) == 12 );
+-C_ASSERT( sizeof(struct get_inproc_sync_fd_reply) == 16 );
++C_ASSERT( offsetof(struct get_inproc_sync_fd_reply, ntsync_handle) == 16 );
++C_ASSERT( sizeof(struct get_inproc_sync_fd_reply) == 24 );
+ C_ASSERT( sizeof(struct get_inproc_alert_fd_request) == 16 );
+ C_ASSERT( offsetof(struct get_inproc_alert_fd_reply, handle) == 8 );
++C_ASSERT( offsetof(struct get_inproc_alert_fd_reply, ntsync_handle) == 12 );
+ C_ASSERT( sizeof(struct get_inproc_alert_fd_reply) == 16 );
+ C_ASSERT( offsetof(struct d3dkmt_object_create_request, type) == 12 );
+ C_ASSERT( offsetof(struct d3dkmt_object_create_request, fd) == 16 );
+diff --git a/server/request_trace.h b/server/request_trace.h
+index 9c7518e..5884679 100644
+--- a/server/request_trace.h
++++ b/server/request_trace.h
+@@ -3411,6 +3411,7 @@ static void dump_get_inproc_sync_fd_reply( const struct get_inproc_sync_fd_reply
+ {
+     fprintf( stderr, " type=%d", req->type );
+     fprintf( stderr, ", access=%08x", req->access );
++    fprintf( stderr, ", ntsync_handle=%08x", req->ntsync_handle );
+ }
+ 
+ static void dump_get_inproc_alert_fd_request( const struct get_inproc_alert_fd_request *req )
+@@ -3420,6 +3421,7 @@ static void dump_get_inproc_alert_fd_request( const struct get_inproc_alert_fd_r
+ static void dump_get_inproc_alert_fd_reply( const struct get_inproc_alert_fd_reply *req )
+ {
+     fprintf( stderr, " handle=%04x", req->handle );
++    fprintf( stderr, ", ntsync_handle=%08x", req->ntsync_handle );
+ }
+ 
+ static void dump_d3dkmt_object_create_request( const struct d3dkmt_object_create_request *req )
+diff --git a/server/thread.c b/server/thread.c
+index bdf48c4..5aa2aec 100644
+--- a/server/thread.c
++++ b/server/thread.c
+@@ -60,6 +60,12 @@
+ #include "user.h"
+ #include "security.h"
+ 
++#ifdef __ANDROID__
++#include "../android/ntsync_android/ntsync_user.h"
++/* from inproc_sync.c: 1 when using userspace ntsync instead of /dev/ntsync */
++extern int ntsync_userspace_active(void);
++#endif
++
+ 
+ /* thread queues */
+ 
+@@ -1745,8 +1751,17 @@ DECL_HANDLER(init_first_thread)
+ 
+     if ((fd = get_inproc_device_fd()) >= 0)
+     {
+-        reply->inproc_device = get_process_id( process ) | 1;
+-        send_client_fd( process, fd, reply->inproc_device );
++#ifdef __ANDROID__
++        /* userspace ntsync needs no device fd; the client attaches to the
++         * shared-memory region itself */
++        if (ntsync_userspace_active())
++            reply->inproc_device = NTSYNC_ANDROID_USED_BY_SERVER;
++        else
++#endif
++        {
++            reply->inproc_device = get_process_id( process ) | 1;
++            send_client_fd( process, fd, reply->inproc_device );
++        }
+     }
+ }
+ 
+@@ -2380,6 +2395,10 @@ DECL_HANDLER(get_inproc_alert_fd)
+     int fd;
+ 
+     if ((fd = get_inproc_sync_fd( current->alert_sync )) < 0) set_error( STATUS_INVALID_PARAMETER );
++#ifdef __ANDROID__
++    /* userspace ntsync alert event handle; valid in every process */
++    else if (ntsync_userspace_active()) reply->ntsync_handle = fd;
++#endif
+     else
+     {
+         reply->handle = get_thread_id( current ) | 1; /* arbitrary token */
