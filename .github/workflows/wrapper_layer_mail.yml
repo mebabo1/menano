@@ -1,11 +1,14 @@
-name: Build Android Vulkan Wrapper mail
+name: Build and Release Android Vulkan Wrapper
 
 on:
   push:
+    branches: [ "main", "master" ]
+    tags:
+      - "v*"
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   build-wrapper:
@@ -105,7 +108,6 @@ jobs:
           c_args = ['-fPIC', '-idirafter$TERMUX_PREFIX/include', '-include', 'fcntl.h', '-include', 'unistd.h']
           cpp_args = ['-fPIC', '-idirafter$TERMUX_PREFIX/include', '-include', 'fcntl.h', '-include', 'unistd.h']
           
-          # 💡 [rpath 교정] /apex/com.android.i18n/lib64 경로를 링커 서치 패스에 완벽하게 바인딩했습니다.
           c_link_args = ['--target=aarch64-linux-android30', '-L$TERMUX_PREFIX/lib', '-Wl,-rpath=/system/lib64:/vendor/lib64:/vendor/lib64/egl:/apex/com.android.i18n/lib64:$RUNTIME_PATH/lib', '-Wl,--no-as-needed', '-lEGL', '-landroid-shmem', '-ldrm', '-lwayland-client']
           cpp_link_args = ['--target=aarch64-linux-android30', '-L$TERMUX_PREFIX/lib', '-Wl,-rpath=/system/lib64:/vendor/lib64:/vendor/lib64/egl:/apex/com.android.i18n/lib64:$RUNTIME_PATH/lib', '-Wl,--no-as-needed', '-lEGL', '-landroid-shmem', '-static-libstdc++', '-ldrm', '-lwayland-client']
 
@@ -153,15 +155,28 @@ jobs:
           cd mesa-src
           DESTDIR=$PWD/install ninja -C build install
 
-      - name: Show Files
+      - name: Package Release Assets
         run: |
-          echo "=== Installed Files ==="
-          find mesa-src/install -type f
+          cd mesa-src/install
+          tar -czvf $GITHUB_WORKSPACE/vulkan-wrapper-aarch64.tar.gz .
 
-      - name: Upload
-        uses: actions/upload-artifact@v4
+      - name: Get Metadata
+        id: meta
+        run: |
+          echo "sha8=$(git rev-parse --short=8 HEAD)" >> $GITHUB_OUTPUT
+          echo "date=$(date +'%Y%m%d')" >> $GITHUB_OUTPUT
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
         with:
-          name: vulkan-wrapper
-          path: |
+          tag_name: "vulkan-wrapper-${{ steps.meta.outputs.date }}-${{ steps.meta.outputs.sha8 }}"
+          name: "Vulkan Wrapper Build (${{ steps.meta.outputs.date }})"
+          body: |
+            Android Vulkan Wrapper (Mesa) Automated Release
+            - Commit: ${{ github.sha }}
+            - API Level: ${{ env.API_LEVEL }}
+          files: |
+            vulkan-wrapper-aarch64.tar.gz
             mesa-src/build.log
-            mesa-src/install
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
