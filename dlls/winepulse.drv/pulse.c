@@ -284,9 +284,13 @@ static void pulse_main_loop(void *args)
     pulse_ml = pa_mainloop_new();
     pa_mainloop_set_poll_func(pulse_ml, pulse_poll_func, NULL);
     NtSetEvent(event, NULL);
+#ifdef __ANDROID__
+    pa_mainloop_run(pulse_ml, &ret);
+#else
     pthread_cleanup_push(pulse_main_loop_thread_cleanup, NULL);
     pa_mainloop_run(pulse_ml, &ret);
     pthread_cleanup_pop(0);
+#endif
     pa_mainloop_free(pulse_ml);
     pulse_unlock();
     PsTerminateSystemThread( 0 );
