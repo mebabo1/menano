@@ -1,10 +1,7 @@
+
 name: Build and Release Android Vulkan Wrapper
 
 on:
-  push:
-    branches: [ "main", "master" ]
-    tags:
-      - "v*"
   workflow_dispatch:
 
 permissions:
