@@ -1703,11 +1703,6 @@ size_t server_init_process(void)
             supported_machines_count = wine_server_reply_size( reply ) / sizeof(*supported_machines);
             if (reply->inproc_device == FSYNC_USED_BY_SERVER)
             {
-                inproc_device_fd = FSYNC_USED_BY_SERVER;
-                fsync_init( pid );
-            }
-            else if (reply->inproc_device)
-            {
 #ifdef __ANDROID__
                 /* userspace ntsync: no device fd; attach to the shared region */
                 if (reply->inproc_device == NTSYNC_ANDROID_USED_BY_SERVER)
@@ -1716,7 +1711,6 @@ size_t server_init_process(void)
                     {
                         inproc_device_fd = 0;
                         ntsync_userspace = 1;
-
                     }
                 }
                 else
@@ -1725,6 +1719,11 @@ size_t server_init_process(void)
                     inproc_device_fd = wine_server_receive_fd( &handle );
                     assert( handle == reply->inproc_device );
                 }
+            }
+            else if (reply->inproc_device)
+            {
+                inproc_device_fd = wine_server_receive_fd( &handle );
+                assert( handle == reply->inproc_device );
             }
         }
     }
