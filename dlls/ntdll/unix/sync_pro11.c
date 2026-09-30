@@ -478,6 +478,9 @@ static NTSTATUS linux_release_semaphore_obj( int obj, ULONG count, ULONG *prev_c
 static NTSTATUS linux_query_semaphore_obj( int obj, SEMAPHORE_BASIC_INFORMATION *info )
 {
     struct ntsync_sem_args args = {0};
+#ifdef __ANDROID__
+    if (ntsync_userspace) return userspace_query_semaphore_obj( obj, info );
+#endif
     if (ioctl( obj, NTSYNC_IOC_SEM_READ, &args ) < 0) return errno_to_status( errno );
     info->CurrentCount = args.count;
     info->MaximumCount = args.max;
