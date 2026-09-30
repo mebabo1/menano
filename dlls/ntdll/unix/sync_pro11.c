@@ -489,7 +489,10 @@ static NTSTATUS linux_query_semaphore_obj( int obj, SEMAPHORE_BASIC_INFORMATION 
 
 static NTSTATUS linux_set_event_obj( int obj, LONG *prev_state )
 {
-    __u32 prev;
+    uint32_t prev;
+#ifdef __ANDROID__
+    if (ntsync_userspace) return userspace_set_event_obj( obj, prev_state );
+#endif
     if (ioctl( obj, NTSYNC_IOC_EVENT_SET, &prev ) < 0) return errno_to_status( errno );
     if (prev_state) *prev_state = prev;
     return STATUS_SUCCESS;
@@ -497,7 +500,10 @@ static NTSTATUS linux_set_event_obj( int obj, LONG *prev_state )
 
 static NTSTATUS linux_reset_event_obj( int obj, LONG *prev_state )
 {
-    __u32 prev;
+    uint32_t prev;
+#ifdef __ANDROID__
+    if (ntsync_userspace) return userspace_reset_event_obj( obj, prev_state );
+#endif
     if (ioctl( obj, NTSYNC_IOC_EVENT_RESET, &prev ) < 0) return errno_to_status( errno );
     if (prev_state) *prev_state = prev;
     return STATUS_SUCCESS;
@@ -505,7 +511,10 @@ static NTSTATUS linux_reset_event_obj( int obj, LONG *prev_state )
 
 static NTSTATUS linux_pulse_event_obj( int obj, LONG *prev_state )
 {
-    __u32 prev;
+    uint32_t prev;
+#ifdef __ANDROID__
+    if (ntsync_userspace) return userspace_pulse_event_obj( obj, prev_state );
+#endif
     if (ioctl( obj, NTSYNC_IOC_EVENT_PULSE, &prev ) < 0) return errno_to_status( errno );
     if (prev_state) *prev_state = prev;
     return STATUS_SUCCESS;
