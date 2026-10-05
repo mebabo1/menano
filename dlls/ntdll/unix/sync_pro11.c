@@ -1083,7 +1083,7 @@ static NTSTATUS inproc_query_mutex( HANDLE handle, MUTANT_BASIC_INFORMATION *inf
     return ret;
 }
 
-int get_inproc_alert_fd(void)
+static int get_inproc_alert_fd(void)
 {
     struct ntdll_thread_data *data = ntdll_get_thread_data();
     obj_handle_t token;
@@ -1098,11 +1098,21 @@ int get_inproc_alert_fd(void)
         {
             if (!server_call_unlocked( req ))
             {
+#ifdef __ANDROID__
+                /* userspace ntsync alert event handle; valid in every process */
+                if (ntsync_userspace) data->alert_fd = fd = reply->ntsync_handle;
+                else
+                {
+                    data->alert_fd = fd = wine_server_receive_fd( &token );
+                    assert( token == reply->handle );
+                }
+#else
                 if (do_fsync()) data->alert_fd = fd = reply->fsync_shm_idx;
                 else
                 {
                     data->alert_fd = fd = wine_server_receive_fd( &token );
                     assert( token == reply->handle );
+#endif
                 }
             }
         }
