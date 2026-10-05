@@ -523,6 +523,9 @@ static NTSTATUS linux_pulse_event_obj( int obj, LONG *prev_state )
 static NTSTATUS linux_query_event_obj( int obj, EVENT_BASIC_INFORMATION *info )
 {
     struct ntsync_event_args args = {0};
+#ifdef __ANDROID__
+    if (ntsync_userspace) return userspace_query_event_obj( obj, info );
+#endif
     if (ioctl( obj, NTSYNC_IOC_EVENT_READ, &args ) < 0) return errno_to_status( errno );
     info->EventType = args.manual ? NotificationEvent : SynchronizationEvent;
     info->EventState = args.signaled;
@@ -532,6 +535,9 @@ static NTSTATUS linux_query_event_obj( int obj, EVENT_BASIC_INFORMATION *info )
 static NTSTATUS linux_release_mutex_obj( int obj, LONG *prev_count )
 {
     struct ntsync_mutex_args args = {.owner = GetCurrentThreadId()};
+#ifdef __ANDROID__
+    if (ntsync_userspace) return userspace_release_mutex_obj( obj, prev_count );
+#endif
     if (ioctl( obj, NTSYNC_IOC_MUTEX_UNLOCK, &args ) < 0)
     {
         if (errno == EOVERFLOW) return STATUS_MUTANT_LIMIT_EXCEEDED;
@@ -545,6 +551,9 @@ static NTSTATUS linux_release_mutex_obj( int obj, LONG *prev_count )
 static NTSTATUS linux_query_mutex_obj( int obj, MUTANT_BASIC_INFORMATION *info )
 {
     struct ntsync_mutex_args args = {0};
+#ifdef __ANDROID__
+    if (ntsync_userspace) return userspace_query_mutex_obj( obj, info );
+#endif
     if (ioctl( obj, NTSYNC_IOC_MUTEX_READ, &args ) < 0)
     {
         if (errno == EOWNERDEAD)
@@ -569,10 +578,13 @@ static NTSTATUS linux_wait_objs( int device, DWORD count, const int *objs, WAIT_
     unsigned long request;
     struct timespec now;
     int ret;
+#ifdef __ANDROID__
+    if (ntsync_userspace) return userspace_wait_objs( count, objs, type, alert_fd, timeout );
+#endif
 
     if (!timeout || timeout->QuadPart == TIMEOUT_INFINITE)
     {
-        args.timeout = ~(__u64)0;
+        args.timeout = ~(uint64_t)0;
     }
     else if (timeout->QuadPart <= 0)
     {
