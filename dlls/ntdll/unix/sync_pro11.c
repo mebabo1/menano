@@ -2627,19 +2627,34 @@ NTSTATUS WINAPI NtSignalAndWaitForSingleObject( HANDLE signal, HANDLE wait,
  */
 NTSTATUS WINAPI NtYieldExecution(void)
 {
-#ifdef HAVE_SCHED_YIELD
-#ifdef RUSAGE_THREAD
-    struct rusage u1, u2;
-    int ret;
+    static int fast_yield = -1;
 
-    ret = getrusage( RUSAGE_THREAD, &u1 );
-#endif
-    sched_yield();
+    if (fast_yield < 0)
+    {
+        const char *e = getenv( "WINE_FAST_YIELD" );
+        fast_yield = e && atoi( e );
+    }
+    if (fast_yield)
+    {
+        usleep( 0 );
+        return STATUS_SUCCESS;
+    }
+
+#ifdef HAVE_SCHED_YIELD
+    {
 #ifdef RUSAGE_THREAD
-    if (!ret) ret = getrusage( RUSAGE_THREAD, &u2 );
-    if (!ret && u1.ru_nvcsw == u2.ru_nvcsw && u1.ru_nivcsw == u2.ru_nivcsw) return STATUS_NO_YIELD_PERFORMED;
+        struct rusage u1, u2;
+        int ret;
+
+        ret = getrusage( RUSAGE_THREAD, &u1 );
 #endif
-    return STATUS_SUCCESS;
+        sched_yield();
+#ifdef RUSAGE_THREAD
+        if (!ret) ret = getrusage( RUSAGE_THREAD, &u2 );
+        if (!ret && u1.ru_nvcsw == u2.ru_nvcsw && u1.ru_nivcsw == u2.ru_nivcsw) return STATUS_NO_YIELD_PERFORMED;
+#endif
+        return STATUS_SUCCESS;
+    }
 #else
     return STATUS_NO_YIELD_PERFORMED;
 #endif
