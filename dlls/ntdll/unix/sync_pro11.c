@@ -812,7 +812,12 @@ static void release_inproc_sync( struct inproc_sync *sync )
     LONG ref = InterlockedDecrement( &sync->refcount );
 
     assert( ref >= 0 );
-    if (!ref) close( fd );
+#ifdef __ANDROID__
+    /* userspace ntsync objects are owned by the server; nothing to close */
+    if (!ref && !ntsync_userspace) close( fd );
+#else
+	if (!ref) close( fd );
+#endif
 }
 
 static struct inproc_sync *get_cached_inproc_sync( HANDLE handle )
@@ -853,8 +858,18 @@ static NTSTATUS get_server_inproc_sync( HANDLE handle, struct inproc_sync *sync 
         {
             obj_handle_t fd_handle;
             sync->refcount = 1;
+#ifdef __ANDROID__
+            /* userspace ntsync object handle is passed in ntsync_handle */
+            if (ntsync_userspace) sync->fd = reply->ntsync_handle;
+            else
+            {
+                sync->fd = wine_server_receive_fd( &fd_handle );
+                assert( wine_server_ptr_handle(fd_handle) == handle );
+            }
+#else
             sync->fd = wine_server_receive_fd( &fd_handle );
             assert( wine_server_ptr_handle(fd_handle) == handle );
+#endif
             sync->access = reply->access;
             sync->type = reply->type;
             sync->closed = 0;
