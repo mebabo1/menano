@@ -33,10 +33,13 @@
 #include "request.h"
 #include "thread.h"
 #include "user.h"
-#ifdef __ANDROID__
-# include "../android/ntsync_android/ntsync_kernel_abi.h"
-#elif defined(HAVE_LINUX_NTSYNC_H)
-# include "ntsync_tmp.h"
+#ifndef __ANDROID__
+ #include "ntsync_tmp.h"
+#else
+#include <stdlib.h>
+/* Kernel /dev/ntsync ioctl ABI + userspace ntsync API: both are compiled
+ * in and selected at runtime (kernel ntsync if usable, userspace else). */
+#include "../android/ntsync_android/ntsync_kernel_abi.h"
 #endif
 #include "fsync.h"
 
@@ -95,7 +98,7 @@ int get_inproc_device_fd(void)
             fd = -1;
         else
         {
-            fd = open( "/dev/ntsync", O_CLOEXEC | O_RDONLY );
+             fd = open( "/dev/ntsync", O_CLOEXEC | O_RDONLY );
 #ifdef __ANDROID__
             if (force_userspace && fd >= 0)
             {
@@ -126,6 +129,7 @@ int get_inproc_device_fd(void)
         }
         if (fd >= 0)
         {
+            do_fsync_cached = 0;
 #ifdef __ANDROID__
             if (ntsync_userspace)
                 fprintf( stderr, force_userspace
@@ -135,8 +139,10 @@ int get_inproc_device_fd(void)
 #endif
             fprintf( stderr, "ntsync: up and running.\n" );
         }
+        else if (do_fsync()) fd = FSYNC_USED_BY_SERVER;
+        else fprintf( stderr, "wineserver: using server-side synchronization.\n" );
     }
-     return fd;
+    return fd;
 }
 
 struct inproc_sync
