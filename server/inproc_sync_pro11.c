@@ -86,17 +86,55 @@ int get_inproc_device_fd(void)
     static int fd = -2;
     if (fd == -2)
     {
+#ifdef __ANDROID__
+        /* escape hatch for A/B testing: PROTON_NO_KERNEL_NTSYNC=1 ignores a
+         * working kernel driver and forces the userspace backend */
+        int force_userspace = getenv( "PROTON_NO_KERNEL_NTSYNC" ) && atoi(getenv( "PROTON_NO_KERNEL_NTSYNC" ));
+#endif
         if (getenv( "PROTON_NO_NTSYNC" ) && atoi(getenv( "PROTON_NO_NTSYNC" )))
             fd = -1;
         else
+        {
             fd = open( "/dev/ntsync", O_CLOEXEC | O_RDONLY );
+#ifdef __ANDROID__
+            if (force_userspace && fd >= 0)
+            {
+                close( fd );
+                fd = -1;
+            }
+            if (fd >= 0)
+            {
+                /* the device node can exist but be unusable (SELinux policy,
+                 * seccomp); probe it with a real object creation */
+                struct ntsync_event_args args = {0};
+                int probe = ioctl( fd, NTSYNC_IOC_CREATE_EVENT, &args );
+                if (probe < 0)
+                {
+                    close( fd );
+                    fd = -1;
+                }
+                else close( probe );
+            }
+            if (fd < 0 && !ntsync_init( NULL ))
+            {
+                /* userspace ntsync needs no device fd; objects live in a
+                 * shared-memory region every process attaches to */
+                fd = 0;
+                ntsync_userspace = 1;
+            }
+#endif
+        }
         if (fd >= 0)
         {
-            do_fsync_cached = 0;
+#ifdef __ANDROID__
+            if (ntsync_userspace)
+                fprintf( stderr, force_userspace
+                                 ? "ntsync: PROTON_NO_KERNEL_NTSYNC set, using userspace ntsync.\n"
+                                 : "ntsync: no usable /dev/ntsync, using userspace ntsync.\n" );
+            else
+#endif
             fprintf( stderr, "ntsync: up and running.\n" );
         }
-        else if (do_fsync()) fd = FSYNC_USED_BY_SERVER;
-        else fprintf( stderr, "wineserver: using server-side synchronization.\n" );
     }
     return fd;
 }
