@@ -279,7 +279,7 @@ jobs:
           curl -L https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/dlls/ntdll/unix/env_pro11.c -o dlls/ntdll/unix/env.c
           curl -L https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/dlls/ntdll/unix/server_pro11.c -o dlls/ntdll/unix/server.c
           curl -L https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/dlls/ntdll/unix/sync_pro11.c -o dlls/ntdll/unix/sync.c
-          curl -L https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/dlls/ntdll/unix/unix_private_pro11.h -o ntdll/unix/unix_private.h
+          curl -L https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/dlls/ntdll/unix/unix_private_pro11.h -o dlls/ntdll/unix/unix_private.h
           curl -L https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/dlls/ntdll/Makefile_pro11.in -o dlls/ntdll/Makefile.in
           curl -L https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/include/wine/server_protocol_pro11.h -o include/wine/server_protocol.h
           curl -L https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/server/Makefile_pro11.in -o server/Makefile.in
