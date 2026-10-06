@@ -86,19 +86,6 @@ int get_inproc_device_fd(void)
     static int fd = -2;
     if (fd == -2)
     {
-        if (getenv( "PROTON_NO_NTSYNC" ) && atoi(getenv( "PROTON_NO_NTSYNC" )))
-            fd = -1;
-        else
-            fd = open( "/dev/ntsync", O_CLOEXEC | O_RDONLY );
-        if (fd >= 0)
-        {
-            do_fsync_cached = 0;
-            fprintf( stderr, "ntsync: up and running.\n" );
-        }
-        else if (do_fsync()) fd = FSYNC_USED_BY_SERVER;
-        else fprintf( stderr, "wineserver: using server-side synchronization.\n" );
-    }
-    {
 #ifdef __ANDROID__
         /* escape hatch for A/B testing: PROTON_NO_KERNEL_NTSYNC=1 ignores a
          * working kernel driver and forces the userspace backend */
