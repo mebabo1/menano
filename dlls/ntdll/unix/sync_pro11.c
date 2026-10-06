@@ -60,13 +60,13 @@
 #ifdef HAVE_KQUEUE
 # include <sys/event.h>
 #endif
-#ifdef __ANDROID__
+#ifndef __ANDROID__
+ # include "ntsync_tmp.h"
+#else
 /* Kernel /dev/ntsync ioctl ABI + userspace ntsync API: both are compiled
  * in and selected at runtime (kernel ntsync if the server passed us a real
  * device fd, userspace if it reported NTSYNC_ANDROID_USED_BY_SERVER). */
 # include "../../../android/ntsync_android/ntsync_kernel_abi.h"
-#elif defined(HAVE_LINUX_NTSYNC_H)
-# include "ntsync_tmp.h"
 #endif
 #include "ntstatus.h"
 #define WIN32_NO_STATUS
