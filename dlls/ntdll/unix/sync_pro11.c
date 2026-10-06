@@ -1083,7 +1083,7 @@ static NTSTATUS inproc_query_mutex( HANDLE handle, MUTANT_BASIC_INFORMATION *inf
     return ret;
 }
 
-static int get_inproc_alert_fd(void)
+int get_inproc_alert_fd(void)
 {
     struct ntdll_thread_data *data = ntdll_get_thread_data();
     obj_handle_t token;
@@ -1112,8 +1112,8 @@ static int get_inproc_alert_fd(void)
                 {
                     data->alert_fd = fd = wine_server_receive_fd( &token );
                     assert( token == reply->handle );
-#endif
                 }
+#endif
             }
         }
         SERVER_END_REQ;
