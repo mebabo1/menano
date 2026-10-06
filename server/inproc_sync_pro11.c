@@ -126,6 +126,7 @@ int get_inproc_device_fd(void)
         }
         if (fd >= 0)
         {
+            do_fsync_cached = 0;
 #ifdef __ANDROID__
             if (ntsync_userspace)
                 fprintf( stderr, force_userspace
@@ -135,6 +136,8 @@ int get_inproc_device_fd(void)
 #endif
             fprintf( stderr, "ntsync: up and running.\n" );
         }
+        else if (do_fsync()) fd = FSYNC_USED_BY_SERVER;
+        else fprintf( stderr, "wineserver: using server-side synchronization.\n" );
     }
     return fd;
 }
