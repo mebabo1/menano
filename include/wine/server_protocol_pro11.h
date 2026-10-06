@@ -7096,6 +7096,6 @@ union generic_reply
     struct d3dkmt_mutex_release_reply d3dkmt_mutex_release_reply;
 };
 
-#define SERVER_PROTOCOL_VERSION 962
+#define SERVER_PROTOCOL_VERSION 930
 
 #endif /* __WINE_WINE_SERVER_PROTOCOL_H */
