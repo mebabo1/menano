@@ -1843,8 +1843,17 @@ DECL_HANDLER(init_first_thread)
     }
     else if ((fd = get_inproc_device_fd()) >= 0)
     {
-        reply->inproc_device = get_process_id( process ) | 1;
-        send_client_fd( process, fd, reply->inproc_device );
+#ifdef __ANDROID__
+        /* userspace ntsync needs no device fd; the client attaches to the
+         * shared-memory region itself */
+        if (ntsync_userspace_active())
+            reply->inproc_device = NTSYNC_ANDROID_USED_BY_SERVER;
+        else
+#endif
+        {
+            reply->inproc_device = get_process_id( process ) | 1;
+            send_client_fd( process, fd, reply->inproc_device );
+        }
     }
 }
 
