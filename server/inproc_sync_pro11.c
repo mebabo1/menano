@@ -36,8 +36,6 @@
 #ifdef __ANDROID__
 # include "../android/ntsync_android/ntsync_kernel_abi.h"
 #elif defined(HAVE_LINUX_NTSYNC_H)
-# include 
-#else
 # include "ntsync_tmp.h"
 #endif
 #include "fsync.h"
