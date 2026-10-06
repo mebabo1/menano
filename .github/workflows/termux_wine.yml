@@ -269,13 +269,27 @@ jobs:
           mkdir -p android/android_sysvshm/sys
           mkdir -p android/shm_utils
 
-          # curl -L https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/path/shm.h -o android/android_sysvshm/sys/shm.h
-          # curl -L https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/path/shm_utils.h -o android/shm_utils/shm_utils.h
+          curl -L https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/path/shm.h -o android/android_sysvshm/sys/shm.h
+          curl -L https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/path/shm_utils.h -o android/shm_utils/shm_utils.h
           # curl -L https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/dlls/ntdll/unix/09env.c -o dlls/ntdll/unix/env.c
           # curl -L https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/dlls/ntdll/unix/09virtual.c -o dlls/ntdll/unix/virtual.c
-          curl -L https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/dlls/ntdll/unix/11_17env.c -o dlls/ntdll/unix/env.c
-          curl -L https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/dlls/winepulse.drv/11_17pulse.c -o dlls/winepulse.drv/pulse.c
-          # curl -L https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/dlls/ntdll/unix/env_pro11.c -o dlls/ntdll/unix/env.c
+          # curl -L https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/dlls/ntdll/unix/11_17env.c -o dlls/ntdll/unix/env.c
+          # curl -L https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/dlls/winepulse.drv/11_17pulse.c -o dlls/winepulse.drv/pulse.c
+          # pro11
+          curl -L https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/dlls/ntdll/unix/env_pro11.c -o dlls/ntdll/unix/env.c
+          curl -L https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/dlls/ntdll/unix/server_pro11.c -o dlls/ntdll/unix/server.c
+          curl -L https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/dlls/ntdll/unix/sync_pro11.c -o dlls/ntdll/unix/sync.c
+          curl -L https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/dlls/ntdll/unix/unix_private_pro11.h -o ntdll/unix/unix_private.h
+          curl -L https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/dlls/ntdll/Makefile_pro11.in -o dlls/ntdll/Makefile.in
+          curl -L https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/include/wine/server_protocol_pro11.h -o include/wine/server_protocol.h
+          curl -L https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/server/Makefile_pro11.in -o server/Makefile.in
+          curl -L https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/server/inproc_sync_pro11.c -o server/inproc_sync.c
+          curl -L https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/server/process_pro11.c -o server/process.c
+          curl -L https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/server/protocol_pro11.def -o server/protocol.def
+          curl -L https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/server/request_handlers_pro11.h -o server/request_handlers.h
+          curl -L https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/server/request_trace_pro11.h -o server/request_trace.h
+          curl -L https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/server/thread_pro11.c -o server/thread.c
+          # pro10
           # curl -L https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/dlls/ntdll/unix/env_pro10.c -o dlls/ntdll/unix/env.c
           # curl -L https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/dlls/ntdll/unix/virtual10.c -o dlls/ntdll/unix/virtual.c
 
@@ -341,7 +355,7 @@ jobs:
 
           export PATCH_BASE="https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/path"
 
-          PATCH_FILES="gstreamer.patch ntsync.patch"
+          PATCH_FILES="1.patch gstreamer.patch ntsync01.patch dlls_ntdll_unix_fsync.c.patch dlls_ntdll_unix_virtual.c.patch"
           echo "Applying external patches from $PATCH_BASE..."
           for FILE in $PATCH_FILES; do
             URL="${PATCH_BASE}/${FILE}"
