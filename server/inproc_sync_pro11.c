@@ -365,11 +365,10 @@ static void inproc_sync_destroy( struct object *obj )
     struct inproc_sync *sync = (struct inproc_sync *)obj;
     assert( obj->ops == &inproc_sync_ops );
     list_remove( &sync->entry );
-#ifdef __ANDROID__
-    if (ntsync_userspace) ntsync_close( sync->fd );
-    else
-#endif
     if (do_fsync()) fsync_free_shm_idx( sync->fd );
+#ifdef __ANDROID__
+    else if (ntsync_userspace) ntsync_close( sync->fd );
+#endif
     else            close( sync->fd );
 }
 
