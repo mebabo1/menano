@@ -33,7 +33,9 @@
 #include "request.h"
 #include "thread.h"
 #include "user.h"
-
+#ifdef __ANDROID__
+# include "../android/ntsync_android/ntsync_kernel_abi.h"
+#elif defined(HAVE_LINUX_NTSYNC_H)
 #include "fsync.h"
 
 #include "ntsync_tmp.h"
@@ -44,6 +46,40 @@
 #include <sys/ioctl.h>
 #include <sys/stat.h>
 #include <unistd.h>
+
+#ifdef __ANDROID__
+#include <stdlib.h>
+/* Kernel /dev/ntsync ioctl ABI + userspace ntsync API: both are compiled
+ * in and selected at runtime (kernel ntsync if usable, userspace else). */
+
+static int ntsync_userspace;  /* 1 when using libntsync_android instead of /dev/ntsync */
+
+int ntsync_userspace_active(void)
+{
+    return ntsync_userspace;
+}
+
+static int create_ntsync_event( const struct ntsync_event_args *args )
+{
+    uint32_t handle;
+    if (ntsync_create_event( &handle, args )) return -1;
+    return (int)handle;
+}
+
+static int create_ntsync_mutex( const struct ntsync_mutex_args *args )
+{
+    uint32_t handle;
+    if (ntsync_create_mutex( &handle, args )) return -1;
+    return (int)handle;
+}
+
+static int create_ntsync_sem( const struct ntsync_sem_args *args )
+{
+    uint32_t handle;
+    if (ntsync_create_sem( &handle, args )) return -1;
+    return (int)handle;
+}
+#endif  /* __ANDROID__ */
 
 int get_inproc_device_fd(void)
 {
