@@ -2493,6 +2493,10 @@ DECL_HANDLER(get_inproc_alert_fd)
     int fd;
 
     if ((fd = get_inproc_sync_fd( current->alert_sync )) < 0) set_error( STATUS_INVALID_PARAMETER );
+#ifdef __ANDROID__
+    /* userspace ntsync alert event handle; valid in every process */
+    else if (ntsync_userspace_active()) reply->ntsync_handle = fd;
+#endif
     else if (do_fsync()) reply->fsync_shm_idx = fd;
     else
     {
