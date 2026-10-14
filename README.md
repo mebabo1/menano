@@ -94,7 +94,7 @@ xbox controller, ps5 controller, GameSir g8 plus
 
 An app supporting the same virtual keyboard as Winlator has been released.
 
-[termux-x11-xodmod](https://github.com/xodiosx/termux-x11-xodmod?tab=readme-ov-file)
+[termux-x11-xodmod](https://github.com/xodiosx/termux-x11-x)
 
 If you install the Winlator pad DLL file and run this app through the wfm.exe file manager, the game controller should also work.
 
