@@ -139,7 +139,7 @@ jobs:
             -Dxmlconfig=disabled \
             -Dgallium-drivers= \
             -Dvulkan-drivers=wrapper \
-            -Dplatforms=x11 \
+            -Dplatforms=x11,wayland \
             --prefix=/data/data/com.termux/files/usr
 
       - name: Build
