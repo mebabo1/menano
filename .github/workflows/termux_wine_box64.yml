@@ -30,29 +30,26 @@ jobs:
         unzip -q android-ndk-r27c-linux.zip
         echo "NDK_HOME=$PWD/android-ndk-r27c" >> $GITHUB_ENV
 
-    - name: Download Wine source
+    - name: Download Valve Wine source
       run: |
         WINE_VER="${{ github.event.inputs.wine_version }}"
-        # 尝试多个源
-        wget -q "https://dl.winehq.org/wine/source/${WINE_VER}/wine-${WINE_VER}.tar.xz" \
-          -O "wine-${WINE_VER}.tar.xz" 2>/dev/null || \
-        wget -q "https://github.com/wine-mirror/wine/archive/refs/tags/wine-${WINE_VER}.tar.gz" \
-          -O "wine-${WINE_VER}.tar.gz" 2>/dev/null || \
-        wget -q "https://gitlab.winehq.org/wine/wine/-/archive/wine-${WINE_VER}/wine-wine-${WINE_VER}.tar.gz" \
-          -O "wine-${WINE_VER}.tar.gz"
+        REF="proton_${WINE_VER}"
         
-        if [ -f "wine-${WINE_VER}.tar.xz" ]; then
-          tar -xf "wine-${WINE_VER}.tar.xz"
-        elif [ -f "wine-${WINE_VER}.tar.gz" ]; then
-          tar -xf "wine-${WINE_VER}.tar.gz"
-        else
-          echo "Failed to download Wine source"
+        echo "Downloading Valve Wine source from ValveSoftware/wine (${REF})..."
+        
+        # ValveSoftware/wine 저장소의 heads(브랜치) 또는 tags(태그)에서 다운로드 시도
+        wget -q "https://github.com/ValveSoftware/wine/archive/refs/heads/${REF}.tar.gz" -O wine.tar.gz || \
+        wget -q "https://github.com/ValveSoftware/wine/archive/refs/tags/${REF}.tar.gz" -O wine.tar.gz
+
+        if [ ! -f "wine.tar.gz" ]; then
+          echo "Error: Failed to download ${REF} from ValveSoftware/wine"
           exit 1
-        fi
-        
-        # 找到解压后的目录（可能有不同命名方式）
+        }
+
+        tar -xf wine.tar.gz
         WINE_DIR=$(ls -d wine-*/ 2>/dev/null | head -1)
         mv "$WINE_DIR" wine-src
+        
         echo "WINE_VERSION=${WINE_VER}" >> $GITHUB_ENV
 
     - name: Build Wine tools (native)
