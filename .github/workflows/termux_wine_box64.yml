@@ -442,8 +442,8 @@ jobs:
           
           export LDFLAGS="-L$deps/lib -Wl,-rpath=$RUNTIME_PATH/lib"
 
-          export CFLAGS="-O2 -pipe -ftree-vectorize -Wno-error -Wno-nullability-completeness -Wno-strict-prototypes -Wno-declaration-after-statement -include strings.h"
-          export CXXFLAGS="-O2 -pipe -ftree-vectorize -Wno-error -Wno-nullability-completeness -Wno-strict-prototypes -Wno-declaration-after-statement include strings.h"
+          export CFLAGS="-O2 -pipe -ftree-vectorize -Wno-error -Wno-nullability-completeness -Wno-strict-prototypes -Wno-declaration-after-statement -include strings.h -include sys/time.h"
+          export CXXFLAGS="-O2 -pipe -ftree-vectorize -Wno-error -Wno-nullability-completeness -Wno-strict-prototypes -Wno-declaration-after-statement include strings.h -include sys/time.h"
           export CROSSCFLAGS="-O2 -pipe -ftree-vectorize"
           export CROSSCXXFLAGS="-O2 -pipe -ftree-vectorize"
           
