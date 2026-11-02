@@ -123,20 +123,25 @@ jobs:
         run: |
           cd mesa-src
           python3 -c '
-          import re
           path = "src/vulkan/wsi/wsi_common_display.c"
           with open(path, "r") as f:
-              content = f.read()
+              lines = f.readlines()
           
-          pattern = r"(\s*)pthread_setcanceltype\(PTHREAD_CANCEL_ASYNCHRONOUS,\s*NULL\);"
-          replacement = r"\1#ifndef __ANDROID__\n\1pthread_setcanceltype(PTHREAD_CANCEL_ASYNCHRONOUS, NULL);\n\1#endif"
-          
-          new_content, count = re.subn(pattern, replacement, content)
-          assert count > 0, "Target pattern not found in wsi_common_display.c"
+          new_lines = []
+          patched_count = 0
+          for line in lines:
+              if "pthread_setcanceltype" in line:
+                  indent = line[:len(line) - len(line.lstrip())]
+                  new_lines.append(f"{indent}#ifndef __ANDROID__\n")
+                  new_lines.append(line)
+                  new_lines.append(f"{indent}#endif\n")
+                  patched_count += 1
+              else:
+                  new_lines.append(line)
           
           with open(path, "w") as f:
-              f.write(new_content)
-          print(f"Successfully patched wsi_common_display.c (replaced {count} occurrence(s))")
+              f.writelines(new_lines)
+          print(f"Successfully patched wsi_common_display.c (Total patched lines: {patched_count})")
           '
 
       - name: Configure Mesa
