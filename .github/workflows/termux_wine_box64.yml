@@ -306,20 +306,6 @@ jobs:
             sed -i 's/^[[:space:]]*mallopt( M_PERTURB,/\/\/ mallopt( M_PERTURB,/g' "$FILE_LOADER"
           fi
 
-          FILE_LOADER="dlls/ntdll/loader.c"
-          if [ -f "$FILE_LOADER" ]; then
-            echo "Patching $FILE_LOADER..."
-            sed -i 's|xtajit64.dll|libarm64ecfex.dll|' "$FILE_LOADER"
-          fi
-
-          INF="loader/wine.inf.in"
-          if [ -f "$INF" ] && ! grep -q 'libarm64ecfex.dll' "$INF"; then
-              echo "Patching wine.inf for FEX libraries..."
-              sed -i 's/xtajit64\.dll/libarm64ecfex.dll/g' "$INF"
-              sed -i 's/xtajit\.dll/libwow64fex.dll/g' "$INF"    
-              echo "✔ wine.inf integrated patch applied."
-          fi
-
           FILE_VIRTUAL="dlls/ntdll/unix/virtual.c"
           if [ -f "$FILE_VIRTUAL" ]; then
             echo "Patching $FILE_VIRTUAL: Completely neutralizing userfaultfd..."
@@ -340,13 +326,6 @@ jobs:
             # 기존 라인 뒤에 -landroid-shmem 추가
             sed -i 's/$(PTHREAD_LIBS) -lm/$(PTHREAD_LIBS) -lm -landroid-shmem/' "$FILE_X11_MK"
           fi
-
-          find . -type f \( -name "*.c" -o -name "*.h" \) \
-            -exec sed -i 's/xtajit64\.dll/libarm64ecfex.dll/g' {} +
-          find . -type f \( -name "*.c" -o -name "*.h" \) \
-            -exec sed -i 's/xtajit\.dll/libwow64fex.dll/g' {} +
-          find dlls/ntdll -type f \( -name "*.c" -o -name "*.h" \) \
-            -exec sed -i 's|x86_64-windows|aarch64-windows|g' {} +
 
           export PATCH_BASE="https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/path"
 
