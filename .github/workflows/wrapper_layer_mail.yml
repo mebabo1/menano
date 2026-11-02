@@ -131,17 +131,14 @@ jobs:
           patched_count = 0
           for line in lines:
               if "pthread_setcanceltype" in line:
-                  indent = line[:len(line) - len(line.lstrip())]
-                  new_lines.append(f"{indent}#ifndef __ANDROID__\n")
-                  new_lines.append(line)
-                  new_lines.append(f"{indent}#endif\n")
+                  new_lines.append(f"// {line}")
                   patched_count += 1
               else:
                   new_lines.append(line)
           
           with open(path, "w") as f:
               f.writelines(new_lines)
-          print(f"Successfully patched wsi_common_display.c (Total patched lines: {patched_count})")
+          print(f"Successfully commented out pthread_setcanceltype (Total: {patched_count})")
           '
 
       - name: Configure Mesa
