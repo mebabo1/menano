@@ -442,8 +442,8 @@ jobs:
           
           export LDFLAGS="-L$deps/lib -Wl,-rpath=$RUNTIME_PATH/lib"
 
-          export CFLAGS="-O2 -pipe -ftree-vectorize -Wno-error -Wno-nullability-completeness -Wno-strict-prototypes -Wno-declaration-after-statement -include strings.h -include sys/time.h"
-          export CXXFLAGS="-O2 -pipe -ftree-vectorize -Wno-error -Wno-nullability-completeness -Wno-strict-prototypes -Wno-declaration-after-statement include strings.h -include sys/time.h"
+          export CFLAGS="-O2 -pipe -ftree-vectorize -Wno-error -Wno-nullability-completeness -Wno-strict-prototypes -Wno-declaration-after-statement -target x86_64-linux-android28 --sysroot=$TOOLCHAIN/../sysroot -D__BIONIC__ -D__ANDROID_API__=28 -D_GNU_SOURCE -include strings.h -include sys/time.h"
+          export CXXFLAGS="-O2 -pipe -ftree-vectorize -Wno-error -Wno-nullability-completeness -Wno-strict-prototypes -Wno-declaration-after-statement -target x86_64-linux-android28 --sysroot=$TOOLCHAIN/../sysroot -D__BIONIC__ -D__ANDROID_API__=28 -D_GNU_SOURCE -include strings.h -include sys/time.h"
           export CROSSCFLAGS="-O2 -pipe -ftree-vectorize"
           export CROSSCXXFLAGS="-O2 -pipe -ftree-vectorize"
           
