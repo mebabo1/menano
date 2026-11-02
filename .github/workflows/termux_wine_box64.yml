@@ -314,23 +314,6 @@ jobs:
             sed -i '/static void kernel_writewatch_init(void)/{n;s/^{/{\n    return;/}' "$FILE_VIRTUAL"
           fi
 
-          python3 - << 'EOF'
-              path = "dlls/ntdll/unix/signal_x86_64.c"
-              with open(path, "r") as f:
-                  content = f.read()
-              
-              target = "#include \"config.h\""
-              addition = "\n#ifdef __ANDROID__\n#include <sys/ucontext.h>\n#endif"
-              
-              if target in content and "#include <sys/ucontext.h>" not in content:
-                  content = content.replace(target, target + addition, 1)
-                  with open(path, "w") as f:
-                      f.write(content)
-                  print("Successfully patched signal_x86_64.c order.")
-              else:
-                  print("Target config.h not found or already patched.")
-              EOF
-
           FILE_PULSE_MK="dlls/winepulse.drv/Makefile.in"
           if [ -f "$FILE_PULSE_MK" ]; then
             echo "Adding -lpulse to $FILE_PULSE_MK..."
