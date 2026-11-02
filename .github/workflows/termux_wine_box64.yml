@@ -74,12 +74,12 @@ jobs:
       - name: Download and extract termuxfs for x86_64
         run: |
           mkdir -p $HOME/termuxfs/x86_64
-          cd $HOME/termuxfs/aarch64
+          cd $HOME/termuxfs/x86_64
           https://github.com/GameNative/termux-on-gha/releases/download/build-20260218/termuxfs-x86_64.tar
           termuxfs-x86_64.tar
           
-          echo "TERMUX_PREFIX=$HOME/termuxfs/aarch64/data/data/com.termux/files/usr" >> $GITHUB_ENV
-          echo "TERMUX_SYSROOT=$HOME/termuxfs/aarch64" >> $GITHUB_ENV
+          echo "TERMUX_PREFIX=$HOME/termuxfs/x86_64/data/data/com.termux/files/usr" >> $GITHUB_ENV
+          echo "TERMUX_SYSROOT=$HOME/termuxfs/x86_64" >> $GITHUB_ENV
           echo "RUNTIME_PATH=/data/data/com.termux/files/usr" >> $GITHUB_ENV
 
       - name: Patch wayland-scanner.pc for wlroots Cross-Compilation
