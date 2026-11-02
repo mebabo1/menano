@@ -314,6 +314,12 @@ jobs:
             sed -i '/static void kernel_writewatch_init(void)/{n;s/^{/{\n    return;/}' "$FILE_VIRTUAL"
           fi
 
+          SIG_FILE="dlls/ntdll/unix/signal_x86_64.c"
+          if [ -f "$SIG_FILE" ]; then
+            echo "Patching $SIG_FILE for Bionic ucontext..."
+            sed -i '1i #ifdef __ANDROID__\n#include <sys/ucontext.h>\n#endif' "$SIG_FILE"
+          fi
+
           FILE_PULSE_MK="dlls/winepulse.drv/Makefile.in"
           if [ -f "$FILE_PULSE_MK" ]; then
             echo "Adding -lpulse to $FILE_PULSE_MK..."
