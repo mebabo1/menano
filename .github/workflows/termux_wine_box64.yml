@@ -330,7 +330,7 @@ jobs:
 
           export PATCH_BASE="https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/path"
 
-          PATCH_FILES="1.patch 5.patch gstreamer.patch ntsync01.patch dlls_ntdll_unix_fsync.patch server_fsync.patch dlls_ntdll_unix_virtual.patch"
+          PATCH_FILES="1.patch 5patch gstreamer.patch ntsync01.patch dlls_ntdll_unix_fsync.patch server_fsync.patch dlls_ntdll_unix_virtual.patch"
           echo "Applying external patches from $PATCH_BASE..."
           for FILE in $PATCH_FILES; do
             URL="${PATCH_BASE}/${FILE}"
@@ -442,8 +442,8 @@ jobs:
           
           export LDFLAGS="-L$deps/lib -Wl,-rpath=$RUNTIME_PATH/lib"
 
-          export CFLAGS="-O2 -pipe -ftree-vectorize -Wno-error -Wno-nullability-completeness -Wno-strict-prototypes -Wno-declaration-after-statement"
-          export CXXFLAGS="-O2 -pipe -ftree-vectorize -Wno-error -Wno-nullability-completeness -Wno-strict-prototypes -Wno-declaration-after-statement"
+          export CFLAGS="-O2 -pipe -ftree-vectorize -Wno-error -Wno-nullability-completeness -Wno-strict-prototypes -Wno-declaration-after-statement -include strings.h"
+          export CXXFLAGS="-O2 -pipe -ftree-vectorize -Wno-error -Wno-nullability-completeness -Wno-strict-prototypes -Wno-declaration-after-statement include strings.h"
           export CROSSCFLAGS="-O2 -pipe -ftree-vectorize"
           export CROSSCXXFLAGS="-O2 -pipe -ftree-vectorize"
           
