@@ -1,0 +1,159 @@
+name: Build Wine for Android/bionic (x86_64)
+
+on:
+  workflow_dispatch:
+    inputs:
+      wine_version:
+        description: 'Wine version (e.g. 11.0)'
+        required: true
+        default: '11.0'
+
+jobs:
+  build-wine:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+
+    - name: Install dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y \
+          autoconf automake libtool \
+          pkg-config gettext flex bison xz-utils \
+          gcc-multilib g++-multilib
+
+    - name: Download Android NDK
+      run: |
+        wget -q https://dl.google.com/android/repository/android-ndk-r27c-linux.zip
+        unzip -q android-ndk-r27c-linux.zip
+        echo "NDK_HOME=$PWD/android-ndk-r27c" >> $GITHUB_ENV
+
+    - name: Download Wine source
+      run: |
+        WINE_VER="${{ github.event.inputs.wine_version }}"
+        # 尝试多个源
+        wget -q "https://dl.winehq.org/wine/source/${WINE_VER}/wine-${WINE_VER}.tar.xz" \
+          -O "wine-${WINE_VER}.tar.xz" 2>/dev/null || \
+        wget -q "https://github.com/wine-mirror/wine/archive/refs/tags/wine-${WINE_VER}.tar.gz" \
+          -O "wine-${WINE_VER}.tar.gz" 2>/dev/null || \
+        wget -q "https://gitlab.winehq.org/wine/wine/-/archive/wine-${WINE_VER}/wine-wine-${WINE_VER}.tar.gz" \
+          -O "wine-${WINE_VER}.tar.gz"
+        
+        if [ -f "wine-${WINE_VER}.tar.xz" ]; then
+          tar -xf "wine-${WINE_VER}.tar.xz"
+        elif [ -f "wine-${WINE_VER}.tar.gz" ]; then
+          tar -xf "wine-${WINE_VER}.tar.gz"
+        else
+          echo "Failed to download Wine source"
+          exit 1
+        fi
+        
+        # 找到解压后的目录（可能有不同命名方式）
+        WINE_DIR=$(ls -d wine-*/ 2>/dev/null | head -1)
+        mv "$WINE_DIR" wine-src
+        echo "WINE_VERSION=${WINE_VER}" >> $GITHUB_ENV
+
+    - name: Build Wine tools (native)
+      run: |
+        cd wine-src
+        mkdir -p ../wine-tools-build ../wine-tools-install
+        cd ../wine-tools-build
+        ../wine-src/configure --prefix=$PWD/../wine-tools-install \
+          --without-x --without-freetype --disable-win16
+        make -j$(nproc)
+        make install
+        echo "$PWD/../wine-tools-install/bin" >> $GITHUB_PATH
+
+    - name: Configure Wine (cross-compile)
+      run: |
+        set -ex
+        export NDK=$NDK_HOME
+        export TOOLCHAIN=$NDK/toolchains/llvm/prebuilt/linux-x86_64
+        export PATH="$TOOLCHAIN/bin:$PATH"
+        export CC=$TOOLCHAIN/bin/x86_64-linux-android24-clang
+        export CXX=$TOOLCHAIN/bin/x86_64-linux-android24-clang++
+        export AR=$TOOLCHAIN/bin/llvm-ar
+        export RANLIB=$TOOLCHAIN/bin/llvm-ranlib
+        export CC_FOR_BUILD=gcc
+        
+        export SYSROOT=$NDK/toolchains/llvm/prebuilt/linux-x86_64/sysroot
+        export CFLAGS="-O2 -fPIC -target x86_64-linux-android24 --sysroot=$SYSROOT -D__BIONIC__ -D__ANDROID_API__=24"
+        export LDFLAGS="-target x86_64-linux-android24 --sysroot=$SYSROOT -lm -landroid-spawn"
+        
+        export ac_cv_func_getpwent=no ac_cv_func_getpwnam=no
+        export ac_cv_func_getpwuid=no ac_cv_func_sigsetmask=no
+        export ac_cv_c_bigendian=no ac_cv_func_fallocate=no
+        export ac_cv_func_strverscmp=no ac_cv_func_getusershell=no
+        export ac_cv_func_log2=yes
+        
+        cd wine-src
+        ./configure \
+          --build=x86_64-pc-linux-gnu \
+          --host=x86_64-linux-android \
+          --enable-archs=i386,x86_64 \
+          --prefix=/tmp/wine-install \
+          --without-x --without-freetype --without-xml \
+          --without-cups --without-gphoto --without-pcsclite \
+          --without-sane --without-udev --without-v4l2 \
+          --without-gstreamer --without-oss --without-alsa \
+          --without-pulse --without-ncurses --without-gettext \
+          --without-opengl --without-osmesa \
+          --with-wine-tools=$PWD/../wine-tools-install \
+          --disable-tests
+
+    - name: Build Wine
+      run: |
+        export NDK=$NDK_HOME
+        export TOOLCHAIN=$NDK/toolchains/llvm/prebuilt/linux-x86_64
+        export PATH="$TOOLCHAIN/bin:$PATH"
+        export CC=$TOOLCHAIN/bin/x86_64-linux-android24-clang
+        export CXX=$TOOLCHAIN/bin/x86_64-linux-android24-clang++
+        cd wine-src
+        make -j$(nproc)
+
+    - name: Package Wine
+      run: |
+        cd wine-src
+        
+        # 找出所有编译好的二进制和库
+        mkdir -p /tmp/wine-pkg/bin /tmp/wine-pkg/lib
+        
+        # 复制loader生成的主wine二进制
+        for f in loader/wine loader/wine.so loader/wine64 loader/wine64.so; do
+          if [ -f "$f" ]; then
+            install -D "$f" "/tmp/wine-pkg/bin/$(basename $f)"
+            # 如果是.so，放到lib目录
+            if [[ "$f" == *.so ]]; then
+              cp "$f" /tmp/wine-pkg/lib/ 2>/dev/null
+            fi
+          fi
+        done
+        
+        # 复制编译好的.so文件（unix端DLL）
+        find dlls -name "*.so" -type f 2>/dev/null | while read so; do
+          dest="lib/$(echo $so | cut -d/ -f2-)"
+          mkdir -p "/tmp/wine-pkg/$(dirname $dest)"
+          cp "$so" "/tmp/wine-pkg/$dest" 2>/dev/null || true
+        done
+        
+        # 复制wine提供的其他工具
+        for tool in wineserver wineboot winecfg wineconsole winedbg winefile winemine; do
+          if [ -f "programs/$tool/$tool" ]; then
+            cp "programs/$tool/$tool" /tmp/wine-pkg/bin/ 2>/dev/null
+          fi
+        done
+        
+        # 复制wine.pdb等杂项文件
+        cp -r fonts nls /tmp/wine-pkg/ 2>/dev/null || true
+        
+        cd /tmp
+        tar -czf "wine-bionic-${{ env.WINE_VERSION }}-x86_64.tar.gz" wine-pkg
+        echo "ARTIFACT=wine-bionic-${{ env.WINE_VERSION }}-x86_64.tar.gz" >> $GITHUB_ENV
+
+    - name: Upload artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: wine-bionic-${{ env.WINE_VERSION }}
+        path: /tmp/${{ env.ARTIFACT }}
