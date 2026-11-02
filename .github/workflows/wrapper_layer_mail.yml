@@ -119,6 +119,25 @@ jobs:
           PKG_CONFIG_SYSROOT_DIR = '$TERMUX_SYSROOT'
           EOF
 
+      - name: Patch WSI for Android Bionic
+        run: |
+          cd mesa-src
+          python3 -c '
+          path = "src/vulkan/wsi/wsi_common_display.c"
+          with open(path, "r") as f:
+              content = f.read()
+          
+          old = "pthread_setcanceltype(PTHREAD_CANCEL_ASYNCHRONOUS, NULL);"
+          new = "#ifndef __ANDROID__\n    pthread_setcanceltype(PTHREAD_CANCEL_ASYNCHRONOUS, NULL);\n#endif"
+          
+          assert old in content, "Target line not found"
+          content = content.replace(old, new)
+          
+          with open(path, "w") as f:
+              f.write(content)
+          print("Successfully patched wsi_common_display.c for Android")
+          '
+
       - name: Configure Mesa
         run: |
           cd mesa-src
