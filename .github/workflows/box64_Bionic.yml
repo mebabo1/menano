@@ -2,10 +2,12 @@ name: Build Box64 (Bionic)
 
 on:
   push:
+    tags:
+      - 'v*'
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   build-box64:
@@ -104,10 +106,10 @@ jobs:
             MINOR=$(grep '#define BOX64_MINOR' src/box64version.h | awk '{print $3}')
             REVISION=$(grep '#define BOX64_REVISION' src/box64version.h | awk '{print $3}')
             echo "FULL_VERSION=Box64-${MAJOR}.${MINOR}.${REVISION}-${COMMIT}-${{ matrix.type }}" >> $GITHUB_ENV
-            echo "ARTIFACT_NAME=box64-${{ matrix.source }}-${{ matrix.type }}-${COMMIT}" >> $GITHUB_ENV
+            echo "ARCHIVE_NAME=box64-${{ matrix.source }}-${{ matrix.type }}-${COMMIT}.tar.gz" >> $GITHUB_ENV
           else
             echo "FULL_VERSION=Box64-Hybrid-${{ matrix.type }}-${COMMIT}" >> $GITHUB_ENV
-            echo "ARTIFACT_NAME=box64-${{ matrix.source }}-${{ matrix.type }}-${COMMIT}" >> $GITHUB_ENV
+            echo "ARCHIVE_NAME=box64-${{ matrix.source }}-${{ matrix.type }}-${COMMIT}.tar.gz" >> $GITHUB_ENV
           fi
 
       - name: Configure and Build
@@ -155,9 +157,36 @@ jobs:
             $TOOLCHAIN/llvm-strip box64
           fi
 
+      - name: Package Box64 into Tarball
+        run: |
+          mkdir -p package_dir
+          cp source/build/box64 package_dir/
+          
+          # tar.gz 파일 생성 (매트릭스 빌드 간 이름 충돌을 방지하기 위해 고유 이름 지정 후 box64.tar.gz로도 복사)
+          tar -czf ${{ env.ARCHIVE_NAME }} -C package_dir box64
+          cp ${{ env.ARCHIVE_NAME }} box64.tar.gz
+          ls -lh box64.tar.gz ${{ env.ARCHIVE_NAME }}
+
       - name: Upload Box64 Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: box64-${{ matrix.source }}-${{ matrix.type }}
-          path: source/build/box64
+          name: box64-${{ matrix.source }}-${{ matrix.type }}-tarball
+          path: |
+            *.tar.gz
           retention-days: 30
+
+      - name: Publish Box64 to GitHub Release
+        uses: softprops/action-gh-release@v1
+        if: github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/v')
+        with:
+          tag_name: release-${{ env.FULL_VERSION }}
+          name: Box64 ${{ matrix.source }} (${{ matrix.type }}) - ${{ env.FULL_VERSION }}
+          body: |
+            - **Source**: ${{ matrix.source }}
+            - **Type**: ${{ matrix.type }}
+            - **Target**: Android Bionic (Termux / NDK r27 / API 30)
+          files: |
+            ${{ env.ARCHIVE_NAME }}
+            box64.tar.gz
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
