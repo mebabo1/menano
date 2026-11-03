@@ -112,7 +112,7 @@ If you install the Winlator pad DLL file and run this app through the wfm.exe fi
 
 [Wined3d](https://fdossena.com/?p=wined3d/index.frag)
 
-[MiceWine](https://github.com/KreitinnSoftware/MiceWine-Application)
+[MiceWine](https://github.com/KreitinnSoftware/MiceWine-Repository/releases)
 
 [Termux](https://github.com/termux/termux-app)
 
