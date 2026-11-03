@@ -1,4 +1,5 @@
-name: name: Build Box64 (Bionic)
+name: Build Box64 (Bionic)
+
 on:
   push:
   workflow_dispatch:
@@ -7,14 +8,23 @@ permissions:
   contents: read
 
 jobs:
-  build-wrapper:
+  build-box64:
     runs-on: ubuntu-22.04
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - source: Official
+            type: Bionic
+          - source: Hybrid
+            type: Bionic
 
     env:
       ANDROID_NDK_VERSION: r27
       API_LEVEL: 30
 
-steps:
+    steps:
       - name: Checkout
         uses: actions/checkout@v4
 
@@ -42,7 +52,6 @@ steps:
       - name: Download Android NDK
         run: |
           cd /tmp
-          ANDROID_NDK_VERSION="r27"
           wget -q https://dl.google.com/android/repository/android-ndk-${ANDROID_NDK_VERSION}-linux.zip
           unzip -q android-ndk-${ANDROID_NDK_VERSION}-linux.zip
           echo "ANDROID_NDK=/tmp/android-ndk-${ANDROID_NDK_VERSION}" >> $GITHUB_ENV
@@ -95,8 +104,10 @@ steps:
             MINOR=$(grep '#define BOX64_MINOR' src/box64version.h | awk '{print $3}')
             REVISION=$(grep '#define BOX64_REVISION' src/box64version.h | awk '{print $3}')
             echo "FULL_VERSION=Box64-${MAJOR}.${MINOR}.${REVISION}-${COMMIT}-${{ matrix.type }}" >> $GITHUB_ENV
+            echo "ARTIFACT_NAME=box64-${{ matrix.source }}-${{ matrix.type }}-${COMMIT}" >> $GITHUB_ENV
           else
             echo "FULL_VERSION=Box64-Hybrid-${{ matrix.type }}-${COMMIT}" >> $GITHUB_ENV
+            echo "ARTIFACT_NAME=box64-${{ matrix.source }}-${{ matrix.type }}-${COMMIT}" >> $GITHUB_ENV
           fi
 
       - name: Configure and Build
@@ -144,3 +155,10 @@ steps:
             
             $TOOLCHAIN/llvm-strip box64
           fi
+
+      - name: Upload Box64 Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: box64-${{ matrix.source }}-${{ matrix.type }}
+          path: source/build/box64
+          retention-days: 30
