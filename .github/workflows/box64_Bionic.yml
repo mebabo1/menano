@@ -129,7 +129,7 @@ jobs:
             make -j$(nproc) wowbox64
           else
             if [ "${{ matrix.type }}" == "Bionic" ]; then
-              CMAKE_ARGS="-DBIONIC=1 -DTERMUX=0 -DHAVE_TRACE=0"
+              CMAKE_ARGS="-DBIONIC=1 -DTERMUX=1 -DHAVE_TRACE=0"
             else
               CMAKE_ARGS=""
             fi
