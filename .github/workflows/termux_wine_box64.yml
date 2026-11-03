@@ -78,6 +78,11 @@ jobs:
           wget https://github.com/GameNative/termux-on-gha/releases/download/build-20260218/termuxfs-x86_64.tar
           tar xf termuxfs-x86_64.tar
           rm -rf termuxfs-x86_64.tar
+
+          cd $HOME/termuxfs/x86_64/data/data/com.termux/files
+          wget -q https://github.com/mebabo1/menano/releases/download/Box/libntsync_x86_64.tar.gz
+          tar xf libntsync_x86_64.tar.gz
+          rm libntsync_x86_64.tar.gz
           
           echo "TERMUX_PREFIX=$HOME/termuxfs/x86_64/data/data/com.termux/files/usr" >> $GITHUB_ENV
           echo "TERMUX_SYSROOT=$HOME/termuxfs/x86_64" >> $GITHUB_ENV
