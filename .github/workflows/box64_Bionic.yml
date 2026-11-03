@@ -160,9 +160,9 @@ jobs:
       - name: Package Box64 into Tarball
         run: |
           mkdir -p package_dir
-          cp source/build/box64 package_dir/
+          cp build/box64 package_dir/
           
-          # tar.gz 파일 생성 (매트릭스 빌드 간 이름 충돌을 방지하기 위해 고유 이름 지정 후 box64.tar.gz로도 복사)
+          # tar.gz 파일 생성
           tar -czf ${{ env.ARCHIVE_NAME }} -C package_dir box64
           cp ${{ env.ARCHIVE_NAME }} box64.tar.gz
           ls -lh box64.tar.gz ${{ env.ARCHIVE_NAME }}
