@@ -145,6 +145,7 @@ jobs:
               -DANDROID=1 \
               -DARM_DYNAREC=1 \
               -DBAD_SIGNAL=1 \
+              -DSD845=1 \
               -DCMAKE_BUILD_TYPE=Release \
               $CMAKE_ARGS
               
