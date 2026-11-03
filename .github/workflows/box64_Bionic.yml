@@ -131,10 +131,9 @@ jobs:
             else
               CMAKE_ARGS=""
             fi
-            
-            # vulkan-wrapper와 동일한 최적화/크로스컴파일 플래그 적용
-            export CFLAGS="-fPIC -idirafter$TERMUX_PREFIX/include -include fcntl.h -include unistd.h --target=aarch64-linux-android${API_LEVEL}"
-            export CXXFLAGS="-fPIC -idirafter$TERMUX_PREFIX/include -include fcntl.h -include unistd.h --target=aarch64-linux-android${API_LEVEL}"
+
+            export CFLAGS="-fPIC -idirafter$TERMUX_PREFIX/include -include fcntl.h -include unistd.h -D_GNU_SOURCE --target=aarch64-linux-android${API_LEVEL}"
+            export CXXFLAGS="-fPIC -idirafter$TERMUX_PREFIX/include -include fcntl.h -include unistd.h -D_GNU_SOURCE --target=aarch64-linux-android${API_LEVEL}"
             export LDFLAGS="-L$TERMUX_PREFIX/lib -Wl,-rpath=/system/lib64:$RUNTIME_PATH/lib -Wl,--no-as-needed -landroid-shmem"
 
             cmake ../source \
