@@ -1,0 +1,146 @@
+name: name: Build Box64 (Bionic)
+on:
+  push:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-wrapper:
+    runs-on: ubuntu-22.04
+
+    env:
+      ANDROID_NDK_VERSION: r27
+      API_LEVEL: 30
+
+steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install Dependencies
+        run: |
+          sudo apt update
+          sudo apt install -y \
+            git \
+            wget \
+            unzip \
+            pkg-config \
+            ninja-build \
+            cmake \
+            bison \
+            flex \
+            python3-dev \
+            zlib1g-dev \
+            libzstd-dev
+
+      - name: Download Android NDK
+        run: |
+          cd /tmp
+          ANDROID_NDK_VERSION="r27"
+          wget -q https://dl.google.com/android/repository/android-ndk-${ANDROID_NDK_VERSION}-linux.zip
+          unzip -q android-ndk-${ANDROID_NDK_VERSION}-linux.zip
+          echo "ANDROID_NDK=/tmp/android-ndk-${ANDROID_NDK_VERSION}" >> $GITHUB_ENV
+
+      - name: Download and extract termuxfs for aarch64
+        run: |
+          mkdir -p $HOME/termuxfs/aarch64
+          cd $HOME/termuxfs/aarch64
+          wget -q https://github.com/ziad9267/termux-on-gha/releases/download/test/termuxfs.tar
+          tar -xf termuxfs.tar
+          
+          echo "TERMUX_PREFIX=$HOME/termuxfs/aarch64/data/data/com.termux/files/usr" >> $GITHUB_ENV
+          echo "TERMUX_SYSROOT=$HOME/termuxfs/aarch64" >> $GITHUB_ENV
+          echo "RUNTIME_PATH=/data/data/com.termux/files/usr" >> $GITHUB_ENV
+
+      - name: Clone & Merge Source
+        run: |
+          git clone https://github.com/ptitSeb/box64 source
+          cd source
+          git config user.email "action@github.com"
+          git config user.name "GitHub Action"
+
+          # Carried fix, pending upstream
+          git remote add banner https://github.com/The412Banner/box64
+          git fetch banner upstream/gstreamer-no-gtk3
+          git merge banner/upstream/gstreamer-no-gtk3 --no-edit || {
+            echo "MERGE FAILED (gstreamer-no-gtk3) - unresolved conflicts:"; git diff --name-only --diff-filter=U; exit 1; }
+          
+          if [ "${{ matrix.source }}" == "Hybrid" ]; then
+            git remote add pipetto https://github.com/Pipetto-crypto/box64
+            git fetch pipetto
+            echo 'src/emu/x64printer.c merge=union' > .git/info/attributes
+            git merge pipetto/main --no-edit || {
+              echo "MERGE FAILED - unresolved conflicts:"; git diff --name-only --diff-filter=U; exit 1; }
+          fi
+          
+          if [ "${{ matrix.type }}" == "WOW64" ]; then
+            mkdir -p wine/common
+            echo -e '\nint __mingw_vsprintf(char* buffer, const char* format, va_list args) { return vsprintf(buffer, format, args); }' >> wine/common/crt.c
+          fi
+
+      - name: Get Version Info
+        id: version
+        run: |
+          cd source
+          COMMIT=$(git rev-parse --short HEAD)
+          
+          if [ "${{ matrix.source }}" == "Official" ]; then
+            MAJOR=$(grep '#define BOX64_MAJOR' src/box64version.h | awk '{print $3}')
+            MINOR=$(grep '#define BOX64_MINOR' src/box64version.h | awk '{print $3}')
+            REVISION=$(grep '#define BOX64_REVISION' src/box64version.h | awk '{print $3}')
+            echo "FULL_VERSION=Box64-${MAJOR}.${MINOR}.${REVISION}-${COMMIT}-${{ matrix.type }}" >> $GITHUB_ENV
+          else
+            echo "FULL_VERSION=Box64-Hybrid-${{ matrix.type }}-${COMMIT}" >> $GITHUB_ENV
+          fi
+
+      - name: Configure and Build
+        run: |
+          NDK_ROOT=$ANDROID_NDK/toolchains/llvm/prebuilt/linux-x86_64
+          TOOLCHAIN=$NDK_ROOT/bin
+          SYSROOT=$NDK_ROOT/sysroot
+          API_LEVEL=30
+
+          mkdir build && cd build
+          
+          if [ "${{ matrix.type }}" == "WOW64" ]; then
+            export PATH=$PATH:${{ env.MINGW_PATH }}
+            cmake ../source \
+              -DCMAKE_C_COMPILER=aarch64-w64-mingw32-gcc \
+              -DWOW64=1 -DARM_DYNAREC=1 -DCMAKE_BUILD_TYPE=Release
+            make -j$(nproc) wowbox64
+          else
+            if [ "${{ matrix.type }}" == "Bionic" ]; then
+              CMAKE_ARGS="-DBIONIC=1 -DTERMUX=0 -DHAVE_TRACE=0"
+            else
+              CMAKE_ARGS=""
+            fi
+            
+            # vulkan-wrapper와 동일한 최적화/크로스컴파일 플래그 적용
+            export CFLAGS="-fPIC -idirafter$TERMUX_PREFIX/include -include fcntl.h -include unistd.h --target=aarch64-linux-android${API_LEVEL}"
+            export CXXFLAGS="-fPIC -idirafter$TERMUX_PREFIX/include -include fcntl.h -include unistd.h --target=aarch64-linux-android${API_LEVEL}"
+            export LDFLAGS="-L$TERMUX_PREFIX/lib -Wl,-rpath=/system/lib64:$RUNTIME_PATH/lib -Wl,--no-as-needed -landroid-shmem"
+
+            cmake ../source \
+              -DCMAKE_C_COMPILER=$TOOLCHAIN/aarch64-linux-android${API_LEVEL}-clang \
+              -DCMAKE_CXX_COMPILER=$TOOLCHAIN/aarch64-linux-android${API_LEVEL}-clang++ \
+              -DCMAKE_SYSROOT=$SYSROOT \
+              -DANDROID=1 \
+              -DARM_DYNAREC=1 \
+              -DBAD_SIGNAL=1 \
+              -DCMAKE_BUILD_TYPE=Release \
+              $CMAKE_ARGS
+              
+            make -j$(nproc)
+            
+            if [ "${{ matrix.type }}" == "Bionic" ]; then
+              readelf -d box64 | grep -q "NEEDED.*libc.so" || { echo "Linking failed!"; exit 1; }
+            fi
+            
+            $TOOLCHAIN/llvm-strip box64
+          fi
