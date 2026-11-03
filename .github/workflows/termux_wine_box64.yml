@@ -330,7 +330,7 @@ jobs:
 
           export PATCH_BASE="https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/path"
 
-          PATCH_FILES="1.patch 5.patch 6.patch gstreamer.patch dlls_ntdll_unix_fsync.patch server_fsync.patch dlls_ntdll_unix_virtual.patch"
+          PATCH_FILES="1.patch gstreamer.patch dlls_ntdll_unix_signal_x86_64_10_c.patch dlls_ntdll_unix_esync_c.patch server_esync_c.patch dlls_ntdll_unix_fsync_10_c.patch server_fsync_10_c.patch"
           echo "Applying external patches from $PATCH_BASE..."
           for FILE in $PATCH_FILES; do
             URL="${PATCH_BASE}/${FILE}"
