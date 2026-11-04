@@ -12,3 +12,7 @@ If you want your GStreamer video to work on both 32-bit and 64-bit, you can inst
 ```sh
 curl -o wine9_13 https://raw.githubusercontent.com/mebabo1/menano/File/wine9_13 && chmod +x wine9_13 && ./wine9_13
 ```
+glibc&box64
+```sh
+curl -o update https://raw.githubusercontent.com/mebabo1/menano/File/update && chmod +x update && ./update
+```
