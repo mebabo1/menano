@@ -179,7 +179,7 @@ jobs:
             proton)
               echo "Processing Proton branch"
 
-              git clone -b "bleeding-edge" https://github.com/ziad9267/wine.git source
+              git clone -b "proton_10.0" https://github.com/ValveSoftware/wine.git source
               cd source
               git config advice.detachedHead false
               if [ "$WINE_VERSION" != "latest" ]; then
@@ -297,7 +297,7 @@ jobs:
           curl -L https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/dlls/ntdll/unix/esync_pro10.c -o dlls/ntdll/unix/esync.c
           curl -L https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/server/fsync_pro10.c -o server/fsync.c
           curl -L https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/server/esync_pro10.c -o server/esync.c
-          # curl -L https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/dlls/ntdll/unix/virtual_pro10.c -o dlls/ntdll/unix/virtual.c
+          curl -L https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/dlls/ntdll/unix/virtual_pro10.c -o dlls/ntdll/unix/virtual.c
 
       - name: Termux
         run: |
@@ -447,7 +447,7 @@ jobs:
 
           # export CFLAGS="-O2 -pipe -ftree-vectorize -Wno-error -Wno-nullability-completeness -Wno-strict-prototypes -Wno-declaration-after-statement -target x86_64-linux-android28 --sysroot=$TOOLCHAIN/../sysroot -D__BIONIC__ -D__ANDROID_API__=28 -D_GNU_SOURCE -include strings.h -include sys/time.h"
           # export CXXFLAGS="-O2 -pipe -ftree-vectorize -Wno-error -Wno-nullability-completeness -Wno-strict-prototypes -Wno-declaration-after-statement -target x86_64-linux-android28 --sysroot=$TOOLCHAIN/../sysroot -D__BIONIC__ -D__ANDROID_API__=28 -D_GNU_SOURCE -include strings.h -include sys/time.h"
-          export C_OPTS="-g0 -O2 -DANDROID_SUPPORT_FLEXIBLE_PAGE_SIZES -march=x86-64 -mtune=generic -Wno-declaration-after-statement -Wno-implicit-function-declaration -Wno-int-conversion"
+          export C_OPTS="-O2 -DANDROID_SUPPORT_FLEXIBLE_PAGE_SIZES -march=x86-64 -mtune=generic -Wno-declaration-after-statement -Wno-implicit-function-declaration -Wno-int-conversion"
           export CFLAGS=$C_OPTS
           export CXXFLAGS=$C_OPTS
           export CROSSCFLAGS="-O2 -pipe -ftree-vectorize"
@@ -484,7 +484,6 @@ jobs:
             --with-pulse \
             --disable-win16 \
             --with-gstreamer \
-            --with-ffmpeg \
             --with-pthread \
             --without-ffmpeg \
             --without-coreaudio \
