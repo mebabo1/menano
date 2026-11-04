@@ -5,6 +5,7 @@ tar xf bin.tar.gz
 rm -rf bin.tar.gz
 cd /data/data/com.termux/files
 rm -rf opt
+rm -rf usr/glibc
 echo "pkg download05"
 wget -O box64.tar.xz https://github.com/mebabo1/menano/releases/download/Box/box64.tar.xz 2>&1 | pv -l > download.log
 echo "pkg download04"
