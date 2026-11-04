@@ -126,7 +126,6 @@ jobs:
           
           # tar.gz 파일 생성
           tar -czf ${{ env.ARCHIVE_NAME }} -C package_dir box64
-          ls -lh box64.tar.gz ${{ env.ARCHIVE_NAME }}
 
       - name: Upload Box64 Artifact
         uses: actions/upload-artifact@v4
