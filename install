@@ -52,13 +52,13 @@ rm -rf /sdcard/SmartBox64
 tar xf SmartBox64.tar.gz
 cp -r SmartBox64 /sdcard
 rm -rf SmartBox64.tar.gz SmartBox64
-echo "pkg download01"
-wget -O glibc.tar.xz https://github.com/mebabo1/menano/releases/download/Box/glibc.tar.xz 2>&1 | pv -l > download.log
-echo "pkg download00"
-wget https://github.com/mebabo1/menano/releases/download/Box/alsa.tar >/dev/null 2>&1
-echo "pkg tar xf"
-tar xf glibc.tar.xz
-tar xf alsa.tar
+# echo "pkg download01"
+# wget -O glibc.tar.xz https://github.com/mebabo1/menano/releases/download/Box/glibc.tar.xz 2>&1 | pv -l > download.log
+# echo "pkg download00"
+# wget https://github.com/mebabo1/menano/releases/download/Box/alsa.tar >/dev/null 2>&1
+# echo "pkg tar xf"
+# tar xf glibc.tar.xz
+# tar xf alsa.tar
 rm -rf alsa.tar glibc.tar.xz
 cd
 echo "SmartBox64 can be operated using x11 commands"
