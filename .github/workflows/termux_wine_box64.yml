@@ -270,8 +270,9 @@ jobs:
           mkdir -p android/android_sysvshm/sys
           mkdir -p android/shm_utils
 
-          curl -L https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/path/shm.h -o android/android_sysvshm/sys/shm.h
-          curl -L https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/path/shm_utils.h -o android/shm_utils/shm_utils.h
+          # curl -L https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/path/shm.h -o android/android_sysvshm/sys/shm.h
+          # curl -L https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/path/shm_utils.h -o android/shm_utils/shm_utils.h
+          
           # curl -L https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/dlls/ntdll/unix/09env.c -o dlls/ntdll/unix/env.c
           # curl -L https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/dlls/ntdll/unix/09virtual.c -o dlls/ntdll/unix/virtual.c
           # curl -L https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/dlls/ntdll/unix/11_17env.c -o dlls/ntdll/unix/env.c
@@ -292,7 +293,11 @@ jobs:
           # curl -L https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/server/thread_pro11.c -o server/thread.c
           # pro10
           curl -L https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/dlls/ntdll/unix/env_pro10.c -o dlls/ntdll/unix/env.c
-          # curl -L https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/dlls/ntdll/unix/virtual10.c -o dlls/ntdll/unix/virtual.c
+          curl -L https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/dlls/ntdll/unix/fsync_pro10.c -o dlls/ntdll/unix/fsync.c
+          curl -L https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/dlls/ntdll/unix/esync_pro10.c -o dlls/ntdll/unix/esync.c
+          curl -L https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/server/fsync_pro10.c -o server/fsync.c
+          curl -L https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/server/esync_pro10.c -o server/esync.c
+          curl -L https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/dlls/ntdll/unix/virtual10.c -o dlls/ntdll/unix/virtual.c
 
       - name: Termux
         run: |
@@ -328,7 +333,7 @@ jobs:
 
           export PATCH_BASE="https://raw.githubusercontent.com/mebabo1/menano/refs/heads/main/path"
 
-          PATCH_FILES="ntsync01.patch 1.patch gstreamer.patch server_fsync_10_c.patch server_esync_c.patch dlls_ntdll_unix_virtual_10_c.patch dlls_ntdll_unix_signal_x86_64_10_c.patch dlls_ntdll_unix_fsync_10_c.patch dlls_ntdll_unix_esync_c.patch"
+          PATCH_FILES="ntsync01.patch 1.patch gstreamer.patch"
           echo "Applying external patches from $PATCH_BASE..."
           for FILE in $PATCH_FILES; do
             URL="${PATCH_BASE}/${FILE}"
