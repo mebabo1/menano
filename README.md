@@ -30,10 +30,7 @@ wine&dxvk
 ```sh
 curl -o install03 https://raw.githubusercontent.com/mebabo1/menano/File/install03 && chmod +x install03 && ./install03
 ```
-glibc&box64
-```sh
-curl -o update https://raw.githubusercontent.com/mebabo1/menano/File/update && chmod +x update && ./update
-```
+
 # run x11
 run openbox mode
 
