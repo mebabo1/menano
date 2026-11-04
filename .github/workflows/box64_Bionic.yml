@@ -19,8 +19,6 @@ jobs:
         include:
           - source: Official
             type: Bionic
-          - source: Hybrid
-            type: Bionic
 
     env:
       ANDROID_NDK_VERSION: r27
@@ -69,31 +67,13 @@ jobs:
           echo "TERMUX_SYSROOT=$HOME/termuxfs/aarch64" >> $GITHUB_ENV
           echo "RUNTIME_PATH=/data/data/com.termux/files/usr" >> $GITHUB_ENV
 
-      - name: Clone & Merge Source
+      - name: Clone Source
         run: |
+          # ptitSeb 공식 소스 v0.4.4 브랜치만 깔끔하게 클론합니다.
           git clone --branch v0.4.4 https://github.com/ptitSeb/box64 source
           cd source
           git config user.email "action@github.com"
           git config user.name "GitHub Action"
-
-          # Carried fix, pending upstream
-          git remote add banner https://github.com/The412Banner/box64
-          git fetch banner upstream/gstreamer-no-gtk3
-          git merge banner/upstream/gstreamer-no-gtk3 --no-edit || {
-            echo "MERGE FAILED (gstreamer-no-gtk3) - unresolved conflicts:"; git diff --name-only --diff-filter=U; exit 1; }
-          
-          if [ "${{ matrix.source }}" == "Hybrid" ]; then
-            git remote add pipetto https://github.com/Pipetto-crypto/box64
-            git fetch pipetto
-            echo 'src/emu/x64printer.c merge=union' > .git/info/attributes
-            git merge pipetto/main --no-edit || {
-              echo "MERGE FAILED - unresolved conflicts:"; git diff --name-only --diff-filter=U; exit 1; }
-          fi
-          
-          if [ "${{ matrix.type }}" == "WOW64" ]; then
-            mkdir -p wine/common
-            echo -e '\nint __mingw_vsprintf(char* buffer, const char* format, va_list args) { return vsprintf(buffer, format, args); }' >> wine/common/crt.c
-          fi
 
       - name: Get Version Info
         id: version
@@ -101,16 +81,12 @@ jobs:
           cd source
           COMMIT=$(git rev-parse --short HEAD)
           
-          if [ "${{ matrix.source }}" == "Official" ]; then
-            MAJOR=$(grep '#define BOX64_MAJOR' src/box64version.h | awk '{print $3}')
-            MINOR=$(grep '#define BOX64_MINOR' src/box64version.h | awk '{print $3}')
-            REVISION=$(grep '#define BOX64_REVISION' src/box64version.h | awk '{print $3}')
-            echo "FULL_VERSION=Box64-${MAJOR}.${MINOR}.${REVISION}-${COMMIT}-${{ matrix.type }}" >> $GITHUB_ENV
-            echo "ARCHIVE_NAME=box64-${{ matrix.source }}-${{ matrix.type }}-${COMMIT}.tar.gz" >> $GITHUB_ENV
-          else
-            echo "FULL_VERSION=Box64-Hybrid-${{ matrix.type }}-${COMMIT}" >> $GITHUB_ENV
-            echo "ARCHIVE_NAME=box64-${{ matrix.source }}-${{ matrix.type }}-${COMMIT}.tar.gz" >> $GITHUB_ENV
-          fi
+          MAJOR=$(grep '#define BOX64_MAJOR' src/box64version.h | awk '{print $3}')
+          MINOR=$(grep '#define BOX64_MINOR' src/box64version.h | awk '{print $3}')
+          REVISION=$(grep '#define BOX64_REVISION' src/box64version.h | awk '{print $3}')
+          
+          echo "FULL_VERSION=Box64-${MAJOR}.${MINOR}.${REVISION}-${COMMIT}-${{ matrix.type }}" >> $GITHUB_ENV
+          echo "ARCHIVE_NAME=box64-${{ matrix.source }}-${{ matrix.type }}-${COMMIT}.tar.gz" >> $GITHUB_ENV
 
       - name: Configure and Build
         run: |
@@ -121,41 +97,27 @@ jobs:
 
           mkdir build && cd build
           
-          if [ "${{ matrix.type }}" == "WOW64" ]; then
-            export PATH=$PATH:${{ env.MINGW_PATH }}
-            cmake ../source \
-              -DCMAKE_C_COMPILER=aarch64-w64-mingw32-gcc \
-              -DWOW64=1 -DARM_DYNAREC=1 -DCMAKE_BUILD_TYPE=Release
-            make -j$(nproc) wowbox64
-          else
-            if [ "${{ matrix.type }}" == "Bionic" ]; then
-              CMAKE_ARGS="-DBIONIC=1 -DTERMUX=1 -DHAVE_TRACE=0"
-            else
-              CMAKE_ARGS=""
-            fi
+          CMAKE_ARGS="-DBIONIC=1 -DTERMUX=1 -DHAVE_TRACE=0"
 
-            export CFLAGS="-fPIC -idirafter$TERMUX_PREFIX/include -include fcntl.h -include unistd.h -D_GNU_SOURCE --target=aarch64-linux-android${API_LEVEL}"
-            export CXXFLAGS="-fPIC -idirafter$TERMUX_PREFIX/include -include fcntl.h -include unistd.h -D_GNU_SOURCE --target=aarch64-linux-android${API_LEVEL}"
-            export LDFLAGS="-L$TERMUX_PREFIX/lib -Wl,-rpath=/system/lib64:$RUNTIME_PATH/lib -Wl,--no-as-needed -landroid-shmem"
+          export CFLAGS="-fPIC -idirafter$TERMUX_PREFIX/include -include fcntl.h -include unistd.h -D_GNU_SOURCE --target=aarch64-linux-android${API_LEVEL}"
+          export CXXFLAGS="-fPIC -idirafter$TERMUX_PREFIX/include -include fcntl.h -include unistd.h -D_GNU_SOURCE --target=aarch64-linux-android${API_LEVEL}"
+          export LDFLAGS="-L$TERMUX_PREFIX/lib -Wl,-rpath=/system/lib64:$RUNTIME_PATH/lib -Wl,--no-as-needed -landroid-shmem"
 
-            cmake ../source \
-              -DCMAKE_C_COMPILER=$TOOLCHAIN/aarch64-linux-android${API_LEVEL}-clang \
-              -DCMAKE_CXX_COMPILER=$TOOLCHAIN/aarch64-linux-android${API_LEVEL}-clang++ \
-              -DCMAKE_SYSROOT=$SYSROOT \
-              -DANDROID=1 \
-              -DARM_DYNAREC=1 \
-              -DBAD_SIGNAL=1 \
-              -DCMAKE_BUILD_TYPE=Release \
-              $CMAKE_ARGS
-              
-            make -j$(nproc)
+          cmake ../source \
+            -DCMAKE_C_COMPILER=$TOOLCHAIN/aarch64-linux-android${API_LEVEL}-clang \
+            -DCMAKE_CXX_COMPILER=$TOOLCHAIN/aarch64-linux-android${API_LEVEL}-clang++ \
+            -DCMAKE_SYSROOT=$SYSROOT \
+            -DANDROID=1 \
+            -DARM_DYNAREC=1 \
+            -DBAD_SIGNAL=ON \
+            -DCMAKE_BUILD_TYPE=Release \
+            $CMAKE_ARGS
             
-            if [ "${{ matrix.type }}" == "Bionic" ]; then
-              readelf -d box64 | grep -q "NEEDED.*libc.so" || { echo "Linking failed!"; exit 1; }
-            fi
-            
-            $TOOLCHAIN/llvm-strip box64
-          fi
+          make -j$(nproc)
+          
+          readelf -d box64 | grep -q "NEEDED.*libc.so" || { echo "Linking failed!"; exit 1; }
+          
+          $TOOLCHAIN/llvm-strip box64
 
       - name: Package Box64 into Tarball
         run: |
@@ -182,7 +144,7 @@ jobs:
           tag_name: release-${{ env.FULL_VERSION }}
           name: Box64 ${{ matrix.source }} (${{ matrix.type }}) - ${{ env.FULL_VERSION }}
           body: |
-            - **Source**: ${{ matrix.source }}
+            - **Source**: ${{ matrix.source }} (Official ptitSeb v0.4.4)
             - **Type**: ${{ matrix.type }}
             - **Target**: Android Bionic (Termux / NDK r27 / API 30)
           files: |
