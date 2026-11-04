@@ -71,7 +71,7 @@ jobs:
 
       - name: Clone & Merge Source
         run: |
-          git clone --branch v0.4.2 https://github.com/ptitSeb/box64 source
+          git clone https://github.com/ptitSeb/box64 source
           cd source
           git config user.email "action@github.com"
           git config user.name "GitHub Action"
