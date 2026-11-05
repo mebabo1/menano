@@ -184,32 +184,47 @@ jobs:
           cd mesa-src
           DESTDIR=$PWD/install ninja -C build install
 
-      - name: Build and Package LeeGao Vulkan Wrapper
+      - name: Configure LeeGao Wrapper
         run: |
-          NDK_ROOT=$ANDROID_NDK/toolchains/llvm/prebuilt/linux-x86_64
-          TOOLCHAIN=$NDK_ROOT/bin
-          SYSROOT=$NDK_ROOT/sysroot
-
           cd leegao-src
-          mkdir build && cd build
 
-          cmake .. -G Ninja \
-            -DCMAKE_SYSTEM_NAME=Android \
-            -DCMAKE_SYSTEM_VERSION=${API_LEVEL} \
-            -DCMAKE_ANDROID_ARCH_ABI=arm64-v8a \
-            -DCMAKE_ANDROID_NDK=$ANDROID_NDK \
-            -DCMAKE_C_COMPILER=$TOOLCHAIN/aarch64-linux-android${API_LEVEL}-clang \
-            -DCMAKE_CXX_COMPILER=$TOOLCHAIN/aarch64-linux-android${API_LEVEL}-clang++ \
-            -DCMAKE_SYSROOT=$SYSROOT \
-            -DCMAKE_BUILD_TYPE=Release
+          export PKG_CONFIG_PATH="$TERMUX_PREFIX/lib/pkgconfig:$TERMUX_PREFIX/share/pkgconfig"
+          export PKG_CONFIG_LIBDIR="$TERMUX_PREFIX/lib/pkgconfig"
+          export PKG_CONFIG_SYSROOT_DIR="$TERMUX_SYSROOT"
 
-          ninja -v
-
-          # 빌드 완료 후 결과물 패키징
-          mkdir -p $GITHUB_WORKSPACE/leegao-install
-          find . -name "*.so" -exec cp {} $GITHUB_WORKSPACE/leegao-install/ \;
+          export X_CFLAGS="-I$TERMUX_PREFIX/include"
+          export X_LIBS="-L$TERMUX_PREFIX/lib -landroid-shmem"
           
-          cd $GITHUB_WORKSPACE/leegao-install
+          export CFLAGS="-I$TERMUX_PREFIX/include -include fcntl.h -include unistd.h"
+          export CXXFLAGS="-I$TERMUX_PREFIX/include -include fcntl.h -include unistd.h"
+          export LDFLAGS="-L$TERMUX_PREFIX/lib -Wl,-rpath=$RUNTIME_PATH/lib -landroid-shmem -static-libstdc++"
+
+          meson setup build \
+            --cross-file /tmp/android-cross.ini \
+            -Dcpp_rtti=false \
+            -Dopengl=false \
+            -Dgbm=disabled \
+            -Dllvm=disabled \
+            -Dshared-llvm=disabled \
+            -Dxmlconfig=disabled \
+            -Dgallium-drivers= \
+            -Dvulkan-drivers=wrapper \
+            -Dplatforms=x11 \
+            --prefix=/data/data/com.termux/files/usr
+
+      - name: Build LeeGao Wrapper
+        run: |
+          cd leegao-src
+          ninja -C build -v
+
+      - name: Install LeeGao Wrapper
+        run: |
+          cd leegao-src
+          DESTDIR=$PWD/install ninja -C build install
+
+      - name: Package LeeGao Release Assets
+        run: |
+          cd leegao-src/install
           tar -czvf $GITHUB_WORKSPACE/wrapper-leegao.tar.gz .
 
       - name: Package Mesa Release Assets
