@@ -31,6 +31,13 @@ jobs:
             --branch feature/ext-robustness2 \
             https://github.com/GunaCharanTeja/gamenative-wrapper.git \
             leegao-src
+
+      - name: Clone GameNative Mesa Repo
+        run: |
+          git clone --depth 1 \
+            --branch fix/isaac-wrapper-discard-fix-2 \
+            https://github.com/GameNative/mesa.git \
+            gamenative-mesa-src
           
       - name: Setup Python
         uses: actions/setup-python@v5
@@ -130,12 +137,11 @@ jobs:
         run: |
           python3 -c '
           import os
-          for dir_name in ["mesa-src", "leegao-src"]:
+          for dir_name in ["mesa-src", "leegao-src", "gamenative-mesa-src"]:
               path = os.path.join(dir_name, "src/vulkan/wsi/wsi_common_display.c")
               if os.path.exists(path):
                   with open(path, "r") as f:
                       content = f.read()
-                  # 해당 함수 호출 라인을 주석 처리
                   content = content.replace("pthread_setcanceltype", "// pthread_setcanceltype")
                   with open(path, "w") as f:
                       f.write(content)
@@ -214,9 +220,48 @@ jobs:
         run: |
           cd leegao-src
           ninja -C build -v 2>&1 | tee build.log
+
       - name: Install LeeGao Wrapper
         run: |
           cd leegao-src
+          DESTDIR=$PWD/install ninja -C build install
+
+      - name: Configure GameNative Mesa Wrapper
+        run: |
+          cd gamenative-mesa-src
+
+          export PKG_CONFIG_PATH="$TERMUX_PREFIX/lib/pkgconfig:$TERMUX_PREFIX/share/pkgconfig"
+          export PKG_CONFIG_LIBDIR="$TERMUX_PREFIX/lib/pkgconfig"
+          export PKG_CONFIG_SYSROOT_DIR="$TERMUX_SYSROOT"
+
+          export X_CFLAGS="-I$TERMUX_PREFIX/include"
+          export X_LIBS="-L$TERMUX_PREFIX/lib -landroid-shmem"
+          
+          export CFLAGS="-I$TERMUX_PREFIX/include -include fcntl.h -include unistd.h"
+          export CXXFLAGS="-I$TERMUX_PREFIX/include -include fcntl.h -include unistd.h"
+          export LDFLAGS="-L$TERMUX_PREFIX/lib -Wl,-rpath=$RUNTIME_PATH/lib -landroid-shmem -static-libstdc++"
+
+          meson setup build \
+            --cross-file /tmp/android-cross.ini \
+            -Dcpp_rtti=false \
+            -Dopengl=false \
+            -Dgbm=disabled \
+            -Dllvm=disabled \
+            -Dshared-llvm=disabled \
+            -Dxmlconfig=disabled \
+            -Dgallium-drivers= \
+            -Dvulkan-drivers=wrapper \
+            -Dplatforms=x11 \
+            --prefix=/data/data/com.termux/files/usr
+
+      - name: Build GameNative Mesa Wrapper
+        run: |
+          cd gamenative-mesa-src
+          ninja -C build -v 2>&1 | tee build-gamenative-mesa.log
+
+      - name: Install GameNative Mesa Wrapper
+        run: |
+          cd gamenative-mesa-src
           DESTDIR=$PWD/install ninja -C build install
 
       - name: Package LeeGao Release Assets
@@ -228,6 +273,11 @@ jobs:
         run: |
           cd mesa-src/install
           tar -czvf $GITHUB_WORKSPACE/vulkan-wrapper-aarch64.tar.gz .
+
+      - name: Package GameNative Mesa Release Assets
+        run: |
+          cd gamenative-mesa-src/install
+          tar -czvf $GITHUB_WORKSPACE/wrapper-gamenative-mesa.tar.gz .
 
       - name: Get Metadata
         id: meta
@@ -241,12 +291,13 @@ jobs:
           tag_name: "vulkan-wrapper-${{ steps.meta.outputs.date }}-${{ steps.meta.outputs.sha8 }}"
           name: "Vulkan Wrapper Build (${{ steps.meta.outputs.date }})"
           body: |
-            Android Vulkan Wrapper (Mesa & LeeGao) Automated Release
+            Android Vulkan Wrapper (Mesa, LeeGao & GameNative Mesa) Automated Release
             - Commit: ${{ github.sha }}
             - API Level: ${{ env.API_LEVEL }}
           files: |
             vulkan-wrapper-aarch64.tar.gz
             wrapper-leegao.tar.gz
+            wrapper-gamenative-mesa.tar.gz
             mesa-src/build.log
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
