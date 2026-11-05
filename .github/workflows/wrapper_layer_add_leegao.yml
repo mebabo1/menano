@@ -25,10 +25,10 @@ jobs:
             https://gitlab.freedesktop.org/Pipetto-crypto/mesa.git \
             mesa-src
 
-      - name: Clone LeeGao Vulkan Wrapper
+      - name: Clone GameNative Wrapper
         run: |
           git clone --depth 1 \
-            https://github.com/leegao/bionic-vulkan-wrapper.git \
+            https://github.com/GunaCharanTeja/gamenative-wrapper.git \
             leegao-src
           
       - name: Setup Python
