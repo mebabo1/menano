@@ -216,8 +216,7 @@ jobs:
       - name: Build LeeGao Wrapper
         run: |
           cd leegao-src
-          ninja -C build -v
-
+          ninja -C build -v 2>&1 | tee build.log
       - name: Install LeeGao Wrapper
         run: |
           cd leegao-src
