@@ -211,6 +211,7 @@ jobs:
             -Dgallium-drivers= \
             -Dvulkan-drivers=wrapper \
             -Dplatforms=x11 \
+            -Dspirv-tools=disabled \
             --prefix=/data/data/com.termux/files/usr
 
       - name: Build LeeGao Wrapper
