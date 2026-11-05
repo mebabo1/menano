@@ -28,6 +28,7 @@ jobs:
       - name: Clone GameNative Wrapper
         run: |
           git clone --depth 1 \
+            --branch feature/ext-robustness2 \
             https://github.com/GunaCharanTeja/gamenative-wrapper.git \
             leegao-src
           
