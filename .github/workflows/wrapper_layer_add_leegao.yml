@@ -130,7 +130,7 @@ jobs:
           for dir in mesa-src leegao-src; do
             if [ -d "$dir" ]; then
               echo "Patching WSI in $dir"
-              python3 -c '
+              python3 - "$dir" << 'EOF'
               import sys
               path = f"{sys.argv[1]}/src/vulkan/wsi/wsi_common_display.c"
               try:
@@ -141,7 +141,6 @@ jobs:
                   patched_count = 0
                   for line in lines:
                       if "pthread_setcanceltype" in line:
-                        # 주석 처리 시 문법 오류를 방지하기 위해 원래 줄 앞에 // 추가
                           new_lines.append(f"// {line}")
                           patched_count += 1
                       else:
@@ -152,7 +151,7 @@ jobs:
                   print(f"Successfully patched {path} (Total: {patched_count})")
               except FileNotFoundError:
                   print(f"Skipping: {path} not found.")
-              ' "$dir"
+              EOF
             fi
           done
 
