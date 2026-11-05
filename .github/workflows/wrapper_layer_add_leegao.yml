@@ -127,25 +127,34 @@ jobs:
 
       - name: Patch WSI for Android Bionic
         run: |
-          cd mesa-src
-          python3 -c '
-          path = "src/vulkan/wsi/wsi_common_display.c"
-          with open(path, "r") as f:
-              lines = f.readlines()
-          
-          new_lines = []
-          patched_count = 0
-          for line in lines:
-              if "pthread_setcanceltype" in line:
-                  new_lines.append(f"// {line}")
-                  patched_count += 1
-              else:
-                  new_lines.append(line)
-          
-          with open(path, "w") as f:
-              f.writelines(new_lines)
-          print(f"Successfully commented out pthread_setcanceltype (Total: {patched_count})")
-          '
+          for dir in mesa-src leegao-src; do
+            if [ -d "$dir" ]; then
+              echo "Patching WSI in $dir"
+              python3 -c '
+              import sys
+              path = f"{sys.argv[1]}/src/vulkan/wsi/wsi_common_display.c"
+              try:
+                  with open(path, "r") as f:
+                      lines = f.readlines()
+                  
+                  new_lines = []
+                  patched_count = 0
+                  for line in lines:
+                      if "pthread_setcanceltype" in line:
+                        # 주석 처리 시 문법 오류를 방지하기 위해 원래 줄 앞에 // 추가
+                          new_lines.append(f"// {line}")
+                          patched_count += 1
+                      else:
+                          new_lines.append(line)
+                  
+                  with open(path, "w") as f:
+                      f.writelines(new_lines)
+                  print(f"Successfully patched {path} (Total: {patched_count})")
+              except FileNotFoundError:
+                  print(f"Skipping: {path} not found.")
+              ' "$dir"
+            fi
+          done
 
       - name: Configure Mesa
         run: |
