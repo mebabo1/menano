@@ -272,12 +272,12 @@ jobs:
       - name: Package Mesa Release Assets
         run: |
           cd mesa-src/install
-          tar -czvf $GITHUB_WORKSPACE/vulkan-wrapper-aarch64.tar.gz .
+          tar -czvf $GITHUB_WORKSPACE/wrapper-mesa.tar.gz .
 
       - name: Package GameNative Mesa Release Assets
         run: |
           cd gamenative-mesa-src/install
-          tar -czvf $GITHUB_WORKSPACE/wrapper-gamenative-mesa.tar.gz .
+          tar -czvf $GITHUB_WORKSPACE/wrapper-gamenative.tar.gz .
 
       - name: Get Metadata
         id: meta
@@ -295,9 +295,9 @@ jobs:
             - Commit: ${{ github.sha }}
             - API Level: ${{ env.API_LEVEL }}
           files: |
-            vulkan-wrapper-aarch64.tar.gz
+            wrapper-mesa.tar.gz
             wrapper-leegao.tar.gz
-            wrapper-gamenative-mesa.tar.gz
+            wrapper-gamenative.tar.gz
             mesa-src/build.log
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
