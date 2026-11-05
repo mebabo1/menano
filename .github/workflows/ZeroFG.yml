@@ -1,0 +1,101 @@
+name: Build Android ZeroFG
+
+on:
+  push:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-zerofg:
+    runs-on: ubuntu-22.04
+
+    env:
+      ANDROID_NDK_VERSION: r27
+      API_LEVEL: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # 1. ZeroFG 소스코드 클론
+      - name: Clone ZeroFG
+        run: |
+          git clone --depth 1 https://github.com/hy300leosquizz-ctrl/ZeroFG.git zerofg-src
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install Dependencies
+        run: |
+          sudo apt update
+          sudo apt install -y git wget unzip pkg-config ninja-build cmake glslang-tools
+
+      # 2. Android NDK 설정
+      - name: Download Android NDK
+        run: |
+          cd /tmp
+          wget -q https://dl.google.com/android/repository/android-ndk-${ANDROID_NDK_VERSION}-linux.zip
+          unzip -q android-ndk-${ANDROID_NDK_VERSION}-linux.zip
+          echo "ANDROID_NDK=/tmp/android-ndk-${ANDROID_NDK_VERSION}" >> $GITHUB_ENV
+
+      # 3. Termux 파일시스템 확보
+      - name: Download and extract termuxfs for aarch64
+        run: |
+          mkdir -p $HOME/termuxfs/aarch64
+          cd $HOME/termuxfs/aarch64
+          wget -q https://github.com/ziad9267/termux-on-gha/releases/download/test/termuxfs.tar
+          tar -xf termuxfs.tar
+          
+          echo "TERMUX_PREFIX=$HOME/termuxfs/aarch64/data/data/com.termux/files/usr" >> $GITHUB_ENV
+          echo "TERMUX_SYSROOT=$HOME/termuxfs/aarch64" >> $GITHUB_ENV
+          echo "RUNTIME_PATH=/data/data/com.termux/files/usr" >> $GITHUB_ENV
+
+      # 4. 요구하신 CMake 명령어 및 안드로이드 크로스 컴파일 설정 적용
+      - name: Configure and Build ZeroFG
+        run: |
+          cd zerofg-src
+
+          NDK_ROOT=$ANDROID_NDK/toolchains/llvm/prebuilt/linux-x86_64
+          TOOLCHAIN=$NDK_ROOT/bin
+
+          # pkg-config 경로 설정
+          export PKG_CONFIG_PATH="$TERMUX_PREFIX/lib/pkgconfig:$TERMUX_PREFIX/share/pkgconfig"
+          export PKG_CONFIG_LIBDIR="$TERMUX_PREFIX/lib/pkgconfig"
+          export PKG_CONFIG_SYSROOT_DIR="$TERMUX_SYSROOT"
+
+          export SYSTEM_LDFLAGS="--target=aarch64-linux-android30 -L$TERMUX_PREFIX/lib -Wl,-rpath=/system/lib64:/vendor/lib64:/vendor/lib64/egl:/apex/com.android.i18n/lib64:$RUNTIME_PATH/lib -Wl,--no-as-needed -lEGL -landroid-shmem -ldrm -lwayland-client"
+
+          # 요구하신 CMake 구성 명령어 적용
+          cmake -S . -B build -G Ninja \
+            -DCMAKE_TOOLCHAIN_FILE=$ANDROID_NDK/build/cmake/android.toolchain.cmake \
+            -DANDROID_ABI=arm64-v8a \
+            -DANDROID_PLATFORM=android-${API_LEVEL} \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_C_COMPILER=$TOOLCHAIN/aarch64-linux-android${API_LEVEL}-clang \
+            -DCMAKE_CXX_COMPILER=$TOOLCHAIN/aarch64-linux-android${API_LEVEL}-clang++ \
+            -DCMAKE_C_FLAGS="-fPIC -D__TERMUX__ -D__USE_GNU -U__ANDROID__ -include fcntl.h -include unistd.h" \
+            -DCMAKE_CXX_FLAGS="-fPIC -D__TERMUX__ -D__USE_GNU -U__ANDROID__ -include fcntl.h -include unistd.h" \
+            -DCMAKE_SHARED_LINKER_FLAGS="$SYSTEM_LDFLAGS" \
+            -DCMAKE_INSTALL_PREFIX=$RUNTIME_PATH
+
+          # 요구하신 빌드 명령어 적용
+          cmake --build build
+
+          # 설치 경로로 빌드 결과물 패키징 준비
+          DESTDIR=$PWD/install cmake --install build
+
+      - name: Show Files
+        run: |
+          echo "=== Installed Files ==="
+          find zerofg-src/install -type f
+
+      # 5. 아티팩트 업로드
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: zerofg-bionic-build
+          path: zerofg-src/install/
