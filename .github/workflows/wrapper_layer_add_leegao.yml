@@ -147,6 +147,45 @@ jobs:
           print(f"Successfully commented out pthread_setcanceltype (Total: {patched_count})")
           '
 
+      - name: Create Missing SPIRV-Tools PC Files
+        run: |
+          mkdir -p $TERMUX_PREFIX/lib/pkgconfig
+          
+          # spirv-tools.pc 생성
+          cat << EOF > $TERMUX_PREFIX/lib/pkgconfig/spirv-tools.pc
+          prefix=$TERMUX_PREFIX
+          exec_prefix=\${prefix}
+          libdir=\${exec_prefix}/lib
+          includedir=\${prefix}/include
+
+          Name: SPIRV-Tools
+          Description: SPIRV-Tools core library for Android Bionic
+          Version: 2023.6
+          Libs: -L\${libdir} -lSPIRV-Tools
+          Cflags: -I\${includedir}
+          EOF
+
+          # SPIRV-Tools-opt.pc 생성
+          cat << EOF > $TERMUX_PREFIX/lib/pkgconfig/SPIRV-Tools-opt.pc
+          prefix=$TERMUX_PREFIX
+          exec_prefix=\${prefix}
+          libdir=\${exec_prefix}/lib
+          includedir=\${prefix}/include
+
+          Name: SPIRV-Tools-opt
+          Description: SPIRV-Tools optimization library for Android Bionic
+          Version: 2023.6
+          Requires: spirv-tools
+          Libs: -L\${libdir} -lSPIRV-Tools-opt
+          Cflags: -I\${includedir}
+          EOF
+
+          # share/pkgconfig에도 복사하여 경로 누락 방지
+          mkdir -p $TERMUX_PREFIX/share/pkgconfig
+          cp $TERMUX_PREFIX/lib/pkgconfig/*.pc $TERMUX_PREFIX/share/pkgconfig/
+          
+          echo "Successfully created SPIRV-Tools pkg-config files."
+
       - name: Configure Mesa
         run: |
           cd mesa-src
