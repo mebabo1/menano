@@ -24,17 +24,30 @@ jobs:
         run: |
           git clone --depth 1 https://github.com/hy300leosquizz-ctrl/ZeroFG.git zerofg-src
 
+      # 2. 최신 SPIRV-Tools를 소스에서 빌드 (Opcode 331 오류 해결용)
+      - name: Build Modern SPIRV-Tools
+        run: |
+          cd zerofg-src
+          git clone --depth 1 https://github.com/KhronosGroup/SPIRV-Tools.git external/spirv-tools
+          git clone --depth 1 https://github.com/KhronosGroup/SPIRV-Headers.git external/spirv-tools/external/spirv-headers
+          cmake -S external/spirv-tools -B external/spirv-tools/build -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DSPIRV_SKIP_EXECUTABLES=OFF \
+            -DSPIRV_WERROR=OFF
+          cmake --build external/spirv-tools/build -j$(nproc)
+          echo "$GITHUB_WORKSPACE/zerofg-src/external/spirv-tools/build/tools" >> $GITHUB_PATH
+
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
 
-      - name: Install Dependencies
+      - name: Install Dependencies (Excluding old apt spirv-tools)
         run: |
           sudo apt update
           sudo apt install -y git wget unzip pkg-config ninja-build cmake glslang-tools
 
-      # 2. Android NDK 설정
+      # 3. Android NDK 설정
       - name: Download Android NDK
         run: |
           cd /tmp
@@ -42,7 +55,7 @@ jobs:
           unzip -q android-ndk-${ANDROID_NDK_VERSION}-linux.zip
           echo "ANDROID_NDK=/tmp/android-ndk-${ANDROID_NDK_VERSION}" >> $GITHUB_ENV
 
-      # 3. Termux 파일시스템 확보
+      # 4. Termux 파일시스템 확보
       - name: Download and extract termuxfs for aarch64
         run: |
           mkdir -p $HOME/termuxfs/aarch64
@@ -54,7 +67,7 @@ jobs:
           echo "TERMUX_SYSROOT=$HOME/termuxfs/aarch64" >> $GITHUB_ENV
           echo "RUNTIME_PATH=/data/data/com.termux/files/usr" >> $GITHUB_ENV
 
-      # 4. 요구하신 CMake 명령어 및 안드로이드 크로스 컴파일 설정 적용
+      # 5. CMake 구성 및 안드로이드 크로스 컴파일 설정 적용
       - name: Configure and Build ZeroFG
         run: |
           cd zerofg-src
@@ -69,7 +82,7 @@ jobs:
 
           export SYSTEM_LDFLAGS="--target=aarch64-linux-android30 -L$TERMUX_PREFIX/lib -Wl,-rpath=/system/lib64:/vendor/lib64:/vendor/lib64/egl:/apex/com.android.i18n/lib64:$RUNTIME_PATH/lib -Wl,--no-as-needed -lEGL -landroid-shmem -ldrm -lwayland-client"
 
-          # 요구하신 CMake 구성 명령어 적용
+          # CMake 구성 명령어 적용
           cmake -S . -B build -G Ninja \
             -DCMAKE_TOOLCHAIN_FILE=$ANDROID_NDK/build/cmake/android.toolchain.cmake \
             -DANDROID_ABI=arm64-v8a \
@@ -82,7 +95,7 @@ jobs:
             -DCMAKE_SHARED_LINKER_FLAGS="$SYSTEM_LDFLAGS" \
             -DCMAKE_INSTALL_PREFIX=$RUNTIME_PATH
 
-          # 요구하신 빌드 명령어 적용
+          # 빌드 명령어 실행
           cmake --build build
 
           # 설치 경로로 빌드 결과물 패키징 준비
@@ -93,7 +106,7 @@ jobs:
           echo "=== Installed Files ==="
           find zerofg-src/install -type f
 
-      # 5. 아티팩트 업로드
+      # 6. 아티팩트 업로드
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
