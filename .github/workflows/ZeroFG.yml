@@ -67,10 +67,10 @@ jobs:
           echo "TERMUX_SYSROOT=$HOME/termuxfs/aarch64" >> $GITHUB_ENV
           echo "RUNTIME_PATH=/data/data/com.termux/files/usr" >> $GITHUB_ENV
 
-      # 5. CMake 구성 및 안드로이드 크로스 컴파일 설정 적용
       - name: Configure and Build ZeroFG
         run: |
           cd zerofg-src
+          INSTALL_DIR="$PWD/install"
 
           NDK_ROOT=$ANDROID_NDK/toolchains/llvm/prebuilt/linux-x86_64
           TOOLCHAIN=$NDK_ROOT/bin
@@ -82,7 +82,7 @@ jobs:
 
           export SYSTEM_LDFLAGS="--target=aarch64-linux-android30 -L$TERMUX_PREFIX/lib -Wl,-rpath=/system/lib64:/vendor/lib64:/vendor/lib64/egl:/apex/com.android.i18n/lib64:$RUNTIME_PATH/lib -Wl,--no-as-needed -lEGL -landroid-shmem -ldrm -lwayland-client"
 
-          # CMake 구성 명령어 적용
+          # CMake 구성 (Cmake 내부에 절대 설치 경로 지정)
           cmake -S . -B build -G Ninja \
             -DCMAKE_TOOLCHAIN_FILE=$ANDROID_NDK/build/cmake/android.toolchain.cmake \
             -DANDROID_ABI=arm64-v8a \
@@ -93,13 +93,11 @@ jobs:
             -DCMAKE_C_FLAGS="-fPIC -D__TERMUX__ -D__USE_GNU -U__ANDROID__ -include fcntl.h -include unistd.h" \
             -DCMAKE_CXX_FLAGS="-fPIC -D__TERMUX__ -D__USE_GNU -U__ANDROID__ -include fcntl.h -include unistd.h" \
             -DCMAKE_SHARED_LINKER_FLAGS="$SYSTEM_LDFLAGS" \
-            -DCMAKE_INSTALL_PREFIX=$RUNTIME_PATH
+            -DCMAKE_INSTALL_PREFIX="$INSTALL_DIR"
 
-          # 빌드 명령어 실행
+          # 빌드 및 설치 실행
           cmake --build build
-
-          # 설치 경로로 빌드 결과물 패키징 준비
-          DESTDIR=$PWD/install cmake --install build
+          cmake --install build
 
       - name: Show Files
         run: |
