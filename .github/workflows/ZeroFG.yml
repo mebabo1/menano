@@ -71,6 +71,7 @@ jobs:
         run: |
           cd zerofg-src
           INSTALL_DIR="$PWD/install"
+          mkdir -p $INSTALL_DIR/lib $INSTALL_DIR/include
 
           NDK_ROOT=$ANDROID_NDK/toolchains/llvm/prebuilt/linux-x86_64
           TOOLCHAIN=$NDK_ROOT/bin
@@ -82,7 +83,7 @@ jobs:
 
           export SYSTEM_LDFLAGS="--target=aarch64-linux-android30 -L$TERMUX_PREFIX/lib -Wl,-rpath=/system/lib64:/vendor/lib64:/vendor/lib64/egl:/apex/com.android.i18n/lib64:$RUNTIME_PATH/lib -Wl,--no-as-needed -lEGL -landroid-shmem -ldrm -lwayland-client"
 
-          # CMake 구성 (Cmake 내부에 절대 설치 경로 지정)
+          # CMake 구성
           cmake -S . -B build -G Ninja \
             -DCMAKE_TOOLCHAIN_FILE=$ANDROID_NDK/build/cmake/android.toolchain.cmake \
             -DANDROID_ABI=arm64-v8a \
@@ -92,12 +93,16 @@ jobs:
             -DCMAKE_CXX_COMPILER=$TOOLCHAIN/aarch64-linux-android${API_LEVEL}-clang++ \
             -DCMAKE_C_FLAGS="-fPIC -D__TERMUX__ -D__USE_GNU -U__ANDROID__ -include fcntl.h -include unistd.h" \
             -DCMAKE_CXX_FLAGS="-fPIC -D__TERMUX__ -D__USE_GNU -U__ANDROID__ -include fcntl.h -include unistd.h" \
-            -DCMAKE_SHARED_LINKER_FLAGS="$SYSTEM_LDFLAGS" \
-            -DCMAKE_INSTALL_PREFIX="$INSTALL_DIR"
+            -DCMAKE_SHARED_LINKER_FLAGS="$SYSTEM_LDFLAGS"
 
-          # 빌드 및 설치 실행
+          # 빌드 실행
           cmake --build build
-          cmake --install build
+
+          # 빌드 결과물(정적 라이브러리 및 헤더)을 수동으로 install 폴더로 복사
+          cp build/libzerofg.a $INSTALL_DIR/lib/
+          find src -name "*.h" -exec cp --parents {} $INSTALL_DIR/include/ \;
+          
+          echo "Successfully created install directory and copied assets."
 
       - name: Show Files
         run: |
