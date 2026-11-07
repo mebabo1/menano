@@ -9,6 +9,7 @@ pkg install wget -y
 apt -f install -y
 pkg install openssl nano pulseaudio -y
 termux-setup-storage
+termux-setup-microphone
 termux-change-repo
 pkg upgrade -y
 pkg install termux-am x11-repo -y
