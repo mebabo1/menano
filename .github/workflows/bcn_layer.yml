@@ -1,4 +1,4 @@
-name: Build EGLWrapper for Termux aarch64
+name: Build locale and locale-gen for Termux aarch64
 
 on:
   push:
@@ -8,7 +8,7 @@ permissions:
   contents: read
 
 jobs:
-  build-wrapper:
+  build-locale:
     runs-on: ubuntu-22.04
 
     env:
@@ -19,14 +19,10 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Clone EGLWrapper
-        run: |
-          git clone --depth 1 https://github.com/Pipetto-crypto/EGLWrapper.git wrapper-src
-
       - name: Install Host Dependencies
         run: |
           sudo apt update
-          sudo apt install -y git wget unzip pkg-config make
+          sudo apt install -y wget unzip make
 
       - name: Download Android NDK
         run: |
@@ -35,40 +31,194 @@ jobs:
           unzip -q android-ndk-${ANDROID_NDK_VERSION}-linux.zip
           echo "ANDROID_NDK=/tmp/android-ndk-${ANDROID_NDK_VERSION}" >> $GITHUB_ENV
 
-      - name: Download and extract termuxfs for aarch64
+      - name: Prepare Source Code
         run: |
-          mkdir -p $HOME/termuxfs/aarch64
-          cd $HOME/termuxfs/aarch64
-          wget -q https://github.com/ziad9267/termux-on-gha/releases/download/test/termuxfs.tar
-          tar -xf termuxfs.tar
-          
-          echo "TERMUX_PREFIX=$HOME/termuxfs/aarch64/data/data/com.termux/files/usr" >> $GITHUB_ENV
-          echo "RUNTIME_PATH=/data/data/com.termux/files/usr" >> $GITHUB_ENV
+          mkdir -p locale-src
+          cd locale-src
 
-      - name: Build Wrapper Via Make Overrides
+          # 1. Termux(Bionic) 호환 locale C 바이너리 소스 생성
+          cat << 'EOF' > locale.c
+          #include <stdio.h>
+          #include <stdlib.h>
+          #include <string.h>
+          #include <locale.h>
+          #include <langinfo.h>
+
+          static const char *lc_vars[] = {
+              "LC_CTYPE",
+              "LC_NUMERIC",
+              "LC_TIME",
+              "LC_COLLATE",
+              "LC_MONETARY",
+              "LC_MESSAGES",
+              "LC_PAPER",
+              "LC_NAME",
+              "LC_ADDRESS",
+              "LC_TELEPHONE",
+              "LC_MEASUREMENT",
+              "LC_IDENTIFICATION"
+          };
+
+          static const char *SUPPORTED_LOCALES[] = {
+              "C",
+              "C.UTF-8",
+              "POSIX",
+              "en_US.UTF-8",
+              "ko_KR.UTF-8",
+              "ja_JP.UTF-8",
+              "zh_CN.UTF-8",
+              "zh_TW.UTF-8",
+              NULL
+          };
+
+          static void print_usage(void) {
+              printf("Usage: locale [OPTION...] [NAME]\n");
+              printf("Get locale-specific information for Termux (aarch64).\n\n");
+              printf("  -a, --all-locales    Write names of available locales\n");
+              printf("  -m, --charmaps       Write names of available charmaps\n");
+              printf("  -c, --category-name  Write names of selected categories\n");
+              printf("  -k, --keyword-name   Write names of selected keywords\n");
+              printf("  -h, --help           Give this help list\n");
+          }
+
+          static void print_all_locales(void) {
+              const char *prefix = getenv("PREFIX");
+              char gen_path[512];
+              FILE *fp = NULL;
+
+              if (prefix) {
+                  snprintf(gen_path, sizeof(gen_path), "%s/etc/locale.gen", prefix);
+                  fp = fopen(gen_path, "r");
+              }
+
+              if (fp) {
+                  char line[256];
+                  while (fgets(line, sizeof(line), fp)) {
+                      char *p = line;
+                      while (*p == ' ' || *p == '\t') p++;
+                      if (*p == '#' || *p == '\n' || *p == '\0') continue;
+                      char loc[128];
+                      if (sscanf(p, "%127s", loc) == 1) {
+                          printf("%s\n", loc);
+                      }
+                  }
+                  fclose(fp);
+                  return;
+              }
+
+              for (int i = 0; SUPPORTED_LOCALES[i] != NULL; i++) {
+                  printf("%s\n", SUPPORTED_LOCALES[i]);
+              }
+          }
+
+          static void print_current_locale(void) {
+              const char *lang = getenv("LANG");
+              const char *lc_all = getenv("LC_ALL");
+              const char *effective_lang = (lang && *lang) ? lang : "C.UTF-8";
+
+              printf("LANG=%s\n", lang ? lang : "");
+
+              for (size_t i = 0; i < sizeof(lc_vars) / sizeof(lc_vars[0]); i++) {
+                  const char *val = getenv(lc_vars[i]);
+                  if (lc_all && *lc_all) {
+                      printf("%s=\"%s\"\n", lc_vars[i], lc_all);
+                  } else if (val && *val) {
+                      printf("%s=\"%s\"\n", lc_vars[i], val);
+                  } else {
+                      printf("%s=\"%s\"\n", lc_vars[i], effective_lang);
+                  }
+              }
+
+              printf("LC_ALL=%s\n", lc_all ? lc_all : "");
+          }
+
+          int main(int argc, char *argv[]) {
+              setlocale(LC_ALL, "");
+
+              if (argc > 1) {
+                  if (strcmp(argv[1], "-a") == 0 || strcmp(argv[1], "--all-locales") == 0) {
+                      print_all_locales();
+                      return 0;
+                  } else if (strcmp(argv[1], "-m") == 0 || strcmp(argv[1], "--charmaps") == 0) {
+                      printf("UTF-8\nASCII\n");
+                      return 0;
+                  } else if (strcmp(argv[1], "-h") == 0 || strcmp(argv[1], "--help") == 0) {
+                      print_usage();
+                      return 0;
+                  } else if (strcmp(argv[1], "-k") == 0 && argc > 2 && strcmp(argv[2], "charmap") == 0) {
+                      printf("charmap=\"UTF-8\"\n");
+                      return 0;
+                  }
+              }
+
+              print_current_locale();
+              return 0;
+          }
+          EOF
+
+          # 2. Termux용 locale-gen 스크립트 생성
+          cat << 'EOF' > locale-gen
+          #!/data/data/com.termux/files/usr/bin/sh
+          PREFIX="${PREFIX:-/data/data/com.termux/files/usr}"
+          LOCALE_GEN_FILE="$PREFIX/etc/locale.gen"
+          LOCALE_DIR="$PREFIX/share/locale"
+
+          mkdir -p "$PREFIX/etc" "$LOCALE_DIR"
+
+          if [ ! -f "$LOCALE_GEN_FILE" ]; then
+              cat << 'CONF' > "$LOCALE_GEN_FILE"
+          # Termux locale.gen configuration
+          en_US.UTF-8 UTF-8
+          ko_KR.UTF-8 UTF-8
+          CONF
+              echo "Created default $LOCALE_GEN_FILE"
+          fi
+
+          echo "Generating locales..."
+          while IFS= read -r line || [ -n "$line" ]; do
+              trimmed=$(echo "$line" | sed 's/^[[:space:]]*//')
+              case "$trimmed" in
+                  ""|\#*) continue ;;
+              esac
+              loc=$(echo "$trimmed" | awk '{print $1}')
+              charset=$(echo "$trimmed" | awk '{print $2}')
+              charset="${charset:-UTF-8}"
+              mkdir -p "$LOCALE_DIR/$loc"
+              echo "  $loc ($charset)... done"
+          done < "$LOCALE_GEN_FILE"
+          echo "Generation complete."
+          EOF
+
+      - name: Build aarch64 Binaries via NDK
         run: |
-          cd wrapper-src
-          
+          cd locale-src
           NDK_ROOT=$ANDROID_NDK/toolchains/llvm/prebuilt/linux-x86_64
           TOOLCHAIN=$NDK_ROOT/bin
-          
-          make \
-            CXX="$TOOLCHAIN/aarch64-linux-android${API_LEVEL}-clang++" \
-            CXXFLAGS="-std=c++17 -fPIC --target=aarch64-linux-android${API_LEVEL} -D__TERMUX__ -D__USE_GNU -U__ANDROID__ -DEGL_EGLEXT_PROTOTYPES -DGL_GLEXT_PROTOTYPES -isystem $TERMUX_PREFIX/include -idirafter $NDK_ROOT/sysroot/usr/include -include fcntl.h -include unistd.h" \
-            LDFLAGS="-shared --target=aarch64-linux-android${API_LEVEL} -nostdlib++ -L$TERMUX_PREFIX/lib -Wl,-rpath=/system/lib64:$RUNTIME_PATH/lib -landroid-shmem -lc++_shared -lxcb -lxcb-sync -lxcb-present -lxcb-dri3 -lX11 -lX11-xcb -landroid"
 
-      - name: Packaging Clean Symlinks
+          # aarch64 ELF 바이너리 컴파일
+          $TOOLCHAIN/aarch64-linux-android${API_LEVEL}-clang \
+            -O2 -Wall -fPIE -pie \
+            --target=aarch64-linux-android${API_LEVEL} \
+            -D__TERMUX__ \
+            locale.c -o locale
+
+          $TOOLCHAIN/llvm-strip locale
+          chmod 755 locale locale-gen
+
+      - name: Package Output
         run: |
-          cd wrapper-src
-          mkdir -p output/lib
-          cp libEGL.so.1.0.0 output/lib/
-          
-          cd output/lib
-          ln -sf libEGL.so.1.0.0 libEGL.so.1
-          ln -sf libEGL.so.1.0.0 libEGL.so
+          cd locale-src
+          mkdir -p output/bin output/etc
+          cp locale output/bin/
+          cp locale-gen output/bin/
+
+          cat << 'EOF' > output/etc/locale.gen
+          en_US.UTF-8 UTF-8
+          ko_KR.UTF-8 UTF-8
+          EOF
 
       - name: Upload Artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: termux-egl-wrapper
-          path: wrapper-src/output/
+          name: termux-locale-aarch64
+          path: locale-src/output/
